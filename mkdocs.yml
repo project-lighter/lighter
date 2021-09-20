@@ -1,0 +1,10 @@
+site_name: pytorchito
+  
+nav:
+    - Home: index.md
+    - Installation: installation.md
+
+theme: readthedocs
+
+markdown_extensions:
+    - admonition
