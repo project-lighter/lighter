@@ -1,15 +1,9 @@
-from pytorchito.engines.trainer import Trainer
-from pytorchito.engines.validator_tester import Tester
-from pytorchito.engines.inferer import Inferer
-
-
-ENGINES = {
-    'train': Trainer,
-    'test': Tester,
-    'infer': Inferer
-}
-
+from pytorchito.utils.io import import_attr
+from pytorchito.configs.utils import init_config
+from pytorchito.configs.config import Config
 
 
 def init_engine(mode, omegaconf_args):
-    pass
+    conf = init_config(omegaconf_args, config_class=Config)
+    engine = import_attr(conf[mode].engine)
+    return engine(conf)
