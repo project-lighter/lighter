@@ -9,9 +9,9 @@ class Trainer(BaseEngine):
 
         self.dataloader = self._get_dataloader()
         self.optimizer = instantiate(conf.train.optimizer, self.model.parameters())
-        self.criteria = instantiate_dict_list_union(conf.train.criteria)
+        self.criteria = instantiate_dict_list_union(conf.train.criteria, to_dict=True)
         if conf.train.metrics:
-            self.metrics = instantiate_dict_list_union(conf.train.metrics)
+            self.metrics = instantiate_dict_list_union(conf.train.metrics, to_dict=True)
 
     def run(self):
         self.logger.info('Training started.')
@@ -20,7 +20,7 @@ class Trainer(BaseEngine):
             self._run_epoch()
 
     def _run_epoch(self):
-        running_loss = 0
+        running_loss = {name: 0 for name in self.criteria.keys()}
 
         for input, target in self.dataloader:
             input = input.to(self.device)
@@ -29,12 +29,17 @@ class Trainer(BaseEngine):
             self.optimizer.zero_grad()
             out = self.model(input)
 
-            loss = sum([criterion(out, target) for criterion in self.criteria])
-            loss.backward()
+            loss = {}
+            for name, criterion in self.criteria.items():
+                loss[name] = criterion(out, target)
+                running_loss[name] += loss[name].item()
+
+            sum(loss.values()).backward()
             self.optimizer.step()
 
-            running_loss += loss.item()
-        print("Running", running_loss)
+        for name in running_loss:
+            running_loss[name] /= len(self.dataloader)
+        print(running_loss)
 
     def _get_mode(self):
         self.conf._mode = "train"

@@ -9,7 +9,7 @@ import torchvision
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from pytorchito.utils import sliding_window_inferer, communication
+from pytorchito.utils import communication
 from pytorchito.utils.io import instantiate, instantiate_dict_list_union
 from catalyst.data.sampler import DistributedSamplerWrapper
 
@@ -62,8 +62,7 @@ class BaseEngine(ABC):
                 if hasattr(dataset, name):
                     setattr(dataset, name, transform)
                 else:
-                    raise ValueError("asdafda")
-                    logger.exception(f"`{name}` specified in the config but the dataset "
+                    raise ValueError(f"`{name}` specified in the config but the dataset "
                                      f"`{type(dataset).__name__}`` does not have that option")
 
         # Sampler
@@ -79,9 +78,9 @@ class BaseEngine(ABC):
             ddp_batch_size = self.conf[self.conf._mode].batch_size
             ddp_batch_size *= communication.get_world_size()
             if ddp_batch_size > len(dataset):
-                logger.exception(f"Dataset has {len(dataset)} examples, while the effective "
-                                f"batch size equals to {ddp_batch_size}. Distributed mode does "
-                                f"not work as expected in this situation.")
+                raise ValueError(f"Dataset has {len(dataset)} examples, while the effective "
+                                 f"batch size equals to {ddp_batch_size}. Distributed mode does "
+                                 f"not work as expected in this situation.")
 
             if sampler is not None:
                 sampler = DistributedSamplerWrapper(sampler,
