@@ -1,12 +1,11 @@
-import torch
 from pytorchito.engines.base import BaseEngine
-from pytorchito.utils.io import instantiate, instantiate_dict_list_union
+from pytorchito.utils.importing import instantiate, instantiate_dict_list_union
 
 
 class Trainer(BaseEngine):
+
     def __init__(self, conf):
         super().__init__(conf)
-
         self.dataloader = self._get_dataloader()
         self.optimizer = instantiate(conf.train.optimizer, self.model.parameters())
         self.criteria = instantiate_dict_list_union(conf.train.criteria, to_dict=True)
@@ -41,5 +40,5 @@ class Trainer(BaseEngine):
             running_loss[name] /= len(self.dataloader)
         print(running_loss)
 
-    def _get_mode(self):
-        self.conf._mode = "train"
+    def _set_mode(self):
+        self.conf["_mode"] = "train"

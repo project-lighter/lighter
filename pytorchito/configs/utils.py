@@ -22,6 +22,7 @@ def init_config(omegaconf_args, config_class):
 
     return conf
 
+
 def import_project_as_module(project):
     assert isinstance(project, str), "project needs to be a str path"
 

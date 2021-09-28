@@ -6,10 +6,10 @@
 # - `reduce` and `all_reduce` for various datatypes
 # - `shared_random_seed` uses `torch.distributed.broadcast` instead of `all_gather` from Detectron2.
 
-from loguru import logger
 import os
 import functools
 
+from loguru import logger
 import torch
 import numpy as np
 
@@ -103,7 +103,7 @@ def shared_random_seed() -> int:
     All workers must call this function, otherwise it will deadlock.
     Returns
     -------
-    A random number that is the same across all workers. If workers need a shared RNG, 
+    A random number that is the same across all workers. If workers need a shared RNG,
     they can use this shared seed to create one.
     """
     # torch.Generator advises to use a high values as seed, hence 2**31
@@ -131,7 +131,6 @@ def _get_global_gloo_group():
 
 
 def gather(input_data):
-    # TODO: Assert for PyTorch version since `gather_object` present from 1.8.0
     if get_world_size() < 2:
         return input_data
 
@@ -142,9 +141,9 @@ def gather(input_data):
         gather_list = [None for _ in range(get_world_size())]
         torch.distributed.gather_object(input_data, gather_list, dst=0, group=group)
         return gather_list
-    else:
-        torch.distributed.gather_object(input_data, dst=0, group=group)
-        return input_data
+
+    torch.distributed.gather_object(input_data, dst=0, group=group)
+    return input_data
 
 
 # ------------ Reduce and All Reduce --------------
@@ -152,8 +151,8 @@ def gather(input_data):
 
 def reduce(input_data, average=False, all_reduce=False):
     """
-    Interface function for performing reduce on any type of 
-    data [int, float, tensor, dict, list, tuple] by summing or 
+    Interface function for performing reduce on any type of
+    data [int, float, tensor, dict, list, tuple] by summing or
     averaging the value(s) using one of the methods:
 
     (1) rank 0 reduce (torch.distributed.reduce):
@@ -209,8 +208,8 @@ def reduce_tensor(tensor, average, all_reduce, device):
 
 
 def reduce_int_float(input_value, average, all_reduce, device):
-    """Reduce an integer or float by converting it to tensor, 
-    performing reduction and, finally, casting it back to the initial type. 
+    """Reduce an integer or float by converting it to tensor,
+    performing reduction and, finally, casting it back to the initial type.
     """
     data_type = type(input_value)  # save the original data type
     tensor = torch.Tensor([input_value])  # convert to tensor
@@ -221,7 +220,7 @@ def reduce_int_float(input_value, average, all_reduce, device):
 
 def reduce_dict(input_dict, average, all_reduce, device):
     """ Reduce a dict by extracting all of its values into a tensor and communicating it.
-    Returns a dict with the same fields as input_dict, after reduction. If its values were 
+    Returns a dict with the same fields as input_dict, after reduction. If its values were
     int or float, they are converted to tensors.
     """
     names = []
@@ -249,8 +248,7 @@ def reduce_dict(input_dict, average, all_reduce, device):
     if average and (get_rank() == 0 or all_reduce):
         values /= get_world_size()
 
-    reduced_dict = {k: v for k, v in zip(names, values)}
-    return reduced_dict
+    return dict(zip(names, values))
 
 
 def reduce_list_tuple(input_data, average, all_reduce, device):
