@@ -42,8 +42,6 @@ class BaseEngine(ABC):
         return instantiate(self.conf[self.conf["_mode"]].model).to(self.device)
 
     def _init_dataloader(self):
-        """
-        """
         shuffle = self.conf["_mode"] == "train"
 
         # Dataset

@@ -2,7 +2,7 @@ project: ./projects/cifar10
 task: classification
 
 train:
-    batch_size: 2
+    batch_size: 128
     epochs: 100
     num_workers: 4
     pin_memory: True
@@ -25,7 +25,7 @@ train:
 
     sampler: null
 
-    optimizer:
+    optimizers:
         _target_: torch.optim.Adam
         lr: 0.001
         weight_decay: 1e-5

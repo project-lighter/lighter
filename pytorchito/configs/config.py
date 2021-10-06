@@ -17,7 +17,7 @@ class TrainConfig:
     transform: Optional[Any] = None  # Union[Dict, List[Dict]]
     target_transform: Optional[Any] = None  # Union[Dict, List[Dict]]
     sampler: Optional[Dict] = None
-    optimizer: Any = MISSING
+    optimizers: Optional[Any] = None  # Union[Dict, List[Dict]]
     criteria: Any = MISSING  # Union[Dict, List[Dict]]
     metrics: Optional[Any] = None  # Union[Dict, List[Dict]]
 
