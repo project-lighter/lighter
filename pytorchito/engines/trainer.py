@@ -6,7 +6,7 @@ class Trainer(BaseEngine):
 
     def __init__(self, conf):
         super().__init__(conf)
-        self.dataloader = self._get_dataloader()
+        self.dataloader = self._init_dataloader()
         self.optimizer = instantiate(conf.train.optimizer, self.model.parameters())
         self.criteria = instantiate_dict_list_union(conf.train.criteria, to_dict=True)
         if conf.train.metrics:

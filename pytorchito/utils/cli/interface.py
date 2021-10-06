@@ -5,7 +5,7 @@ from pytorchito.engines.utils import init_engine
 # Interface
 @click.group()
 def interface():
-    """pytorchito - simple and extensible classification and regression."""
+    """pytorchito"""
 
 
 # Train

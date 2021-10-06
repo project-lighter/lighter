@@ -19,11 +19,8 @@ class BaseEngine(ABC):
         # deep copy to isolate the conf.mode of an engine from other engines (e.g train from val)
         self.conf = copy.deepcopy(conf)
         self._set_mode()
-
-        # self.output_dir = Path(conf[conf.mode].output_dir) / self.conf.mode
-
         self.device = self._get_device()
-        self.model = self._get_model()
+        self.model = self._init_model()
 
         self.logger = logger
 
@@ -41,10 +38,10 @@ class BaseEngine(ABC):
             return torch.device('cuda:0')  # single GPU training
         return torch.device('cpu')
 
-    def _get_model(self):
+    def _init_model(self):
         return instantiate(self.conf[self.conf["_mode"]].model).to(self.device)
 
-    def _get_dataloader(self):
+    def _init_dataloader(self):
         """
         """
         shuffle = self.conf["_mode"] == "train"

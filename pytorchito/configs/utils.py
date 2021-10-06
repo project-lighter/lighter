@@ -7,6 +7,18 @@ from omegaconf import OmegaConf
 
 
 def init_config(omegaconf_args, config_class):
+    """Loads a YAML config file specified with 'config' key in command line arguments,
+    type checks it against the config's dataclass, and parses the remaining comand line
+    arguments as config options.
+
+    Args:
+        omegaconf_args (list): list of command line arguments.
+        config_class (dataclass): config's dataclass, used for static type checking by OmegaConf.
+
+    Returns:
+        omegaconf.DictConfig: configuration
+    """
+
     cli = OmegaConf.from_dotlist(omegaconf_args)
     assert "config" in cli, "Please provide path to a YAML config using `config` option."
 
@@ -24,6 +36,11 @@ def init_config(omegaconf_args, config_class):
 
 
 def import_project_as_module(project):
+    """Given the path to the project, import it as a module with name 'project'.
+
+    Args:
+        project (str): path to the project that will be loaded as module.
+    """
     assert isinstance(project, str), "project needs to be a str path"
 
     # Import project as module with name "project", https://stackoverflow.com/a/41595552
@@ -34,5 +51,4 @@ def import_project_as_module(project):
     spec.loader.exec_module(project_module)
     sys.modules["project"] = project_module
 
-    logger.info(f"Project directory {project} added to the"
-                " path to allow imports of modules from it.")
+    logger.info(f"Project directory {project} added as a module with name 'project'.")
