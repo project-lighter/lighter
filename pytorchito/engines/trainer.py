@@ -1,23 +1,27 @@
 from tqdm import tqdm
 
 from pytorchito.engines.base import BaseEngine
-from pytorchito.utils.importing import instantiate, instantiate_dict_list_union
+from pytorchito.utils.importing import instantiate_dict_list_union
 
 
 class Trainer(BaseEngine):
 
     def __init__(self, conf):
         super().__init__(conf)
-        self.dataloader = self._init_dataloader()
         self.criteria = self._init_criteria()
         self.optimizers = self._init_optimizers()
-        self.metrics = self._init_metrics()
 
     def run(self):
         self.logger.info('Training started.')
         for epoch in range(1, self.conf.train.epochs + 1):
+            # Train
             log = self._train_epoch(epoch)
             self.logger.info("\n" + ", ".join([f"{k}={v}" for k, v in log.items()]))
+
+            # Validate
+
+            # Save checkpoint
+            self._save_checkpoint()
 
     def _train_epoch(self, epoch):
         total_iters = 0
@@ -51,7 +55,7 @@ class Trainer(BaseEngine):
 
             # Metrics
             for name in self.metrics:
-                self.metrics[name](pred, target)
+                metrics[name] += self.metrics[name](pred, target).item()
 
             # Update counters
             total_iters += 1
@@ -72,12 +76,11 @@ class Trainer(BaseEngine):
         return instantiate_dict_list_union(self.conf.train.criteria, to_dict=True)
 
     def _init_optimizers(self):
-        return instantiate_dict_list_union(self.conf.train.optimizers, self.model.parameters())
+        return instantiate_dict_list_union(self.conf.train.optimizers,
+                                           params=self.model.parameters())
 
-    def _init_metrics(self):
-        if self.conf.train.metrics:
-            return instantiate_dict_list_union(self.conf.train.metrics, to_dict=True)
-        return {}
+    def _save_checkpoint(self):
+        pass
 
     def _set_mode(self):
         self.conf["_mode"] = "train"

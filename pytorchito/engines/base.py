@@ -18,9 +18,13 @@ class BaseEngine(ABC):
     def __init__(self, conf):
         # deep copy to isolate the conf.mode of an engine from other engines (e.g train from val)
         self.conf = copy.deepcopy(conf)
+
         self._set_mode()
         self.device = self._get_device()
+
         self.model = self._init_model()
+        self.dataloader = self._init_dataloader()
+        self.metrics = self._init_metrics()
 
         self.logger = logger
 
@@ -33,13 +37,18 @@ class BaseEngine(ABC):
     def _get_device(self):
         if torch.distributed.is_initialized():
             local_rank = communication.get_local_rank()
-            return torch.device(f"cuda:{local_rank}")  # distributed GPU training
+            return torch.device(f"cuda:{local_rank}")  # distributed GPU mode
         elif self.conf[self.conf["_mode"]].cuda:
-            return torch.device('cuda:0')  # single GPU training
+            return torch.device('cuda:0')  # single GPU mode
         return torch.device('cpu')
 
     def _init_model(self):
         return instantiate(self.conf[self.conf["_mode"]].model).to(self.device)
+
+    def _init_metrics(self):
+        if self.conf[self.conf["_mode"]].metrics:
+            return instantiate_dict_list_union(self.conf[self.conf["_mode"]].metrics, to_dict=True)
+        return {}
 
     def _init_dataloader(self):
         shuffle = self.conf["_mode"] == "train"

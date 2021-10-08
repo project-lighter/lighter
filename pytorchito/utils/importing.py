@@ -1,3 +1,5 @@
+import inspect
+from functools import partial
 from omegaconf import OmegaConf, ListConfig, DictConfig
 
 
@@ -15,25 +17,29 @@ def import_attr(module_attr):
     return getattr(module, attr)
 
 
-def instantiate(conf, *args, **kwargs):
-    """Instantiates a class defined in config. Config's `_target_` specifies which class to
-    construct. Remaining options are passed to the object's constructor.
+def instantiate(conf, **kwargs):
+    """Instantiates a class or function defined in config. Config's `_target_` specifies what
+    to construct. Additional keyword arguments can be passed too.
 
     Args:
         conf (omegaconf.DictConfig): Object's config.
-        *args (any, optional): Positional arguments to be passed to the object's constructor.
-        **kwargs (any, optional): Keyword arguments to be passed to the object's constructor.
+        **kwargs (any, optional): Keyword arguments to be passed to the class or function.
 
     Returns:
-        object: Object of type specified with `_target_`, instantiated with config, and,
-            optionally, positional or keyword arguments.
+        object or partial function: If '_target_' is a class, then it returns an object of
+        that class, instantiated with config, and, optionally, keyword arguments. 
+        Otherwise, the '_target_' is a function and it returns a partial function options
+        fixed as specified in conf and keyword arguments.
     """
     conf = OmegaConf.to_container(conf)
-    klass = import_attr(conf.pop("_target_"))
-    return klass(*args, **conf, **kwargs)
+    attr = import_attr(conf.pop("_target_"))
+    if inspect.isclass(attr):
+        return attr(**conf, **kwargs)
+    # Set the specified config and keyword arguments to the function by creating a partial function
+    return partial(attr, **conf, **kwargs)
 
 
-def instantiate_dict_list_union(conf, *args, to_dict=False, **kwargs):
+def instantiate_dict_list_union(conf, to_dict=False, **kwargs):
     """In config, some options like `criteria` can be either a single
     criterion (a DictConfig), or multiple criteria (a ListConfig of
     DictConfigs). This function instantiates objects from such options.
@@ -42,7 +48,6 @@ def instantiate_dict_list_union(conf, *args, to_dict=False, **kwargs):
         conf (omegaconf.DictConfig or omegaconf.ListConfig): Object's config.
         to_dict (bool, optional): If True, the function will return a dictionary of objects
             with their names as dict keys instead of a list of objects. Defaults to False.
-        *args (any, optional): Positional arguments to be passed to the object's constructor.
         **kwargs (any, optional): Keyword arguments to be passed to the object's constructor.
 
     Returns:
@@ -53,8 +58,11 @@ def instantiate_dict_list_union(conf, *args, to_dict=False, **kwargs):
 
     conf = [conf] if isinstance(conf, (DictConfig)) else conf
 
-    instantiated = [instantiate(c, *args, **kwargs) for c in conf]
+    instantiated = [instantiate(c, **kwargs) for c in conf]
+
     if to_dict:
-        instantiated = {type(instance).__name__: instance for instance in instantiated}
+        # If partial fn, get the name of the base fn. Otherwise, it's an object, get the type name.
+        get_name = lambda x: x.func.__name__ if isinstance(x, partial) else type(x).__name__
+        instantiated = {get_name(instance): instance for instance in instantiated}
 
     return instantiated
