@@ -1,7 +1,9 @@
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
+
 class System(pl.LightningModule):
+
     def __init__(self,
                  model,
                  batch_size,
@@ -38,7 +40,7 @@ class System(pl.LightningModule):
         # Losses
         #losses = {name: criterion(y_hat, y) for name, criterion in self.criteria.items()}
         losses = [criterion(y_hat, y) for criterion in self.criteria]
-        losses = sum(losses) # temporary
+        losses = sum(losses)  # temporary
         #losses["loss"] = sum(losses.values())
 
         # Metrics
@@ -46,7 +48,7 @@ class System(pl.LightningModule):
 
         #self.log_dict(losses | metrics, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log("loss", losses)
-        return losses# | metrics
+        return losses  # | metrics
 
     # def training_step_end(self):
 
@@ -75,10 +77,10 @@ class System(pl.LightningModule):
 
     def train_dataloader(self):
         return self._get_dataloader("train")
-    
+
     def val_dataloader(self):
         return self._get_dataloader("val")
-    
+
     def test_dataloader(self):
         return self._get_dataloader("test")
 

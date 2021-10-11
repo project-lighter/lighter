@@ -21,11 +21,13 @@ def train(omegaconf_args):
 def validate(omegaconf_args):
     run('validate', omegaconf_args)
 
+
 # Test
 @interface.command(help="Test a trained model.")
 @click.argument("omegaconf_args", nargs=-1)
 def test(omegaconf_args):
     run('test', omegaconf_args)
+
 
 # Tune
 @interface.command(help="TODO")
