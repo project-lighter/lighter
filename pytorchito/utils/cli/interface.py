@@ -1,5 +1,5 @@
 import click
-from pytorchito.engines.utils import init_engine
+from pytorchito.runner import run
 
 
 # Interface
@@ -12,21 +12,26 @@ def interface():
 @interface.command(help="Train a model.")
 @click.argument("omegaconf_args", nargs=-1)
 def train(omegaconf_args):
-    init_engine('train', omegaconf_args).run()
+    run('fit', omegaconf_args)
 
+
+# Validate
+@interface.command(help="TODO")
+@click.argument("omegaconf_args", nargs=-1)
+def validate(omegaconf_args):
+    run('validate', omegaconf_args)
 
 # Test
 @interface.command(help="Test a trained model.")
 @click.argument("omegaconf_args", nargs=-1)
 def test(omegaconf_args):
-    init_engine('test', omegaconf_args).run()
+    run('test', omegaconf_args)
 
-
-# Infer
-@interface.command(help="Infer with a trained model.")
+# Tune
+@interface.command(help="TODO")
 @click.argument("omegaconf_args", nargs=-1)
-def infer(omegaconf_args):
-    init_engine('infer', omegaconf_args).run()
+def tune(omegaconf_args):
+    run('tune', omegaconf_args)
 
 
 if __name__ == "__main__":

@@ -1,56 +1,21 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
-from omegaconf import MISSING
+from typing import Any, Dict, Optional
 
+from omegaconf import MISSING, OmegaConf
 
-@dataclass
-class TrainConfig:
-    engine: str = "pytorchito.engines.Trainer"
-    epochs: int = MISSING
-    batch_size: int = MISSING
-    cuda: bool = True
-    num_workers: int = 0
-    pin_memory: bool = True
+import pytorch_lightning as pl
 
-    model: Dict = MISSING
-    dataset: Dict = MISSING
-    transform: Optional[Any] = None  # Union[Dict, List[Dict]]
-    target_transform: Optional[Any] = None  # Union[Dict, List[Dict]]
-    sampler: Optional[Dict] = None
-    optimizers: Optional[Any] = None  # Union[Dict, List[Dict]]
-    criteria: Any = MISSING  # Union[Dict, List[Dict]]
-    metrics: Optional[Any] = None  # Union[Dict, List[Dict]]
+from pytorchito import System
+from pytorchito.configs.utils import generate_omegaconf_dataclass
 
+OmegaConf.register_new_resolver("get_model_parameters", lambda x: x.parameters())
 
-@dataclass
-class ValidationConfig:
-    engine: str = "pytorchito.engines.Validator"
-    dataset: Dict = MISSING
-    criteria: Any = MISSING  # Union[Dict, List[Dict]]
-    metrics: Optional[Any] = None  # Union[Dict, List[Dict]]
-
-
-@dataclass
-class TestConfig:
-    engine: str = "pytorchito.engines.Tester"
-    dataset: Dict = MISSING
-    metrics: Any = MISSING  # Union[Dict, List[Dict]]
-    checkpoint: str = MISSING
-
-
-@dataclass
-class InferenceConfig:
-    engine: str = "pytorchito.engines.Inferer"
-    checkpoint: str = MISSING
-
+TrainerConfig = generate_omegaconf_dataclass("TrainerConfig", pl.Trainer)
+SystemConfig = generate_omegaconf_dataclass("SystemConfig", System)
 
 @dataclass
 class Config:
-    _mode: str = "train"
     project: Optional[str] = None
-    task: str = MISSING
 
-    train: Optional[TrainConfig] = None
-    val: Optional[ValidationConfig] = None
-    test: Optional[TestConfig] = None
-    infer: Optional[InferenceConfig] = None
+    trainer: TrainerConfig = TrainerConfig()
+    system: SystemConfig = SystemConfig()

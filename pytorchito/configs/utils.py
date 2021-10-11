@@ -1,9 +1,12 @@
-import sys
 import importlib
+import inspect
+import sys
+import typing
+from dataclasses import make_dataclass
 from pathlib import Path
 
 from loguru import logger
-from omegaconf import OmegaConf
+from omegaconf import MISSING, OmegaConf
 
 
 def init_config(omegaconf_args, config_class):
@@ -52,3 +55,39 @@ def import_project_as_module(project):
     sys.modules["project"] = project_module
 
     logger.info(f"Project directory {project} added as a module with name 'project'.")
+
+
+def generate_omegaconf_dataclass(dataclass_name, source):
+    """Generate a dataclass compatible with OmegaConf that has attributes name, type and value
+    as specified in the source's arguments. If a default value is not specified, OmegaConf's
+    "MISSING" is set instead. If an attribute has no type specified, then it is set to typing.Any.
+    Similarly, attributes that can have multiple types, achieved through Union, will also become
+    typing.Any since OmegaConf doesn't support Union yet.
+
+    Args:
+        dataclass_name (str): desired name of the dataclass.
+        source (class or function): source of attributes for the dataclass.
+    Returns:
+        dataclass: dataclass class (not object).
+    """
+
+    # If partial fn, get the name of the base fn. Otherwise, it's an object, get the type name.
+    fields = [("_target_", str, f"{source.__module__}.{source.__name__}")]
+    for param in inspect.signature(source).parameters.values():
+        # Name
+        name = param.name
+        if name in ["args", "kwargs"]:
+            continue
+
+        # Type
+        annotation = param.annotation
+        if annotation is param.empty:
+            annotation = typing.Any
+        if str(annotation).startswith("typing.Union"):
+            annotation = typing.Any  # TODO: Get rid of this when OmegaConf supports Union
+
+        # Default value
+        default_value = param.default if not param.default is param.empty else MISSING
+
+        fields.append((name, annotation, default_value))
+    return make_dataclass(dataclass_name, fields)
