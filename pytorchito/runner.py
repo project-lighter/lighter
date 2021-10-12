@@ -17,8 +17,8 @@ def run(mode, omegaconf_args):
 
     trainer = instantiate(conf.trainer)
     system = instantiate(conf.system, optimizers=None)
-    # Workaround for https://tinyurl.com/psv9mbub (including the `optimizers=None` above)
+    # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.2.0
+    # https://github.com/facebookresearch/hydra/issues/1758
     system.optimizers = instantiate(conf.system.optimizers, system.model.parameters())
 
-    assert mode in ["fit", "validate", "test", "tune"], f"Trainer does not have a '{mode}' method."
     getattr(trainer, mode)(system)

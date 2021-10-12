@@ -9,7 +9,7 @@ def interface():
 
 
 # Train
-@interface.command(help="Train a model.")
+@interface.command(help="TODO")
 @click.argument("omegaconf_args", nargs=-1)
 def train(omegaconf_args):
     run('fit', omegaconf_args)
@@ -21,9 +21,14 @@ def train(omegaconf_args):
 def validate(omegaconf_args):
     run('validate', omegaconf_args)
 
+# Test
+@interface.command(help="TODO")
+@click.argument("omegaconf_args", nargs=-1)
+def predict(omegaconf_args):
+    run('predict', omegaconf_args)
 
 # Test
-@interface.command(help="Test a trained model.")
+@interface.command(help="TODO")
 @click.argument("omegaconf_args", nargs=-1)
 def test(omegaconf_args):
     run('test', omegaconf_args)

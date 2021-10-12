@@ -1,5 +1,10 @@
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from omegaconf import ListConfig
+# Get the name of an object, class or function
+get_name = lambda x: type(x).__name__ if isinstance(x, object) else x.__name__
+# Wrap into a list if it is not a list or None
+wrap_into_list = lambda x: x if isinstance(x, (list, ListConfig)) or x is None else [x]
 
 
 class System(pl.LightningModule):
@@ -9,7 +14,7 @@ class System(pl.LightningModule):
                  batch_size,
                  num_workers,
                  pin_memory,
-                 criteria=None,
+                 criterion=None,
                  optimizers=None,
                  schedulers=None,
                  metrics=None,
@@ -22,51 +27,51 @@ class System(pl.LightningModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
-        self.criteria = criteria
-        self.optimizers = optimizers
-        self.schedulers = schedulers
-        self.metrics = metrics
+
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+
+        self.criterion = criterion
+        self.optimizers = wrap_into_list(optimizers)
+        self.schedulers = wrap_into_list(schedulers)
+        self.metrics = wrap_into_list(metrics)
 
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
+        return self._step(batch, batch_idx, mode="train")
+
+    def validation_step(self, batch, batch_idx):
+        return self._step(batch, batch_idx, mode="val")
+
+    def test_step(self, batch, batch_idx):
+        return self._step(batch, batch_idx, mode="test")
+
+    def _step(self, batch, batch_idx, mode="train"):
+        assert mode in ["train", "val", "test"]
+
+        output = {"batch_idx": batch_idx}
+        logs = {}
+
         x, y = batch
         y_hat = self(x)
 
-        # Losses
-        #losses = {name: criterion(y_hat, y) for name, criterion in self.criteria.items()}
-        losses = [criterion(y_hat, y) for criterion in self.criteria]
-        losses = sum(losses)  # temporary
-        #losses["loss"] = sum(losses.values())
+        # Loss
+        if mode != "test":
+            loss = self.criterion(y_hat, y)
+            output["loss"] = loss
+            logs[f"{mode}/loss"] = loss
 
         # Metrics
-        #metrics = {}
-
-        #self.log_dict(losses | metrics, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log("loss", losses)
-        return losses  # | metrics
-
-    # def training_step_end(self):
-
-    # def training_epoch_end(self):
-
-    def validation_step(self, batch, batch_idx):
-        pass
-
-    # def validation_step_end(self):
-
-    # def validation_epoch_end(self):
-
-    def test_step(self, batch, batch_idx):
-        pass
-
-    # def test_step_end(self):
-
-    # def test_epoch_end(self):
+        output["metrics"] = {get_name(metric): metric(y_hat, y) for metric in self.metrics}
+        logs.update({f"{mode}/metric/{k}": v for k, v in output["metrics"].items()})
+        
+        # Other (text, images, ...
+        on_step = on_epoch = None if mode == "test" else True
+        self.log_dict(logs, on_step=on_step, on_epoch=on_epoch)
+        return output
 
     def configure_optimizers(self):
         if self.optimizers is None:

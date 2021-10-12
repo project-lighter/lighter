@@ -2,7 +2,7 @@ project: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 2
+    max_epochs: 10
     gpus: 0
     accelerator: null
 
@@ -15,22 +15,22 @@ system:
     model:
         _target_: project.models.net.Net
 
+    criterion:
+        _target_: torch.nn.CrossEntropyLoss
+
     optimizers:
         _target_: torch.optim.Adam
         #_args_: ${get_model_parameters:${system.model}}
         lr: 0.001
         weight_decay: 1e-5
 
-    criteria:  # A Union of a single criterion or list of criteria
-        - _target_: torch.nn.CrossEntropyLoss
-        - _target_: torch.nn.CrossEntropyLoss
-
     metrics:  # A Union of a single metric or list of metrics
-        _target_: torchmetrics.Accuracy
+        - _target_: torchmetrics.Accuracy
+        - _target_: torchmetrics.F1
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: True
+        download: False
         root: ./.datasets/
         train: True
         transform:
@@ -44,7 +44,7 @@ system:
     
     val_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: True
+        download: False
         root: ./.datasets/
         train:  False  # Same as test, for prototyping purposes only
         transform:
@@ -58,7 +58,7 @@ system:
     
     test_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: True
+        download: False
         root: ./.datasets/
         train: False
         transform:
