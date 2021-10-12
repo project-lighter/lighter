@@ -1,6 +1,6 @@
 from hydra.utils import instantiate
 
-from pytorchito.configs import Config, init_config
+from lightningbringer.configs import Config, init_config
 
 
 def run(mode, omegaconf_args):
@@ -8,7 +8,7 @@ def run(mode, omegaconf_args):
 
     Args:
         mode (str): train/val/test/infer mode of running.
-        omegaconf_args (list): list of arguments passed in pytorchito's CLI
+        omegaconf_args (list): list of arguments passed in lightningbringer's CLI
 
     Returns:
         object: instance of the engine specified under the `engine` option in config.

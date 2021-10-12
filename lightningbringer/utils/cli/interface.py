@@ -1,11 +1,11 @@
 import click
-from pytorchito.runner import run
+from lightningbringer.runner import run
 
 
 # Interface
 @click.group()
 def interface():
-    """pytorchito"""
+    """lightningbringer"""
 
 
 # Train

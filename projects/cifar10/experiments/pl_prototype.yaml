@@ -7,7 +7,7 @@ trainer:
     accelerator: null
 
 system:
-    _target_: pytorchito.System
+    _target_: lightningbringer.System
     batch_size: 128
     pin_memory: True
     num_workers: 4
