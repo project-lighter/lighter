@@ -1,26 +1,33 @@
+from typing import Callable, List, Optional, Union
+
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from omegaconf import ListConfig
+from torch.nn import Module
+from torch.optim import Optimizer
+from torch.utils.data import DataLoader, Dataset
+
 # Get the name of an object, class or function
 get_name = lambda x: type(x).__name__ if isinstance(x, object) else x.__name__
 # Wrap into a list if it is not a list or None
-wrap_into_list = lambda x: x if isinstance(x, (list, ListConfig)) or x is None else [x]
+wrap_into_list = lambda x: x if isinstance(x, list) or x is None else [x]
 
 
 class System(pl.LightningModule):
 
     def __init__(self,
-                 model,
-                 batch_size,
-                 num_workers,
-                 pin_memory,
-                 criterion=None,
-                 optimizers=None,
-                 schedulers=None,
-                 metrics=None,
-                 train_dataset=None,
-                 val_dataset=None,
-                 test_dataset=None):
+                 model: Module,
+                 batch_size: int,
+                 num_workers: int = 0,
+                 pin_memory: bool = True,
+                 criterion: Optional[Callable] = None,
+                 optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
+                 schedulers: Optional[Union[Callable, List[Callable]]] = None,
+                 metrics: Optional[Union[Callable, List[Callable]]] = None,
+                 train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+                 val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+                 test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+                 log_input_as: Optional[str] = None,
+                 log_target_as: Optional[str] = None,
+                 log_pred_as: Optional[str] = None):
 
         super().__init__()
         self.model = model
@@ -36,6 +43,10 @@ class System(pl.LightningModule):
         self.optimizers = wrap_into_list(optimizers)
         self.schedulers = wrap_into_list(schedulers)
         self.metrics = wrap_into_list(metrics)
+
+        self.log_input_as = log_input_as
+        self.log_target_as = log_target_as
+        self.log_pred_as = log_pred_as
 
     def forward(self, x):
         return self.model(x)
@@ -55,22 +66,26 @@ class System(pl.LightningModule):
         output = {"batch_idx": batch_idx}
         logs = {}
 
-        x, y = batch
-        y_hat = self(x)
+        input, target = batch
+        pred = self(input)
 
         # Loss
         if mode != "test":
-            loss = self.criterion(y_hat, y)
+            loss = self.criterion(pred, target)
             output["loss"] = loss
             logs[f"{mode}/loss"] = loss
 
         # Metrics
-        output["metrics"] = {get_name(metric): metric(y_hat, y) for metric in self.metrics}
-        logs.update({f"{mode}/metric/{k}": v for k, v in output["metrics"].items()})
-        
-        # Other (text, images, ...
-        on_step = on_epoch = None if mode == "test" else True
+        output["metrics"] = {get_name(metric): metric(pred, target) for metric in self.metrics}
+        logs.update({f"{mode}/metric_{k}": v for k, v in output["metrics"].items()})
+
+        # Other (text, images, ...)
+
+        # ...
+
+        on_step = on_epoch = (None if mode == "test" else True)
         self.log_dict(logs, on_step=on_step, on_epoch=on_epoch)
+        #self.logger.experiment.log_image("")
         return output
 
     def configure_optimizers(self):

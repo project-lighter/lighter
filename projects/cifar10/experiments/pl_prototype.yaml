@@ -1,10 +1,18 @@
-project: ./projects/cifar10
+project: /mnt/particija/lightningbringer/projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 10
     gpus: 0
     accelerator: null
+    logger:
+        - _target_: pytorch_lightning.loggers.TensorBoardLogger
+          save_dir: ./
+          name: tensorboard
+
+        - _target_: pytorch_lightning.loggers.WandbLogger
+          save_dir: ./
+
 
 system:
     _target_: lightningbringer.System
@@ -31,7 +39,7 @@ system:
     train_dataset:
         _target_: torchvision.datasets.CIFAR10
         download: False
-        root: ./.datasets/
+        root: /mnt/particija/lightningbringer/.datasets/
         train: True
         transform:
             _target_: torchvision.transforms.Compose
@@ -45,7 +53,7 @@ system:
     val_dataset:
         _target_: torchvision.datasets.CIFAR10
         download: False
-        root: ./.datasets/
+        root: /mnt/particija/lightningbringer/.datasets/
         train:  False  # Same as test, for prototyping purposes only
         transform:
             _target_: torchvision.transforms.Compose
@@ -59,7 +67,7 @@ system:
     test_dataset:
         _target_: torchvision.datasets.CIFAR10
         download: False
-        root: ./.datasets/
+        root: /mnt/particija/lightningbringer/.datasets/
         train: False
         transform:
             _target_: torchvision.transforms.Compose

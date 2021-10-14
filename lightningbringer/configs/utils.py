@@ -61,8 +61,10 @@ def generate_omegaconf_dataclass(dataclass_name, source):
     """Generate a dataclass compatible with OmegaConf that has attributes name, type and value
     as specified in the source's arguments. If a default value is not specified, OmegaConf's
     "MISSING" is set instead. If an attribute has no type specified, then it is set to typing.Any.
-    Similarly, attributes that can have multiple types, achieved through Union, will also become
-    typing.Any since OmegaConf doesn't support Union yet.
+    Furthermore, if the type is a non-builtin class, it will be changed to typing.Dict, since
+    that class will be instantiated using the '_target_' key in the instance configuration.
+    Attributes that can have different types, achieved through Union, will become typing.Any 
+    since OmegaConf doesn't support Union yet.
 
     Args:
         dataclass_name (str): desired name of the dataclass.
@@ -81,10 +83,18 @@ def generate_omegaconf_dataclass(dataclass_name, source):
 
         # Type
         annotation = param.annotation
+        # If annotation is empty, set it to Any
         if annotation is param.empty:
             annotation = typing.Any
+        # If annotation is a non-builtin class, set it to Dict. This is because
+        # the class is specified via '_target_' key in the config, along with other
+        # arguments for its instantiation.
+        if inspect.isclass(annotation) and annotation.__module__ != "builtins":
+            print(annotation)
+            annotation = typing.Dict
+        # TODO: Get rid of this when OmegaConf supports Union
         if str(annotation).startswith("typing.Union"):
-            annotation = typing.Any  # TODO: Get rid of this when OmegaConf supports Union
+            annotation = typing.Any
 
         # Default value
         default_value = param.default if not param.default is param.empty else MISSING

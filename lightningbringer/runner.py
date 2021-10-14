@@ -15,10 +15,12 @@ def run(mode, omegaconf_args):
     """
     conf = init_config(omegaconf_args, config_class=Config)
 
-    trainer = instantiate(conf.trainer)
-    system = instantiate(conf.system, optimizers=None)
+    trainer = instantiate(conf.trainer, _convert_="all")
+    system = instantiate(conf.system, optimizers=None, _convert_="all")
     # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.2.0
     # https://github.com/facebookresearch/hydra/issues/1758
-    system.optimizers = instantiate(conf.system.optimizers, system.model.parameters())
+    system.optimizers = instantiate(conf.system.optimizers,
+                                    system.model.parameters(),
+                                    _convert_="all")
 
     getattr(trainer, mode)(system)

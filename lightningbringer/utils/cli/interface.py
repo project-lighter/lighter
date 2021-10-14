@@ -21,11 +21,13 @@ def train(omegaconf_args):
 def validate(omegaconf_args):
     run('validate', omegaconf_args)
 
+
 # Test
 @interface.command(help="TODO")
 @click.argument("omegaconf_args", nargs=-1)
 def predict(omegaconf_args):
     run('predict', omegaconf_args)
+
 
 # Test
 @interface.command(help="TODO")
