@@ -134,3 +134,4 @@ lightning_logs/
 logs/
 wandb/
 tensorboard/
+.vscode/
