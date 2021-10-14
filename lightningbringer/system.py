@@ -1,7 +1,7 @@
 from typing import Callable, List, Optional, Union
 
 import pytorch_lightning as pl
-from torch.nn import Module
+from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset
 
@@ -42,7 +42,7 @@ class System(pl.LightningModule):
         self.criterion = criterion
         self.optimizers = wrap_into_list(optimizers)
         self.schedulers = wrap_into_list(schedulers)
-        self.metrics = wrap_into_list(metrics)
+        self.metrics = ModuleList(wrap_into_list(metrics))
 
         self.log_input_as = log_input_as
         self.log_target_as = log_target_as
@@ -68,12 +68,12 @@ class System(pl.LightningModule):
 
         input, target = batch
         pred = self(input)
+        output.update({"input": input, "target": target, "pred": pred.detach()})
 
         # Loss
         if mode != "test":
             loss = self.criterion(pred, target)
-            output["loss"] = loss
-            logs[f"{mode}/loss"] = loss
+            output["loss"] = logs[f"{mode}/loss"] = loss
 
         # Metrics
         output["metrics"] = {get_name(metric): metric(pred, target) for metric in self.metrics}

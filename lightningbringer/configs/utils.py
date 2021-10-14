@@ -86,11 +86,10 @@ def generate_omegaconf_dataclass(dataclass_name, source):
         # If annotation is empty, set it to Any
         if annotation is param.empty:
             annotation = typing.Any
-        # If annotation is a non-builtin class, set it to Dict. This is because
-        # the class is specified via '_target_' key in the config, along with other
-        # arguments for its instantiation.
+        # If an annotation is a class (but not a builtin one), set it to Dict.
+        # This is because, in config, we can define an instance by specifying 
+        # its arguments and '_target_' key, which refers to the instance's class.
         if inspect.isclass(annotation) and annotation.__module__ != "builtins":
-            print(annotation)
             annotation = typing.Dict
         # TODO: Get rid of this when OmegaConf supports Union
         if str(annotation).startswith("typing.Union"):

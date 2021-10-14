@@ -2,23 +2,25 @@ project: /mnt/particija/lightningbringer/projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 10
+    max_epochs: 50
     gpus: 0
     accelerator: null
+    default_root_dir: ./logs
     logger:
         - _target_: pytorch_lightning.loggers.TensorBoardLogger
-          save_dir: ./
+          save_dir: ${trainer.default_root_dir}
           name: tensorboard
 
         - _target_: pytorch_lightning.loggers.WandbLogger
-          save_dir: ./
+          save_dir: ${trainer.default_root_dir}
 
 
 system:
     _target_: lightningbringer.System
-    batch_size: 128
+    batch_size: 512
     pin_memory: True
     num_workers: 4
+    log_input_as: "image"
 
     model:
         _target_: project.models.net.Net
