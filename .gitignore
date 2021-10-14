@@ -128,4 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-MNIST_dataset
+# Custom
+lightning_logs/
+.datasets/
+logs/
+wandb/
+tensorboard/

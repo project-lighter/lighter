@@ -33,7 +33,9 @@ train:
     criteria:  # A Union of a single criterion or list of criteria
         _target_: torch.nn.CrossEntropyLoss
 
-    metrics: null  # A Union of a single metric or list of metrics
+    metrics:  # A Union of a single metric or list of metrics
+        _target_: torchmetrics.functional.accuracy
+        average: none
 
 val:
     dataset:
