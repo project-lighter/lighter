@@ -1,3 +1,4 @@
+import functools
 from typing import Callable, List, Optional, Union
 
 import pytorch_lightning as pl
@@ -5,10 +6,7 @@ from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset
 
-# Get the name of an object, class or function
-get_name = lambda x: type(x).__name__ if isinstance(x, object) else x.__name__
-# Wrap into a list if it is not a list or None
-wrap_into_list = lambda x: x if isinstance(x, list) or x is None else [x]
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, wrap_into_list)
 
 
 class System(pl.LightningModule):
@@ -108,7 +106,12 @@ class System(pl.LightningModule):
         dataset = getattr(self, f"{name}_dataset")
         if dataset is None:
             raise ValueError(f"Please specify '{name}_dataset'")
+
+        # A dataset can return None when a corrupted example occurs. This collate
+        # function replace them with valid examples from the dataset.
+        collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
-                          pin_memory=self.pin_memory)
+                          pin_memory=self.pin_memory,
+                          collate_fn=collate_fn)
