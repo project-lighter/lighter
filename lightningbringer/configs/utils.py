@@ -1,11 +1,7 @@
-import importlib
 import inspect
-import sys
 import typing
 from dataclasses import make_dataclass
-from pathlib import Path
 
-from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
 
@@ -40,7 +36,7 @@ def generate_omegaconf_dataclass(dataclass_name, source):
     "MISSING" is set instead. If an attribute has no type specified, then it is set to typing.Any.
     Furthermore, if the type is a non-builtin class, it will be changed to typing.Dict, since
     that class will be instantiated using the '_target_' key in the instance configuration.
-    Attributes that can have different types, achieved through Union, will become typing.Any 
+    Attributes that can have different types, achieved through Union, will become typing.Any
     since OmegaConf doesn't support Union yet.
 
     Args:
@@ -63,7 +59,7 @@ def generate_omegaconf_dataclass(dataclass_name, source):
         if annotation is param.empty:
             annotation = typing.Any
         # If an annotation is a class (but not a builtin one), set it to Dict.
-        # This is because, in config, we can define an instance as a dict that 
+        # This is because, in config, we can define an instance as a dict that
         # specifies its arguments and class type (with '_target_' key).
         if inspect.isclass(annotation) and annotation.__module__ != "builtins":
             annotation = typing.Dict
