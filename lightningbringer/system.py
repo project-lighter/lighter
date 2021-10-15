@@ -48,33 +48,26 @@ class System(pl.LightningModule):
         self.log_target_as = log_target_as
         self.log_pred_as = log_pred_as
 
+        # Placeholders for these methods. They are actually defined in `self.setup()`.
+        # We do this to prevent PyTorch Lightning from complaining about not having
+        # these methods defined since it checks for them before calling self.setup().
+        self.train_dataloader = lambda: None
+        self.training_step = lambda: None
+
     def forward(self, x):
         return self.model(x)
 
     def _step(self, batch, batch_idx, mode):
-        output = {"batch_idx": batch_idx}
-        logs = {}
-
         input, target = batch
         pred = self(input)
-        output.update({"input": input, "target": target, "pred": pred.detach()})
 
-        # Loss
+        loss = self.criterion(pred, target) if mode != "test" else None
+
+        metrics = [metric(pred, target) for metric in self.metrics]
+
+        self._log(mode, input, target, pred, metrics, loss)
         if mode != "test":
-            loss = self.criterion(pred, target)
-            output["loss"] = logs[f"{mode}/loss"] = loss
-
-        # Metrics
-        output["metrics"] = {get_name(metric): metric(pred, target) for metric in self.metrics}
-        logs.update({f"{mode}/metric_{k}": v for k, v in output["metrics"].items()})
-
-        # Other (text, images, ...)
-        # ...
-
-        on_step = on_epoch = (None if mode == "test" else True)
-        self.log_dict(logs, on_step=on_step, on_epoch=on_epoch)
-        #self.logger.experiment.log_image("")
-        return output
+            return loss
 
     def _dataloader(self, mode):
         """Instantiate the dataloader for a mode (train/val/test).
@@ -101,19 +94,11 @@ class System(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.optimizers is None:
-            logger.error("Please specify 'optimizers' in config. Exiting.")
+            logger.error("Please specify 'optimizers' in the config. Exiting.")
             sys.exit()
         if self.schedulers is None:
             return self.optimizers
         return self.optimizers, self.schedulers
-
-    # Placeholder, the method is actually defined in `self.setup()`. Prevents PL from complaining.
-    def training_step(self, batch, batch_idx):
-        pass
-
-    # Placeholder, the method is actually defined in `self.setup()`. Prevents PL from complaining.
-    def train_dataloader(self):
-        pass
 
     def setup(self, stage):
         dataset_required_by_stage = {
@@ -123,7 +108,7 @@ class System(pl.LightningModule):
         }
         dataset_name = dataset_required_by_stage[stage]
         if getattr(self, dataset_name) is None:
-            logger.error(f"Please specify '{dataset_name}' in config. Exiting.")
+            logger.error(f"Please specify '{dataset_name}' in the config. Exiting.")
             sys.exit()
 
         # Definition of stage-specific PyTorch Lightning methods.
@@ -142,3 +127,33 @@ class System(pl.LightningModule):
         if stage == "test":
             self.test_dataloader = functools.partial(self._dataloader, mode="test")
             self.test_step = functools.partial(self._step, mode="test")
+
+    def _log(self, mode, input, target, pred, metrics=None, loss=None):
+
+        def log_by_type(data, name, data_type, on_step=True, on_epoch=True):
+            assert data_type in [None, "scalar", "image"]  # , ...]
+
+            if data_type == "scalar":
+                self.log(f"{mode}/{name}", data, on_step=on_step, on_epoch=on_epoch)
+
+            elif data_type == "image":
+                # Waiting for PL 1.5:
+                # https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
+                raise NotImplementedError()
+                #self.logger.experiment.log_image(...)
+
+        # Loss
+        if loss is not None:
+            log_by_type(loss, name="loss", data_type="scalar")
+
+        # Metrics
+        if metrics is not None:
+            for i in range(len(metrics)):
+                metric = metrics[i]
+                name = f"metric_{get_name(self.metrics[i])}"
+                log_by_type(metric, name=name, data_type="scalar")
+
+        # # Input, target, pred
+        # log_by_type(input, name="input", data_type=self.log_input_as)
+        # log_by_type(target, name="target", data_type=self.log_target_as)
+        # log_by_type(pred, name="pred", data_type=self.log_pred_as)

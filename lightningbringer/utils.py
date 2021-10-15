@@ -34,10 +34,10 @@ def collate_fn_replace_corrupted(batch, dataset):
     batch = list(filter(lambda x: x is not None, batch))
     filtered_batch_len = len(batch)
     # Num of corrupted examples
-    diff = original_batch_len - filtered_batch_len
-    if diff > 0:
-        # Replace corrupted examples with another examples randomly
-        batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(diff)])
+    num_corrupted = original_batch_len - filtered_batch_len
+    if num_corrupted > 0:
+        # Replace a corrupted example with another randomly selected example
+        batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(num_corrupted)])
         # Recursive call to replace the replacements if they are corrupted
         return collate_fn_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, return it
