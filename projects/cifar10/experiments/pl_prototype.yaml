@@ -20,7 +20,7 @@ system:
     batch_size: 512
     pin_memory: True
     num_workers: 4
-    log_input_as: "image"
+    log_input_as: "image_batch"
 
     model:
         _target_: project.models.net.Net
@@ -30,11 +30,10 @@ system:
 
     optimizers:
         _target_: torch.optim.Adam
-        #_args_: ${get_model_parameters:${system.model}}
         lr: 0.001
         weight_decay: 1e-5
 
-    metrics:  # A Union of a single metric or list of metrics
+    metrics:
         - _target_: torchmetrics.Accuracy
         - _target_: torchmetrics.F1
 

@@ -3,12 +3,16 @@ import sys
 from typing import Callable, List, Optional, Union
 
 import pytorch_lightning as pl
+import torch
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset
+import torchvision
 from loguru import logger
+import wandb
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, wrap_into_list)
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
+                                    wrap_into_list, preprocess_image)
 
 
 class System(pl.LightningModule):
@@ -53,6 +57,8 @@ class System(pl.LightningModule):
         # these methods defined since it checks for them before calling self.setup().
         self.train_dataloader = lambda: None
         self.training_step = lambda: None
+        # Temporary, see self._log() for more comments
+        self.next_epoch = 1
 
     def forward(self, x):
         return self.model(x)
@@ -62,7 +68,6 @@ class System(pl.LightningModule):
         pred = self(input)
 
         loss = self.criterion(pred, target) if mode != "test" else None
-
         metrics = [metric(pred, target) for metric in self.metrics]
 
         self._log(mode, input, target, pred, metrics, loss)
@@ -87,6 +92,7 @@ class System(pl.LightningModule):
         # function replaces them with valid examples from the dataset.
         collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
+                          shuffle=(mode == "train"),
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           pin_memory=self.pin_memory,
@@ -131,29 +137,39 @@ class System(pl.LightningModule):
     def _log(self, mode, input, target, pred, metrics=None, loss=None):
 
         def log_by_type(data, name, data_type, on_step=True, on_epoch=True):
-            assert data_type in [None, "scalar", "image"]  # , ...]
-
+            # Scalars
             if data_type == "scalar":
-                self.log(f"{mode}/{name}", data, on_step=on_step, on_epoch=on_epoch)
-
-            elif data_type == "image":
-                # Waiting for PL 1.5:
-                # https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
-                raise NotImplementedError()
-                #self.logger.experiment.log_image(...)
+                self.log(name, data, on_step=on_step, on_epoch=on_epoch)
+            
+            # Temporary, support for Wandb only, until PL 1.5:
+            # https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
+            # Images
+            elif self.logger is not None and str(data_type).startswith("image"):
+                for lgr in self.logger:
+                    image = data[0:1] if data_type == "image_single" else data
+                    if isinstance(lgr, pl.loggers.WandbLogger):
+                        # Once per epoch
+                        if self.current_epoch == self.next_epoch:
+                            lgr.experiment.log({name: wandb.Image(image)})
+                            self.next_epoch += 1
+            else:
+                raise NotImplementedError(f"'data_type' {data_type} not supported.")
 
         # Loss
         if loss is not None:
-            log_by_type(loss, name="loss", data_type="scalar")
+            log_by_type(loss, name=f"{mode}/loss", data_type="scalar")
 
         # Metrics
-        if metrics is not None:
+        if metrics:
             for i in range(len(metrics)):
                 metric = metrics[i]
-                name = f"metric_{get_name(self.metrics[i])}"
+                name = f"{mode}/metric_{get_name(self.metrics[i])}"
                 log_by_type(metric, name=name, data_type="scalar")
 
         # # Input, target, pred
-        # log_by_type(input, name="input", data_type=self.log_input_as)
-        # log_by_type(target, name="target", data_type=self.log_target_as)
-        # log_by_type(pred, name="pred", data_type=self.log_pred_as)
+        if self.log_input_as is not None:
+            log_by_type(input, name=f"{mode}/input", data_type=self.log_input_as)
+        if self.log_target_as is not None:
+            log_by_type(target, name=f"{mode}/target", data_type=self.log_target_as)
+        if self.log_pred_as is not None:
+            log_by_type(pred, name=f"{mode}/pred", data_type=self.log_pred_as)

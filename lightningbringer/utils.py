@@ -1,7 +1,7 @@
 import random
 
 import torch
-
+import torchvision
 
 def get_name(x):
     # Get the name of an object, class or function
@@ -42,3 +42,16 @@ def collate_fn_replace_corrupted(batch, dataset):
         return collate_fn_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, return it
     return torch.utils.data.dataloader.default_collate(batch)
+
+
+def preprocess_image(image):
+    image = image.detach().cpu()
+    # 3D image (NCDHW)
+    if image.ndim == 5:
+        shape = image.shape
+        image = image.view(shape[0], shape[1], shape[2] * shape[3], shape[4])
+    # If more than one image, create a grid
+    if image.shape[0] > 1:
+        nrow = 1 if image.ndim == 5 else 8
+        image = torchvision.utils.make_grid(image, nrow=nrow)
+    return image
