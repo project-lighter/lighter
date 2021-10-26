@@ -11,8 +11,8 @@ import torchvision
 from loguru import logger
 import wandb
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
-                                    wrap_into_list, preprocess_image)
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, wrap_into_list,
+                                    preprocess_image)
 
 
 class System(pl.LightningModule):
@@ -52,13 +52,10 @@ class System(pl.LightningModule):
         self.log_target_as = log_target_as
         self.log_pred_as = log_pred_as
 
-        # Placeholders for these methods. They are actually defined in `self.setup()`.
-        # We do this to prevent PyTorch Lightning from complaining about not having
-        # these methods defined since it checks for them before calling self.setup().
+        # `train_dataloader()`and `training_step()` are defined in `self.setup()`.
+        #  LightningModule checks for them at init, these prevent it from complaining.
         self.train_dataloader = lambda: None
         self.training_step = lambda: None
-        # Temporary, see self._log() for more comments
-        self.next_epoch = 1
 
     def forward(self, x):
         return self.model(x)
@@ -140,20 +137,19 @@ class System(pl.LightningModule):
             # Scalars
             if data_type == "scalar":
                 self.log(name, data, on_step=on_step, on_epoch=on_epoch)
-            
-            # Temporary, support for Wandb only, until PL 1.5:
-            # https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
+
+            # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
             # Images
-            elif self.logger is not None and str(data_type).startswith("image"):
+            elif data_type in ["image_single", "image_batch"]:
                 for lgr in self.logger:
                     image = data[0:1] if data_type == "image_single" else data
+                    image = preprocess_image(image)
                     if isinstance(lgr, pl.loggers.WandbLogger):
-                        # Once per epoch
-                        if self.current_epoch == self.next_epoch:
+                        # Temporary, log every 50 steps
+                        if self.global_step % 50:
                             lgr.experiment.log({name: wandb.Image(image)})
-                            self.next_epoch += 1
             else:
-                raise NotImplementedError(f"'data_type' {data_type} not supported.")
+                raise NotImplementedError(f"'data_type' '{data_type}' not supported.")
 
         # Loss
         if loss is not None:
@@ -163,10 +159,10 @@ class System(pl.LightningModule):
         if metrics:
             for i in range(len(metrics)):
                 metric = metrics[i]
-                name = f"{mode}/metric_{get_name(self.metrics[i])}"
-                log_by_type(metric, name=name, data_type="scalar")
+                name = get_name(self.metrics[i])
+                log_by_type(metric, name=f"{mode}/metric_{name}", data_type="scalar")
 
-        # # Input, target, pred
+        # Input, target, pred
         if self.log_input_as is not None:
             log_by_type(input, name=f"{mode}/input", data_type=self.log_input_as)
         if self.log_target_as is not None:

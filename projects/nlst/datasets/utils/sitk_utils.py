@@ -8,10 +8,7 @@ import numpy as np
 
 
 def load(file_path):
-    reader = sitk.ImageFileReader()
-    reader.SetFileName(str(file_path))
-    sitk_image = reader.Execute()
-    return sitk_image
+    return sitk.ReadImage(str(file_path))
 
 
 def write(sitk_image, file_path):
@@ -39,13 +36,10 @@ def get_size(sitk_image):
 
 
 def get_torch_like_size(sitk_image):
-    """Get volume size in torch format (e.g. zxy instead of xyz)."""
-    # TODO: does sitk image to tensor produce zxy or zyx?
+    """Get volume size in torch format - (D)HW instead of WH(D)."""
     size = get_size(sitk_image)
-    if len(size) == 3:
-        return (size[2], size[0], size[1])
-    elif len(size) == 2:
-        return size
+    if len(size) in [2, 3]:
+        return size[::-1]
     else:
         raise NotImplementedError(f"Not implemented for {len(size)} dimensions.")
 

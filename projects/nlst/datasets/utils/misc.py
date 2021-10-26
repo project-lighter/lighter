@@ -11,7 +11,7 @@ def get_bounding_box_of_mask(mask):
     start = bounding_box[:3]
     # Obtain the end index by summing up the start index and the size of the bounding box for each coordinate
     end = bounding_box[3:]
-    end = [sum(pair) for pair in zip(start, end)]
+    end = tuple([sum(pair) for pair in zip(start, end)])
     return start, end
 
 
@@ -30,5 +30,7 @@ def pad(volume, target_shape):
             pad_width.append(pad_total % 2 + pad_per_side)
         else:
             pad_width.extend([0, 0])
+    # functional.pad() pads from last dimension to first, reversing the order of padding
+    pad_width = pad_width[::-1]
     volume = torch.nn.functional.pad(volume, pad_width, 'constant', value=volume.min())
     return volume.unsqueeze(0)
