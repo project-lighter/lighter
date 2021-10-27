@@ -5,12 +5,12 @@ import torchvision
 
 
 def get_name(x):
-    # Get the name of an object, class or function
+    """ Get the name of an object, class or function."""
     return type(x).__name__ if isinstance(x, object) else x.__name__
 
 
 def wrap_into_list(x):
-    # Wrap into a list if it is not a list or None
+    """Wrap the input into a list if it is not a list or None."""
     return x if isinstance(x, list) or x is None else [x]
 
 
@@ -46,6 +46,17 @@ def collate_fn_replace_corrupted(batch, dataset):
 
 
 def preprocess_image(image):
+    """Preprocess the image for logging. If it is a batch of multiple images images,
+    it will create a grid image of them. In case of 3D, a single image is displayed
+    with slices stacked vertically, while a batch as a grid where each column is
+    a different 3D image.
+
+    Args:
+        image (torch.Tensor): 2D or 3D image tensor.
+
+    Returns:
+        torch.Tensor: image ready for logging.
+    """
     image = image.detach().cpu()
     # 3D image (NCDHW)
     has_three_dims = image.ndim == 5

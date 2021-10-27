@@ -3,16 +3,14 @@ import sys
 from typing import Callable, List, Optional, Union
 
 import pytorch_lightning as pl
-import torch
+import wandb
+from loguru import logger
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset
-import torchvision
-from loguru import logger
-import wandb
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, wrap_into_list,
-                                    preprocess_image)
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, preprocess_image,
+                                    wrap_into_list)
 
 
 class System(pl.LightningModule):
@@ -68,8 +66,8 @@ class System(pl.LightningModule):
         metrics = [metric(pred, target) for metric in self.metrics]
 
         self._log(mode, input, target, pred, metrics, loss)
-        if mode != "test":
-            return loss
+
+        return loss
 
     def _dataloader(self, mode):
         """Instantiate the dataloader for a mode (train/val/test).
@@ -117,9 +115,10 @@ class System(pl.LightningModule):
         # Definition of stage-specific PyTorch Lightning methods.
         # Dynamically defined to enable flexible configuration system.
 
-        # Training methods. They always need to be defined (PyTorch Lightning requirement).
-        self.train_dataloader = functools.partial(self._dataloader, mode="train")
-        self.training_step = functools.partial(self._step, mode="train")
+        # Training methods.
+        if stage == "fit":
+            self.train_dataloader = functools.partial(self._dataloader, mode="train")
+            self.training_step = functools.partial(self._step, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' stage.
         if stage == "validate" or (stage == "fit" and self.val_dataset is not None):
@@ -157,15 +156,12 @@ class System(pl.LightningModule):
 
         # Metrics
         if metrics:
-            for i in range(len(metrics)):
-                metric = metrics[i]
-                name = get_name(self.metrics[i])
+            for metric, metric_fn in zip(metrics, self.metrics):
+                name = get_name(metric_fn)
                 log_by_type(metric, name=f"{mode}/metric_{name}", data_type="scalar")
 
         # Input, target, pred
-        if self.log_input_as is not None:
-            log_by_type(input, name=f"{mode}/input", data_type=self.log_input_as)
-        if self.log_target_as is not None:
-            log_by_type(target, name=f"{mode}/target", data_type=self.log_target_as)
-        if self.log_pred_as is not None:
-            log_by_type(pred, name=f"{mode}/pred", data_type=self.log_pred_as)
+        for key, value in {"input": input, "target": target, "pred": pred}.items():
+            log_as = getattr(self, f"log_{key}_as")
+            if log_as is not None:
+                log_by_type(value, name=f"{mode}/{key}", data_type=log_as)
