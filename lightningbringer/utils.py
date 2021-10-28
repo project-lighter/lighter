@@ -15,15 +15,18 @@ def wrap_into_list(x):
 
 
 def collate_fn_replace_corrupted(batch, dataset):
-    """Collate function that allows to replace corrupted examples in the
-    dataloader. It expect that the dataloader returns 'None' when that occurs.
-    The 'None's in the batch are replaced with another examples sampled randomly.
+    """Collate function that allows to replace corrupted examples in the batch.
+    It expect that the dataloader returns 'None' when that occurs.
+    The 'None's in the batch are replaced with other, randomly-selected, examples.
 
     Args:
         batch (torch.Tensor): batch from the DataLoader.
-        dataset (torch.utils.data.Dataset): dataset from which the DataLoader is loading from.
-            Specify it with functools.partial and pass the resulting partial function that only
-            requires 'batch' argument to DataLoader's 'collate_fn' option.
+        dataset (torch.utils.data.Dataset): dataset that the DataLoader is passing through.
+            Needs to be fixed in place with functools.partial before passing it to DataLoader's
+            'collate_fn' option as 'collate_fn' should only have a single argument - batch.
+            E.g.:
+                collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)
+                loader = DataLoader(dataset, ..., collate_fn=collate_fn)
 
     Returns:
         torch.Tensor: batch with new examples instead of corrupted ones.
@@ -46,7 +49,7 @@ def collate_fn_replace_corrupted(batch, dataset):
 
 
 def preprocess_image(image):
-    """Preprocess the image for logging. If it is a batch of multiple images images,
+    """Preprocess the image for logging. If it is a batch of multiple images,
     it will create a grid image of them. In case of 3D, a single image is displayed
     with slices stacked vertically, while a batch as a grid where each column is
     a different 3D image.

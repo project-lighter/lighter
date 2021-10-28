@@ -1,12 +1,15 @@
+import sys
+
 import click
 from hydra.utils import instantiate
+from loguru import logger
 
 from lightningbringer.config import init_config
 
 
 def run(mode, omegaconf_args):
     conf = init_config(omegaconf_args, log=True)
-    print(type(conf))
+
     # Don't instantiate datasets that won't be used in the run
     train_dataset, val_dataset, test_dataset = None, None, None
     if mode == "fit":
@@ -17,7 +20,8 @@ def run(mode, omegaconf_args):
     elif mode == "test":
         test_dataset = conf.system.test_dataset
     else:
-        raise NotImplementedError(f"No behavior for {mode}.")
+        logger.error(f"No dataset instantiation filter '{mode}' mode. Exiting.")
+        sys.exit()
 
     # Instantiate the Trainer and the System
     trainer = instantiate(conf.trainer, _convert_="all")

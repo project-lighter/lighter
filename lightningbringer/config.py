@@ -11,12 +11,12 @@ from omegaconf import MISSING, OmegaConf
 
 def init_config(omegaconf_args, log=False):
     """Loads a YAML config file specified with 'config' key in command line arguments,
-    type checks it against the config's dataclass, and parses the remaining comand line
-    arguments as config options.
+    parses the remaining comand line arguments as config options, and type checks it
+    against the config's structured dataclass.
 
     Args:
         omegaconf_args (list): list of command line arguments.
-        config_class (dataclass): config's dataclass, used for static type checking by OmegaConf.
+        log (bool): if True, log the config.
 
     Returns:
         omegaconf.DictConfig: configuration
@@ -24,7 +24,7 @@ def init_config(omegaconf_args, log=False):
 
     cli = OmegaConf.from_dotlist(omegaconf_args)
     if cli.get("config", None) is None:
-        logger.info("Please provide the path to a YAML config using `config` option.")
+        logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
 
     conf = OmegaConf.load(cli.pop("config"))
@@ -45,8 +45,8 @@ def init_config(omegaconf_args, log=False):
 def construct_structured_config(conf):
     """Dynamically constructs the structured config which is used as a default base for the config.
     It infers attributes' name, type and default value of any Trainer and System implementation
-    and populates the structured config with it. This provides default values when user hasn't
-    specified them and it allows static type checking of the config.
+    and populates the structured config with it. This provides default values for the config
+    when user hasn't specified or overriden them and it allows static type checking of the config.
 
     Args:
         conf (omegaconf.DictConfig): non-structured config (in OmegaConf's vocabulary).
@@ -72,7 +72,7 @@ def generate_omegaconf_dataclass(dataclass_name, source):
     "MISSING" is set instead. If an attribute has no type specified, then it is set to typing.Any.
     Furthermore, if the type is a non-builtin class, it will be changed to typing.Dict, since
     that class will be instantiated using the '_target_' key in the instance configuration.
-    Attributes that can have different types, achieved through Union, will become typing.Any
+    Attributes that can have different types, achieved using Union, will become typing.Any
     since OmegaConf doesn't support Union yet.
 
     Args:
@@ -118,9 +118,11 @@ def import_project_as_module(project):
     """
     assert isinstance(project, str), "project needs to be a str path"
 
-    # Import project as module with name "project", https://stackoverflow.com/a/41595552
+    # Import project as module with name "project" (https://stackoverflow.com/a/41595552).
     project_path = Path(project).resolve() / "__init__.py"
-    assert project_path.is_file(), f"No `__init__.py` in project `{project_path}`."
+    if not project_path.is_file():
+        logger.error(f"No `__init__.py` in project `{project_path}`. Exiting.")
+        sys.exit()
     spec = importlib.util.spec_from_file_location("project", str(project_path))
     project_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(project_module)

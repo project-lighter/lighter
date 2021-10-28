@@ -50,15 +50,27 @@ class System(pl.LightningModule):
         self.log_target_as = log_target_as
         self.log_pred_as = log_pred_as
 
-        # `train_dataloader()`and `training_step()` are defined in `self.setup()`.
-        #  LightningModule checks for them at init, these prevent it from complaining.
+        # Methods `train_dataloader()`and `training_step()` are defined in `self.setup()`.
+        # LightningModule checks for them at init, these prevent it from complaining.
         self.train_dataloader = lambda: None
         self.training_step = lambda: None
 
     def forward(self, x):
+        """Forward pass. Allows calling self(x) to do it."""
         return self.model(x)
 
     def _step(self, batch, batch_idx, mode):
+        """Step for all modes ('train', 'val', 'test')
+
+        Args:
+            batch (Tuple(torch.Tensor, Any)): output of the DataLoader.
+            batch_idx (int): index of the batch. Not using it, but Pytorch Lightning requires it.
+            mode (str): mode in which the system is. ['train', 'val', 'test']
+
+        Returns:
+            Union[torch.Tensor, None]: returns the calculated loss in training and validation step,
+                and None in test step.
+        """
         input, target = batch
         pred = self(input)
 
@@ -66,7 +78,6 @@ class System(pl.LightningModule):
         metrics = [metric(pred, target) for metric in self.metrics]
 
         self._log(mode, input, target, pred, metrics, loss)
-
         return loss
 
     def _dataloader(self, mode):
@@ -74,13 +85,13 @@ class System(pl.LightningModule):
         Includes a collate function that enables the DataLoader to replace
         None's (alias for corrupted examples) in the batch with valid examples.
         To make use of it, write a try-except in your Dataset that handles
-        corrupted data and returns None instead.
+        corrupted data by returning None instead.
 
         Args:
             mode (str): mode for which to create the dataloader. ['train', 'val', 'test']
 
         Returns:
-            torch.utils.data.DataLoader: instantiated DataLoader
+            torch.utils.data.DataLoader: instantiated DataLoader.
         """
         dataset = getattr(self, f"{mode}_dataset")
         # A dataset can return None when a corrupted example occurs. This collate
@@ -94,6 +105,7 @@ class System(pl.LightningModule):
                           collate_fn=collate_fn)
 
     def configure_optimizers(self):
+        """LightningModule method. Returns optimizers and, if defined, schedulers."""
         if self.optimizers is None:
             logger.error("Please specify 'optimizers' in the config. Exiting.")
             sys.exit()
@@ -102,6 +114,14 @@ class System(pl.LightningModule):
         return self.optimizers, self.schedulers
 
     def setup(self, stage):
+        """LightningModule method. Called after initializing but before running the system.
+        Here, it checks if the required dataset is provided in the config and sets up
+        LightningModule methods for the stage (mode) in which the system is.
+
+        Args:
+            stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test']
+                # TODO: update when all stages included
+        """
         dataset_required_by_stage = {
             "fit": "train_dataset",
             "validate": "val_dataset",
@@ -112,8 +132,8 @@ class System(pl.LightningModule):
             logger.error(f"Please specify '{dataset_name}' in the config. Exiting.")
             sys.exit()
 
-        # Definition of stage-specific PyTorch Lightning methods.
-        # Dynamically defined to enable flexible configuration system.
+        # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
+        # only has methods used in the stage and for which the configuration was provided.
 
         # Training methods.
         if stage == "fit":
@@ -131,8 +151,28 @@ class System(pl.LightningModule):
             self.test_step = functools.partial(self._step, mode="test")
 
     def _log(self, mode, input, target, pred, metrics=None, loss=None):
+        """Log the data from the system.
+
+        Args:
+            mode (str): mode in which the system is. ['train', 'val', 'test']
+            input (torch.Tensor): input data to the model.
+            target (torch.Tensor): target data (label).
+            pred (torch.Tensor): output (prediction) of the model.
+            metrics (List[torch.Tensor], optional): model's metrics. Defaults to None.
+            loss (torch.Tensor, optional): model's loss. Defaults to None.
+        """
 
         def log_by_type(data, name, data_type, on_step=True, on_epoch=True):
+            """Log data according to its type.
+
+            Args:
+                data (Any): data to log.
+                name (str): the name under which the data will be logged.
+                data_type (str): type of the data to be logged.
+                    ['scalar', 'image_batch', 'image_single']  # TODO update when there's more
+                on_step (bool, optional): Log on step. Defaults to True.
+                on_epoch (bool, optional): Log on batch. Defaults to True.
+            """
             # Scalars
             if data_type == "scalar":
                 self.log(name, data, on_step=on_step, on_epoch=on_epoch)
@@ -148,7 +188,8 @@ class System(pl.LightningModule):
                         if self.global_step % 50:
                             lgr.experiment.log({name: wandb.Image(image)})
             else:
-                raise NotImplementedError(f"'data_type' '{data_type}' not supported.")
+                logger.error(f"'type' '{data_type}' not supported. Exiting.")
+                sys.exit()
 
         # Loss
         if loss is not None:
