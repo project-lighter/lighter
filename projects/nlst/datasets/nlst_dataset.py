@@ -9,22 +9,25 @@ from loguru import logger
 
 from .utils import normalization, sitk_utils
 from .utils.misc import get_bounding_box_of_mask, pad
+from .common import get_dataset_split
 
-
-class NLSTDataset:
+class NLSTDataset(torch.utils.data.Dataset):
 
     def __init__(self,
-                 scans_dir,
-                 masks_dir,
-                 labels_path,
+                 root_dir,
                  label,
                  patch_size,
                  hounsfield_units_range,
                  transform=None):
 
-        self.mask_paths = list(Path(masks_dir).glob(f"[!.]*/*.nrrd"))
-        self.scans_dir = Path(scans_dir)
-        self.labels_df = pd.read_csv(labels_path)
+        self.root_dir = Path(root_dir)
+        split = get_dataset_split(self.root_dir / "SelectionTrainTestFinal.csv")
+        self.mask_paths = [self.root_dir / "lung_masks" / image for image in split["tune"]]
+        self.mask_paths = sorted(list(filter(lambda path: path.is_file(), self.mask_paths)))
+
+        self.nlst_labels = pd.read_csv(self.root_dir / "NLST_clinical_whole.csv")
+        self.romans_labels = pd.read_csv(self.root_dir / "SelectionTrainTestFinal.csv")
+
         self.label = label
 
         self.random_patch_sampler = monai.transforms.RandSpatialCrop(patch_size, random_size=False)
@@ -34,7 +37,7 @@ class NLSTDataset:
 
     def __getitem__(self, idx):
         mask_path = self.mask_paths[idx]
-        scan_path = self.scans_dir / mask_path.parent.name / mask_path.name
+        scan_path = self.root_dir / "nrrd" / mask_path.parent / mask_path.name
 
         # Load the scan
         try:
@@ -51,7 +54,7 @@ class NLSTDataset:
             return None
 
         patient_id = scan_path.stem.replace("_img", "")
-        target = self.get_target(patient_id)
+        target = self.get_target(patient_id, self.label)
 
         # Originally, mask has a label for each lung, here we combine them into a single label
         mask = sitk.Clamp(mask, upperBound=1)
@@ -90,12 +93,14 @@ class NLSTDataset:
         tensor = pad(tensor, self.patch_size)
         return tensor, target
 
-    def get_target(self, patient_id):
-        label_value = self.labels_df[self.labels_df.pid == int(patient_id)][self.label]
+    def get_target(self, patient_id, label):
+        patient_id = int(patient_id)
 
-        if self.label == "packyear":
+        if label == "packyear":
+            packyear = self.nlst_labels[self.nlst_labels.pid == int(patient_id)][label]
+            packyear = float(packyear)
+
             NEVER, LIGHT, MODERATE, HEAVY = 0, 1, 2, 3
-            packyear = float(label_value)
             if packyear > 40:
                 return HEAVY
             if packyear > 20:
@@ -104,7 +109,27 @@ class NLSTDataset:
                 return LIGHT
             return NEVER
 
+        elif label == "age":
+            age = self.nlst_labels[self.nlst_labels.pid == patient_id][label]
+            return float(age)
+
+        # Mortality prediction
+        elif label == "fup_days":
+            N_YEARS = 6
+            fup_days = self.nlst_labels[self.nlst_labels.pid == patient_id][label]
+            death = self.romans_labels[self.romans_labels.Patient_ID == patient_id]["Death"]
+            if int(fup_days) < 365.25 * N_YEARS and int(death) == 1:
+                return 1
+            return 0
+
         raise NotImplementedError
+
+    def get_labels(self):
+        labels = []
+        for path in self.mask_paths:
+            patient_id = path.stem.replace("_img", "")
+            labels.append(self.get_target(patient_id, self.label))
+        return labels
 
     def __len__(self):
         return len(self.mask_paths)

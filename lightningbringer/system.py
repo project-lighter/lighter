@@ -1,16 +1,17 @@
-import functools
 import sys
+from functools import partial
 from typing import Callable, List, Optional, Union
 
 import pytorch_lightning as pl
+import torch
 import wandb
 from loguru import logger
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, preprocess_image,
-                                    wrap_into_list)
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
+                                    preprocess_image, wrap_into_list)
 
 
 class System(pl.LightningModule):
@@ -27,6 +28,9 @@ class System(pl.LightningModule):
                  train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+                 train_sampler: Optional[Sampler] = None,
+                 val_sampler: Optional[Sampler] = None,
+                 test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
                  log_pred_as: Optional[str] = None):
@@ -40,6 +44,10 @@ class System(pl.LightningModule):
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+
+        self.train_sampler = train_sampler
+        self.val_sampler = val_sampler
+        self.test_sampler = test_sampler
 
         self.criterion = criterion
         self.optimizers = wrap_into_list(optimizers)
@@ -73,6 +81,21 @@ class System(pl.LightningModule):
         """
         input, target = batch
         pred = self(input)
+        target = target
+
+        # When the task is to predict a single value, pred and target dimensions often
+        # mismatch - dataloader returns the value with shape (B), while the network
+        # return predictions in shape (B, 1), where the second dim is redundant.
+        if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
+            pred = pred.flatten()
+
+        loss = self.criterion(pred, target.to(pred.dtype)) if mode != "test" else None
+
+        # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
+        # sigmoid output layer. However, for correct metric calculation and logging
+        # we apply it after having calculated the loss.
+        if isinstance(loss, torch.nn.BCEWithLogitsLoss):
+            pred = torch.sigmoid(pred)
 
         loss = self.criterion(pred, target) if mode != "test" else None
         metrics = [metric(pred, target) for metric in self.metrics]
@@ -94,11 +117,13 @@ class System(pl.LightningModule):
             torch.utils.data.DataLoader: instantiated DataLoader.
         """
         dataset = getattr(self, f"{mode}_dataset")
+        sampler = getattr(self, f"{mode}_sampler")
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces them with valid examples from the dataset.
-        collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)
+        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
-                          shuffle=(mode == "train"),
+                          sampler=sampler,
+                          shuffle=(mode == "train" and sampler is None),
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           pin_memory=self.pin_memory,
@@ -137,18 +162,18 @@ class System(pl.LightningModule):
 
         # Training methods.
         if stage == "fit":
-            self.train_dataloader = functools.partial(self._dataloader, mode="train")
-            self.training_step = functools.partial(self._step, mode="train")
+            self.train_dataloader = partial(self._dataloader, mode="train")
+            self.training_step = partial(self._step, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' stage.
         if stage == "validate" or (stage == "fit" and self.val_dataset is not None):
-            self.val_dataloader = functools.partial(self._dataloader, mode="val")
-            self.validation_step = functools.partial(self._step, mode="val")
+            self.val_dataloader = partial(self._dataloader, mode="val")
+            self.validation_step = partial(self._step, mode="val")
 
         # Test methods.
         if stage == "test":
-            self.test_dataloader = functools.partial(self._dataloader, mode="test")
-            self.test_step = functools.partial(self._step, mode="test")
+            self.test_dataloader = partial(self._dataloader, mode="test")
+            self.test_step = partial(self._step, mode="test")
 
     def _log(self, mode, input, target, pred, metrics=None, loss=None):
         """Log the data from the system.

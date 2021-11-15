@@ -11,7 +11,7 @@ trainer:
     logger:
         - _target_: pytorch_lightning.loggers.WandbLogger
           save_dir: ${trainer.default_root_dir}
-          project: packyear_4class
+          project: mortality
 
 
 system:
@@ -22,15 +22,17 @@ system:
     log_input_as: "image_single"
 
     model:
-        _target_: monai.networks.nets.EfficientNetBN
+        _target_: project.models.EfficientNet
         model_name: efficientnet-b0
         pretrained: False
         spatial_dims: 3
         in_channels: 1
-        num_classes: 4
+        num_classes: 1
+        last_activation:
+            _target_: torch.nn.Identity
 
     criterion:
-        _target_: torch.nn.CrossEntropyLoss
+        _target_: torch.nn.BCEWithLogitsLoss
 
     optimizers:
         _target_: torch.optim.Adam
@@ -43,9 +45,12 @@ system:
 
     train_dataset:
         _target_: project.datasets.NLSTDataset
-        scans_dir: /mnt/ssd1/NLST/nrrd/
-        masks_dir: /mnt/ssd1/NLST/lung_masks/
-        labels_path: /mnt/ssd1/NLST/NLST_clinical_whole.csv
-        label: packyear
+        root_dir: /mnt/ssd1/NLST/
+        label: fup_days
         hounsfield_units_range: [-1000, 400]
         patch_size: [128, 304, 392]
+
+    train_sampler:
+        _target_: torchsampler.ImbalancedDatasetSampler
+        # Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
+        dataset: ${system.train_dataset}
