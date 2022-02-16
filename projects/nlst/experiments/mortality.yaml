@@ -16,7 +16,7 @@ trainer:
 
 system:
     _target_: lightningbringer.System
-    batch_size: 4
+    batch_size: 64
     pin_memory: True
     num_workers: 8
     log_input_as: "image_single"
@@ -45,12 +45,34 @@ system:
 
     train_dataset:
         _target_: project.datasets.NLSTDataset
+        mode: train
         root_dir: /mnt/ssd1/NLST/
         label: fup_days
         hounsfield_units_range: [-1000, 400]
-        patch_size: [128, 304, 392]
+        patch_size: [32, 64, 64]  # [128, 304, 392]
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler
         # Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
         dataset: ${system.train_dataset}
+
+    val_dataset:
+        _target_: project.datasets.NLSTDataset
+        mode: tune
+        root_dir: /mnt/ssd1/NLST/
+        label: fup_days
+        hounsfield_units_range: [-1000, 400]
+
+    test_dataset:
+        _target_: project.datasets.NLSTDataset
+        mode: test
+        root_dir: /mnt/ssd1/NLST/
+        label: fup_days
+        hounsfield_units_range: [-1000, 400]
+
+    # sliding_window_inferer:
+    #     _target_: monai.inferers.SlidingWindowInferer
+    #     roi_size: ${system.train_dataset.patch_size}
+    #     sw_batch_size: 1
+    #     overlap: 0.25
+    #     mode: gaussian

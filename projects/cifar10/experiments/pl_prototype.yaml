@@ -1,4 +1,4 @@
-project: /mnt/particija/lightningbringer/projects/cifar10
+project: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -39,8 +39,8 @@ system:
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: False
-        root: /mnt/particija/lightningbringer/.datasets/
+        download: True
+        root: ./.datasets/
         train: True
         transform:
             _target_: torchvision.transforms.Compose
@@ -54,7 +54,7 @@ system:
     val_dataset:
         _target_: torchvision.datasets.CIFAR10
         download: False
-        root: /mnt/particija/lightningbringer/.datasets/
+        root: ./.datasets/
         train:  False  # Same as test, for prototyping purposes only
         transform:
             _target_: torchvision.transforms.Compose
@@ -68,7 +68,7 @@ system:
     test_dataset:
         _target_: torchvision.datasets.CIFAR10
         download: False
-        root: /mnt/particija/lightningbringer/.datasets/
+        root: ./.datasets/
         train: False
         transform:
             _target_: torchvision.transforms.Compose

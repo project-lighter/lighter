@@ -62,6 +62,10 @@ class System(pl.LightningModule):
         # LightningModule checks for them at init, these prevent it from complaining.
         self.train_dataloader = lambda: None
         self.training_step = lambda: None
+        self.val_dataloader = lambda: None
+        self.validation_step = lambda: None
+        self.test_dataloader = lambda: None
+        self.test_step = lambda: None
 
     def forward(self, x):
         """Forward pass. Allows calling self(x) to do it."""
@@ -81,15 +85,15 @@ class System(pl.LightningModule):
         """
         input, target = batch
         pred = self(input)
-        target = target
 
         # When the task is to predict a single value, pred and target dimensions often
         # mismatch - dataloader returns the value with shape (B), while the network
         # return predictions in shape (B, 1), where the second dim is redundant.
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
+        # TODO: What about multi-class
 
-        loss = self.criterion(pred, target.to(pred.dtype)) if mode != "test" else None
+        loss = None if mode == "test" else self.criterion(pred, target.to(pred.dtype))
 
         # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
         # sigmoid output layer. However, for correct metric calculation and logging
@@ -97,7 +101,6 @@ class System(pl.LightningModule):
         if isinstance(loss, torch.nn.BCEWithLogitsLoss):
             pred = torch.sigmoid(pred)
 
-        loss = self.criterion(pred, target) if mode != "test" else None
         metrics = [metric(pred, target) for metric in self.metrics]
 
         self._log(mode, input, target, pred, metrics, loss)
@@ -160,6 +163,8 @@ class System(pl.LightningModule):
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
 
+        del self.train_dataloader, self.val_dataloader, self.test_dataloader
+        del self.training_step, self.validation_step, self.test_step
         # Training methods.
         if stage == "fit":
             self.train_dataloader = partial(self._dataloader, mode="train")

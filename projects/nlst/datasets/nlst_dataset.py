@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import monai
+from monai.transforms import RandSpatialCrop
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
@@ -11,34 +11,33 @@ from .utils import normalization, sitk_utils
 from .utils.misc import get_bounding_box_of_mask, pad
 from .common import get_dataset_split
 
+
 class NLSTDataset(torch.utils.data.Dataset):
 
-    def __init__(self,
-                 root_dir,
-                 label,
-                 patch_size,
-                 hounsfield_units_range,
-                 transform=None):
+    def __init__(self, root_dir, label, hounsfield_units_range,
+                 mode, patch_size=None, transform=None):
 
+        assert mode in ["train", "tune", "test"]
+        self.mode = mode
         self.root_dir = Path(root_dir)
         split = get_dataset_split(self.root_dir / "SelectionTrainTestFinal.csv")
-        self.mask_paths = [self.root_dir / "lung_masks" / image for image in split["tune"]]
+        self.mask_paths = [self.root_dir / "lung_masks" / image for image in split[mode]]
         self.mask_paths = sorted(list(filter(lambda path: path.is_file(), self.mask_paths)))
 
         self.nlst_labels = pd.read_csv(self.root_dir / "NLST_clinical_whole.csv")
         self.romans_labels = pd.read_csv(self.root_dir / "SelectionTrainTestFinal.csv")
 
         self.label = label
-
-        self.random_patch_sampler = monai.transforms.RandSpatialCrop(patch_size, random_size=False)
-        self.patch_size = patch_size
         self.hu_min, self.hu_max = hounsfield_units_range
         self.transform = transform
+        self.patch_size = patch_size
+        self.random_patch_sampler = RandSpatialCrop(self.patch_size,
+                                                    random_size=False)
+        self.mode = mode
 
     def __getitem__(self, idx):
         mask_path = self.mask_paths[idx]
-        scan_path = self.root_dir / "nrrd" / mask_path.parent / mask_path.name
-
+        scan_path = Path(str(mask_path).replace("lung_masks", "nrrd"))
         # Load the scan
         try:
             scan = sitk_utils.load(scan_path)
@@ -88,9 +87,10 @@ class NLSTDataset(torch.utils.data.Dataset):
         # Add channel dimension (CDHW)
         tensor = tensor.unsqueeze(0)
         tensor = tensor if self.transform is None else self.transform(tensor)
-        tensor = self.random_patch_sampler(tensor)
-        # Pad to match the patch size if the resulting patch is smaller
-        tensor = pad(tensor, self.patch_size)
+        if self.mode == "train":
+            tensor = self.random_patch_sampler(tensor)
+            # Pad to match the patch size if the resulting patch is smaller
+            tensor = pad(tensor, self.patch_size)
         return tensor, target
 
     def get_target(self, patient_id, label):
