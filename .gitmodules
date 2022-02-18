@@ -1,0 +1,3 @@
+[submodule "patch-based-inference"]
+	path = patch-based-inference
+	url = https://github.com/ibro45/patch-based-inference
