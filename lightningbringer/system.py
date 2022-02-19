@@ -25,6 +25,7 @@ class System(pl.LightningModule):
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
                  metrics: Optional[Union[Callable, List[Callable]]] = None,
+                 patch_based_inferer: Optional[Callable] = None,
                  train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
@@ -40,6 +41,8 @@ class System(pl.LightningModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
+
+        self._patch_based_inferer = patch_based_inferer
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -84,14 +87,18 @@ class System(pl.LightningModule):
                 and None in test step.
         """
         input, target = batch
-        pred = self(input)
+
+        # Predict
+        if self._patch_based_inferer and mode in ["val", "test"]:
+            pred = self._patch_based_inferer(input, model)
+        else:
+            pred = self(input)
 
         # When the task is to predict a single value, pred and target dimensions often
         # mismatch - dataloader returns the value with shape (B), while the network
         # return predictions in shape (B, 1), where the second dim is redundant.
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
-        # TODO: What about multi-class
 
         loss = None if mode == "test" else self.criterion(pred, target.to(pred.dtype))
 
@@ -121,13 +128,25 @@ class System(pl.LightningModule):
         """
         dataset = getattr(self, f"{mode}_dataset")
         sampler = getattr(self, f"{mode}_sampler")
+
+        # Batch size is 1 when using patch based inference for two reasons:
+        # 1) Patch based inference splits an input into a batch of patches,
+        # so the batch size will actually be defined for it;
+        # 2) In settings where patch based inference is needed, the input data often
+        # varies in shape, preventing the data loader to stack them into a batch.
+        batch_size = self.batch_size
+        if self._patch_based_inferer is not None and mode in ["val", "test"]:
+            logger.info(f"Setting the general batch size to 1 for {mode} "
+                         "mode because a patch-based inferer is used.")
+            batch_size = 1
+
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces them with valid examples from the dataset.
         collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
                           sampler=sampler,
                           shuffle=(mode == "train" and sampler is None),
-                          batch_size=self.batch_size,
+                          batch_size=batch_size,
                           num_workers=self.num_workers,
                           pin_memory=self.pin_memory,
                           collate_fn=collate_fn)
@@ -142,7 +161,7 @@ class System(pl.LightningModule):
         return self.optimizers, self.schedulers
 
     def setup(self, stage):
-        """LightningModule method. Called after initializing but before running the system.
+        """LightningModule method. Called after the initialization but before running the system.
         Here, it checks if the required dataset is provided in the config and sets up
         LightningModule methods for the stage (mode) in which the system is.
 

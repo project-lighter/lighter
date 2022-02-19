@@ -53,7 +53,7 @@ system:
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler
-        # Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
+        # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
         dataset: ${system.train_dataset}
 
     val_dataset:
@@ -70,9 +70,6 @@ system:
         label: fup_days
         hounsfield_units_range: [-1000, 400]
 
-    # sliding_window_inferer:
-    #     _target_: monai.inferers.SlidingWindowInferer
-    #     roi_size: ${system.train_dataset.patch_size}
-    #     sw_batch_size: 1
-    #     overlap: 0.25
-    #     mode: gaussian
+    patch_based_inferer:
+        _target_:
+        patch_size: ${system.train_dataset.patch_size}
