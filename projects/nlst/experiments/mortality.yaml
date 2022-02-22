@@ -16,7 +16,7 @@ trainer:
 
 system:
     _target_: lightningbringer.System
-    batch_size: 64
+    batch_size: 8
     pin_memory: True
     num_workers: 8
     log_input_as: "image_single"
@@ -49,7 +49,7 @@ system:
         root_dir: /mnt/ssd1/NLST/
         label: fup_days
         hounsfield_units_range: [-1000, 400]
-        patch_size: [32, 64, 64]  # [128, 304, 392]
+        patch_size: [32, 128, 128]  # [128, 304, 392]
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler
@@ -71,5 +71,7 @@ system:
         hounsfield_units_range: [-1000, 400]
 
     patch_based_inferer:
-        _target_:
+        _target_: patch_inferers.AvgPatchInferer
+        batch_size: ${system.batch_size}
         patch_size: ${system.train_dataset.patch_size}
+        patch_overlap: [4, 4, 4]

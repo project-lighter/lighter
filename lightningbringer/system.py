@@ -90,7 +90,7 @@ class System(pl.LightningModule):
 
         # Predict
         if self._patch_based_inferer and mode in ["val", "test"]:
-            pred = self._patch_based_inferer(input, model)
+            pred = self._patch_based_inferer(input, self)
         else:
             pred = self(input)
 
@@ -105,7 +105,7 @@ class System(pl.LightningModule):
         # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
         # sigmoid output layer. However, for correct metric calculation and logging
         # we apply it after having calculated the loss.
-        if isinstance(loss, torch.nn.BCEWithLogitsLoss):
+        if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
             pred = torch.sigmoid(pred)
 
         metrics = [metric(pred, target) for metric in self.metrics]
