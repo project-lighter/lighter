@@ -9,13 +9,23 @@ from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
 
-def init_config(omegaconf_args, log=False):
+# As per https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#methods
+ALLOWED_ARGS_PER_MODE = {
+    "fit": ["ckpt_path"],
+    "validate": ["ckpt_path", "verbose"],
+    "test": ["ckpt_path", "verbose"],
+    "predict": ["ckpt_path", "return_predictions"],  # TODO: revisit, haven't used it yet
+    "tune": ["scale_batch_size_kwargs", "lr_find_kwargs"],  # TODO: revisit, haven't used it yet
+}
+
+def init_config(omegaconf_args, mode, log=False):
     """Loads a YAML config file specified with 'config' key in command line arguments,
     parses the remaining comand line arguments as config options, and type checks it
     against the config's structured dataclass.
 
     Args:
         omegaconf_args (list): list of command line arguments.
+        mode (str): fit/validate/test/predict/tune.
         log (bool): if True, log the config.
 
     Returns:
@@ -26,7 +36,8 @@ def init_config(omegaconf_args, log=False):
     if cli.get("config", None) is None:
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
-
+    # Filter out the arguments for the mode method (e.g fit() or test())
+    mode_args = {k: cli.pop(k) for k in ALLOWED_ARGS_PER_MODE[mode]}
     conf = OmegaConf.load(cli.pop("config"))
     # Merge yaml conf and cli conf
     conf = OmegaConf.merge(conf, cli)
@@ -39,7 +50,7 @@ def init_config(omegaconf_args, log=False):
     conf = OmegaConf.merge(construct_structured_config(conf), conf)
     if log:
         logger.info(f"Configuration:\n{OmegaConf.to_yaml(conf)}")
-    return conf
+    return conf, mode_args
 
 
 def construct_structured_config(conf):
