@@ -11,8 +11,7 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
-                                    preprocess_image, wrap_into_list)
-
+                                    preprocess_image, wrap_into_list, import_attr)
 
 class System(pl.LightningModule):
 
@@ -21,6 +20,7 @@ class System(pl.LightningModule):
                  batch_size: int,
                  num_workers: int = 0,
                  pin_memory: bool = True,
+                 cast_target_dtype_to: Optional[str] = None,
                  criterion: Optional[Callable] = None,
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
@@ -42,6 +42,7 @@ class System(pl.LightningModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
+        self._cast_target_dtype_to = cast_target_dtype_to
         self._patch_based_inferer = patch_based_inferer
 
         self.train_dataset = train_dataset
@@ -57,9 +58,9 @@ class System(pl.LightningModule):
         self.schedulers = wrap_into_list(schedulers)
         self.metrics = ModuleList(wrap_into_list(metrics))
 
-        self.log_input_as = log_input_as
-        self.log_target_as = log_target_as
-        self.log_pred_as = log_pred_as
+        self._log_input_as = log_input_as
+        self._log_target_as = log_target_as
+        self._log_pred_as = log_pred_as
 
         # Methods `train_dataloader()`and `training_step()` are defined in `self.setup()`.
         # LightningModule checks for them at init, these prevent it from complaining.
@@ -100,7 +101,12 @@ class System(pl.LightningModule):
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
 
-        loss = None if mode == "test" else self.criterion(pred, target.to(pred.dtype))
+        # Cast the target to the specified dtype
+        if (dtype := self._cast_target_dtype_to) is not None:
+            target = target.to(import_attr(dtype) if dtype != "as_pred" else pred.dtype)
+
+        # Calculate the loss
+        loss = None if mode in ["test", "predict"] else self.criterion(pred, target)
 
         # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
         # sigmoid output layer. However, for correct metric calculation and logging
@@ -252,6 +258,6 @@ class System(pl.LightningModule):
 
         # Input, target, pred
         for key, value in {"input": input, "target": target, "pred": pred}.items():
-            log_as = getattr(self, f"log_{key}_as")
+            log_as = getattr(self, f"_log_{key}_as")
             if log_as is not None:
                 log_by_type(value, name=f"{mode}/{key}", data_type=log_as)

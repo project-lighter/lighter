@@ -4,6 +4,23 @@ import torch
 import torchvision
 
 
+def import_attr(module_attr):
+    """Import using dot-notation string, e.g., 'torch.nn.Module'.
+
+    Args:
+        module_attr (str): dot-notation path to the attribute.
+
+    Returns:
+        Any: imported attribute.
+    """
+    # Split module from attribute name
+    module, attr = module_attr.rsplit(".", 1)
+    # Import the module
+    module = __import__(module, fromlist=[attr])
+    # Get the attribute from the module
+    return getattr(module, attr)
+
+
 def get_name(x):
     """ Get the name of an object, class or function."""
     return type(x).__name__ if isinstance(x, object) else x.__name__

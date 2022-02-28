@@ -8,6 +8,7 @@ from pathlib import Path
 from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
+from lightningbringer.utils import import_attr
 
 # As per https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#methods
 ALLOWED_ARGS_PER_MODE = {
@@ -37,7 +38,7 @@ def init_config(omegaconf_args, mode, log=False):
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
     # Filter out the arguments for the mode method (e.g fit() or test())
-    mode_args = {k: cli.pop(k) for k in ALLOWED_ARGS_PER_MODE[mode]}
+    mode_args = {k: cli.pop(k) for k in ALLOWED_ARGS_PER_MODE[mode] if k in cli}
     conf = OmegaConf.load(cli.pop("config"))
     # Merge yaml conf and cli conf
     conf = OmegaConf.merge(conf, cli)
@@ -111,7 +112,7 @@ def generate_omegaconf_dataclass(dataclass_name, source):
         if inspect.isclass(annotation) and annotation.__module__ != "builtins":
             annotation = typing.Dict
         # TODO: Get rid of this when OmegaConf supports Union
-        if str(annotation).startswith("typing.Union"):
+        if typing.get_origin(annotation) == typing.Union:
             annotation = typing.Any
 
         # Default value
@@ -139,20 +140,3 @@ def import_project_as_module(project):
     spec.loader.exec_module(project_module)
     sys.modules["project"] = project_module
     logger.info(f"Project directory {project} added as a module with name 'project'.")
-
-
-def import_attr(module_attr):
-    """Import using dot-notation string, e.g., 'torch.nn.Module'.
-
-    Args:
-        module_attr (str): dot-notation path to the attribute.
-
-    Returns:
-        Any: imported attribute.
-    """
-    # Split module from attribute name
-    module, attr = module_attr.rsplit(".", 1)
-    # Import the module
-    module = __import__(module, fromlist=[attr])
-    # Get the attribute from the module
-    return getattr(module, attr)
