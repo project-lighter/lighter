@@ -70,6 +70,7 @@ class System(pl.LightningModule):
         self.validation_step = lambda: None
         self.test_dataloader = lambda: None
         self.test_step = lambda: None
+        self._lightning_module_methods_resetted = False
 
     def forward(self, x):
         """Forward pass. Allows calling self(x) to do it."""
@@ -106,7 +107,7 @@ class System(pl.LightningModule):
             target = target.to(import_attr(dtype) if dtype != "as_pred" else pred.dtype)
 
         # Calculate the loss
-        loss = None if mode in ["test", "predict"] else self.criterion(pred, target)
+        loss = None if mode == "test" else self.criterion(pred, target)
 
         # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
         # sigmoid output layer. However, for correct metric calculation and logging
@@ -188,15 +189,20 @@ class System(pl.LightningModule):
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
 
-        del self.train_dataloader, self.val_dataloader, self.test_dataloader
-        del self.training_step, self.validation_step, self.test_step
+        if not self._lightning_module_methods_resetted:
+            del self.train_dataloader, self.val_dataloader, self.test_dataloader
+            del self.training_step, self.validation_step, self.test_step
+            # Trainer.tune() seems to call the setup() method whenever it runs for
+            # a new parameter, re-deleting the LightningModule methods breaks it.
+            self._lightning_module_methods_resetted = True
+
         # Training methods.
-        if stage == "fit":
+        if stage in ["fit", "tune"]:
             self.train_dataloader = partial(self._dataloader, mode="train")
             self.training_step = partial(self._step, mode="train")
 
-        # Validation methods. Required in 'validate' stage and optionally in 'fit' stage.
-        if stage == "validate" or (stage == "fit" and self.val_dataset is not None):
+        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
+        if stage == "validate" or (stage in ["fit", "tune"] and self.val_dataset is not None):
             self.val_dataloader = partial(self._dataloader, mode="val")
             self.validation_step = partial(self._step, mode="val")
 

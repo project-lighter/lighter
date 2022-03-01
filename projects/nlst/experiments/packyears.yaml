@@ -39,7 +39,7 @@ system:
 
     metrics:
         - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1
+        - _target_: torchmetrics.F1Score
 
     train_dataset:
         _target_: project.datasets.NLSTDataset

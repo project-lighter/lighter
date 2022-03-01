@@ -24,6 +24,13 @@ system:
     cast_target_dtype_to: torch.long
     model:
         _target_: project.models.net.Net
+    # model:
+    #     _target_: monai.networks.nets.EfficientNetBN
+    #     model_name: efficientnet-b0
+    #     pretrained: False
+    #     spatial_dims: 2
+    #     in_channels: 3
+    #     num_classes: 10
 
     criterion:
         _target_: torch.nn.CrossEntropyLoss
@@ -35,7 +42,7 @@ system:
 
     metrics:
         - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1
+        - _target_: torchmetrics.F1Score
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10

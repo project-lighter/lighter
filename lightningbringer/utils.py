@@ -22,7 +22,7 @@ def import_attr(module_attr):
 
 
 def get_name(x):
-    """ Get the name of an object, class or function."""
+    """Get the name of an object, class or function."""
     return type(x).__name__ if isinstance(x, object) else x.__name__
 
 

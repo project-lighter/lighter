@@ -12,7 +12,7 @@ def run(mode, omegaconf_args):
 
     # Don't instantiate datasets that won't be used in the run
     train_dataset, val_dataset, test_dataset = None, None, None
-    if mode == "fit":
+    if mode in ["fit", "tune"]:
         train_dataset = conf.system.train_dataset
         val_dataset = conf.system.val_dataset
     elif mode == "validate":
