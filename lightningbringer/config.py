@@ -10,14 +10,6 @@ from omegaconf import MISSING, OmegaConf
 
 from lightningbringer.utils import import_attr
 
-# As per https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#methods
-ALLOWED_ARGS_PER_MODE = {
-    "fit": ["ckpt_path"],
-    "validate": ["ckpt_path", "verbose"],
-    "test": ["ckpt_path", "verbose"],
-    "predict": ["ckpt_path", "return_predictions"],  # TODO: revisit, haven't used it yet
-    "tune": ["scale_batch_size_kwargs", "lr_find_kwargs"],  # TODO: revisit, haven't used it yet
-}
 
 def init_config(omegaconf_args, mode, log=False):
     """Loads a YAML config file specified with 'config' key in command line arguments,
@@ -32,15 +24,18 @@ def init_config(omegaconf_args, mode, log=False):
     Returns:
         omegaconf.DictConfig: configuration
     """
-
+    
     cli = OmegaConf.from_dotlist(omegaconf_args)
     if cli.get("config", None) is None:
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
-    # Filter out the arguments for the mode method (e.g fit() or test())
-    mode_args = {k: cli.pop(k) for k in ALLOWED_ARGS_PER_MODE[mode] if k in cli}
+
+    main_keys = ["config", "trainer", "system", "project"]
+    # Filter out arguments that are passed to the Trainer.fit() or similar methods
+    method_args = {k: cli.pop(k) for k in list(cli) if k.split(".")[0] not in main_keys}
+    # Load the config file
     conf = OmegaConf.load(cli.pop("config"))
-    # Merge yaml conf and cli conf
+    # Merge the params of config file and those specified in cli (e.g. `system.batch_size=8`)
     conf = OmegaConf.merge(conf, cli)
 
     # Allows the framework to find user-defined, project-specific, modules
@@ -51,7 +46,7 @@ def init_config(omegaconf_args, mode, log=False):
     conf = OmegaConf.merge(construct_structured_config(conf), conf)
     if log:
         logger.info(f"Configuration:\n{OmegaConf.to_yaml(conf)}")
-    return conf, mode_args
+    return conf, method_args
 
 
 def construct_structured_config(conf):

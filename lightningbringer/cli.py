@@ -8,7 +8,7 @@ from lightningbringer.config import init_config
 
 
 def run(mode, omegaconf_args):
-    conf, mode_args = init_config(omegaconf_args, mode, log=True)
+    conf, method_args = init_config(omegaconf_args, mode, log=True)
 
     # Don't instantiate datasets that won't be used in the run
     train_dataset, val_dataset, test_dataset = None, None, None
@@ -38,7 +38,7 @@ def run(mode, omegaconf_args):
                                     system.model.parameters(),
                                     _convert_="all")
 
-    getattr(trainer, mode)(model=system, **mode_args)
+    getattr(trainer, mode)(model=system, **method_args)
 
 
 ################### Command Line Interface ###################
