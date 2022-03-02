@@ -102,12 +102,14 @@ class System(pl.LightningModule):
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
 
-        # Cast the target to the specified dtype
-        if (dtype := self._cast_target_dtype_to) is not None:
-            target = target.to(import_attr(dtype) if dtype != "as_pred" else pred.dtype)
+        # Get the dtype to cast the target to, if specified
+        target_dtype = self._cast_target_dtype_to
+        if target_dtype is not None:
+            assert target_dtype.startswith("torch.")
+            target_dtype = import_attr(target_dtype)
 
         # Calculate the loss
-        loss = None if mode == "test" else self.criterion(pred, target)
+        loss = None if mode == "test" else self.criterion(pred, target.to(target_dtype))
 
         # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
         # sigmoid output layer. However, for correct metric calculation and logging
@@ -271,6 +273,7 @@ class System(pl.LightningModule):
 
         # Input, target, pred
         for key, value in {"input": input, "target": target, "pred": pred}.items():
-            log_as = getattr(self, f"log_{key}_as")
+            log_as = getattr(self, f"_log_{key}_as")
             if log_as is not None:
                 log_by_type(value, name=f"{mode}/{key}", data_type=log_as)
+
