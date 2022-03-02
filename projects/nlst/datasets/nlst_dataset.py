@@ -15,7 +15,7 @@ from .common import get_dataset_split
 class NLSTDataset(torch.utils.data.Dataset):
 
     def __init__(self, root_dir, label, hounsfield_units_range,
-                 mode, patch_size=None, transform=None):
+                 mode, patch_size, prototyping_num_scans=None, transform=None):
 
         assert mode in ["train", "tune", "test"]
         self.mode = mode
@@ -23,6 +23,10 @@ class NLSTDataset(torch.utils.data.Dataset):
         split = get_dataset_split(self.root_dir / "SelectionTrainTestFinal.csv")
         self.mask_paths = [self.root_dir / "lung_masks" / image for image in split[mode]]
         self.mask_paths = sorted(list(filter(lambda path: path.is_file(), self.mask_paths)))
+
+        # Reduce the number of datapoints for prototyping
+        if prototyping_num_scans is not None:
+            self.mask_paths = self.mask_paths[:prototyping_num_scans]
 
         self.nlst_labels = pd.read_csv(self.root_dir / "NLST_clinical_whole.csv")
         self.romans_labels = pd.read_csv(self.root_dir / "SelectionTrainTestFinal.csv")
@@ -90,7 +94,7 @@ class NLSTDataset(torch.utils.data.Dataset):
         if self.mode == "train":
             tensor = self.random_patch_sampler(tensor)
             # Pad to match the patch size if the resulting patch is smaller
-            tensor = pad(tensor, self.patch_size)
+        tensor = pad(tensor, self.patch_size)
         return tensor, target
 
     def get_target(self, patient_id, label):

@@ -234,9 +234,18 @@ class System(pl.LightningModule):
                 on_step (bool, optional): Log on step. Defaults to True.
                 on_epoch (bool, optional): Log on batch. Defaults to True.
             """
+            def is_wandb_logger(logger):
+                if isinstance(logger, pl.loggers.WandbLogger) and self.global_step % 50:
+                    return True
+                return False
+
             # Scalars
             if data_type == "scalar":
                 self.log(name, data, on_step=on_step, on_epoch=on_epoch)
+                for lgr in self.logger:
+                    if is_wandb_logger(lgr):
+                        data = data[0] if data.ndim > 0 else data
+                        lgr.experiment.log({name: data})
 
             # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
             # Images
@@ -244,12 +253,10 @@ class System(pl.LightningModule):
                 for lgr in self.logger:
                     image = data[0:1] if data_type == "image_single" else data
                     image = preprocess_image(image)
-                    if isinstance(lgr, pl.loggers.WandbLogger):
-                        # Temporary, log every 50 steps
-                        if self.global_step % 50:
-                            lgr.experiment.log({name: wandb.Image(image)})
+                    if is_wandb_logger(lgr):
+                        lgr.experiment.log({name: wandb.Image(image)})
             else:
-                logger.error(f"'type' '{data_type}' not supported. Exiting.")
+                logger.error(f"type '{data_type}' not supported. Exiting.")
                 sys.exit()
 
         # Loss
@@ -264,6 +271,6 @@ class System(pl.LightningModule):
 
         # Input, target, pred
         for key, value in {"input": input, "target": target, "pred": pred}.items():
-            log_as = getattr(self, f"_log_{key}_as")
+            log_as = getattr(self, f"log_{key}_as")
             if log_as is not None:
                 log_by_type(value, name=f"{mode}/{key}", data_type=log_as)
