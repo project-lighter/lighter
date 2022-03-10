@@ -7,6 +7,7 @@ trainer:
     precision: 16
     accelerator: null
     deterministic: True
+    log_every_n_steps: 200
     default_root_dir: /home/ibrahim/projects/lightningbringer/projects/nlst/logs
     logger:
         - _target_: pytorch_lightning.loggers.WandbLogger
@@ -20,8 +21,8 @@ system:
     pin_memory: True
     num_workers: 8
     log_input_as: null
-    log_pred_as: scalar
-    log_target_as: scalar
+    # log_pred_as: scalar  # TODO: breaking because it can't log a batch of scalars
+    # log_target_as: scalar
 
     model:
         _target_: project.models.EfficientNet
@@ -36,6 +37,12 @@ system:
     cast_target_dtype_to: torch.float
     criterion:
         _target_: torch.nn.BCEWithLogitsLoss
+        # Probably not necessary with ImbalancedSampler
+        # pos_weight:
+        #     # pos_weight needs to be a tensor, instantiating one here
+        #     _target_: torch.tensor
+        #     _args_:
+        #         - 8.05626598465473  # Calculated over whole dataset
 
     optimizers:
         _target_: torch.optim.Adam
@@ -44,7 +51,11 @@ system:
 
     metrics:
         - _target_: torchmetrics.Accuracy
+          num_classes: 1
+          average: weighted
         - _target_: torchmetrics.F1Score
+          num_classes: 1
+          average: weighted
 
     train_dataset:
         _target_: project.datasets.NLSTDataset
@@ -53,7 +64,7 @@ system:
         label: fup_days
         hounsfield_units_range: [-1000, 400]
         patch_size: [96, 304, 392]  # [128, 304, 392]
-        prototyping_num_scans: 10
+        # prototyping_num_scans: 100
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler

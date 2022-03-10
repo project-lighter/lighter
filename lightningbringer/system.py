@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
                                     preprocess_image, wrap_into_list, import_attr)
 
+
 class System(pl.LightningModule):
 
     def __init__(self,
@@ -34,9 +35,12 @@ class System(pl.LightningModule):
                  test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
-                 log_pred_as: Optional[str] = None):
+                 log_pred_as: Optional[str] = None,
+                 debug: bool = False):
 
         super().__init__()
+        self.debug = debug
+
         self.model = model
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -117,9 +121,11 @@ class System(pl.LightningModule):
         if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
             pred = torch.sigmoid(pred)
 
-        metrics = [metric(pred, target) for metric in self.metrics]
+        metrics = {get_name(metric): metric(pred, target) for metric in self.metrics}
 
         self._log(mode, input, target, pred, metrics, loss)
+        if self.debug:
+            logger.debug(debug_message(mode, input, target, pred, metrics, loss))
         return loss
 
     def _dataloader(self, mode):
@@ -221,7 +227,7 @@ class System(pl.LightningModule):
             input (torch.Tensor): input data to the model.
             target (torch.Tensor): target data (label).
             pred (torch.Tensor): output (prediction) of the model.
-            metrics (List[torch.Tensor], optional): model's metrics. Defaults to None.
+            metrics (Dict[str, torch.Tensor], optional): model's metrics. Defaults to None.
             loss (torch.Tensor, optional): model's loss. Defaults to None.
         """
 
@@ -236,18 +242,10 @@ class System(pl.LightningModule):
                 on_step (bool, optional): Log on step. Defaults to True.
                 on_epoch (bool, optional): Log on batch. Defaults to True.
             """
-            def is_wandb_logger(logger):
-                if isinstance(logger, pl.loggers.WandbLogger) and self.global_step % 50:
-                    return True
-                return False
-
             # Scalars
             if data_type == "scalar":
+                # TODO: handle a batch of scalars
                 self.log(name, data, on_step=on_step, on_epoch=on_epoch)
-                for lgr in self.logger:
-                    if is_wandb_logger(lgr):
-                        data = data[0] if data.ndim > 0 else data
-                        lgr.experiment.log({name: data})
 
             # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
             # Images
@@ -255,7 +253,8 @@ class System(pl.LightningModule):
                 for lgr in self.logger:
                     image = data[0:1] if data_type == "image_single" else data
                     image = preprocess_image(image)
-                    if is_wandb_logger(lgr):
+                    # TODO: handle logging frequency better
+                    if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 50:
                         lgr.experiment.log({name: wandb.Image(image)})
             else:
                 logger.error(f"type '{data_type}' not supported. Exiting.")
@@ -267,8 +266,7 @@ class System(pl.LightningModule):
 
         # Metrics
         if metrics:
-            for metric, metric_fn in zip(metrics, self.metrics):
-                name = get_name(metric_fn)
+            for name, metric in metrics.items():
                 log_by_type(metric, name=f"{mode}/metric_{name}", data_type="scalar")
 
         # Input, target, pred
@@ -277,3 +275,14 @@ class System(pl.LightningModule):
             if log_as is not None:
                 log_by_type(value, name=f"{mode}/{key}", data_type=log_as)
 
+
+def debug_message(mode, input, target, pred, metrics, loss):
+    is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
+    msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
+    for name in ["input", "target", "pred"]:
+        tensor = eval(name)
+        msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
+        msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
+    for name in ["loss", "metrics"]:
+        msg += f"\n\n{name.capitalize()}:\n{eval(name)}"
+    return msg
