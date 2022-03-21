@@ -3,13 +3,13 @@ project: /home/ibro/Projects/lightningbringer/projects/nlst
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 100
-    check_val_every_n_epoch: 5
-    gpus: 2
-    strategy: ddp
+    check_val_every_n_epoch: 1
+    gpus: 1
+    # strategy: ddp
     precision: 16
     accelerator: gpu
     # deterministic: True
-    log_every_n_steps: 50
+    log_every_n_steps: 5
     default_root_dir: ${project}/logs
     logger:
         - _target_: pytorch_lightning.loggers.WandbLogger
@@ -19,9 +19,10 @@ trainer:
 
 system:
     _target_: lightningbringer.System
-    batch_size: 4
+    debug: True
+    batch_size: 2
     pin_memory: True
-    num_workers: 8
+    num_workers: 2
     log_input_as: null
     # log_pred_as: scalar  # TODO: breaking because it can't log a batch of scalars
     # log_target_as: scalar
@@ -53,19 +54,19 @@ system:
 
     train_metrics:
         - _target_: torchmetrics.Accuracy
-          num_classes: 1
-          average: weighted
+        #   num_classes: 1
+        #   average: weighted
         - _target_: torchmetrics.F1Score
-          num_classes: 1
-          average: weighted
+        #   num_classes: 1
+        #   average: weighted
 
     val_metrics:
         - _target_: torchmetrics.Accuracy
-          num_classes: 1
-          average: weighted
+        #   num_classes: 1
+        #   average: weighted
         - _target_: torchmetrics.F1Score
-          num_classes: 1
-          average: weighted
+        #   num_classes: 1
+        #   average: weighted
 
     train_dataset:
         _target_: project.datasets.NLSTDataset
@@ -73,7 +74,8 @@ system:
         root_dir: /media/ibro/data_1/NLST/
         label: fup_days
         hounsfield_units_range: [-1000, 400]
-        patch_size: [128, 304, 392]  # 96 [128, 304, 392]
+        patch_size: [64, 256, 256]  # 96 [128, 304, 392]
+        prototyping_num_scans: 1000
 
     # train_sampler:
     #     _target_: torchsampler.ImbalancedDatasetSampler
@@ -87,6 +89,7 @@ system:
         label: fup_days
         hounsfield_units_range: ${system.train_dataset.hounsfield_units_range}
         patch_size: ${system.train_dataset.patch_size}
+        prototyping_num_scans: 10
 
     test_dataset:
         _target_: project.datasets.NLSTDataset
@@ -100,4 +103,4 @@ system:
         _target_: patch_inferers.AvgPatchInferer
         batch_size: ${system.batch_size}
         patch_size: ${system.train_dataset.patch_size}
-        patch_overlap: [32, 76, 98]  # 0.25 * [128, 304, 392]
+        patch_overlap: [4, 4, 4]

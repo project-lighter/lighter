@@ -28,8 +28,10 @@ class NLSTDataset(torch.utils.data.Dataset):
         if prototyping_num_scans is not None:
             self.mask_paths = self.mask_paths[:prototyping_num_scans]
 
-        self.nlst_labels = pd.read_csv(self.root_dir / "NLST_clinical_whole.csv")
-        self.romans_labels = pd.read_csv(self.root_dir / "SelectionTrainTestFinal.csv")
+        self.nlst_labels = pd.read_csv(self.root_dir / "NLST_clinical_whole.csv",
+                                       low_memory=False)
+        self.romans_labels = pd.read_csv(self.root_dir / "SelectionTrainTestFinal.csv",
+                                         low_memory=False)
 
         self.label = label
         self.hu_min, self.hu_max = hounsfield_units_range
@@ -38,6 +40,8 @@ class NLSTDataset(torch.utils.data.Dataset):
         self.random_patch_sampler = RandSpatialCrop(self.patch_size,
                                                     random_size=False)
         self.mode = mode
+
+        logger.info(f"{mode.capitalize()} dataset has {len(self)} datapoints")
 
     def __getitem__(self, idx):
         mask_path = self.mask_paths[idx]

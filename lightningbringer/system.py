@@ -9,6 +9,7 @@ from loguru import logger
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
+from torchmetrics import Metric
 
 from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
                                     preprocess_image, wrap_into_list, import_attr)
@@ -25,8 +26,10 @@ class System(pl.LightningModule):
                  criterion: Optional[Callable] = None,
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
-                 metrics: Optional[Union[Callable, List[Callable]]] = None,
                  patch_based_inferer: Optional[Callable] = None,
+                 train_metrics: Optional[Union[Metric, List[Metric]]] = None,
+                 val_metrics: Optional[Union[Metric, List[Metric]]] = None,
+                 test_metrics: Optional[Union[Metric, List[Metric]]] = None,
                  train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
@@ -46,8 +49,9 @@ class System(pl.LightningModule):
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-        self._cast_target_dtype_to = cast_target_dtype_to
-        self._patch_based_inferer = patch_based_inferer
+        self.criterion = criterion
+        self.optimizers = wrap_into_list(optimizers)
+        self.schedulers = wrap_into_list(schedulers)
 
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -57,24 +61,26 @@ class System(pl.LightningModule):
         self.val_sampler = val_sampler
         self.test_sampler = test_sampler
 
-        self.criterion = criterion
-        self.optimizers = wrap_into_list(optimizers)
-        self.schedulers = wrap_into_list(schedulers)
-        self.metrics = ModuleList(wrap_into_list(metrics))
+        self.train_metrics = ModuleList(wrap_into_list(train_metrics))
+        self.val_metrics = ModuleList(wrap_into_list(val_metrics))
+        self.test_metrics = ModuleList(wrap_into_list(test_metrics))
+
+        self._cast_target_dtype_to = cast_target_dtype_to
+        self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
         self._log_target_as = log_target_as
         self._log_pred_as = log_pred_as
 
-        # Methods `train_dataloader()`and `training_step()` are defined in `self.setup()`.
+        # Methods `..._dataloader()`and `..._step()` are defined in `self.setup()`.
         # LightningModule checks for them at init, these prevent it from complaining.
+        self._lightning_module_methods_resetted = False
         self.train_dataloader = lambda: None
         self.training_step = lambda: None
         self.val_dataloader = lambda: None
         self.validation_step = lambda: None
         self.test_dataloader = lambda: None
         self.test_step = lambda: None
-        self._lightning_module_methods_resetted = False
 
     def forward(self, x):
         """Forward pass. Allows calling self(x) to do it."""
@@ -121,11 +127,14 @@ class System(pl.LightningModule):
         if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
             pred = torch.sigmoid(pred)
 
-        metrics = {get_name(metric): metric(pred, target) for metric in self.metrics}
+        metrics = getattr(self, f"{mode}_metrics", [])
+        step_metrics = {get_name(metric): metric(pred, target) for metric in metrics}
 
+        # Log
         self._log(mode, input, target, pred, metrics, loss)
         if self.debug:
-            logger.debug(debug_message(mode, input, target, pred, metrics, loss))
+            logger.debug(debug_message(mode, input, target, pred, step_metrics, loss))
+        
         return loss
 
     def _dataloader(self, mode):
@@ -219,7 +228,7 @@ class System(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
-    def _log(self, mode, input, target, pred, metrics=None, loss=None):
+    def _log(self, mode, input, target, pred, metrics, loss):
         """Log the data from the system.
 
         Args:
@@ -227,25 +236,23 @@ class System(pl.LightningModule):
             input (torch.Tensor): input data to the model.
             target (torch.Tensor): target data (label).
             pred (torch.Tensor): output (prediction) of the model.
-            metrics (Dict[str, torch.Tensor], optional): model's metrics. Defaults to None.
-            loss (torch.Tensor, optional): model's loss. Defaults to None.
+            loss (torch.Tensor, optional): model's loss.
         """
 
-        def log_by_type(data, name, data_type, on_step=True, on_epoch=True):
-            """Log data according to its type.
+        def log_by_type(data, name, data_type):
+            """Log data according to its type at each epoch and, during training,
+            at each logging step.
 
             Args:
                 data (Any): data to log.
                 name (str): the name under which the data will be logged.
                 data_type (str): type of the data to be logged.
                     ['scalar', 'image_batch', 'image_single']  # TODO update when there's more
-                on_step (bool, optional): Log on step. Defaults to True.
-                on_epoch (bool, optional): Log on batch. Defaults to True.
             """
             # Scalars
             if data_type == "scalar":
                 # TODO: handle a batch of scalars
-                self.log(name, data, on_step=on_step, on_epoch=on_epoch)
+                self.log(name, data, on_step=(mode == "train"), on_epoch=True)
 
             # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
             # Images
@@ -264,10 +271,10 @@ class System(pl.LightningModule):
         if loss is not None:
             log_by_type(loss, name=f"{mode}/loss", data_type="scalar")
 
-        # Metrics
-        if metrics:
-            for name, metric in metrics.items():
-                log_by_type(metric, name=f"{mode}/metric_{name}", data_type="scalar")
+        # Metrics. Note that the torchmetrics objects are passed.
+        # 
+        for metric in metrics:
+            log_by_type(metric, name=f"{mode}/metric_{get_name(metric)}", data_type="scalar")
 
         # Input, target, pred
         for key, value in {"input": input, "target": target, "pred": pred}.items():
@@ -283,6 +290,6 @@ def debug_message(mode, input, target, pred, metrics, loss):
         tensor = eval(name)
         msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
         msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
-    for name in ["loss", "metrics"]:
-        msg += f"\n\n{name.capitalize()}:\n{eval(name)}"
+    msg += f"\n\nLoss:\n{loss}"
+    msg += f"\n\nMetrics:\n{metrics}"
     return msg
