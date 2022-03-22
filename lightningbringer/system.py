@@ -126,15 +126,35 @@ class System(pl.LightningModule):
         # we apply it after having calculated the loss.
         if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
             pred = torch.sigmoid(pred)
-
-        metrics = getattr(self, f"{mode}_metrics", [])
-        step_metrics = {get_name(metric): metric(pred, target) for metric in metrics}
-
-        # Log
-        self._log(mode, input, target, pred, metrics, loss)
-        if self.debug:
-            logger.debug(debug_message(mode, input, target, pred, step_metrics, loss))
         
+        # Calculate the metrics
+        metrics = getattr(self, f"{mode}_metrics")
+        step_metrics = {get_name(m): m(pred, target) for m in metrics}
+        
+        # Logging part
+
+        on_step = (mode == "train")
+
+        # Metrics. Note that torchmetrics objects are passed.
+        for metric in metrics:
+            name = f"{mode}/metric_{get_name(metric)}"
+            self._log_by_type(name, metric, "scalar", on_step=on_step, on_epoch=True)
+
+        # Loss
+        if loss is not None:
+            name = f"{mode}/loss"
+            self._log_by_type(name, loss, "scalar", on_step=on_step, on_epoch=True)
+
+        # Input, target, pred
+        for key in ["input", "target", "pred"]:
+            if data_type := getattr(self, f"_log_{key}_as") is not None:
+                name = f"{mode}/{key}"
+                self._log_by_type(name, eval(key), datxa_type, on_step=on_step, on_epoch=True)
+
+        # Debug message
+        if self.debug:
+            debug_message(mode, input, target, pred, step_metrics, loss)
+
         return loss
 
     def _dataloader(self, mode):
@@ -177,10 +197,10 @@ class System(pl.LightningModule):
 
     def configure_optimizers(self):
         """LightningModule method. Returns optimizers and, if defined, schedulers."""
-        if self.optimizers is None:
+        if not self.optimizers:
             logger.error("Please specify 'optimizers' in the config. Exiting.")
             sys.exit()
-        if self.schedulers is None:
+        if not self.schedulers:
             return self.optimizers
         return self.optimizers, self.schedulers
 
@@ -228,59 +248,33 @@ class System(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
-    def _log(self, mode, input, target, pred, metrics, loss):
-        """Log the data from the system.
+    def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True):
+        """Log data according to its type at each epoch and, during training,
+        at each logging step.
 
         Args:
-            mode (str): mode in which the system is. ['train', 'val', 'test']
-            input (torch.Tensor): input data to the model.
-            target (torch.Tensor): target data (label).
-            pred (torch.Tensor): output (prediction) of the model.
-            loss (torch.Tensor, optional): model's loss.
+            name (str): the name under which the data will be logged.
+            data (Any): data to log.
+            data_type (str): type of the data to be logged.
+                ['scalar', 'image_batch', 'image_single']  # TODO update when there's more
         """
+        # Scalars
+        if data_type == "scalar":
+            # TODO: handle a batch of scalars
+            self.log(name, data, on_step=on_step, on_epoch=on_epoch)
 
-        def log_by_type(data, name, data_type):
-            """Log data according to its type at each epoch and, during training,
-            at each logging step.
-
-            Args:
-                data (Any): data to log.
-                name (str): the name under which the data will be logged.
-                data_type (str): type of the data to be logged.
-                    ['scalar', 'image_batch', 'image_single']  # TODO update when there's more
-            """
-            # Scalars
-            if data_type == "scalar":
-                # TODO: handle a batch of scalars
-                self.log(name, data, on_step=(mode == "train"), on_epoch=True)
-
-            # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
-            # Images
-            elif data_type in ["image_single", "image_batch"]:
-                for lgr in self.logger:
-                    image = data[0:1] if data_type == "image_single" else data
-                    image = preprocess_image(image)
-                    # TODO: handle logging frequency better
-                    if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 50:
-                        lgr.experiment.log({name: wandb.Image(image)})
-            else:
-                logger.error(f"type '{data_type}' not supported. Exiting.")
-                sys.exit()
-
-        # Loss
-        if loss is not None:
-            log_by_type(loss, name=f"{mode}/loss", data_type="scalar")
-
-        # Metrics. Note that the torchmetrics objects are passed.
-        # 
-        for metric in metrics:
-            log_by_type(metric, name=f"{mode}/metric_{get_name(metric)}", data_type="scalar")
-
-        # Input, target, pred
-        for key, value in {"input": input, "target": target, "pred": pred}.items():
-            log_as = getattr(self, f"_log_{key}_as")
-            if log_as is not None:
-                log_by_type(value, name=f"{mode}/{key}", data_type=log_as)
+        # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
+        # Images
+        elif data_type in ["image_single", "image_batch"]:
+            for lgr in self.logger:
+                image = data[0:1] if data_type == "image_single" else data
+                image = preprocess_image(image)
+                # TODO: handle logging frequency better, add tensorboard support
+                if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 50:
+                    lgr.experiment.log({name: wandb.Image(image)})
+        else:
+            logger.error(f"type '{data_type}' not supported. Exiting.")
+            sys.exit()
 
 
 def debug_message(mode, input, target, pred, metrics, loss):

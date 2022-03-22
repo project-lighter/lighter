@@ -27,8 +27,14 @@ def get_name(x):
 
 
 def wrap_into_list(x):
-    """Wrap the input into a list if it is not a list or None."""
-    return x if isinstance(x, list) or x is None else [x]
+    """Wrap the input into a list if it is not a list. If it is a None, return an empty list."""
+    if isinstance(x, list):
+        return x
+    if isinstance(x, tuple):
+        return list(x)
+    if x is None:
+        return []
+    return [x]
 
 
 def collate_fn_replace_corrupted(batch, dataset):
