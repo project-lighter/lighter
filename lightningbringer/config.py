@@ -4,11 +4,14 @@ import sys
 import typing
 from dataclasses import field, make_dataclass
 from pathlib import Path
+from datetime import datetime
 
 from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
 from lightningbringer.utils import import_attr
+
+OmegaConf.register_new_resolver("now", lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
 def init_config(omegaconf_args, mode, log=False):
@@ -134,4 +137,4 @@ def import_project_as_module(project):
     project_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(project_module)
     sys.modules["project"] = project_module
-    logger.info(f"Project directory {project} added as a module with name 'project'.")
+    logger.info(f"Project directory {project} added as 'project' module.")

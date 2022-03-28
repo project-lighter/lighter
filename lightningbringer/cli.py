@@ -2,6 +2,7 @@ import sys
 
 import click
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 from loguru import logger
 
 from lightningbringer.config import init_config
@@ -23,21 +24,21 @@ def run(mode, omegaconf_args):
         logger.error(f"No dataset instantiation filter '{mode}' mode. Exiting.")
         sys.exit()
 
-    # Instantiate the Trainer and the System
+    # Instantiate the Trainer
     trainer = instantiate(conf.trainer, _convert_="all")
+    # Instantiate the System
     system = instantiate(conf.system,
                          optimizers=None,
                          train_dataset=train_dataset,
                          val_dataset=val_dataset,
                          test_dataset=test_dataset,
                          _convert_="all")
-
     # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.2.0
     # https://github.com/facebookresearch/hydra/issues/1758
     system.optimizers = instantiate(conf.system.optimizers,
                                     system.model.parameters(),
                                     _convert_="all")
-
+    # Run the mode (train, validate, test, etc.)
     getattr(trainer, mode)(model=system, **method_args)
 
 

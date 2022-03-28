@@ -4,18 +4,27 @@ trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 100
     check_val_every_n_epoch: 1
-    gpus: 1
-    # strategy: ddp
+    gpus: 2
+    strategy: ddp
     precision: 16
     accelerator: gpu
     # deterministic: True
     log_every_n_steps: 5
-    default_root_dir: ${project}/logs
+    # default_root_dir: ${project}/logs
     logger:
         - _target_: pytorch_lightning.loggers.WandbLogger
-          save_dir: ${trainer.default_root_dir}
+          save_dir: ${project}/prototyping/logs/${now:}
           project: mortality
-
+        - _target_: pytorch_lightning.loggers.TensorBoardLogger
+          save_dir: ${trainer.logger.0.save_dir}
+          name: mortality
+    callbacks:
+        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+          dirpath: ${trainer.logger.0.save_dir}/checkpoints
+          monitor: val/loss
+          mode: min
+          verbose: True
+          save_last: True
 
 system:
     _target_: lightningbringer.System
@@ -75,7 +84,7 @@ system:
         label: fup_days
         hounsfield_units_range: [-1000, 400]
         patch_size: [64, 256, 256]  # 96 [128, 304, 392]
-        prototyping_num_scans: 1000
+        prototyping_num_scans: 30 #0
 
     # train_sampler:
     #     _target_: torchsampler.ImbalancedDatasetSampler

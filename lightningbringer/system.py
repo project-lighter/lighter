@@ -149,7 +149,7 @@ class System(pl.LightningModule):
         for key in ["input", "target", "pred"]:
             if data_type := getattr(self, f"_log_{key}_as") is not None:
                 name = f"{mode}/{key}"
-                self._log_by_type(name, eval(key), datxa_type, on_step=on_step, on_epoch=True)
+                self._log_by_type(name, eval(key), data_type, on_step=on_step, on_epoch=True)
 
         # Debug message
         if self.debug:
@@ -286,4 +286,4 @@ def debug_message(mode, input, target, pred, metrics, loss):
         msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
     msg += f"\n\nLoss:\n{loss}"
     msg += f"\n\nMetrics:\n{metrics}"
-    return msg
+    logger.debug(msg)

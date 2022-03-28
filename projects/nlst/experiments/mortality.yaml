@@ -2,20 +2,25 @@ project: /home/ibro/Projects/lightningbringer/projects/nlst
 
 trainer:
     _target_: pytorch_lightning.Trainer
+    benchmark: True
     max_epochs: 100
     check_val_every_n_epoch: 5
     gpus: 2
     strategy: ddp
     precision: 16
     accelerator: gpu
-    # deterministic: True
     log_every_n_steps: 50
-    default_root_dir: ${project}/logs
     logger:
-        - _target_: pytorch_lightning.loggers.WandbLogger
-          save_dir: ${trainer.default_root_dir}
-          project: mortality
-
+        _target_: lightningbringer.logger.LightningBringerLogger
+        save_dir: ${project}/logs/${now:}
+        project: mortality
+    callbacks:
+        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+          dirpath: ${trainer.logger.save_dir}/checkpoints
+          monitor: val/loss
+          mode: min
+          verbose: True
+          save_last: True
 
 system:
     _target_: lightningbringer.System
@@ -40,18 +45,22 @@ system:
     criterion:
         _target_: torch.nn.BCEWithLogitsLoss
         # Probably not necessary with ImbalancedSampler
-        pos_weight:
-            # pos_weight needs to be a tensor, instantiating one here
-            _target_: torch.tensor
-            _args_:
-                - 8.05626598465473  # Calculated over whole dataset
+        # pos_weight:
+        #     # pos_weight needs to be a tensor, instantiating one here
+        #     _target_: torch.tensor
+        #     _args_:
+        #         - 1 # 8.05626598465473  # Calculated over whole dataset
 
     optimizers:
         _target_: torch.optim.Adam
-        lr: 0.001
+        lr: 0.005
         weight_decay: 1e-5
 
     train_metrics:
+        - _target_: torchmetrics.Accuracy
+        - _target_: torchmetrics.F1Score
+
+    val_metrics:
         - _target_: torchmetrics.Accuracy
           num_classes: 1
           average: weighted
@@ -59,7 +68,7 @@ system:
           num_classes: 1
           average: weighted
 
-    val_metrics:
+    test_metrics:
         - _target_: torchmetrics.Accuracy
           num_classes: 1
           average: weighted
@@ -75,10 +84,10 @@ system:
         hounsfield_units_range: [-1000, 400]
         patch_size: [128, 304, 392]  # 96 [128, 304, 392]
 
-    # train_sampler:
-    #     _target_: torchsampler.ImbalancedDatasetSampler
-    #     # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
-    #     dataset: ${system.train_dataset}
+    train_sampler:
+        _target_: torchsampler.ImbalancedDatasetSampler
+        # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
+        dataset: ${system.train_dataset}
 
     val_dataset:
         _target_: project.datasets.NLSTDataset
