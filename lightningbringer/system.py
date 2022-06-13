@@ -209,7 +209,7 @@ class System(pl.LightningModule):
             sys.exit()
         if not self.schedulers:
             return self.optimizers
-        return self.optimizers, self.schedulers
+        return {"optimizer": self.optimizers, "lr_scheduler": self.schedulers}
 
     def setup(self, stage):
         """LightningModule method. Called after the initialization but before running the system.
