@@ -24,6 +24,7 @@ class System(pl.LightningModule):
                  pin_memory: bool = True,
                  cast_target_dtype_to: Optional[str] = None,
                  criterion: Optional[Callable] = None,
+                 post_criterion_activation: Optional[str] = None,
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
                  patch_based_inferer: Optional[Callable] = None,
@@ -66,6 +67,12 @@ class System(pl.LightningModule):
         self.test_metrics = ModuleList(wrap_into_list(test_metrics))
 
         self._cast_target_dtype_to = cast_target_dtype_to
+        # Get the activation fn that will be run after calculating the loss, if specified
+        self._post_criterion_activation = post_criterion_activation
+        if self._post_criterion_activation is not None:
+            assert self._post_criterion_activation.startswith("torch.")
+            self._post_criterion_activation = import_attr(self._post_criterion_activation)
+
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
@@ -121,11 +128,11 @@ class System(pl.LightningModule):
         # Calculate the loss
         loss = None if mode == "test" else self.criterion(pred, target.to(target_dtype))
 
-        # BCEWithLogitsLoss applies sigmoid internally, so the model shouldn't have
-        # sigmoid output layer. However, for correct metric calculation and logging
-        # we apply it after having calculated the loss.
-        if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
-            pred = torch.sigmoid(pred)
+        # Apply the post criterion/loss activation. Necessary for measuring the metrics
+        # correctly in cases when using a criterion such as BCELossWithLogits which
+        # requires the model to output logits, i.e. non-activated outputs.
+        if self._post_criterion_activation is not None:
+            pred = self._post_criterion_activation(pred)
         
         # Calculate the metrics
         metrics = getattr(self, f"{mode}_metrics")

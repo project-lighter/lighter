@@ -17,7 +17,7 @@ trainer:
         save_dir: ${project}/logs/${now:}
         tensorboard: True
         wandb: True
-        wandb_project: mortality
+        wandb_project: gender_nlst
 
     callbacks:
         - _target_: pytorch_lightning.callbacks.ModelCheckpoint
@@ -34,14 +34,14 @@ system:
     pin_memory: True
     num_workers: 3
     log_input_as: null
-    log_pred_as: scalar  # TODO: breaking because it can't log a batch of scalars
-    log_target_as: scalar
+    # log_pred_as: scalar  # TODO: breaking because it can't log a batch of scalars
+    # log_target_as: scalar
 
     model:
         _target_: project.models.EfficientNet
         model_name: efficientnet-b0
         pretrained: False
-        dropout_rate: 0.5
+        dropout_rate: 0.2
         spatial_dims: 3
         in_channels: 1
         num_classes: 1
@@ -56,7 +56,7 @@ system:
         #     # pos_weight needs to be a tensor, instantiating one here
         #     _target_: torch.tensor
         #     _args_:
-        #         - 5.01782363977486  # Calculated over the train set
+        #         - 7.739782016348774  # Calculated over the train set
     post_criterion_activation: torch.sigmoid
     optimizers:
         _target_: torch.optim.Adam
@@ -73,23 +73,23 @@ system:
         - _target_: torchmetrics.Specificity
         - _target_: torchmetrics.F1Score
 
-    val_metrics: #${system.train_metrics}
-        - _target_: torchmetrics.Precision
-          num_classes: 1
-          average: weighted
-          threshold: 0.2
-        - _target_: torchmetrics.Recall
-          num_classes: 1
-          average: weighted
-          threshold: 0.2
-        - _target_: torchmetrics.Specificity
-          num_classes: 1
-          average: weighted
-          threshold: 0.2
-        - _target_: torchmetrics.F1Score
-          num_classes: 1
-          average: weighted
-          threshold: 0.2
+    val_metrics: ${system.train_metrics}
+        # - _target_: torchmetrics.Precision
+        #   num_classes: 1
+        #   average: weighted
+        #   threshold: 0.2
+        # - _target_: torchmetrics.Recall
+        #   num_classes: 1
+        #   average: weighted
+        #   threshold: 0.2
+        # - _target_: torchmetrics.Specificity
+        #   num_classes: 1
+        #   average: weighted
+        #   threshold: 0.2
+        # - _target_: torchmetrics.F1Score
+        #   num_classes: 1
+        #   average: weighted
+        #   threshold: 0.2
 
     test_metrics: ${system.train_metrics}
 
@@ -97,21 +97,21 @@ system:
         _target_: project.datasets.NLSTDataset
         mode: train
         root_dir: /media/ibro/data_1/NLST/
-        label: fup_days
+        label: gender
         hounsfield_units_range: [-1000, 400]
         patch_size: [128, 304, 392]  # 96 [128, 304, 392]
-        transform:
-            _target_: monai.transforms.Compose
-            transforms:
-                - _target_: monai.transforms.RandGaussianSmooth
-                  prob: 0.2
-                - _target_: monai.transforms.RandAffine
-                  prob: 0.3
-                - _target_: monai.transforms.RandRotate
-                  prob: 0.3
-                  range_x: 0.3
-                  range_z: 0.3
-                  range_y: 0.3
+        # transform:
+        #     _target_: monai.transforms.Compose
+        #     transforms:
+        #         - _target_: monai.transforms.RandGaussianSmooth
+        #           prob: 0.2
+        #         - _target_: monai.transforms.RandAffine
+        #           prob: 0.3
+        #         - _target_: monai.transforms.RandRotate
+        #           prob: 0.3
+        #           range_x: 0.3
+        #           range_z: 0.3
+        #           range_y: 0.3
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler
@@ -122,7 +122,7 @@ system:
         _target_: project.datasets.NLSTDataset
         mode: tune
         root_dir: /media/ibro/data_1/NLST/
-        label: fup_days
+        label: ${system.train_dataset.label}
         hounsfield_units_range: ${system.train_dataset.hounsfield_units_range}
         patch_size: ${system.train_dataset.patch_size}
 
@@ -130,7 +130,7 @@ system:
         _target_: project.datasets.NLSTDataset
         mode: test
         root_dir: /media/ibro/data_1/NLST/
-        label: fup_days
+        label: ${system.train_dataset.label}
         hounsfield_units_range: ${system.train_dataset.hounsfield_units_range}
         patch_size: ${system.train_dataset.patch_size}
 
