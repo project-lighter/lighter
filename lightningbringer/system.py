@@ -65,8 +65,14 @@ class System(pl.LightningModule):
         self.train_metrics = ModuleList(wrap_into_list(train_metrics))
         self.val_metrics = ModuleList(wrap_into_list(val_metrics))
         self.test_metrics = ModuleList(wrap_into_list(test_metrics))
-
+        
+        # TODO: change these two below when _partial_ is supported with Hydra 1.2
+        # Get the dtype to cast the target to, if specified
         self._cast_target_dtype_to = cast_target_dtype_to
+        if self._cast_target_dtype_to is not None:
+            assert self._cast_target_dtype_to.startswith("torch.")
+            self._cast_target_dtype_to = import_attr(self._cast_target_dtype_to)
+        
         # Get the activation fn that will be run after calculating the loss, if specified
         self._post_criterion_activation = post_criterion_activation
         if self._post_criterion_activation is not None:
@@ -119,14 +125,10 @@ class System(pl.LightningModule):
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
 
-        # Get the dtype to cast the target to, if specified
-        target_dtype = self._cast_target_dtype_to
-        if target_dtype is not None:
-            assert target_dtype.startswith("torch.")
-            target_dtype = import_attr(target_dtype)
-
         # Calculate the loss
-        loss = None if mode == "test" else self.criterion(pred, target.to(target_dtype))
+        loss = None
+        if mode != "test":
+            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
 
         # Apply the post criterion/loss activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as BCELossWithLogits which
@@ -140,7 +142,8 @@ class System(pl.LightningModule):
         
         # Logging part
 
-        on_step = (mode == "train")
+        # on_step = (mode == "train")
+        on_step = (mode != "val")
 
         # Metrics. Note that torchmetrics objects are passed.
         for metric in metrics:
@@ -154,7 +157,8 @@ class System(pl.LightningModule):
 
         # Input, target, pred
         for key in ["input", "target", "pred"]:
-            if data_type := getattr(self, f"_log_{key}_as") is not None:
+            data_type = getattr(self, f"_log_{key}_as")
+            if data_type is not None:
                 name = f"{mode}/{key}"
                 self._log_by_type(name, eval(key), data_type, on_step=on_step, on_epoch=True)
 
@@ -223,7 +227,8 @@ class System(pl.LightningModule):
         dataset_required_by_stage = {
             "fit": "train_dataset",
             "validate": "val_dataset",
-            "test": "test_dataset"
+            "test": "test_dataset",
+            # "predict": TODO
         }
         dataset_name = dataset_required_by_stage[stage]
         if getattr(self, dataset_name) is None:
@@ -273,7 +278,7 @@ class System(pl.LightningModule):
         # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
         # Images
         elif data_type in ["image_single", "image_batch"]:
-            for lgr in self.logger:
+            for lgr in wrap_into_list(self.logger):
                 image = data[0:1] if data_type == "image_single" else data
                 image = preprocess_image(image)
                 # TODO: handle logging frequency better, add tensorboard support

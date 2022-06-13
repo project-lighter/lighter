@@ -130,6 +130,13 @@ class NLSTDataset(torch.utils.data.Dataset):
                 return 1
             return 0
 
+        # Lung cancer prediction
+        elif label == "lung_cancer":
+            return int(self.romans_labels[self.romans_labels.Patient_ID == patient_id]["LungCancer"])
+
+        elif label == "gender":
+            return int(self.romans_labels[self.romans_labels.Patient_ID == patient_id]["Female"])
+
         raise NotImplementedError
 
     def get_labels(self):

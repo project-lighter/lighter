@@ -6,14 +6,13 @@ from pytorch_lightning.loggers.base import rank_zero_experiment
 
 
 class LightningBringerLogger(LightningLoggerBase):
-    def __init__(self, save_dir, timestamp=None, project=None, wandb=True, tensorboard=True):
+    def __init__(self, save_dir, timestamp=None, tensorboard=False, wandb=False, wandb_project=None):
+        assert True in [tensorboard, wandb], "You need to use at least one logger!"
         
         if timestamp == "auto":
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if timestamp is not None:
             save_dir += f"/{timestamp}"
-        if project is not None:
-            save_dir += f"_{project}"
 
         self._save_dir = save_dir
 
@@ -29,7 +28,7 @@ class LightningBringerLogger(LightningLoggerBase):
         if wandb:
             self.wandb_logger = WandbLogger(
                 save_dir=self._save_dir,
-                project=project,
+                project=wandb_project,
                 name=timestamp
             )
 
@@ -55,7 +54,6 @@ class LightningBringerLogger(LightningLoggerBase):
 
     @rank_zero_only
     def log_hyperparams(self, params, metrics=None):
-        # TODO: metrics here for tensorboard, not wandb
         if self.wandb_logger is not None:
             self.wandb_logger.log_hyperparams(params)
         

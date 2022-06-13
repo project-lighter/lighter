@@ -5,14 +5,11 @@ trainer:
     max_epochs: 50
     gpus: 0
     accelerator: null
-    default_root_dir: ./logs
     logger:
-        - _target_: pytorch_lightning.loggers.TensorBoardLogger
-          save_dir: ${trainer.default_root_dir}
-          name: tensorboard
-
-        - _target_: pytorch_lightning.loggers.WandbLogger
-          save_dir: ${trainer.default_root_dir}
+        - _target_: lightningbringer.logger.LightningBringerLogger
+          save_dir: ${project}/logs/${now:}
+          tensorboard: True
+          wandb: True
 
 
 system:
@@ -22,15 +19,15 @@ system:
     num_workers: 4
     log_input_as: "image_batch"
     cast_target_dtype_to: torch.long
-    model:
-        _target_: project.models.net.Net
     # model:
-    #     _target_: monai.networks.nets.EfficientNetBN
-    #     model_name: efficientnet-b0
-    #     pretrained: False
-    #     spatial_dims: 2
-    #     in_channels: 3
-    #     num_classes: 10
+    #     _target_: project.models.net.Net
+    model:
+        _target_: monai.networks.nets.EfficientNetBN
+        model_name: efficientnet-b0
+        pretrained: False
+        spatial_dims: 2
+        in_channels: 3
+        num_classes: 10
 
     criterion:
         _target_: torch.nn.CrossEntropyLoss
@@ -40,7 +37,17 @@ system:
         lr: 0.001
         weight_decay: 1e-5
 
-    metrics:
+    train_metrics:
+        - _target_: torchmetrics.Accuracy
+        - _target_: torchmetrics.F1Score
+    
+
+    val_metrics:
+        - _target_: torchmetrics.Accuracy
+        - _target_: torchmetrics.F1Score
+
+    
+    test_metrics:
         - _target_: torchmetrics.Accuracy
         - _target_: torchmetrics.F1Score
 
