@@ -76,9 +76,6 @@ class System(pl.LightningModule):
         # Criterion-specific activation function and data type casting
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
-        if self._cast_target_dtype_to is not None:
-            assert self._cast_target_dtype_to.startswith("torch.")
-            self._cast_target_dtype_to = import_attr(self._cast_target_dtype_to)
 
         self._patch_based_inferer = patch_based_inferer
 
