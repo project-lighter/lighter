@@ -3,8 +3,9 @@ project: ./projects/cifar10
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 50
-    gpus: 0
-    accelerator: null
+    accelerator: gpu
+    devices: 0
+    
     logger:
         - _target_: lightningbringer.logger.LightningBringerLogger
           save_dir: ${project}/logs/${now:}

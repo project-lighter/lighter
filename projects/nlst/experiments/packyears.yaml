@@ -3,9 +3,9 @@ project: /home/ibrahim/projects/lightningbringer/projects/nlst
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 5000
-    gpus: 1
+    accelerator: gpu
+    devices: 1
     precision: 16
-    accelerator: null
     deterministic: True
     default_root_dir: /home/ibrahim/projects/lightningbringer/projects/nlst/logs
     logger:

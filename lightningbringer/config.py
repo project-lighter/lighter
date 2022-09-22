@@ -3,14 +3,15 @@ import inspect
 import sys
 import typing
 from dataclasses import field, make_dataclass
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
 from lightningbringer.utils import import_attr
 
+# Allows `${now:}` to be used in configs to get the current datetime string
 OmegaConf.register_new_resolver("now", lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
@@ -27,7 +28,7 @@ def init_config(omegaconf_args, mode, log=False):
     Returns:
         omegaconf.DictConfig: configuration
     """
-    
+
     cli = OmegaConf.from_dotlist(omegaconf_args)
     if cli.get("config", None) is None:
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
@@ -109,7 +110,8 @@ def generate_omegaconf_dataclass(dataclass_name, source):
         # specifies its arguments and class type (with '_target_' key).
         if inspect.isclass(annotation) and annotation.__module__ != "builtins":
             annotation = typing.Dict
-        # TODO: Get rid of this when OmegaConf supports Union
+        # TODO: Get rid of this when OmegaConf supports Union,
+        # https://github.com/omry/omegaconf/issues/144
         if typing.get_origin(annotation) == typing.Union:
             annotation = typing.Any
 

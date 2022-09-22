@@ -4,10 +4,10 @@ trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 100
     check_val_every_n_epoch: 1
-    gpus: 2
+    accelerator: gpu
+    devices: 2
     strategy: ddp
     precision: 16
-    accelerator: gpu
     # deterministic: True
     log_every_n_steps: 5
     # default_root_dir: ${project}/logs
@@ -88,7 +88,8 @@ system:
 
     # train_sampler:
     #     _target_: torchsampler.ImbalancedDatasetSampler
-    #     # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
+    #     # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support),
+    #     # https://github.com/facebookresearch/hydra/issues/1758
     #     dataset: ${system.train_dataset}
 
     val_dataset:

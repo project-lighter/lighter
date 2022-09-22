@@ -41,7 +41,7 @@ def run(mode, omegaconf_args):
                          test_dataset=test_dataset,
                          test_sampler=test_sampler,
                          _convert_="all")
-    # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.2.0
+    # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.3
     # https://github.com/facebookresearch/hydra/issues/1758
     system.optimizers = instantiate(conf.system.optimizers,
                                     params=system.model.parameters(),

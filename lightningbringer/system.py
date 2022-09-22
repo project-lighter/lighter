@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name,
-                                    preprocess_image, wrap_into_list, import_attr)
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, import_attr,
+                                    preprocess_image, wrap_into_list)
 
 
 class System(pl.LightningModule):
@@ -22,11 +22,11 @@ class System(pl.LightningModule):
                  batch_size: int,
                  num_workers: int = 0,
                  pin_memory: bool = True,
-                 cast_target_dtype_to: Optional[str] = None,
-                 criterion: Optional[Callable] = None,
-                 post_criterion_activation: Optional[str] = None,
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
+                 criterion: Optional[Callable] = None,
+                 cast_target_dtype_to: Optional[str] = None,
+                 post_criterion_activation: Optional[str] = None,
                  patch_based_inferer: Optional[Callable] = None,
                  train_metrics: Optional[Union[Metric, List[Metric]]] = None,
                  val_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -43,57 +43,48 @@ class System(pl.LightningModule):
                  debug: bool = False):
 
         super().__init__()
+        self._init_placeholders_for_dataloader_and_step_methods()
+
         self.debug = debug
 
+        # Model setup
         self.model = model
         self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.pin_memory = pin_memory
 
+        # Criterion, optimizer, and scheduler
         self.criterion = criterion
         self.optimizers = wrap_into_list(optimizers)
         self.schedulers = wrap_into_list(schedulers)
 
+        # Datasets
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+        self.num_workers = num_workers
+        self.pin_memory = pin_memory
 
+        # Samplers
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
         self.test_sampler = test_sampler
 
+        # Metrics
         self.train_metrics = ModuleList(wrap_into_list(train_metrics))
         self.val_metrics = ModuleList(wrap_into_list(val_metrics))
         self.test_metrics = ModuleList(wrap_into_list(test_metrics))
-        
-        # TODO: change these two below when _partial_ is supported with Hydra 1.2
-        # Get the dtype to cast the target to, if specified
+
+        # Criterion-specific activation function and data type casting
+        self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
         if self._cast_target_dtype_to is not None:
             assert self._cast_target_dtype_to.startswith("torch.")
             self._cast_target_dtype_to = import_attr(self._cast_target_dtype_to)
-        
-        # Get the activation fn that will be run after calculating the loss, if specified
-        self._post_criterion_activation = post_criterion_activation
-        if self._post_criterion_activation is not None:
-            assert self._post_criterion_activation.startswith("torch.")
-            self._post_criterion_activation = import_attr(self._post_criterion_activation)
 
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
         self._log_target_as = log_target_as
         self._log_pred_as = log_pred_as
-
-        # Methods `..._dataloader()`and `..._step()` are defined in `self.setup()`.
-        # LightningModule checks for them at init, these prevent it from complaining.
-        self._lightning_module_methods_resetted = False
-        self.train_dataloader = lambda: None
-        self.training_step = lambda: None
-        self.val_dataloader = lambda: None
-        self.validation_step = lambda: None
-        self.test_dataloader = lambda: None
-        self.test_step = lambda: None
 
     def forward(self, x):
         """Forward pass. Allows calling self(x) to do it."""
@@ -120,8 +111,8 @@ class System(pl.LightningModule):
             pred = self(input)
 
         # When the task is to predict a single value, pred and target dimensions often
-        # mismatch - dataloader returns the value with shape (B), while the network
-        # return predictions in shape (B, 1), where the second dim is redundant.
+        # mismatch - dataloader returns the value in the (B) shape, while the network
+        # returns predictions in the (B, 1) shape, where the second dim is redundant.
         if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
             pred = pred.flatten()
 
@@ -130,17 +121,17 @@ class System(pl.LightningModule):
         if mode != "test":
             loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
 
-        # Apply the post criterion/loss activation. Necessary for measuring the metrics
-        # correctly in cases when using a criterion such as BCELossWithLogits which
+        # Apply the post-criterion activation. Necessary for measuring the metrics
+        # correctly in cases when using a criterion such as `BCELossWithLogits`` which
         # requires the model to output logits, i.e. non-activated outputs.
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
-        
+
         # Calculate the metrics
         metrics = getattr(self, f"{mode}_metrics")
         step_metrics = {get_name(m): m(pred, target) for m in metrics}
-        
-        # Logging part
+
+        ## Logging part ##
 
         # on_step = (mode == "train")
         on_step = (mode != "val")
@@ -192,7 +183,7 @@ class System(pl.LightningModule):
         batch_size = self.batch_size
         if self._patch_based_inferer is not None and mode in ["val", "test"]:
             logger.info(f"Setting the general batch size to 1 for {mode} "
-                         "mode because a patch-based inferer is used.")
+                        "mode because a patch-based inferer is used.")
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
@@ -238,12 +229,12 @@ class System(pl.LightningModule):
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
 
-        if not self._lightning_module_methods_resetted:
+        if not self._lightning_module_methods_defined:
             del self.train_dataloader, self.val_dataloader, self.test_dataloader
             del self.training_step, self.validation_step, self.test_step
-            # Trainer.tune() seems to call the setup() method whenever it runs for
-            # a new parameter, re-deleting the LightningModule methods breaks it.
-            self._lightning_module_methods_resetted = True
+            # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
+            #  parameter, and deleting the above methods again breaks it. This flag prevents it.
+            self._lightning_module_methods_defined = True
 
         # Training methods.
         if stage in ["fit", "tune"]:
@@ -260,6 +251,20 @@ class System(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
+    def _init_placeholders_for_dataloader_and_step_methods(self):
+        """LightningModule checks for `..._dataloader()`and `..._step()` methods at init
+        before calling `self.setup()`. However, in `System`, these methods are dynamically
+        defined in `self.setup()`. To circumvent this, we set `..._dataloader()`
+        and `..._step()` placeholders during the object's initialization.
+        """
+        self.train_dataloader = lambda: None
+        self.training_step = lambda: None
+        self.val_dataloader = lambda: None
+        self.validation_step = lambda: None
+        self.test_dataloader = lambda: None
+        self.test_step = lambda: None
+        self._lightning_module_methods_defined = False
+
     def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True):
         """Log data according to its type at each epoch and, during training,
         at each logging step.
@@ -273,7 +278,7 @@ class System(pl.LightningModule):
         # Scalars
         if data_type == "scalar":
             # TODO: handle a batch of scalars
-            self.log(name, data, on_step=on_step, on_epoch=on_epoch)
+            self.log(name, data, on_step=on_step, on_epoch=on_epoch, sync_dist=True)
 
         # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
         # Images

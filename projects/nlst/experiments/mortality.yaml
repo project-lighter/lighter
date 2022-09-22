@@ -5,12 +5,12 @@ trainer:
     benchmark: True
     max_epochs: 100
     check_val_every_n_epoch: 5
-    gpus: 2
+    accelerator: gpu
+    devices: 2
     strategy:
         _target_: pytorch_lightning.strategies.ddp.DDPStrategy
         find_unused_parameters: False
     precision: 16
-    accelerator: gpu
     log_every_n_steps: 50
     logger:
         _target_: lightningbringer.logger.LightningBringerLogger
@@ -115,7 +115,8 @@ system:
 
     train_sampler:
         _target_: torchsampler.ImbalancedDatasetSampler
-        # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support)
+        # TODO: Workaround, it will reinstantiate it but that's ok in this case (wait for Hydra support),
+        # https://github.com/facebookresearch/hydra/issues/1758
         dataset: ${system.train_dataset}
 
     val_dataset:

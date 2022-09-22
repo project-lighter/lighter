@@ -1,14 +1,20 @@
-
 from datetime import datetime
+
+from pytorch_lightning.loggers import (LightningLoggerBase, TensorBoardLogger, WandbLogger)
+from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
-from pytorch_lightning.loggers import LightningLoggerBase, TensorBoardLogger, WandbLogger
-from pytorch_lightning.loggers.base import rank_zero_experiment
 
 
 class LightningBringerLogger(LightningLoggerBase):
-    def __init__(self, save_dir, timestamp=None, tensorboard=False, wandb=False, wandb_project=None):
+
+    def __init__(self,
+                 save_dir,
+                 timestamp=None,
+                 tensorboard=False,
+                 wandb=False,
+                 wandb_project=None):
         assert True in [tensorboard, wandb], "You need to use at least one logger!"
-        
+
         if timestamp == "auto":
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if timestamp is not None:
@@ -18,19 +24,15 @@ class LightningBringerLogger(LightningLoggerBase):
 
         self.tensorboard_logger = None
         if tensorboard:
-            self.tensorboard_logger = TensorBoardLogger(
-                save_dir=self._save_dir,
-                name="",
-                version="tensorboard"
-            )
-        
+            self.tensorboard_logger = TensorBoardLogger(save_dir=self._save_dir,
+                                                        name="",
+                                                        version="tensorboard")
+
         self.wandb_logger = None
         if wandb:
-            self.wandb_logger = WandbLogger(
-                save_dir=self._save_dir,
-                project=wandb_project,
-                name=timestamp
-            )
+            self.wandb_logger = WandbLogger(save_dir=self._save_dir,
+                                            project=wandb_project,
+                                            name=timestamp)
 
     @property
     def name(self):
@@ -56,7 +58,7 @@ class LightningBringerLogger(LightningLoggerBase):
     def log_hyperparams(self, params, metrics=None):
         if self.wandb_logger is not None:
             self.wandb_logger.log_hyperparams(params)
-        
+
         if self.tensorboard_logger is not None:
             self.tensorboard_logger.log_hyperparams(params, metrics)
 
@@ -64,7 +66,7 @@ class LightningBringerLogger(LightningLoggerBase):
     def log_metrics(self, metrics, step):
         if self.wandb_logger is not None:
             self.wandb_logger.log_metrics(metrics, step)
-        
+
         if self.tensorboard_logger is not None:
             self.tensorboard_logger.log_metrics(metrics, step)
 
@@ -79,6 +81,6 @@ class LightningBringerLogger(LightningLoggerBase):
     def finalize(self, status):
         if self.wandb_logger is not None:
             self.wandb_logger.finalize(status)
-        
+
         if self.tensorboard_logger is not None:
             self.tensorboard_logger.finalize(status)
