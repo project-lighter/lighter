@@ -11,7 +11,6 @@ from omegaconf import MISSING, OmegaConf
 
 from lightningbringer.utils import import_attr
 
-
 # `${import:<ATTR>}` can be used to import an attribute via config. E.g. `${import:torch.float}`
 OmegaConf.register_new_resolver("import", lambda attr: import_attr(attr))
 # `${now:}` can be used in configs to get the current datetime string

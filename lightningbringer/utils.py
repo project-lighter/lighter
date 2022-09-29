@@ -55,7 +55,6 @@ def collate_fn_replace_corrupted(batch, dataset):
         torch.Tensor: batch with new examples instead of corrupted ones.
     """
     # Idea from https://stackoverflow.com/a/57882783
-
     original_batch_len = len(batch)
     # Filter out all the Nones (corrupted examples)
     batch = list(filter(lambda x: x is not None, batch))
@@ -94,3 +93,26 @@ def preprocess_image(image):
         nrow = image.shape[0] if has_three_dims else 8
         image = torchvision.utils.make_grid(image, nrow=nrow)
     return image
+
+
+def debug_message(mode, input, label, pred, metrics, loss):
+    is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
+    msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
+    for name in ["input", "label", "pred"]:
+        tensor = eval(name)
+        msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
+        msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
+    msg += f"\n\nLoss:\n{loss}"
+    msg += f"\n\nMetrics:\n{metrics}"
+    logger.debug(msg)
+
+
+def reshape_pred_if_single_value_prediction(pred, label):
+    """When the task is to predict a single value, pred and label dimensions often
+    mismatch - dataloader returns the value in the (B) shape, while the network
+    returns predictions in the (B, 1) shape, where the second dim is redundant.
+    """
+    if isinstance(pred, torch.Tensor) and label is not None:
+        if len(pred.shape) == 2 and len(label.shape) == 1 == pred.shape[1]:
+            return pred.flatten()
+    return pred

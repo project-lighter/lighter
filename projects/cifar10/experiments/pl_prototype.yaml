@@ -19,7 +19,7 @@ system:
     pin_memory: True
     num_workers: 4
     log_input_as: "image_batch"
-    cast_target_dtype_to: torch.long
+    cast_label_dtype_to: torch.long
     # model:
     #     _target_: project.models.net.Net
     model:

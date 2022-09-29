@@ -6,10 +6,10 @@ trainer:
     max_epochs: 100
     check_val_every_n_epoch: 5
     accelerator: gpu
-    devices: 2
-    strategy:
-        _target_: pytorch_lightning.strategies.ddp.DDPStrategy
-        find_unused_parameters: False
+    devices: 1
+    # strategy:
+    #     _target_: pytorch_lightning.strategies.ddp.DDPStrategy
+    #     find_unused_parameters: False
     precision: 16
     log_every_n_steps: 50
     logger:
@@ -58,7 +58,7 @@ system:
         #         - 7.739782016348774  # Calculated over the train set
     
     post_criterion_activation: ${import:torch.sigmoid}
-    cast_target_dtype_to: ${import:torch.float}
+    cast_label_dtype_to: ${import:torch.float}
 
     optimizers:
         _target_: torch.optim.Adam

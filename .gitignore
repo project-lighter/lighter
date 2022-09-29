@@ -131,8 +131,10 @@ dmypy.json
 # Custom
 lightning_logs/
 .datasets/
+datasets/
 logs/
 wandb/
 tensorboard/
 .vscode/
 *.pkl
+prototyping.ipynb

@@ -12,7 +12,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
 from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, import_attr,
-                                    preprocess_image, wrap_into_list)
+                                    preprocess_image, wrap_into_list, debug_message,
+                                    reshape_pred_if_single_value_prediction)
 
 
 class System(pl.LightningModule):
@@ -25,7 +26,7 @@ class System(pl.LightningModule):
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
                  criterion: Optional[Callable] = None,
-                 cast_target_dtype_to: Optional[str] = None,
+                 cast_label_dtype_to: Optional[str] = None,
                  post_criterion_activation: Optional[str] = None,
                  patch_based_inferer: Optional[Callable] = None,
                  train_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -38,7 +39,7 @@ class System(pl.LightningModule):
                  val_sampler: Optional[Sampler] = None,
                  test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
-                 log_target_as: Optional[str] = None,
+                 log_label_as: Optional[str] = None,
                  log_pred_as: Optional[str] = None,
                  debug: bool = False):
 
@@ -75,12 +76,12 @@ class System(pl.LightningModule):
 
         # Criterion-specific activation function and data type casting
         self._post_criterion_activation = post_criterion_activation
-        self._cast_target_dtype_to = cast_target_dtype_to
+        self._cast_label_dtype_to = cast_label_dtype_to
 
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
-        self._log_target_as = log_target_as
+        self._log_label_as = log_label_as
         self._log_pred_as = log_pred_as
 
     def forward(self, x):
@@ -99,24 +100,20 @@ class System(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in training and validation step,
                 and None in test step.
         """
-        input, target = batch
-
+        input, label = batch
         # Predict
         if self._patch_based_inferer and mode in ["val", "test"]:
             pred = self._patch_based_inferer(input, self)
         else:
             pred = self(input)
 
-        # When the task is to predict a single value, pred and target dimensions often
-        # mismatch - dataloader returns the value in the (B) shape, while the network
-        # returns predictions in the (B, 1) shape, where the second dim is redundant.
-        if len(target.shape) == 1 and len(pred.shape) == 2 and pred.shape[1] == 1:
-            pred = pred.flatten()
+        pred = reshape_pred_if_single_value_prediction(pred, label)
 
         # Calculate the loss
         loss = None
         if mode != "test":
-            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
+            loss = self.criterion(pred,
+                                  label if label is None else label.to(self._cast_label_dtype_to))
 
         # Apply the post-criterion activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as `BCELossWithLogits`` which
@@ -126,11 +123,10 @@ class System(pl.LightningModule):
 
         # Calculate the metrics
         metrics = getattr(self, f"{mode}_metrics")
-        step_metrics = {get_name(m): m(pred, target) for m in metrics}
+        step_metrics = {get_name(m): m(pred, label) for m in metrics}
 
         ## Logging part ##
 
-        # on_step = (mode == "train")
         on_step = (mode != "val")
 
         # Metrics. Note that torchmetrics objects are passed.
@@ -143,8 +139,8 @@ class System(pl.LightningModule):
             name = f"{mode}/loss"
             self._log_by_type(name, loss, "scalar", on_step=on_step, on_epoch=True)
 
-        # Input, target, pred
-        for key in ["input", "target", "pred"]:
+        # Input, label, pred
+        for key in ["input", "label", "pred"]:
             data_type = getattr(self, f"_log_{key}_as")
             if data_type is not None:
                 name = f"{mode}/{key}"
@@ -152,7 +148,7 @@ class System(pl.LightningModule):
 
         # Debug message
         if self.debug:
-            debug_message(mode, input, target, pred, step_metrics, loss)
+            debug_message(mode, input, label, pred, step_metrics, loss)
 
         return loss
 
@@ -255,10 +251,10 @@ class System(pl.LightningModule):
         and `..._step()` placeholders during the object's initialization.
         """
         self.train_dataloader = lambda: None
-        self.training_step = lambda: None
         self.val_dataloader = lambda: None
-        self.validation_step = lambda: None
         self.test_dataloader = lambda: None
+        self.training_step = lambda: None
+        self.validation_step = lambda: None
         self.test_step = lambda: None
         self._lightning_module_methods_defined = False
 
@@ -289,15 +285,3 @@ class System(pl.LightningModule):
         else:
             logger.error(f"type '{data_type}' not supported. Exiting.")
             sys.exit()
-
-
-def debug_message(mode, input, target, pred, metrics, loss):
-    is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
-    msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
-    for name in ["input", "target", "pred"]:
-        tensor = eval(name)
-        msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
-        msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
-    msg += f"\n\nLoss:\n{loss}"
-    msg += f"\n\nMetrics:\n{metrics}"
-    logger.debug(msg)
