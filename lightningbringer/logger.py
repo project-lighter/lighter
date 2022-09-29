@@ -3,7 +3,7 @@ from datetime import datetime
 from pytorch_lightning.loggers import (LightningLoggerBase, TensorBoardLogger, WandbLogger)
 from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
-
+from pathlib import Path
 
 class LightningBringerLogger(LightningLoggerBase):
 
@@ -20,8 +20,9 @@ class LightningBringerLogger(LightningLoggerBase):
         if timestamp is not None:
             save_dir += f"/{timestamp}"
 
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
         self._save_dir = save_dir
-
+        
         self.tensorboard_logger = None
         if tensorboard:
             self.tensorboard_logger = TensorBoardLogger(save_dir=self._save_dir,
