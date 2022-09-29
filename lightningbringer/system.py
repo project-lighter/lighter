@@ -84,9 +84,9 @@ class System(pl.LightningModule):
         self._log_label_as = log_label_as
         self._log_pred_as = log_pred_as
 
-    def forward(self, x):
-        """Forward pass. Allows calling self(x) to do it."""
-        return self.model(x)
+    def forward(self, input):
+        """Forward pass. Multi-input models are supported."""
+        return self.model(input) if not isinstance(input, (list, tuple)) else self.model(*input)
 
     def _step(self, batch, batch_idx, mode):
         """Step for all modes ('train', 'val', 'test')
@@ -103,6 +103,7 @@ class System(pl.LightningModule):
         input, label = batch
         # Predict
         if self._patch_based_inferer and mode in ["val", "test"]:
+            # TODO: Patch-based inference doesn't support multiple inputs yet
             pred = self._patch_based_inferer(input, self)
         else:
             pred = self(input)

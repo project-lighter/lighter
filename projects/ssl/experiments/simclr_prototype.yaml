@@ -1,0 +1,64 @@
+project: /home/ibro/Projects/lightningbringer/projects/ssl
+trainer:
+    _target_: pytorch_lightning.Trainer
+    benchmark: true
+    max_epochs: 100
+    check_val_every_n_epoch: 5
+    accelerator: gpu
+    devices: 1
+    precision: 16
+    log_every_n_steps: 50
+system:
+    _target_: lightningbringer.System
+    batch_size: 256
+    pin_memory: true
+    num_workers: 3
+    log_input_as: null
+    model:
+        _target_: lightly.models.simclr.SimCLR
+        num_ftrs: 512
+        out_dim: 128
+        backbone:
+            _target_: lightningbringer.ssl.utils.replace_layer_with_identity
+            layer_name: fc
+            model:
+                _target_: torchvision.models.resnet18
+    criterion:
+        _target_: lightningbringer.ssl.losses.NTXentLoss
+    optimizers:
+        _target_: torch.optim.Adam
+        lr: 0.005
+        weight_decay: 0.00001
+    train_metrics: null
+    val_metrics: '${system.train_metrics}'
+    test_metrics: '${system.train_metrics}'
+    train_dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: datasets/cifar10
+        download: true
+        transform:
+            _target_: lightningbringer.ssl.transforms.Duplicate
+            transforms1:
+                _target_: torchvision.transforms.Compose
+                transforms:
+                    -
+                        _target_: torchvision.transforms.RandomCrop
+                        size: 32
+                        padding: 4
+                    -
+                        _target_: torchvision.transforms.RandomHorizontalFlip
+                    -
+                        _target_: torchvision.transforms.ToTensor
+                    -
+                        _target_: torchvision.transforms.Normalize
+                        mean:
+                            - 0.485
+                            - 0.456
+                            - 0.406
+                        std:
+                            - 0.229
+                            - 0.224
+                            - 0.225
+            transforms2: '${system.train_dataset.transform.transforms1}'
+    val_dataset: null
+    test_dataset: null
