@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, import_attr,
-                                    preprocess_image, wrap_into_list, debug_message,
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, hasarg,
+                                    import_attr, preprocess_image, wrap_into_list, debug_message,
                                     reshape_pred_if_single_value_prediction)
 
 
@@ -21,6 +21,7 @@ class System(pl.LightningModule):
     def __init__(self,
                  model: Module,
                  batch_size: int,
+                 drop_last_batch: bool = False,
                  num_workers: int = 0,
                  pin_memory: bool = True,
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
@@ -51,6 +52,7 @@ class System(pl.LightningModule):
         # Model setup
         self.model = model
         self.batch_size = batch_size
+        self.drop_last_batch = drop_last_batch
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
@@ -111,10 +113,7 @@ class System(pl.LightningModule):
         pred = reshape_pred_if_single_value_prediction(pred, label)
 
         # Calculate the loss
-        loss = None
-        if mode != "test":
-            loss = self.criterion(pred,
-                                  label if label is None else label.to(self._cast_label_dtype_to))
+        loss = self._calculate_loss(pred, label) if mode != "test" else None
 
         # Apply the post-criterion activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as `BCELossWithLogits`` which
@@ -153,6 +152,18 @@ class System(pl.LightningModule):
 
         return loss
 
+    def _calculate_loss(self, pred, label):
+        if hasarg(self.criterion, "target"):
+            loss = self.criterion(pred, label.to(self._cast_label_dtype_to))
+        loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
+
+        if self.global_step == 0:
+            logger.warning(f"The criterion {get_name(self.criterion)} has no `target` argument. "
+                            "In such cases, the System passes only the predicted values to the "
+                            "criterion. This is intended as a support for self-supervised "
+                            "losses where target is not needed.")
+        return loss
+
     def _dataloader(self, mode):
         """Instantiate the dataloader for a mode (train/val/test).
         Includes a collate function that enables the DataLoader to replace
@@ -187,6 +198,7 @@ class System(pl.LightningModule):
                           sampler=sampler,
                           shuffle=(mode == "train" and sampler is None),
                           batch_size=batch_size,
+                          drop_last=self.drop_last_batch,
                           num_workers=self.num_workers,
                           pin_memory=self.pin_memory,
                           collate_fn=collate_fn)

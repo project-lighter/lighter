@@ -12,6 +12,7 @@ system:
     _target_: lightningbringer.System
     batch_size: 256
     pin_memory: true
+    drop_last_batch: True  # Used in SSL cases because of negatives
     num_workers: 3
     log_input_as: null
     model:
@@ -19,12 +20,12 @@ system:
         num_ftrs: 512
         out_dim: 128
         backbone:
-            _target_: lightningbringer.ssl.utils.replace_layer_with_identity
+            _target_: lightningbringer.utils.replace_layer_with_identity
             layer_name: fc
             model:
                 _target_: torchvision.models.resnet18
     criterion:
-        _target_: lightningbringer.ssl.losses.NTXentLoss
+        _target_: lightly.loss.ntx_ent_loss.NTXentLoss
     optimizers:
         _target_: torch.optim.Adam
         lr: 0.005
@@ -37,7 +38,7 @@ system:
         root: datasets/cifar10
         download: true
         transform:
-            _target_: lightningbringer.ssl.transforms.Duplicate
+            _target_: lightningbringer.transforms.Duplicate
             transforms1:
                 _target_: torchvision.transforms.Compose
                 transforms:

@@ -1,7 +1,9 @@
+import inspect
 import random
 
 import torch
 import torchvision
+from torch.nn import Identity, Module, Sequential
 
 
 def import_attr(module_attr):
@@ -19,6 +21,11 @@ def import_attr(module_attr):
     module = __import__(module, fromlist=[attr])
     # Get the attribute from the module
     return getattr(module, attr)
+
+
+def hasarg(callable, arg_name):
+    args = inspect.signature(callable).parameters.keys()
+    return arg_name in args
 
 
 def get_name(x):
@@ -116,3 +123,53 @@ def reshape_pred_if_single_value_prediction(pred, label):
         if len(pred.shape) == 2 and len(label.shape) == 1 == pred.shape[1]:
             return pred.flatten()
     return pred
+
+
+def dot_notation_setattr(obj, attr, value):
+    # https://gist.github.com/alixedi/4695abcd259d1493ac9c
+    """Set object's attribute. May use dot notation.
+
+    >>> class C(object): pass
+    >>> a = C()
+    >>> a.b = C()
+    >>> a.b.c = 4
+    >>> rec_setattr(a, 'b.c', 2)
+    >>> a.b.c
+    2
+    """
+    if '.' not in attr:
+        setattr(obj, attr, value)
+    else:
+        splitted = attr.split('.')
+        dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
+
+
+def replace_layer_with_identity(model: Module,
+                                layer_name: str) -> Module:
+    """Replaces any layer of the network with an Identity layer.
+    Useful for removing the last layer of a network to be used as a backbone
+    of an SSL model. 
+
+    Args:
+        model (Module): PyTorch model to be edited
+        layer_name (string): Name of the layer which will be replaced with an
+            Identity function. Dot-notation supported, e.g. "layer10.fc". 
+
+    Returns:
+        Module: PyTorch model with Identity layer at the specified location.
+    """
+    dot_notation_setattr(model, layer_name, Identity())
+    return model
+
+
+def remove_last_layer_sequentially(model: Module()) -> Sequential:
+    """Removes the last layer of a network and returns it as an nn.Sequential model.
+    Useful when a network is to be used as a backbone of an SSL model.
+
+    Args:
+        model (Module): PyTorch model object.
+
+    Returns:
+        Sequential: PyTorch Sequential model with the last layer removed.
+    """
+    return Sequential(*list(model.children())[:-1])
