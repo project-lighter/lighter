@@ -46,7 +46,7 @@ system:
         last_activation:
             _target_: torch.nn.Identity  # Because using BCEWithLogitsLoss
 
-    cast_label_dtype_to: torch.float
+    cast_target_dtype_to: torch.float
     criterion:
         _target_: torch.nn.BCEWithLogitsLoss
         # Probably not necessary with ImbalancedSampler

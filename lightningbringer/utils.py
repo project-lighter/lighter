@@ -28,9 +28,13 @@ def hasarg(callable, arg_name):
     return arg_name in args
 
 
-def get_name(x):
+def get_name(x, include_module_name=False):
     """Get the name of an object, class or function."""
-    return type(x).__name__ if isinstance(x, object) else x.__name__
+    name = type(x).__name__ if isinstance(x, object) else x.__name__
+    if include_module_name:
+        module = type(x).__module__ if isinstance(x, object) else x.__module__
+        name = f"{module}.{name}"
+    return name
 
 
 def wrap_into_list(x):
@@ -102,10 +106,10 @@ def preprocess_image(image):
     return image
 
 
-def debug_message(mode, input, label, pred, metrics, loss):
+def debug_message(mode, input, target, pred, metrics, loss):
     is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
     msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
-    for name in ["input", "label", "pred"]:
+    for name in ["input", "target", "pred"]:
         tensor = eval(name)
         msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
         msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
@@ -114,13 +118,13 @@ def debug_message(mode, input, label, pred, metrics, loss):
     logger.debug(msg)
 
 
-def reshape_pred_if_single_value_prediction(pred, label):
-    """When the task is to predict a single value, pred and label dimensions often
+def reshape_pred_if_single_value_prediction(pred, target):
+    """When the task is to predict a single value, pred and target dimensions often
     mismatch - dataloader returns the value in the (B) shape, while the network
     returns predictions in the (B, 1) shape, where the second dim is redundant.
     """
-    if isinstance(pred, torch.Tensor) and label is not None:
-        if len(pred.shape) == 2 and len(label.shape) == 1 == pred.shape[1]:
+    if isinstance(pred, torch.Tensor) and target is not None:
+        if len(pred.shape) == 2 and len(target.shape) == 1 == pred.shape[1]:
             return pred.flatten()
     return pred
 
@@ -144,8 +148,7 @@ def dot_notation_setattr(obj, attr, value):
         dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
 
 
-def replace_layer_with_identity(model: Module,
-                                layer_name: str) -> Module:
+def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.
     Useful for removing the last layer of a network to be used as a backbone
     of an SSL model. 

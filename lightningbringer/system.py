@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, hasarg,
-                                    import_attr, preprocess_image, wrap_into_list, debug_message,
+from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
+                                    preprocess_image, wrap_into_list, debug_message,
                                     reshape_pred_if_single_value_prediction)
 
 
@@ -27,7 +27,7 @@ class System(pl.LightningModule):
                  optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
                  schedulers: Optional[Union[Callable, List[Callable]]] = None,
                  criterion: Optional[Callable] = None,
-                 cast_label_dtype_to: Optional[str] = None,
+                 cast_target_dtype_to: Optional[str] = None,
                  post_criterion_activation: Optional[str] = None,
                  patch_based_inferer: Optional[Callable] = None,
                  train_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -40,7 +40,7 @@ class System(pl.LightningModule):
                  val_sampler: Optional[Sampler] = None,
                  test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
-                 log_label_as: Optional[str] = None,
+                 log_target_as: Optional[str] = None,
                  log_pred_as: Optional[str] = None,
                  debug: bool = False):
 
@@ -78,12 +78,12 @@ class System(pl.LightningModule):
 
         # Criterion-specific activation function and data type casting
         self._post_criterion_activation = post_criterion_activation
-        self._cast_label_dtype_to = cast_label_dtype_to
+        self._cast_target_dtype_to = cast_target_dtype_to
 
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
-        self._log_label_as = log_label_as
+        self._log_target_as = log_target_as
         self._log_pred_as = log_pred_as
 
     def forward(self, input):
@@ -102,7 +102,7 @@ class System(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in training and validation step,
                 and None in test step.
         """
-        input, label = batch
+        input, target = batch
         # Predict
         if self._patch_based_inferer and mode in ["val", "test"]:
             # TODO: Patch-based inference doesn't support multiple inputs yet
@@ -110,10 +110,10 @@ class System(pl.LightningModule):
         else:
             pred = self(input)
 
-        pred = reshape_pred_if_single_value_prediction(pred, label)
+        pred = reshape_pred_if_single_value_prediction(pred, target)
 
         # Calculate the loss
-        loss = self._calculate_loss(pred, label) if mode != "test" else None
+        loss = self._calculate_loss(pred, target) if mode != "test" else None
 
         # Apply the post-criterion activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as `BCELossWithLogits`` which
@@ -123,7 +123,7 @@ class System(pl.LightningModule):
 
         # Calculate the metrics
         metrics = getattr(self, f"{mode}_metrics")
-        step_metrics = {get_name(m): m(pred, label) for m in metrics}
+        step_metrics = {get_name(m): m(pred, target) for m in metrics}
 
         ## Logging part ##
 
@@ -139,8 +139,8 @@ class System(pl.LightningModule):
             name = f"{mode}/loss"
             self._log_by_type(name, loss, "scalar", on_step=on_step, on_epoch=True)
 
-        # Input, label, pred
-        for key in ["input", "label", "pred"]:
+        # Input, target, pred
+        for key in ["input", "target", "pred"]:
             data_type = getattr(self, f"_log_{key}_as")
             if data_type is not None:
                 name = f"{mode}/{key}"
@@ -148,20 +148,22 @@ class System(pl.LightningModule):
 
         # Debug message
         if self.debug:
-            debug_message(mode, input, label, pred, step_metrics, loss)
+            debug_message(mode, input, target, pred, step_metrics, loss)
 
         return loss
 
-    def _calculate_loss(self, pred, label):
-        if hasarg(self.criterion, "target"):
-            loss = self.criterion(pred, label.to(self._cast_label_dtype_to))
-        loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
+    def _calculate_loss(self, pred, target):
+        if hasarg(self.criterion.forward, "target"):
+            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
+        else:
+            loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
 
-        if self.global_step == 0:
-            logger.warning(f"The criterion {get_name(self.criterion)} has no `target` argument. "
-                            "In such cases, the System passes only the predicted values to the "
-                            "criterion. This is intended as a support for self-supervised "
-                            "losses where target is not needed.")
+            if self.global_step == 0 and not self.trainer.sanity_checking:
+                logger.warning(f"The criterion `{get_name(self.criterion, True)}` "
+                               "has no `target` argument. In such cases, the System "
+                               "passes only the predicted values to the criterion. "
+                               "This is intended as a support for self-supervised "
+                               "losses where target is not used.")
         return loss
 
     def _dataloader(self, mode):

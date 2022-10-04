@@ -12,21 +12,21 @@ trainer:
     #     find_unused_parameters: False
     precision: 16
     log_every_n_steps: 50
-    logger:
-        _target_: lightningbringer.logger.LightningBringerLogger
-        save_dir: ${project}/logs/${now:}
-        tensorboard: True
-        wandb: True
-        wandb_project: gender_nlst
+    # logger:
+    #     _target_: lightningbringer.logger.LightningBringerLogger
+    #     save_dir: ${project}/logs/${now:}
+    #     tensorboard: True
+    #     wandb: True
+    #     wandb_project: gender_nlst
 
-    callbacks:
-        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-          dirpath: ${trainer.logger.save_dir}/checkpoints
-          monitor: val/loss
-          mode: min
-          verbose: True
-          save_last: True
-          save_on_train_epoch_end: True
+    # callbacks:
+    #     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    #       dirpath: ${trainer.logger.save_dir}/checkpoints
+    #       monitor: val/loss
+    #       mode: min
+    #       verbose: True
+    #       save_last: True
+    #       save_on_train_epoch_end: True
 
 system:
     _target_: lightningbringer.System
@@ -58,7 +58,7 @@ system:
         #         - 7.739782016348774  # Calculated over the train set
     
     post_criterion_activation: ${import:torch.sigmoid}
-    cast_label_dtype_to: ${import:torch.float}
+    cast_target_dtype_to: ${import:torch.float}
 
     optimizers:
         _target_: torch.optim.Adam
