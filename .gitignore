@@ -137,4 +137,7 @@ wandb/
 tensorboard/
 .vscode/
 *.pkl
+
+# Pytorch models 
+*.torch
 prototyping.ipynb
