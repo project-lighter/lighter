@@ -41,15 +41,25 @@ def run(mode, omegaconf_args):
                          test_dataset=test_dataset,
                          test_sampler=test_sampler,
                          _convert_="all")
-    # Workaround (including `optimizers=None` above)  TODO: change with Hydra 1.3
-    # https://github.com/facebookresearch/hydra/issues/1758
+
+    ################ https://github.com/facebookresearch/hydra/issues/1758 ################
+    # This issue prevents us from referencing other objects through config. For example,
+    # the optimizer requires model's parameters, and instead of referring to the model,
+    # we instantiate the optimizer separately once the model has been instantiated.
+    # The same goes for the schedulers. Currently, because of this behavior, only
+    # one optimizer and scheduler are allowed. TODO: change it when Hydra fixes this issue.
+    # This workaround includes the `optimizers=None` and `schedulers=None` above).
+    from omegaconf import DictConfig
+    assert isinstance(conf.system.optimizers, DictConfig), "One optimizer!"
+    assert isinstance(conf.system.schedulers, (DictConfig, type(None))), "One scheduler!"
     system.optimizers = instantiate(conf.system.optimizers,
                                     params=system.model.parameters(),
                                     _convert_="all")
-    if system.schedulers is not None:
-        system.schedulers = instantiate(conf.system.schedulers,
-                                        optimizer=system.optimizers,
-                                        _convert_="all")
+    system.schedulers = instantiate(conf.system.schedulers,
+                                    optimizer=system.optimizers,
+                                    _convert_="all")
+    #######################################################################################
+
     # Run the mode (train, validate, test, etc.)
     getattr(trainer, mode)(model=system, **method_args)
 

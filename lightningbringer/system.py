@@ -163,7 +163,9 @@ class System(pl.LightningModule):
                                "has no `target` argument. In such cases, the System "
                                "passes only the predicted values to the criterion. "
                                "This is intended as a support for self-supervised "
-                               "losses where target is not used.")
+                               "losses where target is not used. If this is not the "
+                               "behavior you expected, redefine your criterion "
+                               "so that it has a `target` argument.")
         return loss
 
     def _dataloader(self, mode):
