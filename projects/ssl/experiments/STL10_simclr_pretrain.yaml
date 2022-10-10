@@ -8,11 +8,22 @@ trainer:
     max_epochs: 100
     check_val_every_n_epoch: 5
     accelerator: gpu
-    devices: 4
+    devices: 2
     strategy: ddp
     sync_batchnorm: True
     precision: 16
-    # log_every_n_steps: 50
+    logger:
+        _target_: lightningbringer.logger.LightningBringerLogger
+        save_dir: ${project}/logs/${now:}
+        tensorboard: True
+        wandb: True
+        wandb_project: STL10_simclr
+    callbacks:
+        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+          dirpath: ${trainer.logger.save_dir}/checkpoints
+          verbose: True
+          save_last: True
+          every_n_epochs: 1
 system:
     _target_: lightningbringer.System
     batch_size: "${eval: 256 // ${trainer.devices}}"

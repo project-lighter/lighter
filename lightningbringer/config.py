@@ -18,14 +18,22 @@ OmegaConf.register_new_resolver("import", lambda attr: import_attr(attr))
 OmegaConf.register_new_resolver("now", lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
-def init_config(omegaconf_args, mode, log=False):
+def init_config(config_path):
+    # Load the config file
+    conf = OmegaConf.load(config_path)
+    # Allows the framework to find user-defined, project-specific, modules
+    if conf.get("project", None) is not None:
+        import_project_as_module(conf.project)
+    return conf
+
+
+def init_config_from_cli(omegaconf_args, log=False):
     """Loads a YAML config file specified with 'config' key in command line arguments,
     parses the remaining comand line arguments as config options, and type checks it
     against the config's structured dataclass.
 
     Args:
         omegaconf_args (list): list of command line arguments.
-        mode (str): fit/validate/test/predict/tune.
         log (bool): if True, log the config.
 
     Returns:
@@ -37,17 +45,14 @@ def init_config(omegaconf_args, mode, log=False):
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
 
-    main_keys = ["config", "trainer", "system", "project"]
     # Filter out arguments that are passed to the Trainer.fit() or similar methods
+    main_keys = ["config", "trainer", "system", "project"]
     method_args = {k: cli.pop(k) for k in list(cli) if k.split(".")[0] not in main_keys}
-    # Load the config file
-    conf = OmegaConf.load(cli.pop("config"))
+
+    # Load the config file and import the project module
+    conf = init_config(cli.pop("config"))
     # Merge the params of config file and those specified in cli (e.g. `system.batch_size=8`)
     conf = OmegaConf.merge(conf, cli)
-
-    # Allows the framework to find user-defined, project-specific, modules
-    if conf.get("project", None) is not None:
-        import_project_as_module(conf.project)
 
     # Merge conf and the conf dataclass for type checking
     conf = OmegaConf.merge(construct_structured_config(conf), conf)
