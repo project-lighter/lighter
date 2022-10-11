@@ -49,8 +49,17 @@ def init_system(conf, mode=None):
     system.optimizers = instantiate(conf.system.optimizers,
                                     params=system.model.parameters(),
                                     _convert_="all")
-    system.schedulers = instantiate(conf.system.schedulers,
-                                    optimizer=system.optimizers,
-                                    _convert_="all")
+
+    # Handles the PL scheduler dicts. This won't be needed once the Hydra issue is resolved.
+    # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.core.LightningModule.html#pytorch_lightning.core.LightningModule.configure_optimizers
+    if "scheduler" in conf.system.schedulers:
+        system.schedulers = instantiate(conf.system.schedulers,
+                                        scheduler={"optimizer": system.optimizers},
+                                        _convert_="all")
+    else:
+        system.schedulers = instantiate(conf.system.schedulers,
+                                        optimizer=system.optimizers,
+                                        _convert_="all")
+
     #######################################################################################
     return system

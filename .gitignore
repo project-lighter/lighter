@@ -141,3 +141,4 @@ tensorboard/
 # Pytorch models 
 *.torch
 prototyping.ipynb
+checkpoints/
