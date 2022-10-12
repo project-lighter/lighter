@@ -11,37 +11,37 @@ def interface():
 
 # Train
 @interface.command(help="TODO")
-@click.argument("omegaconf_args", nargs=-1)
-def train(omegaconf_args):
-    run('fit', omegaconf_args)
+@click.argument("args", nargs=-1)
+def train(args):
+    run('fit', args)
 
 
 # Validate
 @interface.command(help="TODO")
-@click.argument("omegaconf_args", nargs=-1)
-def validate(omegaconf_args):
-    run('validate', omegaconf_args)
+@click.argument("args", nargs=-1)
+def validate(args):
+    run('validate', args)
 
 
 # Predict
 @interface.command(help="TODO")
-@click.argument("omegaconf_args", nargs=-1)
-def predict(omegaconf_args):
-    run('predict', omegaconf_args)
+@click.argument("args", nargs=-1)
+def predict(args):
+    run('predict', args)
 
 
 # Test
 @interface.command(help="TODO")
-@click.argument("omegaconf_args", nargs=-1)
-def test(omegaconf_args):
-    run('test', omegaconf_args)
+@click.argument("args", nargs=-1)
+def test(args):
+    run('test', args)
 
 
 # Tune
 @interface.command(help="TODO")
-@click.argument("omegaconf_args", nargs=-1)
-def tune(omegaconf_args):
-    run('tune', omegaconf_args)
+@click.argument("args", nargs=-1)
+def tune(args):
+    run('tune', args)
 
 
 if __name__ == "__main__":

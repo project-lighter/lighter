@@ -1,6 +1,7 @@
 import inspect
 import random
 
+from loguru import logger
 import torch
 import torchvision
 from torch.nn import Identity, Module, Sequential
@@ -147,6 +148,21 @@ def dot_notation_setattr(obj, attr, value):
         splitted = attr.split('.')
         dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
 
+def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
+    """Replaces the specified layer of the network with a layer.
+    Useful for removing the last layer of a network to be used as a backbone
+    of an SSL model. 
+
+    Args:
+        model (Module): PyTorch model to be edited
+        layer_name (string): Name of the layer which will be replaced with an
+            Identity function. Dot-notation supported, e.g. "layer10.fc". 
+
+    Returns:
+        Module: PyTorch model with Identity layer at the specified location.
+    """
+    dot_notation_setattr(model, layer_name, new_layer)
+    return model
 
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.

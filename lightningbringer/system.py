@@ -1,3 +1,4 @@
+import os
 import sys
 from functools import partial
 from typing import Callable, List, Optional, Union
@@ -41,13 +42,10 @@ class System(pl.LightningModule):
                  test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
-                 log_pred_as: Optional[str] = None,
-                 debug: bool = False):
+                 log_pred_as: Optional[str] = None):
 
         super().__init__()
         self._init_placeholders_for_dataloader_and_step_methods()
-
-        self.debug = debug
 
         # Model setup
         self.model = model
@@ -147,7 +145,7 @@ class System(pl.LightningModule):
                 self._log_by_type(name, eval(key), data_type, on_step=on_step, on_epoch=True)
 
         # Debug message
-        if self.debug:
+        if os.getenv("DEBUG") in ["1", "True", "true"]:
             debug_message(mode, input, target, pred, step_metrics, loss)
 
         return loss

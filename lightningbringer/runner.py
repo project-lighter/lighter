@@ -6,8 +6,8 @@ from loguru import logger
 from lightningbringer.config import init_config_from_cli
 
 
-def run(mode, omegaconf_args):
-    conf, method_args = init_config_from_cli(omegaconf_args, log=True)
+def run(mode, args):
+    conf, method_args = init_config_from_cli(args, log=True)
     trainer = init_trainer(conf)
     system = init_system(conf, mode)
     # Run the mode (train, validate, test, etc.)

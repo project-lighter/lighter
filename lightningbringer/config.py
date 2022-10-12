@@ -27,20 +27,20 @@ def init_config(config_path):
     return conf
 
 
-def init_config_from_cli(omegaconf_args, log=False):
+def init_config_from_cli(args, log=False):
     """Loads a YAML config file specified with 'config' key in command line arguments,
     parses the remaining comand line arguments as config options, and type checks it
     against the config's structured dataclass.
 
     Args:
-        omegaconf_args (list): list of command line arguments.
+        args (list): list of command line arguments.
         log (bool): if True, log the config.
 
     Returns:
         omegaconf.DictConfig: configuration
     """
 
-    cli = OmegaConf.from_dotlist(omegaconf_args)
+    cli = OmegaConf.from_dotlist(args)
     if cli.get("config", None) is None:
         logger.error("Please provide the path to a YAML config using `config` option. Exiting.")
         sys.exit()
