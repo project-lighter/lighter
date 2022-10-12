@@ -1,7 +1,7 @@
 # Installation
 
 ```
-git clone https://github.com/ibro45/lightningbringer
-cd lightningbringer
+git clone https://github.com/ibro45/lighter
+cd lighter
 pip install -e .  # flag -e (editable)
 ```

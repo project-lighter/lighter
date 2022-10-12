@@ -5,7 +5,7 @@ from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
 from pathlib import Path
 
-class LightningBringerLogger(LightningLoggerBase):
+class LighterLogger(LightningLoggerBase):
 
     def __init__(self,
                  save_dir,
@@ -37,7 +37,7 @@ class LightningBringerLogger(LightningLoggerBase):
 
     @property
     def name(self):
-        return "LightningBringerLogger"
+        return "LighterLogger"
 
     @property
     @rank_zero_experiment

@@ -1,12 +1,12 @@
 import click
 
-from lightningbringer.runner import run
+from lighter.runner import run
 
 
 # Interface
 @click.group()
 def interface():
-    """lightningbringer"""
+    """lighter"""
 
 
 # Train

@@ -1,4 +1,4 @@
-project: /home/ibro/Projects/lightningbringer/projects/nlst
+project: /home/ibro/Projects/lighter/projects/nlst
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -13,7 +13,7 @@ trainer:
     precision: 16
     log_every_n_steps: 50
     logger:
-        _target_: lightningbringer.logger.LightningBringerLogger
+        _target_: lighter.logger.LighterLogger
         save_dir: ${project}/logs/${now:}
         tensorboard: True
         wandb: True
@@ -29,7 +29,7 @@ trainer:
           save_on_train_epoch_end: True
 
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     batch_size: 8
     pin_memory: True
     num_workers: 3

@@ -1,4 +1,4 @@
-project: /home/ibro/Projects/lightningbringer/projects/nlst
+project: /home/ibro/Projects/lighter/projects/nlst
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -27,7 +27,7 @@ trainer:
           save_last: True
 
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     debug: True
     batch_size: 2
     pin_memory: True

@@ -6,7 +6,7 @@ from tqdm import tqdm
 import SimpleITK as sitk
 import numpy as np
 
-sys.path.append("/home/ibrahim/projects/lightningbringer/projects/nlst/")
+sys.path.append("/home/ibrahim/projects/lighter/projects/nlst/")
 from datasets.utils import misc, sitk_utils
 
 mask_sizes = {}

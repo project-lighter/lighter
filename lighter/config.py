@@ -9,7 +9,7 @@ from pathlib import Path
 from loguru import logger
 from omegaconf import MISSING, OmegaConf
 
-from lightningbringer.utils import import_attr
+from lighter.utils import import_attr
 
 OmegaConf.register_new_resolver("eval", eval)
 # `${import:<ATTR>}` can be used to import an attribute via config. E.g. `${import:torch.float}`

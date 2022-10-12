@@ -12,12 +12,12 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-from lightningbringer.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
+from lighter.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
                                     preprocess_image, wrap_into_list, debug_message,
                                     reshape_pred_if_single_value_prediction)
 
 
-class System(pl.LightningModule):
+class LighterSystem(pl.LightningModule):
 
     def __init__(self,
                  model: Module,
@@ -158,7 +158,7 @@ class System(pl.LightningModule):
 
             if self.global_step == 0 and not self.trainer.sanity_checking:
                 logger.warning(f"The criterion `{get_name(self.criterion, True)}` "
-                               "has no `target` argument. In such cases, the System "
+                               "has no `target` argument. In such cases, the LighterSystem "
                                "passes only the predicted values to the criterion. "
                                "This is intended as a support for self-supervised "
                                "losses where target is not used. If this is not the "
@@ -261,7 +261,7 @@ class System(pl.LightningModule):
 
     def _init_placeholders_for_dataloader_and_step_methods(self):
         """LightningModule checks for `..._dataloader()`and `..._step()` methods at init
-        before calling `self.setup()`. However, in `System`, these methods are dynamically
+        before calling `self.setup()`. However, in `LighterSystem`, these methods are dynamically
         defined in `self.setup()`. To circumvent this, we set `..._dataloader()`
         and `..._step()` placeholders during the object's initialization.
         """

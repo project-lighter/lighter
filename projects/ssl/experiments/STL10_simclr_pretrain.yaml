@@ -1,7 +1,7 @@
 # Replicating the experiment from 
 # https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial17/SimCLR.html
 
-project: /home/ibro/Projects/lightningbringer/projects/ssl
+project: /home/ibro/Projects/lighter/projects/ssl
 trainer:
     _target_: pytorch_lightning.Trainer
     benchmark: true
@@ -13,7 +13,7 @@ trainer:
     sync_batchnorm: True
     precision: 16
     logger:
-        _target_: lightningbringer.logger.LightningBringerLogger
+        _target_: lighter.logger.LighterLogger
         save_dir: ${project}/logs/${now:}
         tensorboard: True
         wandb: True
@@ -25,7 +25,7 @@ trainer:
           save_last: True
           every_n_epochs: 1
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     batch_size: "${eval: 256 // ${trainer.devices}}"
     pin_memory: true
     drop_last_batch: True  # Used in SSL cases because of negatives
@@ -39,7 +39,7 @@ system:
             _target_: torchvision.models.resnet18
             pretrained: False
             num_classes: ${system.model.num_ftrs}
-            # _target_: lightningbringer.utils.replace_layer_with_identity
+            # _target_: lighter.utils.replace_layer_with_identity
             # layer_name: fc
             # model:
             #     _target_: torchvision.models.resnet18
@@ -66,7 +66,7 @@ system:
         root: datasets/cifar10
         download: true
         transform:
-            _target_: lightningbringer.transforms.Duplicate
+            _target_: lighter.transforms.Duplicate
             transforms1:
                 _target_: torchvision.transforms.Compose
                 transforms:

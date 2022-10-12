@@ -3,7 +3,7 @@ import sys
 from hydra.utils import instantiate
 from loguru import logger
 
-from lightningbringer.config import init_config_from_cli
+from lighter.config import init_config_from_cli
 
 
 def run(mode, args):
@@ -19,7 +19,7 @@ def init_trainer(conf):
 
 
 def init_system(conf, mode=None):
-    # Don't instantiate datasets and samplers that won't be used in the run
+    # Datasets and samplers not used in the run won't be instantiated
     if mode in ["fit", "tune"]:
         conf.system.test_dataset = None
         conf.system.test_sampler = None

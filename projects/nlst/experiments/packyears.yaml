@@ -1,4 +1,4 @@
-project: /home/ibrahim/projects/lightningbringer/projects/nlst
+project: /home/ibrahim/projects/lighter/projects/nlst
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -7,7 +7,7 @@ trainer:
     devices: 1
     precision: 16
     deterministic: True
-    default_root_dir: /home/ibrahim/projects/lightningbringer/projects/nlst/logs
+    default_root_dir: /home/ibrahim/projects/lighter/projects/nlst/logs
     logger:
         - _target_: pytorch_lightning.loggers.WandbLogger
           save_dir: ${trainer.default_root_dir}
@@ -15,7 +15,7 @@ trainer:
 
 
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     batch_size: 4
     pin_memory: True
     num_workers: 8

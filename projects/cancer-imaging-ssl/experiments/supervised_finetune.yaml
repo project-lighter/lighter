@@ -12,7 +12,7 @@ trainer:
         find_unused_parameters: False
     log_every_n_steps: 50
     logger:
-        _target_: lightningbringer.logger.LightningBringerLogger
+        _target_: lighter.logger.LighterLogger
         save_dir: ${project}/logs/${now:}
         tensorboard: True
         wandb: True
@@ -28,7 +28,7 @@ trainer:
           save_on_train_epoch_end: True
 
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     batch_size: 32
     pin_memory: True
     num_workers: 3
@@ -39,7 +39,7 @@ system:
     model:
         _target_: project.models.Resnet3D
         num_classes: 1
-        pretrained: "/home/suraj/Repositories/lightningbringer/projects/cancer-imaging-ssl/pretrained_model/model.torch"
+        pretrained: "/home/suraj/Repositories/lighter/projects/cancer-imaging-ssl/pretrained_model/model.torch"
 
     post_criterion_activation: ${import:torch.sigmoid}
     cast_target_dtype_to: ${import:torch.float}

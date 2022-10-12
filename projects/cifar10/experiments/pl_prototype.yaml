@@ -7,14 +7,14 @@ trainer:
     devices: 0
     
     logger:
-        - _target_: lightningbringer.logger.LightningBringerLogger
+        - _target_: lighter.logger.LighterLogger
           save_dir: ${project}/logs/${now:}
           tensorboard: True
           wandb: True
 
 
 system:
-    _target_: lightningbringer.System
+    _target_: lighter.LighterSystem
     batch_size: 512
     pin_memory: True
     num_workers: 4
