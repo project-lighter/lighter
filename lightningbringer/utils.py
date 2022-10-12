@@ -149,17 +149,15 @@ def dot_notation_setattr(obj, attr, value):
         dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
 
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
-    """Replaces the specified layer of the network with a layer.
-    Useful for removing the last layer of a network to be used as a backbone
-    of an SSL model. 
+    """Replaces the specified layer of the network with another layer.
 
     Args:
         model (Module): PyTorch model to be edited
-        layer_name (string): Name of the layer which will be replaced with an
-            Identity function. Dot-notation supported, e.g. "layer10.fc". 
+        layer_name (string): Name of the layer which will be replaced.
+            Dot-notation supported, e.g. "layer10.fc". 
 
     Returns:
-        Module: PyTorch model with Identity layer at the specified location.
+        Module: PyTorch model with the new layer set at the specified location.
     """
     dot_notation_setattr(model, layer_name, new_layer)
     return model
@@ -177,8 +175,7 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     Returns:
         Module: PyTorch model with Identity layer at the specified location.
     """
-    dot_notation_setattr(model, layer_name, Identity())
-    return model
+    return replace_layer_with(model, layer_name, Identity())
 
 
 def remove_last_layer_sequentially(model: Module()) -> Sequential:
