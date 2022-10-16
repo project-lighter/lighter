@@ -1,13 +1,15 @@
 import inspect
 import random
+from typing import Any, Callable, List
 
-from loguru import logger
 import torch
 import torchvision
+from loguru import logger
 from torch.nn import Identity, Module, Sequential
+from torch.utils.data import DataLoader
 
 
-def import_attr(module_attr):
+def import_attr(module_attr: str) -> Any:
     """Import using dot-notation string, e.g., 'torch.nn.Module'.
 
     Args:
@@ -24,13 +26,32 @@ def import_attr(module_attr):
     return getattr(module, attr)
 
 
-def hasarg(callable, arg_name):
+def hasarg(callable: Callable, arg_name: str) -> bool:
+    """Check if a function, class, or method has an argument with the specified name.
+
+    Args:
+        callable (Callable): function, class, or method to inspect.
+        arg_name (str): argument name to check for.
+
+    Returns:
+        bool: `True` if the argument if the specified name exists.
+    """
+
     args = inspect.signature(callable).parameters.keys()
     return arg_name in args
 
 
-def get_name(x, include_module_name=False):
-    """Get the name of an object, class or function."""
+def get_name(x: Callable, include_module_name: bool = False) -> str:
+    """Get the name of an object, class or function.
+
+    Args:
+        x (Callable): object, class or function.
+        include_module_name (bool, optional): whether to include the name of the module from
+            which it comes. Defaults to False.
+
+    Returns:
+        str: name
+    """
     name = type(x).__name__ if isinstance(x, object) else x.__name__
     if include_module_name:
         module = type(x).__module__ if isinstance(x, object) else x.__module__
@@ -38,8 +59,15 @@ def get_name(x, include_module_name=False):
     return name
 
 
-def wrap_into_list(x):
-    """Wrap the input into a list if it is not a list. If it is a None, return an empty list."""
+def wrap_into_list(x: Any) -> List:
+    """Wrap the input into a list if it is not a list. If it is a None, return an empty list.
+
+    Args:
+        x (Any): input to wrap into a list.
+
+    Returns:
+        List: output list.
+    """
     if isinstance(x, list):
         return x
     if isinstance(x, tuple):
@@ -49,20 +77,20 @@ def wrap_into_list(x):
     return [x]
 
 
-def collate_fn_replace_corrupted(batch, dataset):
+def collate_fn_replace_corrupted(batch: torch.Tensor, dataset: DataLoader) -> torch.Tensor:
     """Collate function that allows to replace corrupted examples in the batch.
-    It expect that the dataloader returns 'None' when that occurs.
-    The 'None's in the batch are replaced with other, randomly-selected, examples.
+    The dataloader should return `None` when that occurs.
+    The `None`s in the batch are replaced with other, randomly-selected, examples.
 
     Args:
         batch (torch.Tensor): batch from the DataLoader.
-        dataset (torch.utils.data.Dataset): dataset that the DataLoader is passing through.
-            Needs to be fixed in place with functools.partial before passing it to DataLoader's
-            'collate_fn' option as 'collate_fn' should only have a single argument - batch.
-            E.g.:
-                collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)
-                loader = DataLoader(dataset, ..., collate_fn=collate_fn)
-
+        dataset (Dataset): dataset that the DataLoader is passing through. Needs to be fixed
+            in place with functools.partial before passing it to DataLoader's 'collate_fn' option
+            as 'collate_fn' should only have a single argument - batch. Example:
+                ```
+                collate_fn = functools.partial(collate_fn_replace_corrupted, dataset=dataset)`
+                loader = DataLoader(dataset, ..., collate_fn=collate_fn).
+                ```
     Returns:
         torch.Tensor: batch with new examples instead of corrupted ones.
     """
@@ -82,8 +110,8 @@ def collate_fn_replace_corrupted(batch, dataset):
     return torch.utils.data.dataloader.default_collate(batch)
 
 
-def preprocess_image(image):
-    """Preprocess the image for logging. If it is a batch of multiple images,
+def preprocess_image(image: torch.Tensor) -> torch.Tensor:
+    """Preprocess the image before logging it. If it is a batch of multiple images,
     it will create a grid image of them. In case of 3D, a single image is displayed
     with slices stacked vertically, while a batch as a grid where each column is
     a different 3D image.
@@ -107,7 +135,22 @@ def preprocess_image(image):
     return image
 
 
-def debug_message(mode, input, target, pred, metrics, loss):
+def debug_message(mode: str,
+                  input: torch.Tensor,
+                  target: torch.Tensor,
+                  pred: torch.Tensor,
+                  metrics: Dict,
+                  loss: torch.Tensor) -> None:
+    """Logs the debug message.
+
+    Args:
+        mode (str): the mode of the system.
+        input (torch.Tensor): input.
+        target (torch.Tensor): target.
+        pred (torch.Tensor): prediction.
+        metrics (Dict): a dict where keys are the metric names and values the measured values.
+        loss (torch.Tensor): calculated loss.
+    """
     is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
     msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
     for name in ["input", "target", "pred"]:
@@ -119,10 +162,18 @@ def debug_message(mode, input, target, pred, metrics, loss):
     logger.debug(msg)
 
 
-def reshape_pred_if_single_value_prediction(pred, target):
+def reshape_pred_if_single_value_prediction(pred: torch.Tensor,
+                                            target: torch.Tensor) -> torch.Tensor:
     """When the task is to predict a single value, pred and target dimensions often
     mismatch - dataloader returns the value in the (B) shape, while the network
     returns predictions in the (B, 1) shape, where the second dim is redundant.
+
+    Args:
+        pred (torch.Tensor): predicted tensor.
+        target (torch.Tensor): target tensor.
+
+    Returns:
+        torch.Tensor: reshaped predicted tensor if that was necessary.
     """
     if isinstance(pred, torch.Tensor) and target is not None:
         if len(pred.shape) == 2 and len(target.shape) == 1 == pred.shape[1]:
@@ -130,23 +181,21 @@ def reshape_pred_if_single_value_prediction(pred, target):
     return pred
 
 
-def dot_notation_setattr(obj, attr, value):
-    # https://gist.github.com/alixedi/4695abcd259d1493ac9c
+def dot_notation_setattr(obj: Callable, attr: str, value: Any):
     """Set object's attribute. May use dot notation.
 
-    >>> class C(object): pass
-    >>> a = C()
-    >>> a.b = C()
-    >>> a.b.c = 4
-    >>> rec_setattr(a, 'b.c', 2)
-    >>> a.b.c
-    2
+    Args:
+        obj (Callable): object.
+        attr (str): attribute name of the object.
+        value (Any): attribute value to be set.
     """
+    # https://gist.github.com/alixedi/4695abcd259d1493ac9c
     if '.' not in attr:
         setattr(obj, attr, value)
     else:
         splitted = attr.split('.')
         dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
+
 
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
     """Replaces the specified layer of the network with another layer.
@@ -161,6 +210,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
     """
     dot_notation_setattr(model, layer_name, new_layer)
     return model
+
 
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.

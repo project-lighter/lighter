@@ -1,7 +1,7 @@
 import os
 import sys
 from functools import partial
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
@@ -13,8 +13,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
 from lighter.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
-                                    preprocess_image, wrap_into_list, debug_message,
-                                    reshape_pred_if_single_value_prediction)
+                           preprocess_image, wrap_into_list, debug_message,
+                           reshape_pred_if_single_value_prediction)
 
 
 class LighterSystem(pl.LightningModule):
@@ -42,8 +42,56 @@ class LighterSystem(pl.LightningModule):
                  test_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
-                 log_pred_as: Optional[str] = None):
+                 log_pred_as: Optional[str] = None) -> None:
+        """_summary_
 
+        Args:
+            model (Module): the model.
+            batch_size (int): batch size.
+            drop_last_batch (bool, optional): whether the last batch in the dataloader
+                should be dropped. Defaults to False.
+            num_workers (int, optional): number of dataloader workers. Defaults to 0.
+            pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
+            optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
+                a single or a list of optimizers. Defaults to None.
+            schedulers (Optional[Union[Callable, List[Callable]]], optional): 
+                a single or a list of schedulers. Defaults to None.
+            criterion (Optional[Callable], optional):
+                criterion/loss function. Defaults to None.
+            cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
+                specified type before calculating the loss. May be necessary for some criterions.
+                Defaults to None.
+            post_criterion_activation (Optional[str], optional): some criterions
+                (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
+                However, to calculate the metrics and log the data, it may be necessary to activate
+                the predictions. Defaults to None.
+            patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
+                either a class with a `__call__` method or function that accepts two arguments - 
+                first one is the input tensor, and the other one the model itself. It should
+                perform the inference over the patches and return the aggregated/averaged output.
+                Defaults to None.
+            train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
+                They have to be implemented using `torchmetrics`. Defaults to None.
+            val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
+                They have to be implemented using `torchmetrics`. Defaults to None.
+            test_metrics (Optional[Union[Metric, List[Metric]]], optional): test metric(s).
+                They have to be implemented using `torchmetrics`. Defaults to None.
+            train_dataset (Optional[Union[Dataset, List[Dataset]]], optional): training dataset(s).
+                Defaults to None.
+            val_dataset (Optional[Union[Dataset, List[Dataset]]], optional): validation dataset(s).
+                Defaults to None.
+            test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
+                Defaults to None.
+            train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
+            val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
+            test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
+            log_input_as (Optional[str], optional): how the input tensors should be logged.
+                ['scalar', 'image_batch', 'image_single']. Defaults to None.
+            log_target_as (Optional[str], optional): how the target tensors should be logged.
+                ['scalar', 'image_batch', 'image_single']. Defaults to None.
+            log_pred_as (Optional[str], optional): how the predicted tensors should be logged.
+                ['scalar', 'image_batch', 'image_single']. Defaults to None.
+        """
         super().__init__()
         self._init_placeholders_for_dataloader_and_step_methods()
 
@@ -84,21 +132,32 @@ class LighterSystem(pl.LightningModule):
         self._log_target_as = log_target_as
         self._log_pred_as = log_pred_as
 
-    def forward(self, input):
-        """Forward pass. Multi-input models are supported."""
+    def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
+        """Forward pass. Multi-input models are supported.
+
+        Args:
+            input (Union[torch.Tensor, List, Tuple]): input to the model.
+
+        Returns:
+            Union[torch.Tensor, List, Tuple]: output of the model.
+        """
         return self.model(input) if not isinstance(input, (list, tuple)) else self.model(*input)
 
-    def _step(self, batch, batch_idx, mode):
+    def _step(self,
+              batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
+              batch_idx: int,
+              mode: str) -> Union[torch.Tensor, None]:
         """Step for all modes ('train', 'val', 'test')
 
         Args:
-            batch (Tuple(torch.Tensor, Any)): output of the DataLoader.
-            batch_idx (int): index of the batch. Not using it, but Pytorch Lightning requires it.
-            mode (str): mode in which the system is. ['train', 'val', 'test']
+            batch (Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]]):
+                output of the DataLoader and input to the model.
+            batch_idx (int): index of the batch. Not used, but Lightning requires it.
+            mode (str): mode in which the system is.
 
         Returns:
-            Union[torch.Tensor, None]: returns the calculated loss in training and validation step,
-                and None in test step.
+            Union[torch.Tensor, None]: returns the calculated loss in the training and
+                validation step, and None in the test step.
         """
         input, target = batch
         # Predict
@@ -150,7 +209,18 @@ class LighterSystem(pl.LightningModule):
 
         return loss
 
-    def _calculate_loss(self, pred, target):
+    def _calculate_loss(self,
+                        pred: Union[torch.Tensor, List, Tuple],
+                        target: Union[torch.Tensor, None]) -> torch.Tensor:
+        """_summary_
+
+        Args:
+            pred (Union[torch.Tensor, List, Tuple]): the predicted values from the model.
+            target (Union[torch.Tensor, None]): the target/label.
+
+        Returns:
+            torch.Tensor: the calculated loss.
+        """
         if hasarg(self.criterion.forward, "target"):
             loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
         else:
@@ -166,7 +236,7 @@ class LighterSystem(pl.LightningModule):
                                "so that it has a `target` argument.")
         return loss
 
-    def _dataloader(self, mode):
+    def _dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
         Includes a collate function that enables the DataLoader to replace
         None's (alias for corrupted examples) in the batch with valid examples.
@@ -174,10 +244,10 @@ class LighterSystem(pl.LightningModule):
         corrupted data by returning None instead.
 
         Args:
-            mode (str): mode for which to create the dataloader. ['train', 'val', 'test']
+            mode (str): mode for which to create the dataloader ['train', 'val', 'test'].
 
         Returns:
-            torch.utils.data.DataLoader: instantiated DataLoader.
+            DataLoader: instantiated DataLoader.
         """
         dataset = getattr(self, f"{mode}_dataset")
         sampler = getattr(self, f"{mode}_sampler")
@@ -205,8 +275,12 @@ class LighterSystem(pl.LightningModule):
                           pin_memory=self.pin_memory,
                           collate_fn=collate_fn)
 
-    def configure_optimizers(self):
-        """LightningModule method. Returns optimizers and, if defined, schedulers."""
+    def configure_optimizers(self) -> Dict:
+        """LightningModule method. Returns optimizers and, if defined, schedulers.
+
+        Returns:
+            Dict: a dict of optimizers and schedulers.
+        """
         if not self.optimizers:
             logger.error("Please specify 'optimizers' in the config. Exiting.")
             sys.exit()
@@ -214,20 +288,18 @@ class LighterSystem(pl.LightningModule):
             return self.optimizers
         return {"optimizer": self.optimizers, "lr_scheduler": self.schedulers}
 
-    def setup(self, stage):
-        """LightningModule method. Called after the initialization but before running the system.
-        Here, it checks if the required dataset is provided in the config and sets up
-        LightningModule methods for the stage (mode) in which the system is.
+    def setup(self, stage: str) -> None:
+        """Automatically called by the LightningModule after the initialization.
+        `LighterSystem`'s setup checks if the required dataset is provided in the config and
+        sets up LightningModule methods for the stage in which the system is.
 
         Args:
-            stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test']
-                # TODO: update when all stages included
+            stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test'].
         """
         dataset_required_by_stage = {
             "fit": "train_dataset",
             "validate": "val_dataset",
             "test": "test_dataset",
-            # "predict": TODO
         }
         dataset_name = dataset_required_by_stage[stage]
         if getattr(self, dataset_name) is None:
@@ -259,11 +331,11 @@ class LighterSystem(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
-    def _init_placeholders_for_dataloader_and_step_methods(self):
-        """LightningModule checks for `..._dataloader()`and `..._step()` methods at init
-        before calling `self.setup()`. However, in `LighterSystem`, these methods are dynamically
-        defined in `self.setup()`. To circumvent this, we set `..._dataloader()`
-        and `..._step()` placeholders during the object's initialization.
+    def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
+        """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
+        in the `self.setup()` method. However, `LightningModule` excepts them to be defined at
+        the initialization. To prevent it from throwing an error, the `..._dataloader()` and
+        `..._step()` are initially defined as `lambda: None`, before `self.setup()` is called.
         """
         self.train_dataloader = lambda: None
         self.val_dataloader = lambda: None
@@ -273,15 +345,16 @@ class LighterSystem(pl.LightningModule):
         self.test_step = lambda: None
         self._lightning_module_methods_defined = False
 
-    def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True):
-        """Log data according to its type at each epoch and, during training,
-        at each logging step.
+    def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True) -> None:
+        """Log the data according to its type.
 
         Args:
             name (str): the name under which the data will be logged.
             data (Any): data to log.
             data_type (str): type of the data to be logged.
-                ['scalar', 'image_batch', 'image_single']  # TODO update when there's more
+                ['scalar', 'image_batch', 'image_single']
+            on_step (bool, optional): whether to log at each step. Defaults to True.
+            on_epoch (bool, optional): whether to log at each epoch. Defaults to True.
         """
         # Scalars
         if data_type == "scalar":

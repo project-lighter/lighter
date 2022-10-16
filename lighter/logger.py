@@ -1,28 +1,32 @@
 from datetime import datetime
+from typing import List
 
 from pytorch_lightning.loggers import (LightningLoggerBase, TensorBoardLogger, WandbLogger)
 from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
 from pathlib import Path
 
+
 class LighterLogger(LightningLoggerBase):
 
     def __init__(self,
-                 save_dir,
-                 timestamp=None,
-                 tensorboard=False,
-                 wandb=False,
-                 wandb_project=None):
+                 save_dir: str,
+                 tensorboard: bool = False,
+                 wandb: bool = False,
+                 wandb_project: str = None):
+        """Logger that unifies tensorboard and wandb loggers. 
+
+        Args:
+            save_dir (str): path to the directory where the logging data is stored.
+            tensorboard (bool, optional): whether to use tensorboard. Defaults to False.
+            wandb (bool, optional): whether to use wandb. Defaults to False.
+            wandb_project (str, optional): wandb project name. Defaults to None.
+        """
+
         assert True in [tensorboard, wandb], "You need to use at least one logger!"
-
-        if timestamp == "auto":
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        if timestamp is not None:
-            save_dir += f"/{timestamp}"
-
         Path(save_dir).mkdir(parents=True, exist_ok=True)
         self._save_dir = save_dir
-        
+
         self.tensorboard_logger = None
         if tensorboard:
             self.tensorboard_logger = TensorBoardLogger(save_dir=self._save_dir,
@@ -31,18 +35,15 @@ class LighterLogger(LightningLoggerBase):
 
         self.wandb_logger = None
         if wandb:
-            self.wandb_logger = WandbLogger(save_dir=self._save_dir,
-                                            project=wandb_project,
-                                            name=timestamp)
+            self.wandb_logger = WandbLogger(save_dir=self._save_dir, project=wandb_project)
 
     @property
     def name(self):
-        return "LighterLogger"
+        return ""
 
     @property
     @rank_zero_experiment
     def experiment(self):
-        # Return the experiment object associated with this logger.
         experiments = []
         if self.wandb_logger is not None:
             experiment.append(self.wandb_logger.experiment)
@@ -52,7 +53,6 @@ class LighterLogger(LightningLoggerBase):
 
     @property
     def version(self):
-        # Return the experiment version, int or str.
         return self._save_dir.split("/")[-1]
 
     @rank_zero_only

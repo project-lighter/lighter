@@ -1,15 +1,19 @@
 import importlib
 import inspect
 import sys
-import typing
-from dataclasses import field, make_dataclass
+from dataclasses import dataclass, field, make_dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Union, get_origin
 
 from loguru import logger
-from omegaconf import MISSING, OmegaConf
+from omegaconf import MISSING, DictConfig, OmegaConf
 
 from lighter.utils import import_attr
+
+
+# Resolvers - functions that can be used from the config. For example, given a function with the
+# name `fn` that accepts two inputs, it can be called from configs as follows: `${fn: 1, 2}`.
 
 OmegaConf.register_new_resolver("eval", eval)
 # `${import:<ATTR>}` can be used to import an attribute via config. E.g. `${import:torch.float}`
@@ -18,7 +22,16 @@ OmegaConf.register_new_resolver("import", lambda attr: import_attr(attr))
 OmegaConf.register_new_resolver("now", lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
-def init_config(config_path):
+def init_config(config_path: str) -> DictConfig:
+    """Loads and returns the config from the given path and imports
+    the project module if specified.
+
+    Args:
+        config_path (str): path to the yaml file.
+
+    Returns:
+        DictConfig: configuration.
+    """
     # Load the config file
     conf = OmegaConf.load(config_path)
     # Allows the framework to find user-defined, project-specific, modules
@@ -27,17 +40,17 @@ def init_config(config_path):
     return conf
 
 
-def init_config_from_cli(args, log=False):
+def init_config_from_cli(args: list, log: bool = False) -> DictConfig:
     """Loads a YAML config file specified with 'config' key in command line arguments,
     parses the remaining comand line arguments as config options, and type checks it
     against the config's structured dataclass.
 
     Args:
         args (list): list of command line arguments.
-        log (bool): if True, log the config.
+        log (bool, optional): whether to log the config. Defaults to False.
 
     Returns:
-        omegaconf.DictConfig: configuration
+        DictConfig: configuration.
     """
 
     cli = OmegaConf.from_dotlist(args)
@@ -61,17 +74,17 @@ def init_config_from_cli(args, log=False):
     return conf, method_args
 
 
-def construct_structured_config(conf):
+def construct_structured_config(conf: DictConfig) -> DictConfig:
     """Dynamically constructs the structured config which is used as a default base for the config.
     It infers attributes' name, type and default value of any Trainer and System implementation
     and populates the structured config with it. This provides default values for the config
     when user hasn't specified or overriden them and it allows static type checking of the config.
 
     Args:
-        conf (omegaconf.DictConfig): non-structured config (in OmegaConf's vocabulary).
+        conf (DictConfig): non-structured config (in OmegaConf's vocabulary).
 
     Returns:
-        omegaconf.DictConfig: input config made structured.
+        DictConfig: input config made structured.
     """
     trainer = generate_omegaconf_dataclass("TrainerConfig", import_attr(conf.trainer["_target_"]))
     system = generate_omegaconf_dataclass("SystemConfig", import_attr(conf.system["_target_"]))
@@ -80,25 +93,25 @@ def construct_structured_config(conf):
         # Field name, type, default value
         ("trainer", trainer, trainer),
         ("system", system, system),
-        ("project", typing.Optional[str], field(default=None)),
+        ("project", Optional[str], field(default=None)),
     ]
     return OmegaConf.structured(make_dataclass("Config", fields))
 
 
-def generate_omegaconf_dataclass(dataclass_name, source):
+def generate_omegaconf_dataclass(dataclass_name: str, source: Callable) -> Callable:
     """Generate a dataclass compatible with OmegaConf that has attributes name, type and value
     as specified in the source's arguments. If a default value is not specified, OmegaConf's
-    "MISSING" is set instead. If an attribute has no type specified, then it is set to typing.Any.
-    Furthermore, if the type is a non-builtin class, it will be changed to typing.Dict, since
+    "MISSING" is set instead. If an attribute has no type specified, then it is set to Any.
+    Furthermore, if the type is a non-builtin class, it will be changed to Dict, since
     that class will be instantiated using the '_target_' key in the instance configuration.
-    Attributes that can have different types, achieved using Union, will become typing.Any
-    since OmegaConf doesn't support Union yet.
+    Attributes that can have different types, achieved using Union, will become Any since 
+    OmegaConf doesn't support Union yet.
 
     Args:
         dataclass_name (str): desired name of the dataclass.
         source (class or function): source of attributes for the dataclass.
     Returns:
-        dataclass: dataclass class (not object).
+        Callable: dataclass class (not object).
     """
 
     fields = [("_target_", str, f"{source.__module__}.{source.__name__}")]
@@ -112,16 +125,16 @@ def generate_omegaconf_dataclass(dataclass_name, source):
         annotation = param.annotation
         # If annotation is empty, set it to Any
         if annotation is param.empty:
-            annotation = typing.Any
+            annotation = Any
         # If an annotation is a class (but not a builtin one), set it to Dict.
         # This is because, in config, we can define an instance as a dict that
         # specifies its arguments and class type (with '_target_' key).
         if inspect.isclass(annotation) and annotation.__module__ != "builtins":
-            annotation = typing.Dict
+            annotation = Dict
         # TODO: Get rid of this when OmegaConf supports Union,
         # https://github.com/omry/omegaconf/issues/144
-        if typing.get_origin(annotation) == typing.Union:
-            annotation = typing.Any
+        if get_origin(annotation) == Union:
+            annotation = Any
 
         # Default value
         default_value = param.default if not param.default is param.empty else MISSING
@@ -130,7 +143,7 @@ def generate_omegaconf_dataclass(dataclass_name, source):
     return make_dataclass(dataclass_name, fields)
 
 
-def import_project_as_module(project):
+def import_project_as_module(project: str) -> None:
     """Given the path to the project, import it as a module with name 'project'.
 
     Args:

@@ -1,24 +1,51 @@
 import sys
+from typing import Any
 
 from hydra.utils import instantiate
 from loguru import logger
+from omegaconf import DictConfig
 
 from lighter.config import init_config_from_cli
 
 
-def run(mode, args):
+def run(trainer_method_name: str, args: list) -> None:
+    """Initializes the trainer and the system, passes the system to the trainer
+    and calls the specified trainer's method.
+
+    Args:
+        trainer_method_name (str): trainer's method that will be used. It's name is also
+            used to let the system know in which mode should it run.
+        args (list): command-line arguments passed when running Lighter's CLI.
+    """
     conf, method_args = init_config_from_cli(args, log=True)
     trainer = init_trainer(conf)
-    system = init_system(conf, mode)
+    system = init_system(conf, mode=trainer_method_name)
     # Run the mode (train, validate, test, etc.)
-    getattr(trainer, mode)(model=system, **method_args)
+    getattr(trainer, trainer_method_name)(model=system, **method_args)
 
 
-def init_trainer(conf):
+def init_trainer(conf: DictConfig) -> Any:
+    """Initialize the trainer given it's definition in the config.
+
+    Args:
+        conf (DictConfig): the experiment's config.
+
+    Returns:
+        Any: the trainer instance of a particular class.
+    """
     return instantiate(conf.trainer, _convert_="all")
 
 
-def init_system(conf, mode=None):
+def init_system(conf: DictConfig, mode: str = None) -> Any:
+    """Initialize the trainer given its definition in the config.
+
+    Args:
+        conf (DictConfig): the experiment's config.
+        mode (str, optional): Mode in which the system will be initialized. Defaults to None.
+
+    Returns:
+        Any: the sytem instance of a particular class.
+    """
     # Datasets and samplers not used in the run won't be instantiated
     if mode in ["fit", "tune"]:
         conf.system.test_dataset = None
@@ -43,7 +70,6 @@ def init_system(conf, mode=None):
     # The same goes for the schedulers. Currently, because of this behavior, only
     # one optimizer and scheduler are allowed. TODO: change it when Hydra fixes this issue.
     # This workaround includes the `optimizers=None` and `schedulers=None` above).
-    from omegaconf import DictConfig
     assert isinstance(conf.system.optimizers, DictConfig), "One optimizer!"
     assert isinstance(conf.system.schedulers, (DictConfig, type(None))), "One scheduler!"
     system.optimizers = instantiate(conf.system.optimizers,

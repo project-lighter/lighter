@@ -2,43 +2,48 @@ import click
 
 from lighter.runner import run
 
+trainer_method_desc = lambda method: (f"Run the `{method}()` method for the Trainer "
+                                      "")
+
 
 # Interface
 @click.group()
 def interface():
-    """lighter"""
+    """Lighter - config-based wrapper for PyTorch Lightning for
+    deep learning with little to no coding required.
+    """
 
 
 # Train
-@interface.command(help="TODO")
+@interface.command()
 @click.argument("args", nargs=-1)
 def train(args):
     run('fit', args)
 
 
 # Validate
-@interface.command(help="TODO")
+@interface.command()
 @click.argument("args", nargs=-1)
 def validate(args):
     run('validate', args)
 
 
 # Predict
-@interface.command(help="TODO")
+@interface.command()
 @click.argument("args", nargs=-1)
 def predict(args):
     run('predict', args)
 
 
 # Test
-@interface.command(help="TODO")
+@interface.command()
 @click.argument("args", nargs=-1)
 def test(args):
     run('test', args)
 
 
 # Tune
-@interface.command(help="TODO")
+@interface.command()
 @click.argument("args", nargs=-1)
 def tune(args):
     run('tune', args)
