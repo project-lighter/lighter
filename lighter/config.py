@@ -94,6 +94,7 @@ def construct_structured_config(conf: DictConfig) -> DictConfig:
         ("trainer", trainer, trainer),
         ("system", system, system),
         ("project", Optional[str], field(default=None)),
+        ("CONSTANTS", Optional[Dict], field(default=None))
     ]
     return OmegaConf.structured(make_dataclass("Config", fields))
 

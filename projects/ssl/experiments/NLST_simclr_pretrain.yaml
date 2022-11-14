@@ -1,0 +1,124 @@
+CONSTANTS:
+    PATCH_SIZE: [32, 320, 320]
+
+project: /home/ibro/Projects/lighter/projects/ssl
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  benchmark: True
+  max_epochs: 100
+  check_val_every_n_epoch: 5
+  accelerator: gpu
+  devices: 4
+  strategy: ddp
+  sync_batchnorm: True
+  precision: 16
+  log_every_n_steps: 1
+  logger:
+    _target_: lighter.logger.LighterLogger
+    save_dir: ${project}/logs/${now:}
+    tensorboard: False
+    wandb: True
+    wandb_project: NLST_simclr
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      dirpath: ${trainer.logger.save_dir}/checkpoints
+      verbose: True
+      save_last: True
+      every_n_epochs: 1
+
+system:
+  _target_: lighter.LighterSystem
+  batch_size: 20
+  pin_memory: True
+  drop_last_batch: True # Used in SSL cases because of negatives
+  num_workers: 3
+  log_input_as: "image_single"
+
+  model:
+    _target_: lightly.models.simclr.SimCLR
+    num_ftrs: 2048
+    out_dim: 128
+    backbone:
+      _target_: lighter.utils.replace_layer_with_identity
+      layer_name: fc
+      model:
+        _target_: monai.networks.nets.resnet.resnet50
+        pretrained: False
+        n_input_channels: 1
+        # widen_factor: 2
+  
+  criterion:
+    _target_: lightly.loss.ntx_ent_loss.NTXentLoss
+    temperature: 0.1
+    gather_distributed: True
+
+  optimizers:
+    _target_: torch.optim.Adam
+    lr: 5e-4
+    weight_decay: 1e-4
+  
+#   schedulers:
+#     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+#     T_max: ${trainer.max_epochs}
+#     eta_min: "${eval: ${system.optimizers.lr} // 50}"
+
+  train_metrics: null
+  val_metrics: "${system.train_metrics}"
+  test_metrics: "${system.train_metrics}"
+  
+  train_dataset:
+    _target_: project.datasets.nlst_ssl.NLSTDataset
+    mode: train
+    root_dir: /mnt/data1/NLST/
+    transform:
+      _target_: torchvision.transforms.Compose
+      transforms:
+        - _target_: lighter.transforms.SitkRandomSpacing
+          prob: 0.25
+          min_spacing: [0.4, 0.4, 2]
+          max_spacing: [1, 1, 3]
+          tolerance: null
+          default_value: -1024
+          interpolator: "linear"
+        - _target_: lighter.transforms.SitkToTensor
+          add_channel_dim: True
+        - # Scale from -1024 to 3072 to 0-1 and clip outside values
+          _target_: monai.transforms.ScaleIntensityRange
+          a_min: -1024
+          a_max: 3072
+          b_min: 0
+          b_max: 1
+          clip: True
+        - _target_: lighter.transforms.Duplicate
+          transforms1:
+            _target_: torchvision.transforms.Compose
+            transforms:
+              - _target_: torchvision.transforms.RandomApply
+                p: 0.25
+                transforms:
+                  - _target_: monai.transforms.RandSpatialCrop
+                    roi_size: [16, 64, 64]  # basically min_roi_size
+                    max_roi_size: ${CONSTANTS.PATCH_SIZE}
+                    random_size: True
+              - _target_: monai.transforms.SpatialPad
+                spatial_size: ${CONSTANTS.PATCH_SIZE}
+              # If the previous RandSpatialCrop wasn't called, the image might still be too big,
+              # here we crop it to the target size at a random location
+              - _target_: monai.transforms.RandSpatialCrop
+                roi_size: ${CONSTANTS.PATCH_SIZE}
+                random_size: False
+              - _target_: monai.transforms.RandFlip
+                prob: 0.25
+                spatial_axis: 2
+              - # RandHistogramShift serves purpose similar to color jitter
+                # by modifying the intensity histogram
+                _target_: monai.transforms.RandHistogramShift
+                prob: 0.5
+              - # RandGaussianSmooth is similar to SimCLR GaussianBlur
+                _target_: monai.transforms.RandGaussianSmooth
+                prob: 0.5
+
+          transforms2: "${.transforms1}"
+  val_dataset: null
+  test_dataset: null

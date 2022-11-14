@@ -227,13 +227,13 @@ class LighterSystem(pl.LightningModule):
             loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
 
             if self.global_step == 0 and not self.trainer.sanity_checking:
-                logger.warning(f"The criterion `{get_name(self.criterion, True)}` "
-                               "has no `target` argument. In such cases, the LighterSystem "
-                               "passes only the predicted values to the criterion. "
-                               "This is intended as a support for self-supervised "
-                               "losses where target is not used. If this is not the "
-                               "behavior you expected, redefine your criterion "
-                               "so that it has a `target` argument.")
+                logger.info(f"The criterion `{get_name(self.criterion, True)}` "
+                            "has no `target` argument. In such cases, the LighterSystem "
+                            "passes only the predicted values to the criterion. "
+                            "This is intended as a support for self-supervised "
+                            "losses where target is not used. If this is not the "
+                            "behavior you expected, redefine your criterion "
+                            "so that it has a `target` argument.")
         return loss
 
     def _dataloader(self, mode: str) -> DataLoader:

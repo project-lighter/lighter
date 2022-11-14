@@ -44,11 +44,11 @@ class LighterLogger(LightningLoggerBase):
     @property
     @rank_zero_experiment
     def experiment(self):
-        experiments = []
+        experiments = {}
         if self.wandb_logger is not None:
-            experiment.append(self.wandb_logger.experiment)
+            experiments["wandb"] = self.wandb_logger.experiment
         if self.tensorboard_logger is not None:
-            experiment.append(self.tensorboard_logger.experiment)
+            experiments["tensorboard"] = self.wandb_logger.experiment
         return experiments
 
     @property

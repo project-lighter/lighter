@@ -1,6 +1,6 @@
 import inspect
 import random
-from typing import Any, Callable, List
+from typing import Any, Callable, Dict, List
 
 import torch
 import torchvision
@@ -151,12 +151,22 @@ def debug_message(mode: str,
         metrics (Dict): a dict where keys are the metric names and values the measured values.
         loss (torch.Tensor): calculated loss.
     """
-    is_tensor_loggable = lambda x: (torch.tensor(x.shape[1:]) < 16).all()
+    is_tensor_loggable = lambda data: (torch.tensor(data.shape[1:]) < 16).all()
     msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
     for name in ["input", "target", "pred"]:
-        tensor = eval(name)
-        msg += f"\n\n{name.capitalize()} shape and tensor:\n{tensor.shape}"
-        msg += f"\n{tensor}" if is_tensor_loggable(tensor) else "\n*Tensor is too big to log"
+        data = eval(name)
+        if isinstance(data, (list, tuple)):
+            msg += f"\n\n{name.capitalize()} is a {type(data).__name__} of {len(data)} elements."
+            for idx, d in enumerate(data):
+                if is_tensor_loggable(d):
+                    msg += f"\nTensor {idx} shape and value:\n{d.shape}\n{d}"
+                else:
+                    msg += f"\n*Tensor {idx} is too big to log."
+        else:
+            if is_tensor_loggable(d):
+                msg += f"\n\n{name.capitalize()} tensor shape and value:\n{data.shape}\n{data}"
+            else:
+                msg += f"\n\n*{name.capitalize()} tensor is too big to log."
     msg += f"\n\nLoss:\n{loss}"
     msg += f"\n\nMetrics:\n{metrics}"
     logger.debug(msg)
