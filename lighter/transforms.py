@@ -56,6 +56,20 @@ class Duplicate:
         return (out1, out2)
 
 
+class MultiCrop:
+    """SwaV Multi-Crop augmentation.
+    """
+    def __init__(self,
+                 high_resolution_transforms: List[Callable],
+                 low_resolution_transforms: List[Callable]):
+        self.high_resolution_transforms = high_resolution_transforms
+        self.low_resolution_transforms = low_resolution_transforms
+
+    def __call__(self, input):
+        high_resolution_crops = [transform(input) for transform in self.high_resolution_transforms]
+        low_resolution_crops = [transform(input) for transform in self.low_resolution_transforms]
+        return (high_resolution_crops, low_resolution_crops)
+
 
 class SitkToTensor:
     def __init__(self, add_channel_dim: bool):

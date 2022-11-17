@@ -12,6 +12,7 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
+import lighter
 from lighter.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
                            preprocess_image, wrap_into_list, debug_message,
                            reshape_pred_if_single_value_prediction)
@@ -40,6 +41,7 @@ class LighterSystem(pl.LightningModule):
                  train_sampler: Optional[Sampler] = None,
                  val_sampler: Optional[Sampler] = None,
                  test_sampler: Optional[Sampler] = None,
+                 auto_move_batch_to_device: bool = True,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
                  log_pred_as: Optional[str] = None) -> None:
@@ -126,6 +128,8 @@ class LighterSystem(pl.LightningModule):
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
 
+        self._auto_move_batch_to_device = auto_move_batch_to_device
+
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
@@ -159,7 +163,9 @@ class LighterSystem(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in the training and
                 validation step, and None in the test step.
         """
-        input, target = batch
+
+        input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
+
         # Predict
         if self._patch_based_inferer and mode in ["val", "test"]:
             # TODO: Patch-based inference doesn't support multiple inputs yet
@@ -331,6 +337,14 @@ class LighterSystem(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
+    def transfer_batch_to_device(self,
+                                 batch: Any,
+                                 device: torch.device,
+                                 dataloader_idx: int) -> Any:
+        if self._auto_move_batch_to_device:
+            return super().transfer_batch_to_device(batch, device, dataloader_idx)
+        return batch
+
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
         in the `self.setup()` method. However, `LightningModule` excepts them to be defined at
@@ -364,12 +378,23 @@ class LighterSystem(pl.LightningModule):
         # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
         # Images
         elif data_type in ["image_single", "image_batch"]:
-            for lgr in wrap_into_list(self.logger):
+            def log_image(lgr, data, name):
                 image = data[0:1] if data_type == "image_single" else data
                 image = preprocess_image(image)
                 # TODO: handle logging frequency better, add tensorboard support
                 if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 50:
-                    lgr.experiment.log({name: wandb.Image(image)})
+                    lgr.experiment.log({name: wandb.Image(image)}, step=self.global_step)
+
+                elif isinstance(lgr, lighter.logger.LighterLogger):# and self.global_step % 1:
+                    lgr.experiment["wandb"].log({name: wandb.Image(image)}, step=self.global_step)
+
+            for lgr in wrap_into_list(self.logger):
+                if isinstance(data, (tuple, list)):
+                    for idx, d in enumerate(data):
+                        log_image(lgr, d, f"{name}_{idx}")
+                else:
+                    log_image(lgr, data, name)
+
         else:
             logger.error(f"type '{data_type}' not supported. Exiting.")
             sys.exit()
