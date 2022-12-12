@@ -2,9 +2,6 @@ import click
 
 from lighter.runner import run
 
-trainer_method_desc = lambda method: (f"Run the `{method}()` method for the Trainer "
-                                      "")
-
 
 # Interface
 @click.group()

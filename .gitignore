@@ -142,3 +142,7 @@ tensorboard/
 *.torch
 prototyping.ipynb
 checkpoints/
+
+projects/*
+!projects/README.md
+!projects/cifar10
