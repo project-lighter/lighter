@@ -1,7 +1,7 @@
 import importlib
 import inspect
 import sys
-from dataclasses import dataclass, field, make_dataclass
+from dataclasses import field, make_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union, get_origin
@@ -11,13 +11,12 @@ from omegaconf import MISSING, DictConfig, OmegaConf
 
 from lighter.utils import import_attr
 
-
 # Resolvers - functions that can be used from the config. For example, given a function with the
 # name `fn` that accepts two inputs, it can be called from configs as follows: `${fn: 1, 2}`.
 
 OmegaConf.register_new_resolver("eval", eval)
 # `${import:<ATTR>}` can be used to import an attribute via config. E.g. `${import:torch.float}`
-OmegaConf.register_new_resolver("import", lambda attr: import_attr(attr))
+OmegaConf.register_new_resolver("import", import_attr)
 # `${now:}` can be used in configs to get the current datetime string
 OmegaConf.register_new_resolver("now", lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
@@ -105,7 +104,7 @@ def generate_omegaconf_dataclass(dataclass_name: str, source: Callable) -> Calla
     "MISSING" is set instead. If an attribute has no type specified, then it is set to Any.
     Furthermore, if the type is a non-builtin class, it will be changed to Dict, since
     that class will be instantiated using the '_target_' key in the instance configuration.
-    Attributes that can have different types, achieved using Union, will become Any since 
+    Attributes that can have different types, achieved using Union, will become Any since
     OmegaConf doesn't support Union yet.
 
     Args:

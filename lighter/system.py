@@ -5,17 +5,17 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
-import wandb
 from loguru import logger
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-import lighter
-from lighter.utils import (collate_fn_replace_corrupted, get_name, hasarg, import_attr,
-                           preprocess_image, wrap_into_list, debug_message,
-                           reshape_pred_if_single_value_prediction)
+import wandb
+from lighter.logger import LighterLogger
+from lighter.utils import (collate_fn_replace_corrupted, debug_message, get_name, hasarg,
+                           preprocess_image, reshape_pred_if_single_value_prediction,
+                           wrap_into_list)
 
 
 class LighterSystem(pl.LightningModule):
@@ -56,7 +56,7 @@ class LighterSystem(pl.LightningModule):
             pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
             optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
                 a single or a list of optimizers. Defaults to None.
-            schedulers (Optional[Union[Callable, List[Callable]]], optional): 
+            schedulers (Optional[Union[Callable, List[Callable]]], optional):
                 a single or a list of schedulers. Defaults to None.
             criterion (Optional[Callable], optional):
                 criterion/loss function. Defaults to None.
@@ -68,7 +68,7 @@ class LighterSystem(pl.LightningModule):
                 However, to calculate the metrics and log the data, it may be necessary to activate
                 the predictions. Defaults to None.
             patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
-                either a class with a `__call__` method or function that accepts two arguments - 
+                either a class with a `__call__` method or function that accepts two arguments -
                 first one is the input tensor, and the other one the model itself. It should
                 perform the inference over the patches and return the aggregated/averaged output.
                 Defaults to None.
@@ -176,7 +176,9 @@ class LighterSystem(pl.LightningModule):
         pred = reshape_pred_if_single_value_prediction(pred, target)
 
         # Calculate the loss
-        loss = self._calculate_loss(pred, target) if mode != "test" else None
+        loss = None
+        if mode in ["train", "val"]:
+            loss = self._calculate_loss(pred, target)
 
         # Apply the post-criterion activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as `BCELossWithLogits`` which
@@ -203,11 +205,11 @@ class LighterSystem(pl.LightningModule):
             self._log_by_type(name, loss, "scalar", on_step=on_step, on_epoch=True)
 
         # Input, target, pred
-        for key in ["input", "target", "pred"]:
-            data_type = getattr(self, f"_log_{key}_as")
+        for name, data in {"input": input, "target": target, "pred": pred}.items():
+            data_type = getattr(self, f"_log_{name}_as")
             if data_type is not None:
-                name = f"{mode}/{key}"
-                self._log_by_type(name, eval(key), data_type, on_step=on_step, on_epoch=True)
+                name = f"{mode}/{name}"
+                self._log_by_type(name, data, data_type, on_step=on_step, on_epoch=True)
 
         # Debug message
         if os.getenv("DEBUG") in ["1", "True", "true"]:
@@ -337,9 +339,7 @@ class LighterSystem(pl.LightningModule):
             self.test_dataloader = partial(self._dataloader, mode="test")
             self.test_step = partial(self._step, mode="test")
 
-    def transfer_batch_to_device(self,
-                                 batch: Any,
-                                 device: torch.device,
+    def transfer_batch_to_device(self, batch: Any, device: torch.device,
                                  dataloader_idx: int) -> Any:
         if self._auto_move_batch_to_device:
             return super().transfer_batch_to_device(batch, device, dataloader_idx)
@@ -378,20 +378,21 @@ class LighterSystem(pl.LightningModule):
         # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
         # Images
         elif data_type in ["image_single", "image_batch"]:
+
             def log_image(lgr, data, name):
                 image = data[0:1] if data_type == "image_single" else data
                 image = preprocess_image(image)
                 # TODO: handle logging frequency better, add tensorboard support
-                if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 50:
+                if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 200:
                     lgr.experiment.log({name: wandb.Image(image)}, step=self.global_step)
 
-                elif isinstance(lgr, lighter.logger.LighterLogger):# and self.global_step % 1:
+                elif isinstance(lgr, LighterLogger) and self.global_step % 200:
                     lgr.experiment["wandb"].log({name: wandb.Image(image)}, step=self.global_step)
 
             for lgr in wrap_into_list(self.logger):
-                if isinstance(data, (tuple, list)):
-                    for idx, d in enumerate(data):
-                        log_image(lgr, d, f"{name}_{idx}")
+                if isinstance(data, list):
+                    for idx, tensor in enumerate(data):
+                        log_image(lgr, tensor, f"{name}_{idx}")
                 else:
                     log_image(lgr, data, name)
 

@@ -5,9 +5,6 @@ import SimpleITK as sitk
 import numpy as np
 import torch
 
-from lighter.utils import wrap_into_list
-
-
 # https://github.com/SimpleITK/SlicerSimpleFilters/blob/master/SimpleFilters/SimpleFilters.py
 SITK_INTERPOLATOR_DICT = {
     "nearest": sitk.sitkNearestNeighbor,
@@ -35,7 +32,7 @@ class Duplicate:
             transforms1 (Optional[Callable], optional): _description_. Defaults to None.
             transforms2 (Optional[Callable], optional): _description_. Defaults to None.
         """
-        # Wrapped into a list if it isn't one already to allow both a 
+        # Wrapped into a list if it isn't one already to allow both a
         # list of transforms as well as `torchvision.transform.Compose` transforms.
         self.transforms1 = transforms1
         self.transforms2 = transforms2
@@ -59,8 +56,8 @@ class Duplicate:
 class MultiCrop:
     """SwaV Multi-Crop augmentation.
     """
-    def __init__(self,
-                 high_resolution_transforms: List[Callable],
+
+    def __init__(self, high_resolution_transforms: List[Callable],
                  low_resolution_transforms: List[Callable]):
         self.high_resolution_transforms = high_resolution_transforms
         self.low_resolution_transforms = low_resolution_transforms
@@ -72,6 +69,7 @@ class MultiCrop:
 
 
 class SitkToTensor:
+
     def __init__(self, add_channel_dim: bool):
         """_summary_
 
@@ -86,6 +84,7 @@ class SitkToTensor:
 
 
 class SitkRandomSpacing:
+
     def __init__(self,
                  prob: float,
                  min_spacing: Union[int, List[int], Tuple[int]],
@@ -107,7 +106,7 @@ class SitkRandomSpacing:
 
         current_spacing = sitk_image.GetSpacing()
         current_size = sitk_image.GetSize()
-        
+
         if self.tolerance is not None:
             tolerated_min_spacing = np.array(self.min_spacing) * (1 - self.tolerance)
             tolerated_max_spacing = np.array(self.max_spacing) * (1 - self.tolerance)
@@ -123,12 +122,13 @@ class SitkRandomSpacing:
         for size, spacing, n_spacing in zip(current_size, current_spacing, new_spacing):
             new_size.append(int(round(size * spacing / n_spacing)))
 
-        return sitk.Resample(sitk_image,
-                             new_size,                  # size
-                             sitk.Transform(),          # transform
-                             self.interpolator,         # interpolator
-                             sitk_image.GetOrigin(),    # outputOrigin
-                             new_spacing,               # outputSpacing
-                             sitk_image.GetDirection(), # outputDirection
-                             self.default_value,        # defaultPixelValue
-                             sitk_image.GetPixelID())   # outputPixelType
+        return sitk.Resample(
+            sitk_image,
+            new_size,  # size
+            sitk.Transform(),  # transform
+            self.interpolator,  # interpolator
+            sitk_image.GetOrigin(),  # outputOrigin
+            new_spacing,  # outputSpacing
+            sitk_image.GetDirection(),  # outputDirection
+            self.default_value,  # defaultPixelValue
+            sitk_image.GetPixelID())  # outputPixelType

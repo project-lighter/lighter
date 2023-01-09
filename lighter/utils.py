@@ -135,12 +135,8 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     return image
 
 
-def debug_message(mode: str,
-                  input: torch.Tensor,
-                  target: torch.Tensor,
-                  pred: torch.Tensor,
-                  metrics: Dict,
-                  loss: torch.Tensor) -> None:
+def debug_message(mode: str, input: torch.Tensor, target: torch.Tensor, pred: torch.Tensor,
+                  metrics: Dict, loss: torch.Tensor) -> None:
     """Logs the debug message.
 
     Args:
@@ -151,25 +147,28 @@ def debug_message(mode: str,
         metrics (Dict): a dict where keys are the metric names and values the measured values.
         loss (torch.Tensor): calculated loss.
     """
-    is_tensor_loggable = lambda data: (torch.tensor(data.shape[1:]) < 16).all()
     msg = f"\n----------- Debugging Output -----------\nMode: {mode}"
-    for name in ["input", "target", "pred"]:
-        data = eval(name)
-        if isinstance(data, (list, tuple)):
+    for name, data in {"input": input, "target": target, "pred": pred}.items():
+        if isinstance(data, list):
             msg += f"\n\n{name.capitalize()} is a {type(data).__name__} of {len(data)} elements."
-            for idx, d in enumerate(data):
-                if is_tensor_loggable(d):
-                    msg += f"\nTensor {idx} shape and value:\n{d.shape}\n{d}"
+            for idx, tensor in enumerate(data):
+                if is_tensor_debug_loggable(tensor):
+                    msg += f"\nTensor {idx} shape and value:\n{tensor.shape}\n{tensor}"
                 else:
                     msg += f"\n*Tensor {idx} is too big to log."
         else:
-            if is_tensor_loggable(d):
+            if is_tensor_debug_loggable(data):
                 msg += f"\n\n{name.capitalize()} tensor shape and value:\n{data.shape}\n{data}"
             else:
                 msg += f"\n\n*{name.capitalize()} tensor is too big to log."
     msg += f"\n\nLoss:\n{loss}"
     msg += f"\n\nMetrics:\n{metrics}"
     logger.debug(msg)
+
+
+def is_tensor_debug_loggable(tensor):
+    """A tensor is loggable for debugging if its shape is smaller than 16 in each axis."""
+    return (torch.tensor(tensor.shape[1:]) < 16).all()
 
 
 def reshape_pred_if_single_value_prediction(pred: torch.Tensor,
@@ -213,7 +212,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
     Args:
         model (Module): PyTorch model to be edited
         layer_name (string): Name of the layer which will be replaced.
-            Dot-notation supported, e.g. "layer10.fc". 
+            Dot-notation supported, e.g. "layer10.fc".
 
     Returns:
         Module: PyTorch model with the new layer set at the specified location.
@@ -225,12 +224,12 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.
     Useful for removing the last layer of a network to be used as a backbone
-    of an SSL model. 
+    of an SSL model.
 
     Args:
         model (Module): PyTorch model to be edited
         layer_name (string): Name of the layer which will be replaced with an
-            Identity function. Dot-notation supported, e.g. "layer10.fc". 
+            Identity function. Dot-notation supported, e.g. "layer10.fc".
 
     Returns:
         Module: PyTorch model with Identity layer at the specified location.

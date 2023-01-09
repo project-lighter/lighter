@@ -1,10 +1,8 @@
-from datetime import datetime
-from typing import List
+from pathlib import Path
 
 from pytorch_lightning.loggers import (LightningLoggerBase, TensorBoardLogger, WandbLogger)
 from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
-from pathlib import Path
 
 
 class LighterLogger(LightningLoggerBase):
@@ -14,7 +12,7 @@ class LighterLogger(LightningLoggerBase):
                  tensorboard: bool = False,
                  wandb: bool = False,
                  wandb_project: str = None):
-        """Logger that unifies tensorboard and wandb loggers. 
+        """Logger that unifies tensorboard and wandb loggers.
 
         Args:
             save_dir (str): path to the directory where the logging data is stored.
@@ -22,7 +20,7 @@ class LighterLogger(LightningLoggerBase):
             wandb (bool, optional): whether to use wandb. Defaults to False.
             wandb_project (str, optional): wandb project name. Defaults to None.
         """
-
+        super().__init__()
         assert True in [tensorboard, wandb], "You need to use at least one logger!"
         Path(save_dir).mkdir(parents=True, exist_ok=True)
         self._save_dir = save_dir
