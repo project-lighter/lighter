@@ -48,14 +48,19 @@ def init_system(conf: DictConfig, mode: str = None) -> Any:
     """
     # Datasets and samplers not used in the run won't be instantiated
     if mode in ["fit", "tune"]:
-        conf.system.test_dataset = None
-        conf.system.test_sampler = None
+        conf.system.test_dataset = conf.system.test_sampler = None
     elif mode == "validate":
-        conf.system.train_dataset = conf.system.test_dataset = None
-        conf.system.train_sampler = conf.system.test_sampler = None
+        conf.system.train_dataset = conf.system.train_sampler = None
+        conf.system.test_dataset = conf.system.test_sampler = None
+        conf.system.predict_dataset = conf.system.predict_sampler = None
     elif mode == "test":
-        conf.system.train_dataset = conf.system.val_dataset = None
-        conf.system.train_sampler = conf.system.val_sampler = None
+        conf.system.train_dataset = conf.system.train_sampler = None
+        conf.system.val_dataset = conf.system.val_sampler = None
+        conf.system.predict_dataset = conf.system.predict_sampler = None
+    elif mode == "predict":
+        conf.system.train_dataset = conf.system.train_sampler = None
+        conf.system.val_dataset = conf.system.val_sampler = None
+        conf.system.test_dataset = conf.system.test_sampler = None
     elif mode is not None:
         logger.error(f"'{mode}' mode does not exist. Exiting.")
         sys.exit()

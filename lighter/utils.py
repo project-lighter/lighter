@@ -198,12 +198,15 @@ def dot_notation_setattr(obj: Callable, attr: str, value: Any):
         attr (str): attribute name of the object.
         value (Any): attribute value to be set.
     """
-    # https://gist.github.com/alixedi/4695abcd259d1493ac9c
     if '.' not in attr:
+        if not hasattr(obj, attr):
+            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
+            sys.exit()
         setattr(obj, attr, value)
+    # Solve recursively if the attribute is defined in dot-notation
     else:
-        splitted = attr.split('.')
-        dot_notation_setattr(getattr(obj, splitted[0]), '.'.join(splitted[1:]), value)
+        obj_name, attr = attr.split('.', maxsplit=1)
+        dot_notation_setattr(getattr(obj, obj_name), attr, value)
 
 
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:

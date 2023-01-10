@@ -38,10 +38,11 @@ class LighterSystem(pl.LightningModule):
                  train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+                 predict_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
                  train_sampler: Optional[Sampler] = None,
                  val_sampler: Optional[Sampler] = None,
                  test_sampler: Optional[Sampler] = None,
-                 auto_move_batch_to_device: bool = True,
+                 predict_sampler: Optional[Sampler] = None,
                  log_input_as: Optional[str] = None,
                  log_target_as: Optional[str] = None,
                  log_pred_as: Optional[str] = None) -> None:
@@ -84,9 +85,12 @@ class LighterSystem(pl.LightningModule):
                 Defaults to None.
             test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
                 Defaults to None.
+            predict_dataset (Optional[Union[Dataset, List[Dataset]]], optional): predict dataset(s).
+                Defaults to None.
             train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
             val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
             test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
+            predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
             log_input_as (Optional[str], optional): how the input tensors should be logged.
                 ['scalar', 'image_batch', 'image_single']. Defaults to None.
             log_target_as (Optional[str], optional): how the target tensors should be logged.
@@ -111,6 +115,7 @@ class LighterSystem(pl.LightningModule):
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+        self.predict_dataset = predict_dataset
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
@@ -118,6 +123,7 @@ class LighterSystem(pl.LightningModule):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
         self.test_sampler = test_sampler
+        self.predict_sampler = predict_sampler
 
         # Metrics
         self.train_metrics = ModuleList(wrap_into_list(train_metrics))
@@ -136,6 +142,8 @@ class LighterSystem(pl.LightningModule):
         self._log_target_as = log_target_as
         self._log_pred_as = log_pred_as
 
+        self._lightning_module_methods_defined = False
+
     def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
         """Forward pass. Multi-input models are supported.
 
@@ -145,13 +153,19 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Union[torch.Tensor, List, Tuple]: output of the model.
         """
-        return self.model(input) if not isinstance(input, (list, tuple)) else self.model(*input)
+        kwargs = {}
+        if hasarg(self.model.forward, "epoch"):
+            kwargs["epoch"] = self.current_epoch
+        if hasarg(self.model.forward, "step"):
+            kwargs["step"] = self.global_step
 
-    def _step(self,
-              batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
-              batch_idx: int,
-              mode: str) -> Union[torch.Tensor, None]:
-        """Step for all modes ('train', 'val', 'test')
+        if isinstance(input, list):
+            return self.model(*input, **kwargs)
+        return self.model(input, **kwargs)
+
+    def _base_step(self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
+                   batch_idx: int, mode: str) -> Union[torch.Tensor, None]:
+        """Base step for all modes ('train', 'val', 'test', 'predict')
 
         Args:
             batch (Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]]):
@@ -161,13 +175,12 @@ class LighterSystem(pl.LightningModule):
 
         Returns:
             Union[torch.Tensor, None]: returns the calculated loss in the training and
-                validation step, and None in the test step.
+                validation step, None in the test step, and predicted batch in the predict step.
         """
-
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 
         # Predict
-        if self._patch_based_inferer and mode in ["val", "test"]:
+        if self._patch_based_inferer and mode in ["val", "test", "predict"]:
             # TODO: Patch-based inference doesn't support multiple inputs yet
             pred = self._patch_based_inferer(input, self)
         else:
@@ -186,8 +199,12 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
+        # When predicting, skip metrics and logging parts and return the predicted value
+        if mode == "predict":
+            return pred
+
         # Calculate the metrics
-        metrics = getattr(self, f"{mode}_metrics")
+        metrics = getattr(self, f"{mode}_metrics", [])
         step_metrics = {get_name(m): m(pred, target) for m in metrics}
 
         ## Logging part ##
@@ -244,7 +261,7 @@ class LighterSystem(pl.LightningModule):
                             "so that it has a `target` argument.")
         return loss
 
-    def _dataloader(self, mode: str) -> DataLoader:
+    def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
         Includes a collate function that enables the DataLoader to replace
         None's (alias for corrupted examples) in the batch with valid examples.
@@ -318,32 +335,31 @@ class LighterSystem(pl.LightningModule):
         # only has methods used in the stage and for which the configuration was provided.
 
         if not self._lightning_module_methods_defined:
-            del self.train_dataloader, self.val_dataloader, self.test_dataloader
-            del self.training_step, self.validation_step, self.test_step
+            del (self.train_dataloader, self.training_step, self.val_dataloader,
+                 self.validation_step, self.test_dataloader, self.test_step,
+                 self.predict_dataloader, self.predict_step)
             # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
             #  parameter, and deleting the above methods again breaks it. This flag prevents it.
             self._lightning_module_methods_defined = True
 
         # Training methods.
         if stage in ["fit", "tune"]:
-            self.train_dataloader = partial(self._dataloader, mode="train")
-            self.training_step = partial(self._step, mode="train")
+            self.train_dataloader = partial(self._base_dataloader, mode="train")
+            self.training_step = partial(self._base_step, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
         if stage == "validate" or (stage in ["fit", "tune"] and self.val_dataset is not None):
-            self.val_dataloader = partial(self._dataloader, mode="val")
-            self.validation_step = partial(self._step, mode="val")
+            self.val_dataloader = partial(self._base_dataloader, mode="val")
+            self.validation_step = partial(self._base_step, mode="val")
 
         # Test methods.
         if stage == "test":
-            self.test_dataloader = partial(self._dataloader, mode="test")
-            self.test_step = partial(self._step, mode="test")
+            self.test_dataloader = partial(self._base_dataloader, mode="test")
+            self.test_step = partial(self._base_step, mode="test")
 
-    def transfer_batch_to_device(self, batch: Any, device: torch.device,
-                                 dataloader_idx: int) -> Any:
-        if self._auto_move_batch_to_device:
-            return super().transfer_batch_to_device(batch, device, dataloader_idx)
-        return batch
+        if stage == "predict":
+            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
+            self.predict_step = partial(self._base_step, mode="predict")
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
@@ -351,12 +367,10 @@ class LighterSystem(pl.LightningModule):
         the initialization. To prevent it from throwing an error, the `..._dataloader()` and
         `..._step()` are initially defined as `lambda: None`, before `self.setup()` is called.
         """
-        self.train_dataloader = lambda: None
-        self.val_dataloader = lambda: None
-        self.test_dataloader = lambda: None
-        self.training_step = lambda: None
-        self.validation_step = lambda: None
-        self.test_step = lambda: None
+        self.train_dataloader = self.training_step = lambda: None
+        self.val_dataloader = self.validation_step = lambda: None
+        self.test_dataloader = self.test_step = lambda: None
+        self.predict_dataloader = self.predict_step = lambda: None
         self._lightning_module_methods_defined = False
 
     def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True) -> None:
