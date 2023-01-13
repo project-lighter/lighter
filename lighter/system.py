@@ -134,8 +134,6 @@ class LighterSystem(pl.LightningModule):
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
 
-        self._auto_move_batch_to_device = auto_move_batch_to_device
-
         self._patch_based_inferer = patch_based_inferer
 
         self._log_input_as = log_input_as
@@ -234,8 +232,7 @@ class LighterSystem(pl.LightningModule):
 
         return loss
 
-    def _calculate_loss(self,
-                        pred: Union[torch.Tensor, List, Tuple],
+    def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple],
                         target: Union[torch.Tensor, None]) -> torch.Tensor:
         """_summary_
 
@@ -283,7 +280,7 @@ class LighterSystem(pl.LightningModule):
         # 2) In settings where patch based inference is needed, the input data often
         # varies in shape, preventing the data loader to stack them into a batch.
         batch_size = self.batch_size
-        if self._patch_based_inferer is not None and mode in ["val", "test"]:
+        if self._patch_based_inferer is not None and mode in ["val", "test", "predict"]:
             logger.info(f"Setting the general batch size to 1 for {mode} "
                         "mode because a patch-based inferer is used.")
             batch_size = 1
