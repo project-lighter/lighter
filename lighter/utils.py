@@ -1,6 +1,6 @@
-import sys
 import inspect
 import random
+import sys
 from typing import Any, Callable, Dict, List, Union
 
 import torch
@@ -104,7 +104,7 @@ def collate_fn_replace_corrupted(batch: Union[List, torch.Tensor], dataset: Data
     num_corrupted = original_batch_len - filtered_batch_len
     if num_corrupted > 0:
         # Replace a corrupted example with another randomly selected example
-        filtered_batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(num_corrupted)])  # type: ignore
+        batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(num_corrupted)])  # type: ignore
         # Recursive call to replace the replacements if they are corrupted
         return collate_fn_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, return it

@@ -1,8 +1,8 @@
 from copy import deepcopy
 from typing import Any, Callable, List, Optional, Tuple, Union
 
-import SimpleITK as sitk
 import numpy as np
+import SimpleITK as sitk
 import torch
 
 # https://github.com/SimpleITK/SlicerSimpleFilters/blob/master/SimpleFilters/SimpleFilters.py

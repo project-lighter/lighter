@@ -5,13 +5,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
+import wandb
 from loguru import logger
 from torch.nn import Module, ModuleList
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
-import wandb
 from lighter.logger import LighterLogger
 from lighter.utils import (
     collate_fn_replace_corrupted,
@@ -183,7 +183,7 @@ class LighterSystem(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in the training and
                 validation step, None in the test step, and predicted batch in the predict step.
         """
-        
+
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])  # type: ignore
 
         # Predict

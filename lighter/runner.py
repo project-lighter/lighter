@@ -1,5 +1,5 @@
 import sys
-from typing import Optional, Any
+from typing import Any, Optional
 
 from hydra.utils import instantiate
 from loguru import logger
