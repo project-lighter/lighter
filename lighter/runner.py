@@ -1,5 +1,5 @@
 import sys
-from typing import Any
+from typing import Optional, Any
 
 from hydra.utils import instantiate
 from loguru import logger
@@ -36,7 +36,7 @@ def init_trainer(conf: DictConfig) -> Any:
     return instantiate(conf.trainer, _convert_="all")
 
 
-def init_system(conf: DictConfig, mode: str = None) -> Any:
+def init_system(conf: DictConfig, mode: Optional[str] = None) -> Any:
     """Initialize the trainer given its definition in the config.
 
     Args:

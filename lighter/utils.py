@@ -1,7 +1,7 @@
 import sys
 import inspect
 import random
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 import torch
 import torchvision
@@ -22,7 +22,7 @@ def import_attr(module_attr: str) -> Any:
     # Split module from attribute name
     module, attr = module_attr.rsplit(".", 1)
     # Import the module
-    module = __import__(module, fromlist=[attr])
+    module = __import__(module, fromlist=[attr])  # type: ignore
     # Get the attribute from the module
     return getattr(module, attr)
 
@@ -78,7 +78,7 @@ def wrap_into_list(x: Any) -> List:
     return [x]
 
 
-def collate_fn_replace_corrupted(batch: torch.Tensor, dataset: DataLoader) -> torch.Tensor:
+def collate_fn_replace_corrupted(batch: Union[List, torch.Tensor], dataset: DataLoader) -> torch.Tensor:
     """Collate function that allows to replace corrupted examples in the batch.
     The dataloader should return `None` when that occurs.
     The `None`s in the batch are replaced with other, randomly-selected, examples.
@@ -104,7 +104,7 @@ def collate_fn_replace_corrupted(batch: torch.Tensor, dataset: DataLoader) -> to
     num_corrupted = original_batch_len - filtered_batch_len
     if num_corrupted > 0:
         # Replace a corrupted example with another randomly selected example
-        batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(num_corrupted)])
+        filtered_batch.extend([dataset[random.randint(0, len(dataset))] for _ in range(num_corrupted)])  # type: ignore
         # Recursive call to replace the replacements if they are corrupted
         return collate_fn_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, return it
@@ -241,7 +241,7 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     return replace_layer_with(model, layer_name, Identity())
 
 
-def remove_last_layer_sequentially(model: Module()) -> Sequential:
+def remove_last_layer_sequentially(model: Module) -> Sequential:
     """Removes the last layer of a network and returns it as an nn.Sequential model.
     Useful when a network is to be used as a backbone of an SSL model.
 

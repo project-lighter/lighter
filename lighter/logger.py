@@ -3,10 +3,11 @@ from pathlib import Path
 from pytorch_lightning.loggers import LightningLoggerBase, TensorBoardLogger, WandbLogger
 from pytorch_lightning.loggers.logger import rank_zero_experiment
 from pytorch_lightning.utilities import rank_zero_only
+from typing import Optional
 
 
 class LighterLogger(LightningLoggerBase):
-    def __init__(self, save_dir: str, tensorboard: bool = False, wandb: bool = False, wandb_project: str = None):
+    def __init__(self, save_dir: str, tensorboard: bool = False, wandb: bool = False, wandb_project: Optional[str] = None):
         """Logger that unifies tensorboard and wandb loggers.
 
         Args:

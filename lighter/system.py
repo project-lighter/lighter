@@ -34,9 +34,9 @@ class LighterSystem(pl.LightningModule):
         pin_memory: bool = True,
         optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
         schedulers: Optional[Union[Callable, List[Callable]]] = None,
-        criterion: Optional[Callable] = None,
+        criterion: Optional[Union[Module, Callable]] = None,
         cast_target_dtype_to: Optional[str] = None,
-        post_criterion_activation: Optional[str] = None,
+        post_criterion_activation: Optional[Callable] = None,
         patch_based_inferer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
         val_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -71,7 +71,7 @@ class LighterSystem(pl.LightningModule):
             cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
                 specified type before calculating the loss. May be necessary for some criterions.
                 Defaults to None.
-            post_criterion_activation (Optional[str], optional): some criterions
+            post_criterion_activation (Optional[Callable], optional): some criterions
                 (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
                 However, to calculate the metrics and log the data, it may be necessary to activate
                 the predictions. Defaults to None.
@@ -164,12 +164,12 @@ class LighterSystem(pl.LightningModule):
         if hasarg(self.model.forward, "step"):
             kwargs["step"] = self.global_step
 
-        if isinstance(input, list):
+        if isinstance(input, (tuple, list)):
             return self.model(*input, **kwargs)
         return self.model(input, **kwargs)
 
     def _base_step(
-        self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]], batch_idx: int, mode: str
+        self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple]], Optional[Any]], batch_idx: int, mode: str
     ) -> Union[torch.Tensor, None]:
         """Base step for all modes ('train', 'val', 'test', 'predict')
 
@@ -183,7 +183,8 @@ class LighterSystem(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in the training and
                 validation step, None in the test step, and predicted batch in the predict step.
         """
-        input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
+        
+        input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])  # type: ignore
 
         # Predict
         if self._patch_based_inferer and mode in ["val", "test", "predict"]:
