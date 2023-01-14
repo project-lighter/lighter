@@ -156,7 +156,7 @@ def import_project_as_module(project: str) -> None:
     if not project_path.is_file():
         logger.error(f"No `__init__.py` in project `{project_path}`. Exiting.")
         sys.exit()
-    spec = importlib.util.spec_from_file_location("project", str(project_path))
+    spec = importlib.util.spec_from_file_location("project", str(project_path))  # type: ignore
     project_module = importlib.util.module_from_spec(spec)  # type: ignore
     spec.loader.exec_module(project_module)  # type: ignore
     sys.modules["project"] = project_module
