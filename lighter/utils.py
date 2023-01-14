@@ -1,7 +1,7 @@
 import inspect
 import random
 import sys
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import torch
 import torchvision
@@ -137,7 +137,12 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
 
 
 def debug_message(
-    mode: str, input: torch.Tensor, target: torch.Tensor, pred: torch.Tensor, metrics: Dict, loss: torch.Tensor
+    mode: str,
+    input: torch.Tensor,
+    target: torch.Tensor,
+    pred: torch.Tensor,
+    metrics: Dict,
+    loss: Optional[torch.Tensor],
 ) -> None:
     """Logs the debug message.
 

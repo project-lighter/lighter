@@ -3,8 +3,9 @@ import inspect
 import sys
 from dataclasses import field, make_dataclass
 from datetime import datetime
+from importlib.machinery import ModuleSpec
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union, get_origin
+from typing import Any, Callable, Dict, List, Optional, Union, get_origin
 
 from loguru import logger
 from omegaconf import MISSING, DictConfig, OmegaConf
@@ -88,7 +89,7 @@ def construct_structured_config(conf: DictConfig) -> DictConfig:
     trainer = generate_omegaconf_dataclass("TrainerConfig", import_attr(conf.trainer["_target_"]))
     system = generate_omegaconf_dataclass("SystemConfig", import_attr(conf.system["_target_"]))
 
-    fields = [
+    fields: List = [
         # Field name, type, default value
         ("trainer", trainer, trainer),
         ("system", system, system),
@@ -156,8 +157,8 @@ def import_project_as_module(project: str) -> None:
     if not project_path.is_file():
         logger.error(f"No `__init__.py` in project `{project_path}`. Exiting.")
         sys.exit()
-    spec = importlib.util.spec_from_file_location("project", str(project_path))
+    spec: ModuleSpec = importlib.util.spec_from_file_location("project", str(project_path))  # type: ignore[assignment]
     project_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(project_module)
+    spec.loader.exec_module(project_module)  # type: ignore[union-attr]
     sys.modules["project"] = project_module
     logger.info(f"Project directory {project} added as 'project' module.")

@@ -183,6 +183,9 @@ class LighterSystem(pl.LightningModule):
             Union[torch.Tensor, None]: returns the calculated loss in the training and
                 validation step, None in the test step, and predicted batch in the predict step.
         """
+        input: torch.Tensor
+        target: torch.Tensor
+        pred: torch.Tensor
 
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])  # type: ignore
 
@@ -242,8 +245,8 @@ class LighterSystem(pl.LightningModule):
         return loss
 
     def _calculate_loss(
-        self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]
-    ) -> torch.Tensor:
+        self, pred: Union[torch.Tensor, List, Tuple], target: Optional[torch.Tensor]
+    ) -> Union[torch.Tensor, None]:
         """_summary_
 
         Args:
@@ -253,8 +256,10 @@ class LighterSystem(pl.LightningModule):
         Returns:
             torch.Tensor: the calculated loss.
         """
-        if hasarg(self.criterion.forward, "target"):
-            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
+        if self.criterion is None:
+            loss = None
+        elif hasarg(self.criterion, "target") or hasarg(self.criterion.forward, "target"):  # type: ignore
+            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))  # type: ignore
         else:
             loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
 
@@ -312,7 +317,7 @@ class LighterSystem(pl.LightningModule):
             collate_fn=collate_fn,
         )
 
-    def configure_optimizers(self) -> Dict:
+    def configure_optimizers(self) -> Union[List, Dict[str, Any]]:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
@@ -348,14 +353,14 @@ class LighterSystem(pl.LightningModule):
 
         if not self._lightning_module_methods_defined:
             del (
-                self.train_dataloader,
-                self.training_step,
-                self.val_dataloader,
-                self.validation_step,
-                self.test_dataloader,
-                self.test_step,
-                self.predict_dataloader,
-                self.predict_step,
+                self.train_dataloader,  # type: ignore[has-type]
+                self.training_step,  # type: ignore[has-type]
+                self.val_dataloader,  # type: ignore[has-type]
+                self.validation_step,  # type: ignore[has-type]
+                self.test_dataloader,  # type: ignore[has-type]
+                self.test_step,  # type: ignore[has-type]
+                self.predict_dataloader,  # type: ignore[has-type]
+                self.predict_step,  # type: ignore[has-type]
             )
             # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
             #  parameter, and deleting the above methods again breaks it. This flag prevents it.
@@ -386,10 +391,10 @@ class LighterSystem(pl.LightningModule):
         the initialization. To prevent it from throwing an error, the `..._dataloader()` and
         `..._step()` are initially defined as `lambda: None`, before `self.setup()` is called.
         """
-        self.train_dataloader = self.training_step = lambda: None
-        self.val_dataloader = self.validation_step = lambda: None
-        self.test_dataloader = self.test_step = lambda: None
-        self.predict_dataloader = self.predict_step = lambda: None
+        self.train_dataloader = self.training_step = lambda: None  # type: ignore[assignment]
+        self.val_dataloader = self.validation_step = lambda: None  # type: ignore[assignment]
+        self.test_dataloader = self.test_step = lambda: None  # type: ignore[assignment]
+        self.predict_dataloader = self.predict_step = lambda: None  # type: ignore[assignment]
         self._lightning_module_methods_defined = False
 
     def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True) -> None:
