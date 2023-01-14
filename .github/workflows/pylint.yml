@@ -1,0 +1,43 @@
+# This workflow will install Python dependencies, runs lint, static typechecking and tests
+# with multiple versions of Python. 
+
+name: Continuous Integration
+
+on: push
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install basic libraries
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel flake8 black mypy parameterized
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: black
+      run: |
+        black -l 120 --check lighter projects tests
+    - name: type checking with mypy
+      run: |
+        python -m pip install types-PyYAML types-attrs types-pyOpenSSL types-requests types-setuptools
+        mypy .
+    - name: Install library with all dependencies
+      run: pip install -e .
+# Activate as soon as we have the firsts test for this repository
+#    - name: Run tests
+#      run: make test
