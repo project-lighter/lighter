@@ -15,17 +15,14 @@ SITK_INTERPOLATOR_DICT = {
     "hamming_sinc": sitk.sitkHammingWindowedSinc,
     "cosine_windowed_sinc": sitk.sitkCosineWindowedSinc,
     "welch_windowed_sinc": sitk.sitkWelchWindowedSinc,
-    "lanczos_windowed_sinc": sitk.sitkLanczosWindowedSinc
+    "lanczos_windowed_sinc": sitk.sitkLanczosWindowedSinc,
 }
 
 
 class Duplicate:
-    """Duplicate an input and apply two different transforms. Used for SimCLR primarily.
-    """
+    """Duplicate an input and apply two different transforms. Used for SimCLR primarily."""
 
-    def __init__(self,
-                 transforms1: Optional[Callable] = None,
-                 transforms2: Optional[Callable] = None):
+    def __init__(self, transforms1: Optional[Callable] = None, transforms2: Optional[Callable] = None):
         """Duplicates an input and applies the given transformations to each copy separately.
 
         Args:
@@ -54,11 +51,9 @@ class Duplicate:
 
 
 class MultiCrop:
-    """SwaV Multi-Crop augmentation.
-    """
+    """SwaV Multi-Crop augmentation."""
 
-    def __init__(self, high_resolution_transforms: List[Callable],
-                 low_resolution_transforms: List[Callable]):
+    def __init__(self, high_resolution_transforms: List[Callable], low_resolution_transforms: List[Callable]):
         self.high_resolution_transforms = high_resolution_transforms
         self.low_resolution_transforms = low_resolution_transforms
 
@@ -69,7 +64,6 @@ class MultiCrop:
 
 
 class SitkToTensor:
-
     def __init__(self, add_channel_dim: bool):
         """_summary_
 
@@ -84,14 +78,15 @@ class SitkToTensor:
 
 
 class SitkRandomSpacing:
-
-    def __init__(self,
-                 prob: float,
-                 min_spacing: Union[int, List[int], Tuple[int]],
-                 max_spacing: Union[int, List[int], Tuple[int]],
-                 default_value: Union[int, float],
-                 tolerance: Optional[float] = None,
-                 interpolator: str = "linear"):
+    def __init__(
+        self,
+        prob: float,
+        min_spacing: Union[int, List[int], Tuple[int]],
+        max_spacing: Union[int, List[int], Tuple[int]],
+        default_value: Union[int, float],
+        tolerance: Optional[float] = None,
+        interpolator: str = "linear",
+    ):
 
         self.prob = prob
         self.min_spacing = np.array(min_spacing)
@@ -131,4 +126,5 @@ class SitkRandomSpacing:
             new_spacing,  # outputSpacing
             sitk_image.GetDirection(),  # outputDirection
             self.default_value,  # defaultPixelValue
-            sitk_image.GetPixelID())  # outputPixelType
+            sitk_image.GetPixelID(),
+        )  # outputPixelType

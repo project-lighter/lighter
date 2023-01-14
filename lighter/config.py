@@ -93,7 +93,7 @@ def construct_structured_config(conf: DictConfig) -> DictConfig:
         ("trainer", trainer, trainer),
         ("system", system, system),
         ("project", Optional[str], field(default=None)),
-        ("CONSTANTS", Optional[Dict], field(default=None))
+        ("CONSTANTS", Optional[Dict], field(default=None)),
     ]
     return OmegaConf.structured(make_dataclass("Config", fields))
 
@@ -137,7 +137,7 @@ def generate_omegaconf_dataclass(dataclass_name: str, source: Callable) -> Calla
             annotation = Any
 
         # Default value
-        default_value = param.default if not param.default is param.empty else MISSING
+        default_value = param.default if param.default is not param.empty else MISSING
 
         fields.append((name, annotation, default_value))
     return make_dataclass(dataclass_name, fields)

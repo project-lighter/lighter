@@ -136,8 +136,9 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     return image
 
 
-def debug_message(mode: str, input: torch.Tensor, target: torch.Tensor, pred: torch.Tensor,
-                  metrics: Dict, loss: torch.Tensor) -> None:
+def debug_message(
+    mode: str, input: torch.Tensor, target: torch.Tensor, pred: torch.Tensor, metrics: Dict, loss: torch.Tensor
+) -> None:
     """Logs the debug message.
 
     Args:
@@ -172,8 +173,7 @@ def is_tensor_debug_loggable(tensor):
     return (torch.tensor(tensor.shape[1:]) < 16).all()
 
 
-def reshape_pred_if_single_value_prediction(pred: torch.Tensor,
-                                            target: torch.Tensor) -> torch.Tensor:
+def reshape_pred_if_single_value_prediction(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """When the task is to predict a single value, pred and target dimensions often
     mismatch - dataloader returns the value in the (B) shape, while the network
     returns predictions in the (B, 1) shape, where the second dim is redundant.
@@ -199,14 +199,14 @@ def dot_notation_setattr(obj: Callable, attr: str, value: Any):
         attr (str): attribute name of the object.
         value (Any): attribute value to be set.
     """
-    if '.' not in attr:
+    if "." not in attr:
         if not hasattr(obj, attr):
             logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
             sys.exit()
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
     else:
-        obj_name, attr = attr.split('.', maxsplit=1)
+        obj_name, attr = attr.split(".", maxsplit=1)
         dot_notation_setattr(getattr(obj, obj_name), attr, value)
 
 

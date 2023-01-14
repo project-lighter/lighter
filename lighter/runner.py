@@ -68,7 +68,7 @@ def init_system(conf: DictConfig, mode: str = None) -> Any:
     # Instantiate the System
     system = instantiate(conf.system, optimizers=None, schedulers=None, _convert_="all")
 
-    ################ https://github.com/facebookresearch/hydra/issues/1758 ################
+    # https://github.com/facebookresearch/hydra/issues/1758
     # This issue prevents us from referencing other objects through config. For example,
     # the optimizer requires model's parameters, and instead of referring to the model,
     # we instantiate the optimizer separately once the model has been instantiated.
@@ -77,21 +77,17 @@ def init_system(conf: DictConfig, mode: str = None) -> Any:
     # This workaround includes the `optimizers=None` and `schedulers=None` above).
     assert isinstance(conf.system.optimizers, DictConfig), "One optimizer!"
     assert isinstance(conf.system.schedulers, (DictConfig, type(None))), "One scheduler!"
-    system.optimizers = instantiate(conf.system.optimizers,
-                                    params=system.model.parameters(),
-                                    _convert_="all")
+    system.optimizers = instantiate(conf.system.optimizers, params=system.model.parameters(), _convert_="all")
 
     # Handles the PL scheduler dicts. This won't be needed once the Hydra issue is resolved.
     # https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.core.LightningModule.html#pytorch_lightning.core.LightningModule.configure_optimizers
     if conf.system.schedulers is not None:
         if "scheduler" in conf.system.schedulers:
-            system.schedulers = instantiate(conf.system.schedulers,
-                                            scheduler={"optimizer": system.optimizers},
-                                            _convert_="all")
+            system.schedulers = instantiate(
+                conf.system.schedulers, scheduler={"optimizer": system.optimizers}, _convert_="all"
+            )
         else:
-            system.schedulers = instantiate(conf.system.schedulers,
-                                            optimizer=system.optimizers,
-                                            _convert_="all")
+            system.schedulers = instantiate(conf.system.schedulers, optimizer=system.optimizers, _convert_="all")
 
     #######################################################################################
     return system
