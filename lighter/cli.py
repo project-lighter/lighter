@@ -14,18 +14,18 @@ def interface():
     })
 
 def fit(**kwargs):
-    fit_config = """
+    fit_config = yaml.safe_load("""
         fit:
             _method_: >
                 $@trainer.fit(model=@fit#model,
                             ckpt_path=@fit#ckpt_path)
             model: "@system"
             ckpt_path: null
-    """
-    run("fit", **yaml.safe_load(fit_config), **kwargs)
+    """)
+    run("fit", **fit_config, **kwargs)
 
 def validate(**kwargs):
-    validate_config = """
+    validate_config = yaml.safe_load("""
         validate:
             _method_: > 
                 $@trainer.validate(model=@validate#model,
@@ -34,22 +34,22 @@ def validate(**kwargs):
             model: "@system"
             ckpt_path: null
             verbose: True
-    """
-    run("validate", **yaml.safe_load(validate_config), **kwargs)
+    """)
+    run("validate", **validate_config, **kwargs)
 
 def predict(**kwargs):
-    predict_config = """
+    predict_config = yaml.safe_load("""
         predict:
             _method_: >
                 $@trainer.predict(model=@predict#model,
                                 ckpt_path=@predict#ckpt_path)
             model: "@system"
             ckpt_path: null
-    """
-    run("predict", **yaml.safe_load(predict_config), **kwargs)
+    """)
+    run("predict", **predict_config, **kwargs)
 
 def test(**kwargs):
-    test_config = """
+    test_config = yaml.safe_load("""
         test:
             _method_: >
                 $@trainer.test(model=@test#model,
@@ -58,11 +58,11 @@ def test(**kwargs):
             model: "@system"
             ckpt_path: null
             verbose: True
-    """
-    run("test", **yaml.safe_load(test_config), **kwargs)
+    """)
+    run("test", **test_config, **kwargs)
 
 def tune(**kwargs):
-    tune_config = """
+    tune_config = yaml.safe_load("""
         tune:
             _method_: > 
                 $@trainer.tune(model=@tune#model,
@@ -75,5 +75,5 @@ def tune(**kwargs):
             scale_batch_size_kwargs: null
             lr_find_kwargs: null
             method: fit
-    """
-    run("tune", **yaml.safe_load(tune_config), **kwargs)
+    """)
+    run("tune", **tune_config, **kwargs)
