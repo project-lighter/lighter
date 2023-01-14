@@ -1,12 +1,11 @@
 torch
 torchvision
 pytorch-lightning
-hydra-core
-click
+fire
 loguru
 wandb
 pandas
 SimpleITK
-monai==0.9.0  # Introduction of MetaTensor in the later version breaks DDP https://github.com/Project-MONAI/MONAI/issues/5198
+monai
 lightly
 pandas
