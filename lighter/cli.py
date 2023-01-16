@@ -18,7 +18,7 @@ def fit(**kwargs):
         fit:
             _method_: >
                 $@trainer.fit(model=@fit#model,
-                            ckpt_path=@fit#ckpt_path)
+                              ckpt_path=@fit#ckpt_path)
             model: "@system"
             ckpt_path: null
     """)
@@ -29,8 +29,8 @@ def validate(**kwargs):
         validate:
             _method_: > 
                 $@trainer.validate(model=@validate#model,
-                                ckpt_path=@validate#ckpt_path,
-                                verbose=@validate#verbose)
+                                   ckpt_path=@validate#ckpt_path,
+                                   verbose=@validate#verbose)
             model: "@system"
             ckpt_path: null
             verbose: True
@@ -42,7 +42,7 @@ def predict(**kwargs):
         predict:
             _method_: >
                 $@trainer.predict(model=@predict#model,
-                                ckpt_path=@predict#ckpt_path)
+                                  ckpt_path=@predict#ckpt_path)
             model: "@system"
             ckpt_path: null
     """)
@@ -53,8 +53,8 @@ def test(**kwargs):
         test:
             _method_: >
                 $@trainer.test(model=@test#model,
-                            ckpt_path=@test#ckpt_path,
-                            verbose=@test#verbose)
+                               ckpt_path=@test#ckpt_path,
+                               verbose=@test#verbose)
             model: "@system"
             ckpt_path: null
             verbose: True
@@ -66,10 +66,10 @@ def tune(**kwargs):
         tune:
             _method_: > 
                 $@trainer.tune(model=@tune#model,
-                            ckpt_path=@tune#ckpt_path,
-                            scale_batch_size_kwargs=@tune#scale_batch_size_kwargs,
-                            lr_find_kwargs=@tune#lr_find_kwargs,
-                            method=@tune#method)
+                               ckpt_path=@tune#ckpt_path,
+                               scale_batch_size_kwargs=@tune#scale_batch_size_kwargs,
+                               lr_find_kwargs=@tune#lr_find_kwargs,
+                               method=@tune#method)
             model: "@system"
             ckpt_path: null
             scale_batch_size_kwargs: null

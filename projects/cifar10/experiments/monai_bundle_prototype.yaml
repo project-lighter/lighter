@@ -1,4 +1,7 @@
-# project: ./projects/cifar10
+project:
+    _target_: lighter.utils.import_module_from_path
+    module_name: project
+    module_path: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -14,12 +17,15 @@ system:
     log_input_as: "image_batch"
 
     model:
-        _target_: monai.networks.nets.EfficientNetBN
-        model_name: efficientnet-b0
-        pretrained: False
-        spatial_dims: 2
-        in_channels: 3
-        num_classes: 10
+        _target_: "project.models.net.Net"
+
+    # model:
+    #     _target_: monai.networks.nets.EfficientNetBN
+    #     model_name: efficientnet-b0
+    #     pretrained: False
+    #     spatial_dims: 2
+    #     in_channels: 3
+    #     num_classes: 10
 
     criterion:
         _target_: torch.nn.CrossEntropyLoss
