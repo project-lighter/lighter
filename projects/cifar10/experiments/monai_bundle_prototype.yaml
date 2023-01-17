@@ -1,7 +1,6 @@
 imports:
     - $import lighter
     - $lighter.utils.import_module_from_path('project', './projects/cifar10')
-    - $import project
 
 trainer:
     _target_: pytorch_lightning.Trainer
