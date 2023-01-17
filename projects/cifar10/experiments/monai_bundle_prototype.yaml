@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 project:
     _target_: "lighter.utils.ImportProject"
     module_path: ./projects/cifar10
+=======
+project: ./projects/cifar10
+>>>>>>> b1c87d2e45f974005529ddb0022af44cc08d4670
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -16,8 +20,12 @@ system:
     log_input_as: "image_batch"
 
     model:
+<<<<<<< HEAD
         _target_: project.models.net.Net
         _requires_: "@project"
+=======
+        _target_: "project.models.net.Net"
+>>>>>>> b1c87d2e45f974005529ddb0022af44cc08d4670
 
     # model:
     #     _target_: monai.networks.nets.EfficientNetBN
