@@ -1,3 +1,3 @@
-[submodule "contrib"]
-	path = contrib
+[submodule "lighter/contrib"]
+	path = lighter/contrib
 	url = https://github.com/project-lighter/contrib
