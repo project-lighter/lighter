@@ -8,7 +8,7 @@ from loguru import logger
 from monai.bundle.scripts import run
 from monai.utils.misc import ensure_tuple
 
-from lighter.utils.importing import import_module_from_path
+from lighter.utils.dynamic_imports import import_module_from_path
 
 # Trainer methods calls in YAML format with support for command line arguments.
 # Waiting for https://github.com/Project-MONAI/MONAI/pull/5854#issuecomment-1384800886.
