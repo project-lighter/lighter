@@ -12,10 +12,10 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric
 
 import wandb
-from lighter.logger import LighterLogger
-from lighter.utils import (collate_fn_replace_corrupted, debug_message, get_name, hasarg,
-                           preprocess_image, reshape_pred_if_single_value_prediction,
-                           wrap_into_list)
+from lighter.logger import LighterLogger, debug_message, preprocess_image
+from lighter.utils.collate import collate_fn_replace_corrupted
+from lighter.utils.misc import ensure_list, get_name, hasarg
+from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
 class LighterSystem(pl.LightningModule):
@@ -108,8 +108,8 @@ class LighterSystem(pl.LightningModule):
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
-        self.optimizers = wrap_into_list(optimizers)
-        self.schedulers = wrap_into_list(schedulers)
+        self.optimizers = ensure_list(optimizers)
+        self.schedulers = ensure_list(schedulers)
 
         # Datasets
         self.train_dataset = train_dataset
@@ -126,9 +126,9 @@ class LighterSystem(pl.LightningModule):
         self.predict_sampler = predict_sampler
 
         # Metrics
-        self.train_metrics = ModuleList(wrap_into_list(train_metrics))
-        self.val_metrics = ModuleList(wrap_into_list(val_metrics))
-        self.test_metrics = ModuleList(wrap_into_list(test_metrics))
+        self.train_metrics = ModuleList(ensure_list(train_metrics))
+        self.val_metrics = ModuleList(ensure_list(val_metrics))
+        self.test_metrics = ModuleList(ensure_list(test_metrics))
 
         # Criterion-specific activation function and data type casting
         self._post_criterion_activation = post_criterion_activation
@@ -400,7 +400,7 @@ class LighterSystem(pl.LightningModule):
                 elif isinstance(lgr, LighterLogger) and self.global_step % 200:
                     lgr.experiment["wandb"].log({name: wandb.Image(image)}, step=self.global_step)
 
-            for lgr in wrap_into_list(self.logger):
+            for lgr in ensure_list(self.logger):
                 if isinstance(data, list):
                     for idx, tensor in enumerate(data):
                         log_image(lgr, tensor, f"{name}_{idx}")

@@ -8,7 +8,7 @@ from loguru import logger
 from monai.bundle.scripts import run
 from monai.utils.misc import ensure_tuple
 
-from lighter.utils import import_module_from_path
+from lighter.utils.importing import import_module_from_path
 
 
 def interface():
@@ -49,15 +49,16 @@ def run_trainer_method(name: str, **kwargs: Any):
 # Trainer methods calls in YAML format with support for command line arguments.
 # Waiting for https://github.com/Project-MONAI/MONAI/pull/5854#issuecomment-1384800886.
 trainer_methods = {
-    "fit": yaml.safe_load("""
+    "fit":
+        yaml.safe_load("""
         fit:
             _method_: >
                 $@trainer.fit(model=@fit#model,
                               ckpt_path=@fit#ckpt_path)
             model: "@system"
             ckpt_path: null"""),
-
-    "validate": yaml.safe_load("""
+    "validate":
+        yaml.safe_load("""
         validate:
             _method_: > 
                 $@trainer.validate(model=@validate#model,
@@ -66,16 +67,16 @@ trainer_methods = {
             model: "@system"
             ckpt_path: null
             verbose: True"""),
-
-    "predict": yaml.safe_load("""
+    "predict":
+        yaml.safe_load("""
         predict:
             _method_: >
                 $@trainer.predict(model=@predict#model,
                                   ckpt_path=@predict#ckpt_path)
             model: "@system"
             ckpt_path: null"""),
-
-    "test": yaml.safe_load("""
+    "test":
+        yaml.safe_load("""
         test:
             _method_: >
                 $@trainer.test(model=@test#model,
@@ -84,8 +85,8 @@ trainer_methods = {
             model: "@system"
             ckpt_path: null
             verbose: True"""),
-
-    "tune": yaml.safe_load("""
+    "tune":
+        yaml.safe_load("""
         tune:
             _method_: > 
                 $@trainer.tune(model=@tune#model,
