@@ -11,25 +11,26 @@ from loguru import logger
 from torch.nn import Identity, Module, Sequential
 from torch.utils.data import DataLoader
 
-
-def import_module_from_path(module_name: str, module_path: str) -> None:
+class ImportProject:
     """Given the path to a module, import it, and name it as specified.
 
-    Args:
-        module_name (str): what to name the imported module.
-        module_path (str): path to the module to load.
     """
-    # Based on https://stackoverflow.com/a/41595552.
-    module_path = Path(module_path).resolve() / "__init__.py"
-    print(module_path)
-    if not module_path.is_file():
-        logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
-        sys.exit()
-    spec = importlib.util.spec_from_file_location(module_name, str(module_path))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    sys.modules[module_name] = module
-    logger.info(f"{module_path.parent} imported as '{module_name}' module.")
+    def __init__(self, module_path: str) -> None:
+        """
+        Args:
+        module_path (str): path to the module to load.
+        """
+   
+        # Based on https://stackoverflow.com/a/41595552.
+        module_path = Path(module_path).resolve() / "__init__.py"
+        if not module_path.is_file():
+            logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
+            sys.exit()
+        spec = importlib.util.spec_from_file_location("project", str(module_path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules["project"] = module
+        logger.info(f"{module_path.parent} imported as 'project' module.")
 
 
 def import_attr(module_attr: str) -> Any:

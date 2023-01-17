@@ -1,6 +1,5 @@
 project:
-    _target_: lighter.utils.import_module_from_path
-    module_name: project
+    _target_: "lighter.utils.ImportProject"
     module_path: ./projects/cifar10
 
 trainer:
@@ -17,7 +16,8 @@ system:
     log_input_as: "image_batch"
 
     model:
-        _target_: "project.models.net.Net"
+        _target_: project.models.net.Net
+        _requires_: "@project"
 
     # model:
     #     _target_: monai.networks.nets.EfficientNetBN
@@ -38,17 +38,25 @@ system:
 
     train_metrics:
         - _target_: torchmetrics.Accuracy
+          task: "multiclass"
+
         - _target_: torchmetrics.F1Score
-    
+          task: "multiclass"
 
     val_metrics:
         - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1Score
+          task: "multiclass"
 
-    
+        - _target_: torchmetrics.F1Score
+          task: "multiclass"
+
+
     test_metrics:
         - _target_: torchmetrics.Accuracy
+          task: "multiclass"
+
         - _target_: torchmetrics.F1Score
+          task: "multiclass"
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10
