@@ -151,15 +151,26 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Union[torch.Tensor, List, Tuple]: output of the model.
         """
+        # Keyword arguments to pass to the forward method
         kwargs = {}
         if hasarg(self.model.forward, "epoch"):
+            # Add `epoch` argument if forward accepts it
             kwargs["epoch"] = self.current_epoch
         if hasarg(self.model.forward, "step"):
+            # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
+        # Perform the forward method
         if isinstance(input, list):
             return self.model(*input, **kwargs)
-        return self.model(input, **kwargs)
+        elif isinstance(input, dict):
+            return self.model(**input, **kwargs)
+        elif torch.is_tensor(input):
+            return self.model(input, **kwargs)
+        else:
+            logger.error(f"Input type '{type(input)}' not supported.")
+            sys.exit()
+
 
     def _base_step(self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
                    batch_idx: int, mode: str) -> Union[torch.Tensor, None]:
@@ -207,7 +218,7 @@ class LighterSystem(pl.LightningModule):
 
         ## Logging part ##
 
-        on_step = (mode != "val")
+        on_step = mode != "val"
 
         # Metrics. Note that torchmetrics objects are passed.
         for metric in metrics:
@@ -243,11 +254,12 @@ class LighterSystem(pl.LightningModule):
         Returns:
             torch.Tensor: the calculated loss.
         """
+        # Keyword arguments to pass to the loss/criterion function
+        kwargs = {}
         if hasarg(self.criterion.forward, "target"):
-            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
+            # Add `target` argument if forward accepts it. Casting performed if specified.
+            kwargs["target"] = target.to(self._cast_target_dtype_to)
         else:
-            loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
-
             if self.global_step == 0 and not self.trainer.sanity_checking:
                 logger.info(f"The criterion `{get_name(self.criterion, True)}` "
                             "has no `target` argument. In such cases, the LighterSystem "
@@ -256,7 +268,16 @@ class LighterSystem(pl.LightningModule):
                             "losses where target is not used. If this is not the "
                             "behavior you expected, redefine your criterion "
                             "so that it has a `target` argument.")
-        return loss
+
+        if torch.is_tensor(pred):
+            return self.criterion(pred, **kwargs)
+        elif isinstance(pred, list):
+            return self.criterion(*pred, **kwargs)
+        elif isinstance(pred, dict):
+            return self.criterion(**pred, **kwargs)
+        else:
+            logger.error(f"Pred type '{type(pred)}' not supported.")
+            sys.exit()
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
