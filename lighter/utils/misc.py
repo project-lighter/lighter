@@ -33,7 +33,7 @@ def dot_notation_setattr(obj: Callable, attr: str, value: Any):
     """
     if '.' not in attr:
         if not hasattr(obj, attr):
-            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
+            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`. Exiting.")
             sys.exit()
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
@@ -42,7 +42,7 @@ def dot_notation_setattr(obj: Callable, attr: str, value: Any):
         dot_notation_setattr(getattr(obj, obj_name), attr, value)
 
 
-def hasarg(callable: Callable, arg_name: str) -> bool:
+def hasarg(_callable: Callable, arg_name: str) -> bool:
     """Check if a function, class, or method has an argument with the specified name.
 
     Args:
@@ -53,7 +53,7 @@ def hasarg(callable: Callable, arg_name: str) -> bool:
         bool: `True` if the argument if the specified name exists.
     """
 
-    args = inspect.signature(callable).parameters.keys()
+    args = inspect.signature(_callable).parameters.keys()
     return arg_name in args
 
 
