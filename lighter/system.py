@@ -161,12 +161,12 @@ class LighterSystem(pl.LightningModule):
             kwargs["step"] = self.global_step
 
         # Perform the forward method
-        if isinstance(input, list):
+        if torch.is_tensor(input):
+            return self.model(input, **kwargs)
+        elif isinstance(input, list):
             return self.model(*input, **kwargs)
         elif isinstance(input, dict):
             return self.model(**input, **kwargs)
-        elif torch.is_tensor(input):
-            return self.model(input, **kwargs)
         else:
             logger.error(f"Input type '{type(input)}' not supported.")
             sys.exit()
