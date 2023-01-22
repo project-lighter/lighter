@@ -2,9 +2,16 @@ project: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 50
+    max_epochs: 10
     accelerator: gpu
     devices: 1
+    log_every_n_steps: 10
+    callbacks:
+        - _target_: lighter.callbacks.LighterLogger
+          project: CIFAR10
+          log_dir: "$@project + '/logs' "
+          tensorboard: True
+          wandb: True
 
 system:
     _target_: lighter.LighterSystem
@@ -34,17 +41,21 @@ system:
 
     train_metrics:
         - _target_: torchmetrics.Accuracy
+          task: multiclass
+          num_classes: 10
         - _target_: torchmetrics.F1Score
-    
+          task: multiclass
+          num_classes: 10
+        - _target_: torchmetrics.Precision
+          task: multiclass
+          num_classes: 10
+        - _target_: torchmetrics.Recall
+          task: multiclass
+          num_classes: 10
 
-    val_metrics:
-        - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1Score
+    val_metrics: "%system#train_metrics"
 
-    
-    test_metrics:
-        - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1Score
+    test_metrics: "%system#train_metrics"
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10

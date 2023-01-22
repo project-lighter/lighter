@@ -185,18 +185,17 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # When predicting, skip metrics and logging parts and return the predicted value
+        # In predict mode, skip metrics and logging parts and return the predicted value
         if mode == "predict":
             return pred
 
-        # Calculate the metrics
-        metrics = getattr(self, f"{mode}_metrics")
-        metrics.update(pred, target)
+        # Calculate the metrics for the step      
+        step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
         return {
             "mode": mode,
             "loss": loss,
-            "metrics": metrics,
+            "metrics": step_metrics,
             "input": input,
             "target": target,
             "pred": pred
@@ -260,7 +259,7 @@ class LighterSystem(pl.LightningModule):
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces them with valid examples from the dataset.
+        # function replaces None's with valid examples from the dataset.
         collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
                           sampler=sampler,
@@ -317,6 +316,7 @@ class LighterSystem(pl.LightningModule):
             self.test_dataloader = partial(self._base_dataloader, mode="test")
             self.test_step = partial(self._base_step, mode="test")
 
+        # Predict methods.
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
