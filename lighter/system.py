@@ -193,7 +193,6 @@ class LighterSystem(pl.LightningModule):
         step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
         return {
-            "mode": mode,
             "loss": loss,
             "metrics": step_metrics,
             "input": input,

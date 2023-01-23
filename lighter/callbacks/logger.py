@@ -14,6 +14,11 @@ from loguru import logger
 from lighter import LighterSystem
 
 
+LIGHTNING_TO_LIGHTER_STAGE = {"train": "train",
+                              "validate": "val",
+                              "test": "test_metrics"}
+
+
 class LighterLogger(Callback):
 
     def __init__(self, project, log_dir, tensorboard=False, wandb=False):
@@ -65,7 +70,52 @@ class LighterLogger(Callback):
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         self.tensorboard.close()
 
-    # Train step
+    @rank_zero_only
+    def _log(self, outputs: dict, mode: str, global_step, is_epoch=False):
+        step_or_epoch = "epoch" if is_epoch else "step"
+
+        # Loss
+        loss = outputs["loss"]
+        name = f"{mode}/loss/{step_or_epoch}"
+        self.tensorboard.add_scalar(name, loss, global_step=global_step)
+        self.wandb.log({name: loss}, step=global_step)
+
+        # Metrics
+        metrics = outputs["metrics"]
+        for name, metric in metrics.items():
+            name = f"{mode}/metric/{name}_{step_or_epoch}"
+            self.tensorboard.add_scalar(name, metric, global_step=global_step)
+            self.wandb.log({name: metric}, step=global_step)
+
+        # Input
+
+        # Target
+
+        # Pred
+
+    def _on_batch_end(self, outputs, trainer):
+        if not trainer.sanity_checking:
+            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            # Should loss be gathered or not on batch end?
+            # if distributed:
+            #   gather(outputs["loss"])
+            self.loss[mode] += outputs["loss"]
+            if self.step_counter[mode] % trainer.log_every_n_steps == 0:
+                self._log(outputs, mode, global_step=self._get_global_step(trainer))
+            self.step_counter[mode] += 1
+
+    def _on_epoch_end(self, trainer, pl_module):
+        if not trainer.sanity_checking:
+            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            loss = self.loss[mode]
+            # if distributed:
+            #   loss = gather(loss)
+            loss = loss / self.step_counter[mode]
+            metrics = getattr(pl_module, f"{mode}_metrics")
+            outputs = {"loss": loss, "metrics": metrics.compute()}
+            self._log(outputs, mode, is_epoch=True, global_step=self._get_global_step(trainer))
+            # metrics.reset()
+
     def on_train_batch_end(self, trainer: Trainer, pl_module: LighterSystem,
                            outputs: Any, batch: Any, batch_idx: int) -> None:
         self._on_batch_end(outputs, trainer)
@@ -79,61 +129,18 @@ class LighterLogger(Callback):
         self._on_batch_end(outputs, trainer)
 
     def on_train_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        self._on_epoch_end("train", trainer, pl_module)
+        self._on_epoch_end(trainer, pl_module)
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        print("Yooo")
-        self._on_epoch_end("val", trainer, pl_module)
+        self._on_epoch_end(trainer, pl_module)
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        self._on_epoch_end("test", trainer, pl_module)
+        self._on_epoch_end(trainer, pl_module)
 
-    def _on_batch_end(self, outputs, trainer):
-        if trainer.sanity_checking:
-            return
-        mode = outputs["mode"]
-        # Should loss be gathered or not on batch end?
-        # if distributed:
-        #   gather(outputs["loss"])
-        self.loss[mode] += outputs["loss"]
-        if self.step_counter[mode] % trainer.log_every_n_steps == 0:
-            self._log(outputs, global_step=self.step_counter[mode])
-        self.step_counter[mode] += 1
-
-    def _on_epoch_end(self, mode, trainer, pl_module):
-        if trainer.sanity_checking:
-            return
-        loss = self.loss[mode]
-        # if distributed:
-        #   loss = gather(loss)
-        loss = loss / self.step_counter[mode]
-        metrics = getattr(pl_module, f"{mode}_metrics")
-        outputs = {"mode": mode, "loss": loss, "metrics": metrics.compute()}
-        self._log(outputs, is_epoch=True, global_step=self.step_counter[mode])
-        metrics.reset()
-
-    @rank_zero_only
-    def _log(self, data: dict, global_step, is_epoch=False):
-        step_or_epoch = "epoch" if is_epoch else "step"
-
-        # Mode
-        mode = data["mode"]
-
-        # Loss
-        loss = data["loss"]
-        name = f"{mode}/loss/{step_or_epoch}"
-        self.tensorboard.add_scalar(name, loss, global_step=global_step)
-        self.wandb.log({name: loss}, step=global_step)
-
-        # Metrics
-        metrics = data["metrics"]
-        for name, metric in metrics.items():
-            name = f"{mode}/metric/{name}_{step_or_epoch}"
-            self.tensorboard.add_scalar(name, metric, global_step=global_step)
-            self.wandb.log({name: metric}, step=global_step)
-
-        # Input
-
-        # Target
-
-        # Pred
+    def _get_global_step(self, trainer: Trainer) -> int:
+        mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+        # Return train step counter when validating during fit() to
+        # correctly log the validation steps against training steps.
+        if mode == "val" and trainer.state.fn == "fit":
+            return self.step_counter["train"]
+        return self.step_counter[mode]
