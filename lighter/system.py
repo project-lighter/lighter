@@ -301,14 +301,25 @@ class LighterSystem(pl.LightningModule):
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Dict: a dict of optimizers and schedulers.
+            Single optimizer: If only a optimizer is provided 
+            Tuple of dictionaries: a tuple of `dict` with keys `optimizer` and `lr_scheduler`
         """
         if not self.optimizers:
             logger.error("Please specify 'optimizers' in the config. Exiting.")
             sys.exit()
         if not self.schedulers:
             return self.optimizers
-        return {"optimizer": self.optimizers, "lr_scheduler": self.schedulers}
+
+        if len(self.optimizers) != len(self.schedulers):
+            logger.error("'optimizers' and 'schedulers' should be paired")
+            sys.exit()
+
+        optim_sched_paired = []
+        for optimizer, scheduler in zip(self.optimizers, self.schedulers):
+            optim_sched_paired.append({"optimizer": optimizer, 
+                                        "lr_scheduler": scheduler})
+        
+        return tuple(optim_sched_paired)
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.
