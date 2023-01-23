@@ -189,7 +189,7 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             return pred
 
-        # Calculate the metrics for the step      
+        # Calculate the metrics for the step
         step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
         return {
@@ -217,6 +217,7 @@ class LighterSystem(pl.LightningModule):
             loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
 
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
+                self._target_not_used_reported = True
                 logger.info(f"The criterion `{get_name(self.criterion, True)}` "
                             "has no `target` argument. In such cases, the LighterSystem "
                             "passes only the predicted values to the criterion. "

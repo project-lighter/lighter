@@ -2,10 +2,12 @@ project: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 10
+    max_epochs: 100
     accelerator: gpu
-    devices: 1
+    devices: 2
+    strategy: ddp
     log_every_n_steps: 10
+    logger: null
     callbacks:
         - _target_: lighter.callbacks.LighterLogger
           project: CIFAR10
@@ -43,15 +45,19 @@ system:
         - _target_: torchmetrics.Accuracy
           task: multiclass
           num_classes: 10
+          average: macro
         - _target_: torchmetrics.F1Score
           task: multiclass
           num_classes: 10
+          average: macro
         - _target_: torchmetrics.Precision
           task: multiclass
           num_classes: 10
+          average: macro
         - _target_: torchmetrics.Recall
           task: multiclass
           num_classes: 10
+          average: macro
 
     val_metrics: "%system#train_metrics"
 
