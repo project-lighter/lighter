@@ -4,14 +4,16 @@ trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 100
     accelerator: gpu
-    devices: 2
-    strategy: ddp
+    devices: 1
+    # strategy: ddp
     log_every_n_steps: 10
     logger: null
     callbacks:
         - _target_: lighter.callbacks.LighterLogger
           project: CIFAR10
           log_dir: "$@project + '/logs' "
+          log_input_as: image_1
+          # log_pred_as: scalar
           tensorboard: True
           wandb: True
 
@@ -19,7 +21,7 @@ system:
     _target_: lighter.LighterSystem
     batch_size: 512
     pin_memory: True
-    num_workers: 4
+    num_workers: 1
 
     model:
         _target_: "project.models.net.Net"
