@@ -130,7 +130,7 @@ class LighterLogger(Callback):
                 n_images_to_log = int(log_as.split("_")[1])
                 for identifier, image in parse_image_data(data):
                     name = name if identifier is None else f"{name}_{identifier}"
-                    image = image[0:min(len(image), n_images_to_log)]
+                    image = image[:min(len(image), n_images_to_log)]
                     image = preprocess_image(image)
                     self._log_image(name, image, global_step)
             else:
@@ -246,12 +246,12 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     if has_three_dims:
         shape = image.shape
         image = image.view(shape[0], shape[1], shape[2] * shape[3], shape[4])
-    # If more than one image, create a grid
-    if image.shape[0] > 1:
+    if image.shape[0] == 1:
+        image = image[0]
+    else:
+        # If more than one image, create a grid
         nrow = image.shape[0] if has_three_dims else 8
         image = torchvision.utils.make_grid(image, nrow=nrow)
-    else:
-        image = image[0]
     return image
 
 
