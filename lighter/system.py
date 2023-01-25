@@ -149,19 +149,21 @@ class LighterSystem(pl.LightningModule):
             return self.model(*input, **kwargs)
         return self.model(input, **kwargs)
 
-    def _base_step(self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
-                   batch_idx: int, mode: str) -> Union[torch.Tensor, None]:
+    def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ('train', 'val', 'test', 'predict')
 
         Args:
-            batch (Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]]):
+            batch (Tuple):
                 output of the DataLoader and input to the model.
-            batch_idx (int): index of the batch. Not used, but Lightning requires it.
+            batch_idx (int): index of the batch. Not used, but PyTorch Lightning requires it.
             mode (str): mode in which the system is.
 
         Returns:
-            Union[torch.Tensor, None]: returns the calculated loss in the training and
-                validation step, None in the test step, and predicted batch in the predict step.
+            Union[Dict[str, Any], Any]: For the training, validation and test step, it returns
+                a dict containing loss, metrics, input, target, and pred. Loss will be `None`
+                for the test step. Metrics will be `None` if no metrics are specified.
+                
+                For predict step, it returns pred only.
         """
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 

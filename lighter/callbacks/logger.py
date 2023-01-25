@@ -2,7 +2,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Optional
 
 import torch
 import torch.distributed as dist
@@ -20,7 +20,7 @@ OPTIONAL_IMPORTS = {}
 
 class LighterLogger(Callback):
 
-    def __init__(self, project, log_dir, log_input_as=None, log_target_as=None, log_pred_as=None, tensorboard=False, wandb=False):
+    def __init__(self, project, log_dir, log_input_as=None, log_target_as=None, log_pred_as=None, tensorboard=False, wandb=False) -> None:
         self.project = project
         # Only used on rank 0, the dir is created in setup().
         self.log_dir = Path(log_dir) / project / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -30,15 +30,24 @@ class LighterLogger(Callback):
         self.tensorboard = tensorboard
         self.wandb = wandb
 
+        # Running loss. Resets at each epoch. Loss is not calculated for `test` mode.
+        self.loss = {"train": 0, "val": 0}
+        # Epoch steps. Resets at each epoch. No `test` mode step counter as loss is not calculated for it.
+        self.epoch_step_counter = {"train": 0, "val": 0}
         # Global steps. Replaces `Trainer.global_step` because it counts optimizer steps
         # instead of batch steps, which can be problematic when using gradient accumulation.
         self.global_step_counter = {"train": 0, "val": 0, "test": 0}
-        # Epoch steps. Resets at each epoch.
-        self.epoch_step_counter = {"train": 0, "val": 0, "test": 0}
-        # Running loss. Resets at each epoch.
-        self.loss = {"train": 0, "val": 0, "test": 0}
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
+        """
+        Initialize logging for the LighterSystem.
+        TODO: improve this docstring.
+
+        Args:
+            trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
+            pl_module (LighterSystem): LighterSystem, passed automatically by PyTorch Lightning.
+            stage (str): stage of the training process. Passed automatically by PyTorch Lightning.
+        """
         if trainer.logger is not None:
             logger.error("When using LighterLogger, set Trainer(logger=None).")
             sys.exit()
@@ -77,22 +86,32 @@ class LighterLogger(Callback):
             return
         self.tensorboard.close()
 
-    def _log(self, outputs: dict, mode: str, global_step, is_epoch=False):
+    def _log(self, outputs: dict, mode: str, global_step: int, is_epoch=False) -> None:
+        """Logs the outputs to TensorBoard and Weights & Biases (if enabled).
+        The outputs are logged as scalars and images, depending on the configuration.
+
+        Args:
+            outputs (dict): model outputs.
+            mode (str): current mode (train/val/test).
+            global_step (int): current global step.
+            is_epoch (bool): whether the log is being done at the end
+                of an epoch or astep. Default is False.
+        """
         if dist.is_initialized() and dist.get_rank() != 0:
             return
 
         step_or_epoch = "epoch" if is_epoch else "step"
 
         # Loss
-        loss = outputs["loss"]
-        name = f"{mode}/loss/{step_or_epoch}"
-        self._log_scalar(name, loss, global_step)
+        if outputs["loss"] is not None:
+            name = f"{mode}/loss/{step_or_epoch}"
+            self._log_scalar(name, outputs["loss"], global_step)
 
         # Metrics
-        metrics = outputs["metrics"]
-        for name, metric in metrics.items():
-            name = f"{mode}/metrics/{name}_{step_or_epoch}"
-            self._log_scalar(name, metric, global_step)
+        if outputs["metrics"] is not None:
+            for name, metric in outputs["metrics"].items():
+                name = f"{mode}/metrics/{name}_{step_or_epoch}"
+                self._log_scalar(name, metric, global_step)
 
         # Epoch does not log input, target, and pred.
         if is_epoch:
@@ -116,7 +135,7 @@ class LighterLogger(Callback):
                 # Check if the data type is valid.
                 check_image_data_type(data, data_name)
                 # Check if the `log_as` format is correct.
-                if not re.match("image_\d+", log_as):
+                if not re.match(r"image_\d+", log_as):
                     logger.error(f"`log_{data_name}_as` needs to be in `image_N` format where `N` is an integer")
                     sys.exit()
                 # Number of images to extract from the batch.
@@ -125,7 +144,7 @@ class LighterLogger(Callback):
                     name = name if identifier is None else f"{name}_{identifier}"
                     # Slice to `n_images_to_log` only if it less than the batch size.
                     if n_images_to_log < image.shape[0]:
-                        image = image[:min(len(image), n_images_to_log)]
+                        image = image[:n_images_to_log]
                     # Preprocess a batch of images into a single, loggable, image.
                     image = preprocess_image(image)
                     self._log_image(name, image, global_step)
@@ -133,76 +152,128 @@ class LighterLogger(Callback):
                 logger.error(f"`log_{data_name}_as` does not support `{log_as}`.")
                 sys.exit()
 
-    def _log_scalar(self, name, scalar, global_step):
+    def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
+        """Logs the scalar to TensorBoard and Weights & Biases (if enabled).
+
+        Args:
+            name (str): name of the image to be logged.
+            scalar (Union[int, float, torch.Tensor]): image to be logged.
+            global_step (int): current global step.
+        """
+        if not isinstance(scalar, (int, float, torch.Tensor)):
+            raise NotImplementedError("Currently it supports only single scalars.")
+        if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
+            raise NotImplementedError("Currently it supports only single scalars.")
+
         if self.tensorboard:
             self.tensorboard.add_scalar(name, scalar, global_step=global_step)
         if self.wandb:
             self.wandb.log({name: scalar}, step=global_step)
 
-    def _log_image(self, name, image, global_step):
+    def _log_image(self, name: str, image: torch.Tensor, global_step: int) -> None:
+        """Logs the image to TensorBoard and Weights & Biases (if enabled).
+
+        Args:
+            name (str): name of the image to be logged.
+            image (torch.Tensor): image to be logged.
+            global_step (int): current global step.
+        """
         if self.tensorboard:
             self.tensorboard.add_image(name, image, global_step=global_step)
         if self.wandb:
             self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Image(image)}, step=global_step)
 
-    def _on_batch_end(self, outputs: Any, trainer: Trainer):
+    def _on_batch_end(self, outputs: Dict, trainer: Trainer) -> None:
+        """Performs logging at the end of a batch/step. It logs the loss and metrics,
+        and, if specified how, the input, target, and pred data.
+
+        Args:
+            outputs (Dict): output dict from the model.
+            trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
+        """
         if not trainer.sanity_checking:
             mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
             # Accumulate the loss.
-            self.loss[mode] += outputs["loss"].item()
+            if mode in ["train", "val"]:
+                self.loss[mode] += outputs["loss"].item()
             # Logging frequency.
             if self.global_step_counter[mode] % trainer.log_every_n_steps == 0:
                 # Log. Done only on rank 0.
                 self._log(outputs, mode, global_step=self._get_global_step(trainer))
             # Increment the step counters.
             self.global_step_counter[mode] += 1
-            self.epoch_step_counter[mode] += 1
+            if mode in ["train", "val"]:
+                self.epoch_step_counter[mode] += 1
 
-    def _on_epoch_end(self, trainer: Trainer, pl_module: LighterSystem):
+    def _on_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
+        """Performs logging at the end of an epoch. It calculates the average
+        loss and metrics for the epoch and logs them. In distributed mode, it averages
+        the losses and metrics from all processes.
+
+        Args:
+            trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
+            pl_module (LighterSystem): LighterSystem, passed automatically by PyTorch Lightning.
+        """
         if not trainer.sanity_checking:
             mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
-            loss = self.loss[mode]
-            # Reduce the loss to rank 0 and average it.
-            if dist.is_initialized():
-                # Distributed communication works only tensors.
-                loss = torch.tensor(loss).to(pl_module.device)
-                # On rank 0, sum the losses from all ranks. Other ranks remain with the same loss as before.
-                dist.reduce(loss, dst=0)
-                # On rank 0, average the loss sum by dividing it with the number of processes.
-                loss = loss.item() / dist.get_world_size() if dist.get_rank() == 0 else loss.item()
-            # Divide the accumulated loss by the number of steps in the epoch.
-            loss /= self.epoch_step_counter[mode]
+            outputs = {"loss": None, "metrics": None}
+
+            # Loss
+            if mode in ["train", "val"]:
+                # Get the accumulated loss.
+                loss = self.loss[mode]
+                # Reduce the loss to rank 0 and average it.
+                if dist.is_initialized():
+                    # Distributed communication works only tensors.
+                    loss = torch.tensor(loss).to(pl_module.device)
+                    # On rank 0, sum the losses from all ranks. Other ranks remain with the same loss as before.
+                    dist.reduce(loss, dst=0)
+                    # On rank 0, average the loss sum by dividing it with the number of processes.
+                    loss = loss.item() / dist.get_world_size() if dist.get_rank() == 0 else loss.item()
+                # Divide the accumulated loss by the number of steps in the epoch.
+                loss /= self.epoch_step_counter[mode]
+                outputs["loss"] = loss
+            
+            # Metrics
             # Get the torchmetrics.
             metrics = getattr(pl_module, f"{mode}_metrics")
-            # Outputs to log. Compute the metrics over the epoch.
-            outputs = {"loss": loss, "metrics": metrics.compute()}
+            if metrics is not None:
+                # Compute the epoch metrics.
+                outputs["metrics"] = metrics.compute()
+                # Reset the metrics for the next epoch.
+                metrics.reset()
+
             # Log. Done only on rank 0.
             self._log(outputs, mode, is_epoch=True, global_step=self._get_global_step(trainer))
-            # Reset the metrics for the next epoch.
-            metrics.reset()
 
     def _get_global_step(self, trainer: Trainer) -> int:
+        """Return the global step for the current mode. Note that when Trainer
+        is running Trainer.fit() and is in `val` mode, this method will return
+        the global step of the `train` mode in order to correctly log the validation
+        steps against training steps.
+
+        Args:
+            trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
+
+        Returns:
+            int: global step.
+        """
         mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
         # When validating in Trainer.fit(), return the train steps instead of the
-        # val steps to correctly log the validation steps against training steps.
+        # val steps to correctly 
         if mode == "val" and trainer.state.fn == "fit":
             return self.global_step_counter["train"]
         return self.global_step_counter[mode]
 
     def on_train_epoch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        # Reset the epoch step counter and the loss for the next epoch.
-        self.epoch_step_counter["train"] = 0
+        # Reset the loss and the epoch step counter for the next epoch.
         self.loss["train"] = 0
+        self.epoch_step_counter["train"] = 0
 
     def on_validation_epoch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        # Reset the epoch step counter and the loss for the next epoch.
-        self.epoch_step_counter["val"] = 0
+        # Reset the loss and the epoch step counter for the next epoch.
         self.loss["val"] = 0
-
-    def on_test_epoch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        # Reset the epoch step counter and the loss for the next epoch.
-        self.epoch_step_counter["test"] = 0
-        self.loss["test"] = 0
+        self.epoch_step_counter["val"] = 0
 
     def on_train_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any,
                            batch: Any, batch_idx: int) -> None:
@@ -213,7 +284,7 @@ class LighterLogger(Callback):
         self._on_batch_end(outputs, trainer)
 
     def on_test_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any,
-                          batch: Any, batch_idx: int) -> None:
+                          batch: Any, batch_idx: int, dataloader_idx: int) -> None:
         self._on_batch_end(outputs, trainer)
 
     def on_train_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
@@ -273,11 +344,11 @@ def check_image_data_type(data: Any, name: str) -> None:
         is_valid = False
     
     if not is_valid:
-        logger.error(f"`{data_name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
+        logger.error(f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
                         f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported.")
         sys.exit()
 
-def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]) -> List[Tuple[str, torch.Tensor]]:
+def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]) -> List[Tuple[Optional[str], torch.Tensor]]:
     """Given input data, this function will parse it and return a list of tuples where 
     each tuple contains an identifier and a tensor.
 
@@ -285,8 +356,8 @@ def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.T
         data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]): image tensor(s).
 
     Returns:
-        List[Tuple[str, torch.Tensor]]: a list of tuples where the first element is a string identifier and the
-            second an image tensor.
+        List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is
+            a string identifier (or `None` if there is only one image) and the second an image tensor.
     """
     result = []
     if isinstance(data, dict):
