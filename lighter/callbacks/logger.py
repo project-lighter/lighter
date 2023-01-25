@@ -1,24 +1,22 @@
-import sys
 import re
-from pathlib import Path
+import sys
 from datetime import datetime
-from yaml import safe_load
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 import torch.distributed as dist
-from torch.utils import tensorboard
 import torchvision
-from pytorch_lightning import Callback, Trainer
-from monai.utils.module import optional_import
 from loguru import logger
+from monai.utils.module import optional_import
+from pytorch_lightning import Callback, Trainer
+from torch.utils import tensorboard
+from yaml import safe_load
 
 from lighter import LighterSystem
-from lighter.utils.misc import ensure_list
 
-
-LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test_metrics"}
-optional_imports = {}
+LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test"}
+OPTIONAL_IMPORTS = {}
 
 class LighterLogger(Callback):
 
@@ -27,11 +25,7 @@ class LighterLogger(Callback):
         # Only used on rank 0, the dir is created in setup().
         self.log_dir = Path(log_dir) / project / datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.log_as = {
-            "input": log_input_as,
-            "target": log_target_as,
-            "pred": log_pred_as
-        }
+        self.log_as = {"input": log_input_as, "target": log_target_as, "pred": log_pred_as}
 
         self.tensorboard = tensorboard
         self.wandb = wandb
@@ -49,7 +43,7 @@ class LighterLogger(Callback):
             logger.error("When using LighterLogger, set Trainer(logger=None).")
             sys.exit()
 
-        if dist.is_initialized() and dist.get_rank != 0:
+        if dist.is_initialized() and dist.get_rank() != 0:
             return
 
         self.log_dir.mkdir(parents=True)
@@ -69,22 +63,22 @@ class LighterLogger(Callback):
 
         # Wandb initialization.
         if self.wandb:
-            optional_imports["wandb"], wandb_available = optional_import("wandb")
+            OPTIONAL_IMPORTS["wandb"], wandb_available = optional_import("wandb")
             if not wandb_available:
                 logger.error("W&B not installed. To install it, run `pip install wandb`. Exiting.")
                 sys.exit()
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
-            self.wandb = optional_imports["wandb"].init(project=self.project, dir=wandb_dir)
+            self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir)
             # self.wandb.config.update(config)
 
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
-        if dist.is_initialized() and dist.get_rank != 0:
+        if dist.is_initialized() and dist.get_rank() != 0:
             return
         self.tensorboard.close()
 
     def _log(self, outputs: dict, mode: str, global_step, is_epoch=False):
-        if dist.is_initialized() and dist.get_rank != 0:
+        if dist.is_initialized() and dist.get_rank() != 0:
             return
 
         step_or_epoch = "epoch" if is_epoch else "step"
@@ -119,22 +113,24 @@ class LighterLogger(Callback):
 
             # Image
             elif log_as.startswith("image_"):
-                if not image_data_type_check(data):
-                    logger.error(f"`{data_name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
-                                 f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported.")
-                    sys.exit()
+                # Check if the data type is valid.
+                check_image_data_type(data, data_name)
+                # Check if the `log_as` format is correct.
                 if not re.match("image_\d+", log_as):
                     logger.error(f"`log_{data_name}_as` needs to be in `image_N` format where `N` is an integer")
                     sys.exit()
-                # Number of images from the batch to log
+                # Number of images to extract from the batch.
                 n_images_to_log = int(log_as.split("_")[1])
                 for identifier, image in parse_image_data(data):
                     name = name if identifier is None else f"{name}_{identifier}"
-                    image = image[:min(len(image), n_images_to_log)]
+                    # Slice to `n_images_to_log` only if it less than the batch size.
+                    if n_images_to_log < image.shape[0]:
+                        image = image[:min(len(image), n_images_to_log)]
+                    # Preprocess a batch of images into a single, loggable, image.
                     image = preprocess_image(image)
                     self._log_image(name, image, global_step)
             else:
-                logger.error(f"`log_{data_name}_as` does not support `{log_as}.")
+                logger.error(f"`log_{data_name}_as` does not support `{log_as}`.")
                 sys.exit()
 
     def _log_scalar(self, name, scalar, global_step):
@@ -147,7 +143,7 @@ class LighterLogger(Callback):
         if self.tensorboard:
             self.tensorboard.add_image(name, image, global_step=global_step)
         if self.wandb:
-            self.wandb.log({name: optional_imports["wandb"].Image(image)}, step=global_step)
+            self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Image(image)}, step=global_step)
 
     def _on_batch_end(self, outputs: Any, trainer: Trainer):
         if not trainer.sanity_checking:
@@ -185,6 +181,14 @@ class LighterLogger(Callback):
             # Reset the metrics for the next epoch.
             metrics.reset()
 
+    def _get_global_step(self, trainer: Trainer) -> int:
+        mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+        # When validating in Trainer.fit(), return the train steps instead of the
+        # val steps to correctly log the validation steps against training steps.
+        if mode == "val" and trainer.state.fn == "fit":
+            return self.global_step_counter["train"]
+        return self.global_step_counter[mode]
+
     def on_train_epoch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         # Reset the epoch step counter and the loss for the next epoch.
         self.epoch_step_counter["train"] = 0
@@ -221,14 +225,6 @@ class LighterLogger(Callback):
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         self._on_epoch_end(trainer, pl_module)
 
-    def _get_global_step(self, trainer: Trainer) -> int:
-        mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
-        # When validating in Trainer.fit(), return the train steps instead of the
-        # val steps to correctly log the validation steps against training steps.
-        if mode == "val" and trainer.state.fn == "fit":
-            return self.global_step_counter["train"]
-        return self.global_step_counter[mode]
-
 
 def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     """Preprocess the image before logging it. If it is a batch of multiple images,
@@ -244,6 +240,7 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     # 3D image (NCDHW)
     has_three_dims = image.ndim == 5
     if has_three_dims:
+        # Reshape 3D image from NCDHW to NC(D*H)W format
         shape = image.shape
         image = image.view(shape[0], shape[1], shape[2] * shape[3], shape[4])
     if image.shape[0] == 1:
@@ -255,31 +252,53 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     return image
 
 
-def image_data_type_check(data):
+def check_image_data_type(data: Any, name: str) -> None:
+    """Check the input image data for its type. Valid image data types are:
+        - torch.Tensor
+        - List[torch.Tensor]
+        - Dict[str, torch.Tensor]
+        - Dict[str, List[torch.Tensor]]
+
+    Args:
+        data (Any): image data to check
+        name (str): name of the image data, for logging purposes. 
+    """
     if isinstance(data, dict):
-        return all([image_data_type_check(elem) for elem in data.values()])
+        is_valid = all(check_image_data_type(elem) for elem in data.values())
     elif isinstance(data, list):
-        return all([image_data_type_check(elem) for elem in data])
+        is_valid = all(check_image_data_type(elem) for elem in data)
     elif isinstance(data, torch.Tensor):
-        return True
+        is_valid = True
     else:
-        return False
+        is_valid = False
+    
+    if not is_valid:
+        logger.error(f"`{data_name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
+                        f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported.")
+        sys.exit()
 
+def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]) -> List[Tuple[str, torch.Tensor]]:
+    """Given input data, this function will parse it and return a list of tuples where 
+    each tuple contains an identifier and a tensor.
 
-def parse_image_data(data):
+    Args:
+        data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]): image tensor(s).
+
+    Returns:
+        List[Tuple[str, torch.Tensor]]: a list of tuples where the first element is a string identifier and the
+            second an image tensor.
+    """
+    result = []
     if isinstance(data, dict):
-        _data = data
-        data = []
-        for key, elem in _data:
-            if isinstance(elem, list):
-                if len(elem) > 1:
-                    data += [(f"{key}_{i}", tensor) for i, tensor in enumerate(elem)]
-                else:
-                    data.append((key, elem))
+        for key, value in data.items():
+            if isinstance(value, list):
+                for i, tensor in enumerate(value):
+                    result.append((f"{key}_{i}", tensor) if len(value > 1) else (key, tensor))
             else:
-                data.append((key, elem))
+                result.append((key, value))
     elif isinstance(data, list):
-        data = [(i, elem) for i, elem in enumerate(ensure_list(data))]
+        for i, tensor in enumerate(data):
+            result.append((str(i), tensor))
     else:
-        data = [(None, data)]
-    return data
+        result.append((None, data))
+    return result
