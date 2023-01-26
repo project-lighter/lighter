@@ -163,7 +163,7 @@ class LighterLogger(Callback):
         if not isinstance(scalar, (int, float, torch.Tensor)):
             raise NotImplementedError("LighterLogger currently supports only single scalars.")
         if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
-            raise NotImplementedError("Currently it supports only single scalars.")
+            raise NotImplementedError("LighterLogger currently supports only single scalars.")
 
         if self.tensorboard:
             self.tensorboard.add_scalar(name, scalar, global_step=global_step)
