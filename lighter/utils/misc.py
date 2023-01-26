@@ -1,6 +1,7 @@
+from typing import Any, Callable, List
+
 import inspect
 import sys
-from typing import Any, Callable, List
 
 from loguru import logger
 
@@ -31,14 +32,14 @@ def dot_notation_setattr(obj: Callable, attr: str, value: Any):
         attr (str): attribute name of the object.
         value (Any): attribute value to be set.
     """
-    if '.' not in attr:
+    if "." not in attr:
         if not hasattr(obj, attr):
             logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`. Exiting.")
             sys.exit()
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
     else:
-        obj_name, attr = attr.split('.', maxsplit=1)
+        obj_name, attr = attr.split(".", maxsplit=1)
         dot_notation_setattr(getattr(obj, obj_name), attr, value)
 
 

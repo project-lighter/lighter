@@ -1,6 +1,7 @@
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import sys
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
@@ -16,30 +17,31 @@ from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
 class LighterSystem(pl.LightningModule):
-
-    def __init__(self,
-                 model: Module,
-                 batch_size: int,
-                 drop_last_batch: bool = False,
-                 num_workers: int = 0,
-                 pin_memory: bool = True,
-                 optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
-                 schedulers: Optional[Union[Callable, List[Callable]]] = None,
-                 criterion: Optional[Callable] = None,
-                 cast_target_dtype_to: Optional[str] = None,
-                 post_criterion_activation: Optional[str] = None,
-                 patch_based_inferer: Optional[Callable] = None,
-                 train_metrics: Optional[Union[Metric, List[Metric]]] = None,
-                 val_metrics: Optional[Union[Metric, List[Metric]]] = None,
-                 test_metrics: Optional[Union[Metric, List[Metric]]] = None,
-                 train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-                 val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-                 test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-                 predict_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-                 train_sampler: Optional[Sampler] = None,
-                 val_sampler: Optional[Sampler] = None,
-                 test_sampler: Optional[Sampler] = None,
-                 predict_sampler: Optional[Sampler] = None) -> None:
+    def __init__(
+        self,
+        model: Module,
+        batch_size: int,
+        drop_last_batch: bool = False,
+        num_workers: int = 0,
+        pin_memory: bool = True,
+        optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
+        schedulers: Optional[Union[Callable, List[Callable]]] = None,
+        criterion: Optional[Callable] = None,
+        cast_target_dtype_to: Optional[str] = None,
+        post_criterion_activation: Optional[str] = None,
+        patch_based_inferer: Optional[Callable] = None,
+        train_metrics: Optional[Union[Metric, List[Metric]]] = None,
+        val_metrics: Optional[Union[Metric, List[Metric]]] = None,
+        test_metrics: Optional[Union[Metric, List[Metric]]] = None,
+        train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+        val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+        test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+        predict_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
+        train_sampler: Optional[Sampler] = None,
+        val_sampler: Optional[Sampler] = None,
+        test_sampler: Optional[Sampler] = None,
+        predict_sampler: Optional[Sampler] = None,
+    ) -> None:
         """_summary_
 
         Args:
@@ -162,7 +164,7 @@ class LighterSystem(pl.LightningModule):
             Union[Dict[str, Any], Any]: For the training, validation and test step, it returns
                 a dict containing loss, metrics, input, target, and pred. Loss will be `None`
                 for the test step. Metrics will be `None` if no metrics are specified.
-                
+
                 For predict step, it returns pred only.
         """
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
@@ -194,16 +196,9 @@ class LighterSystem(pl.LightningModule):
         # Calculate the metrics for the step
         step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
-        return {
-            "loss": loss,
-            "metrics": step_metrics,
-            "input": input,
-            "target": target,
-            "pred": pred
-        }
+        return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
 
-    def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple],
-                        target: Union[torch.Tensor, None]) -> torch.Tensor:
+    def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]) -> torch.Tensor:
         """_summary_
 
         Args:
@@ -220,13 +215,15 @@ class LighterSystem(pl.LightningModule):
 
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
-                logger.info(f"The criterion `{get_name(self.criterion, True)}` "
-                            "has no `target` argument. In such cases, the LighterSystem "
-                            "passes only the predicted values to the criterion. "
-                            "This is intended as a support for self-supervised "
-                            "losses where target is not used. If this is not the "
-                            "behavior you expected, redefine your criterion "
-                            "so that it has a `target` argument.")
+                logger.info(
+                    f"The criterion `{get_name(self.criterion, True)}` "
+                    "has no `target` argument. In such cases, the LighterSystem "
+                    "passes only the predicted values to the criterion. "
+                    "This is intended as a support for self-supervised "
+                    "losses where target is not used. If this is not the "
+                    "behavior you expected, redefine your criterion "
+                    "so that it has a `target` argument."
+                )
         return loss
 
     def _base_dataloader(self, mode: str) -> DataLoader:
@@ -256,27 +253,28 @@ class LighterSystem(pl.LightningModule):
         # varies in shape, preventing the data loader to stack them into a batch.
         batch_size = self.batch_size
         if self._patch_based_inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the general batch size to 1 for {mode} "
-                        "mode because a patch-based inferer is used.")
+            logger.info(f"Setting the general batch size to 1 for {mode} " "mode because a patch-based inferer is used.")
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces None's with valid examples from the dataset.
         collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
-        return DataLoader(dataset,
-                          sampler=sampler,
-                          shuffle=(mode == "train" and sampler is None),
-                          batch_size=batch_size,
-                          drop_last=self.drop_last_batch,
-                          num_workers=self.num_workers,
-                          pin_memory=self.pin_memory,
-                          collate_fn=collate_fn)
+        return DataLoader(
+            dataset,
+            sampler=sampler,
+            shuffle=(mode == "train" and sampler is None),
+            batch_size=batch_size,
+            drop_last=self.drop_last_batch,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            collate_fn=collate_fn,
+        )
 
     def configure_optimizers(self) -> Dict:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Single optimizer: If only a optimizer is provided 
+            Single optimizer: If only a optimizer is provided
             Tuple of dictionaries: a tuple of `dict` with keys `optimizer` and `lr_scheduler`
         """
         if not self.optimizers:
@@ -291,9 +289,8 @@ class LighterSystem(pl.LightningModule):
 
         optim_sched_paired = []
         for optimizer, scheduler in zip(self.optimizers, self.schedulers):
-            optim_sched_paired.append({"optimizer": optimizer, 
-                                        "lr_scheduler": scheduler})
-        
+            optim_sched_paired.append({"optimizer": optimizer, "lr_scheduler": scheduler})
+
         return tuple(optim_sched_paired)
 
     def setup(self, stage: str) -> None:
@@ -307,9 +304,16 @@ class LighterSystem(pl.LightningModule):
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
         if not self._lightning_module_methods_defined:
-            del (self.train_dataloader, self.training_step, self.val_dataloader,
-                 self.validation_step, self.test_dataloader, self.test_step,
-                 self.predict_dataloader, self.predict_step)
+            del (
+                self.train_dataloader,
+                self.training_step,
+                self.val_dataloader,
+                self.validation_step,
+                self.test_dataloader,
+                self.test_step,
+                self.predict_dataloader,
+                self.predict_step,
+            )
             # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
             #  parameter, and deleting the above methods again breaks it. This flag prevents it.
             self._lightning_module_methods_defined = True

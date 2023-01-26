@@ -1,0 +1,6 @@
+trainer#max_steps: 5
+trainer#num_sanity_val_steps: 0
+trainer#accelerator: cpu
+system#batch_size: 16
+system#num_workers: 2
+trainer#callbacks: null

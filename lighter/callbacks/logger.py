@@ -1,8 +1,9 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union, Optional
 
 import torch
 import torch.distributed as dist
@@ -18,11 +19,19 @@ from lighter import LighterSystem
 LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test"}
 OPTIONAL_IMPORTS = {}
 
+
 class LighterLogger(Callback):
-
-    def __init__(self, project, log_dir, tensorboard=False, wandb=False,
-                 input_type=None, target_type=None, pred_type=None, max_samples=None) -> None:
-
+    def __init__(
+        self,
+        project,
+        log_dir,
+        tensorboard=False,
+        wandb=False,
+        input_type=None,
+        target_type=None,
+        pred_type=None,
+        max_samples=None,
+    ) -> None:
         self.project = project
         # Only used on rank 0, the dir is created in setup().
         self.log_dir = Path(log_dir) / project / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -142,7 +151,7 @@ class LighterLogger(Callback):
                     name = name if identifier is None else f"{name}_{identifier}"
                     # Slice to `max_samples` only if it less than the batch size.
                     if self.max_samples is not None and self.max_samples < image.shape[0]:
-                        image = image[:self.max_samples]
+                        image = image[: self.max_samples]
                     # Preprocess a batch of images into a single, loggable, image.
                     image = preprocess_image(image)
                     self._log_image(name, image, global_step)
@@ -231,7 +240,7 @@ class LighterLogger(Callback):
                 # Divide the accumulated loss by the number of steps in the epoch.
                 loss /= self.epoch_step_counter[mode]
                 outputs["loss"] = loss
-            
+
             # Metrics
             # Get the torchmetrics.
             metrics = getattr(pl_module, f"{mode}_metrics")
@@ -258,7 +267,7 @@ class LighterLogger(Callback):
         """
         mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
         # When validating in Trainer.fit(), return the train steps instead of the
-        # val steps to correctly 
+        # val steps to correctly
         if mode == "val" and trainer.state.fn == "fit":
             return self.global_step_counter["train"]
         return self.global_step_counter[mode]
@@ -273,16 +282,17 @@ class LighterLogger(Callback):
         self.loss["val"] = 0
         self.epoch_step_counter["val"] = 0
 
-    def on_train_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any,
-                           batch: Any, batch_idx: int) -> None:
+    def on_train_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int) -> None:
         self._on_batch_end(outputs, trainer)
 
-    def on_validation_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any,
-                                batch: Any, batch_idx: int, dataloader_idx: int) -> None:
+    def on_validation_batch_end(
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+    ) -> None:
         self._on_batch_end(outputs, trainer)
 
-    def on_test_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any,
-                          batch: Any, batch_idx: int, dataloader_idx: int) -> None:
+    def on_test_batch_end(
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+    ) -> None:
         self._on_batch_end(outputs, trainer)
 
     def on_train_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
@@ -330,7 +340,7 @@ def check_image_data_type(data: Any, name: str) -> None:
 
     Args:
         data (Any): image data to check
-        name (str): name of the image data, for logging purposes. 
+        name (str): name of the image data, for logging purposes.
     """
     if isinstance(data, dict):
         is_valid = all(check_image_data_type(elem) for elem in data.values())
@@ -340,15 +350,19 @@ def check_image_data_type(data: Any, name: str) -> None:
         is_valid = True
     else:
         is_valid = False
-    
+
     if not is_valid:
-        logger.error(f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
-                        f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported.")
+        logger.error(
+            f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
+            f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported."
+        )
         sys.exit()
 
 
-def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]) -> List[Tuple[Optional[str], torch.Tensor]]:
-    """Given input data, this function will parse it and return a list of tuples where 
+def parse_image_data(
+    data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]
+) -> List[Tuple[Optional[str], torch.Tensor]]:
+    """Given input data, this function will parse it and return a list of tuples where
     each tuple contains an identifier and a tensor.
 
     Args:
