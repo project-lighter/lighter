@@ -20,12 +20,16 @@ OPTIONAL_IMPORTS = {}
 
 class LighterLogger(Callback):
 
-    def __init__(self, project, log_dir, log_input_as=None, log_target_as=None, log_pred_as=None, tensorboard=False, wandb=False) -> None:
+    def __init__(self, project, log_dir, tensorboard=False, wandb=False,
+                 input_type=None, target_type=None, pred_type=None, max_samples=None) -> None:
+
         self.project = project
         # Only used on rank 0, the dir is created in setup().
         self.log_dir = Path(log_dir) / project / datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.log_as = {"input": log_input_as, "target": log_target_as, "pred": log_pred_as}
+        self.data_types = {"input": input_type, "target": target_type, "pred": pred_type}
+        # Max number of samples from the batch to log.
+        self.max_samples = max_samples
 
         self.tensorboard = tensorboard
         self.wandb = wandb
@@ -61,7 +65,7 @@ class LighterLogger(Callback):
         # config = safe_load(open(self.log_dir / "config.yaml"))
 
         # Loguru log file.
-        logger.add(sink=self.log_dir / f"{stage}.log")
+        # logger.add(sink=self.log_dir / f"{stage}.log")
 
         # Tensorboard initialization.
         if self.tensorboard:
@@ -119,37 +123,31 @@ class LighterLogger(Callback):
 
         # Input, Target, Pred
         for data_name in ["input", "target", "pred"]:
-            if self.log_as[data_name] is None:
+            if self.data_types[data_name] is None:
                 continue
 
-            log_as = self.log_as[data_name]
+            data_type = self.data_types[data_name]
             data = outputs[data_name]
             name = f"{mode}/data/{data_name}_{step_or_epoch}"
 
             # Scalar
-            if log_as == "scalar":
+            if data_type == "scalar":
                 self._log_scalar(name, data, global_step)
 
             # Image
-            elif log_as.startswith("image_"):
+            elif data_type == "image":
                 # Check if the data type is valid.
                 check_image_data_type(data, data_name)
-                # Check if the `log_as` format is correct.
-                if not re.match(r"image_\d+", log_as):
-                    logger.error(f"`log_{data_name}_as` needs to be in `image_N` format where `N` is an integer")
-                    sys.exit()
-                # Number of images to extract from the batch.
-                n_images_to_log = int(log_as.split("_")[1])
                 for identifier, image in parse_image_data(data):
                     name = name if identifier is None else f"{name}_{identifier}"
-                    # Slice to `n_images_to_log` only if it less than the batch size.
-                    if n_images_to_log < image.shape[0]:
-                        image = image[:n_images_to_log]
+                    # Slice to `max_samples` only if it less than the batch size.
+                    if self.max_samples is not None and self.max_samples < image.shape[0]:
+                        image = image[:self.max_samples]
                     # Preprocess a batch of images into a single, loggable, image.
                     image = preprocess_image(image)
                     self._log_image(name, image, global_step)
             else:
-                logger.error(f"`log_{data_name}_as` does not support `{log_as}`.")
+                logger.error(f"`{data_name}_type` does not support `{data_type}`.")
                 sys.exit()
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
@@ -347,6 +345,7 @@ def check_image_data_type(data: Any, name: str) -> None:
         logger.error(f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
                         f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported.")
         sys.exit()
+
 
 def parse_image_data(data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]) -> List[Tuple[Optional[str], torch.Tensor]]:
     """Given input data, this function will parse it and return a list of tuples where 

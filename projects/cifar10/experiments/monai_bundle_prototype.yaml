@@ -12,10 +12,10 @@ trainer:
         - _target_: lighter.callbacks.LighterLogger
           project: CIFAR10
           log_dir: "$@project + '/logs' "
-          log_input_as: image_1
-          # log_pred_as: scalar
           tensorboard: True
           wandb: True
+          input_type: image
+          max_samples: 10
 
 system:
     _target_: lighter.LighterSystem
