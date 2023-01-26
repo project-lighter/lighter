@@ -161,7 +161,7 @@ class LighterLogger(Callback):
             global_step (int): current global step.
         """
         if not isinstance(scalar, (int, float, torch.Tensor)):
-            raise NotImplementedError("Currently it supports only single scalars.")
+            raise NotImplementedError("LighterLogger currently supports only single scalars.")
         if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
             raise NotImplementedError("Currently it supports only single scalars.")
 
