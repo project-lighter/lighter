@@ -74,7 +74,7 @@ class LighterLogger(Callback):
         if self.wandb:
             OPTIONAL_IMPORTS["wandb"], wandb_available = optional_import("wandb")
             if not wandb_available:
-                logger.error("W&B not installed. To install it, run `pip install wandb`. Exiting.")
+                logger.error("Weights & Biases not installed. To install it, run `pip install wandb`. Exiting.")
                 sys.exit()
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
