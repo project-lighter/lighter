@@ -2,16 +2,26 @@ project: ./projects/cifar10
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 50
+    max_epochs: 100
     accelerator: gpu
     devices: 1
+    # strategy: ddp
+    log_every_n_steps: 10
+    logger: null
+    callbacks:
+        - _target_: lighter.callbacks.LighterLogger
+          project: CIFAR10
+          log_dir: "$@project + '/logs' "
+          tensorboard: True
+          wandb: True
+          input_type: image
+          max_samples: 10
 
 system:
     _target_: lighter.LighterSystem
     batch_size: 512
     pin_memory: True
-    num_workers: 4
-    log_input_as: "image_batch"
+    num_workers: 1
 
     model:
         _target_: "project.models.net.Net"
@@ -35,17 +45,25 @@ system:
 
     train_metrics:
         - _target_: torchmetrics.Accuracy
+          task: multiclass
+          num_classes: 10
+          average: macro
         - _target_: torchmetrics.F1Score
-    
+          task: multiclass
+          num_classes: 10
+          average: macro
+        - _target_: torchmetrics.Precision
+          task: multiclass
+          num_classes: 10
+          average: macro
+        - _target_: torchmetrics.Recall
+          task: multiclass
+          num_classes: 10
+          average: macro
 
-    val_metrics:
-        - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1Score
+    val_metrics: "%system#train_metrics"
 
-    
-    test_metrics:
-        - _target_: torchmetrics.Accuracy
-        - _target_: torchmetrics.F1Score
+    test_metrics: "%system#train_metrics"
 
     train_dataset:
         _target_: torchvision.datasets.CIFAR10

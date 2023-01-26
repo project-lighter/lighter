@@ -1,4 +1,3 @@
-import os
 import sys
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -6,13 +5,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import pytorch_lightning as pl
 import torch
 from loguru import logger
-from torch.nn import Module, ModuleList
+from torch.nn import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
-from torchmetrics import Metric
+from torchmetrics import Metric, MetricCollection
 
-import wandb
-from lighter.logger import LighterLogger, debug_message, preprocess_image
 from lighter.utils.collate import collate_fn_replace_corrupted
 from lighter.utils.misc import ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
@@ -42,10 +39,7 @@ class LighterSystem(pl.LightningModule):
                  train_sampler: Optional[Sampler] = None,
                  val_sampler: Optional[Sampler] = None,
                  test_sampler: Optional[Sampler] = None,
-                 predict_sampler: Optional[Sampler] = None,
-                 log_input_as: Optional[str] = None,
-                 log_target_as: Optional[str] = None,
-                 log_pred_as: Optional[str] = None) -> None:
+                 predict_sampler: Optional[Sampler] = None) -> None:
         """_summary_
 
         Args:
@@ -91,14 +85,9 @@ class LighterSystem(pl.LightningModule):
             val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
             test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
             predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
-            log_input_as (Optional[str], optional): how the input tensors should be logged.
-                ['scalar', 'image_batch', 'image_single']. Defaults to None.
-            log_target_as (Optional[str], optional): how the target tensors should be logged.
-                ['scalar', 'image_batch', 'image_single']. Defaults to None.
-            log_pred_as (Optional[str], optional): how the predicted tensors should be logged.
-                ['scalar', 'image_batch', 'image_single']. Defaults to None.
         """
         super().__init__()
+        # Bypass LightningModule's check for default methods. We define them in self.setup().
         self._init_placeholders_for_dataloader_and_step_methods()
 
         # Model setup
@@ -126,21 +115,20 @@ class LighterSystem(pl.LightningModule):
         self.predict_sampler = predict_sampler
 
         # Metrics
-        self.train_metrics = ModuleList(ensure_list(train_metrics))
-        self.val_metrics = ModuleList(ensure_list(val_metrics))
-        self.test_metrics = ModuleList(ensure_list(test_metrics))
+        self.train_metrics = MetricCollection(ensure_list(train_metrics))
+        self.val_metrics = MetricCollection(ensure_list(val_metrics))
+        self.test_metrics = MetricCollection(ensure_list(test_metrics))
 
         # Criterion-specific activation function and data type casting
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
 
+        # Patch-based inference
         self._patch_based_inferer = patch_based_inferer
 
-        self._log_input_as = log_input_as
-        self._log_target_as = log_target_as
-        self._log_pred_as = log_pred_as
-
+        # Checks
         self._lightning_module_methods_defined = False
+        self._target_not_used_reported = False
 
     def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
         """Forward pass. Multi-input models are supported.
@@ -161,19 +149,21 @@ class LighterSystem(pl.LightningModule):
             return self.model(*input, **kwargs)
         return self.model(input, **kwargs)
 
-    def _base_step(self, batch: Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]],
-                   batch_idx: int, mode: str) -> Union[torch.Tensor, None]:
+    def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ('train', 'val', 'test', 'predict')
 
         Args:
-            batch (Union[Tuple[Union[torch.Tensor, List, Tuple], Optional[Any]]]):
+            batch (Tuple):
                 output of the DataLoader and input to the model.
-            batch_idx (int): index of the batch. Not used, but Lightning requires it.
+            batch_idx (int): index of the batch. Not used, but PyTorch Lightning requires it.
             mode (str): mode in which the system is.
 
         Returns:
-            Union[torch.Tensor, None]: returns the calculated loss in the training and
-                validation step, None in the test step, and predicted batch in the predict step.
+            Union[Dict[str, Any], Any]: For the training, validation and test step, it returns
+                a dict containing loss, metrics, input, target, and pred. Loss will be `None`
+                for the test step. Metrics will be `None` if no metrics are specified.
+                
+                For predict step, it returns pred only.
         """
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 
@@ -197,40 +187,20 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # When predicting, skip metrics and logging parts and return the predicted value
+        # In predict mode, skip metrics and logging parts and return the predicted value
         if mode == "predict":
             return pred
 
-        # Calculate the metrics
-        metrics = getattr(self, f"{mode}_metrics", [])
-        step_metrics = {get_name(m): m(pred, target) for m in metrics}
+        # Calculate the metrics for the step
+        step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
-        ## Logging part ##
-
-        on_step = (mode != "val")
-
-        # Metrics. Note that torchmetrics objects are passed.
-        for metric in metrics:
-            name = f"{mode}/metric_{get_name(metric)}"
-            self._log_by_type(name, metric, "scalar", on_step=on_step, on_epoch=True)
-
-        # Loss
-        if loss is not None:
-            name = f"{mode}/loss"
-            self._log_by_type(name, loss, "scalar", on_step=on_step, on_epoch=True)
-
-        # Input, target, pred
-        for name, data in {"input": input, "target": target, "pred": pred}.items():
-            data_type = getattr(self, f"_log_{name}_as")
-            if data_type is not None:
-                name = f"{mode}/{name}"
-                self._log_by_type(name, data, data_type, on_step=on_step, on_epoch=True)
-
-        # Debug message
-        if os.getenv("DEBUG") in ["1", "True", "true"]:
-            debug_message(mode, input, target, pred, step_metrics, loss)
-
-        return loss
+        return {
+            "loss": loss,
+            "metrics": step_metrics,
+            "input": input,
+            "target": target,
+            "pred": pred
+        }
 
     def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple],
                         target: Union[torch.Tensor, None]) -> torch.Tensor:
@@ -248,7 +218,8 @@ class LighterSystem(pl.LightningModule):
         else:
             loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
 
-            if self.global_step == 0 and not self.trainer.sanity_checking:
+            if not self._target_not_used_reported and not self.trainer.sanity_checking:
+                self._target_not_used_reported = True
                 logger.info(f"The criterion `{get_name(self.criterion, True)}` "
                             "has no `target` argument. In such cases, the LighterSystem "
                             "passes only the predicted values to the criterion. "
@@ -274,6 +245,10 @@ class LighterSystem(pl.LightningModule):
         dataset = getattr(self, f"{mode}_dataset")
         sampler = getattr(self, f"{mode}_sampler")
 
+        if dataset is None:
+            logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
+            sys.exit()
+
         # Batch size is 1 when using patch based inference for two reasons:
         # 1) Patch based inference splits an input into a batch of patches,
         # so the batch size will actually be defined for it;
@@ -286,7 +261,7 @@ class LighterSystem(pl.LightningModule):
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces them with valid examples from the dataset.
+        # function replaces None's with valid examples from the dataset.
         collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
         return DataLoader(dataset,
                           sampler=sampler,
@@ -329,19 +304,8 @@ class LighterSystem(pl.LightningModule):
         Args:
             stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test'].
         """
-        dataset_required_by_stage = {
-            "fit": "train_dataset",
-            "validate": "val_dataset",
-            "test": "test_dataset",
-        }
-        dataset_name = dataset_required_by_stage[stage]
-        if getattr(self, dataset_name) is None:
-            logger.error(f"Please specify '{dataset_name}' in the config. Exiting.")
-            sys.exit()
-
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
-
         if not self._lightning_module_methods_defined:
             del (self.train_dataloader, self.training_step, self.val_dataloader,
                  self.validation_step, self.test_dataloader, self.test_step,
@@ -365,6 +329,7 @@ class LighterSystem(pl.LightningModule):
             self.test_dataloader = partial(self._base_dataloader, mode="test")
             self.test_step = partial(self._base_step, mode="test")
 
+        # Predict methods.
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
@@ -379,45 +344,3 @@ class LighterSystem(pl.LightningModule):
         self.val_dataloader = self.validation_step = lambda: None
         self.test_dataloader = self.test_step = lambda: None
         self.predict_dataloader = self.predict_step = lambda: None
-        self._lightning_module_methods_defined = False
-
-    def _log_by_type(self, name, data, data_type, on_step=True, on_epoch=True) -> None:
-        """Log the data according to its type.
-
-        Args:
-            name (str): the name under which the data will be logged.
-            data (Any): data to log.
-            data_type (str): type of the data to be logged.
-                ['scalar', 'image_batch', 'image_single']
-            on_step (bool, optional): whether to log at each step. Defaults to True.
-            on_epoch (bool, optional): whether to log at each epoch. Defaults to True.
-        """
-        # Scalars
-        if data_type == "scalar":
-            # TODO: handle a batch of scalars
-            self.log(name, data, on_step=on_step, on_epoch=on_epoch, sync_dist=True)
-
-        # Temporary, https://github.com/PyTorchLightning/pytorch-lightning/issues/6720
-        # Images
-        elif data_type in ["image_single", "image_batch"]:
-
-            def log_image(lgr, data, name):
-                image = data[0:1] if data_type == "image_single" else data
-                image = preprocess_image(image)
-                # TODO: handle logging frequency better, add tensorboard support
-                if isinstance(lgr, pl.loggers.WandbLogger) and self.global_step % 200:
-                    lgr.experiment.log({name: wandb.Image(image)}, step=self.global_step)
-
-                elif isinstance(lgr, LighterLogger) and self.global_step % 200:
-                    lgr.experiment["wandb"].log({name: wandb.Image(image)}, step=self.global_step)
-
-            for lgr in ensure_list(self.logger):
-                if isinstance(data, list):
-                    for idx, tensor in enumerate(data):
-                        log_image(lgr, tensor, f"{name}_{idx}")
-                else:
-                    log_image(lgr, data, name)
-
-        else:
-            logger.error(f"type '{data_type}' not supported. Exiting.")
-            sys.exit()
