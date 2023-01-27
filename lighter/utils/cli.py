@@ -44,15 +44,16 @@ def run_trainer_method(method_name, method_config: Dict, **kwargs: Any):
         project_imported = False
         # Handle multiple configs. Start from the config file specified last as it overrides the previous ones.
         for config in reversed(ensure_list(kwargs["config_file"])):
-            config = yaml.safe_load(open(config, "r"))
-            if "project" not in config:
-                continue
-            # Only one config file can specify the project path
-            if project_imported:
-                logger.error("`project` must be specified in one config only. Exiting.")
-                sys.exit()
-            # Import it as a module named 'project'.
-            import_module_from_path("project", config["project"])
-            project_imported = True
+            with open(config, "r", encoding="utf-8") as config:
+                config = yaml.safe_load(config)
+                if "project" not in config:
+                    continue
+                # Only one config file can specify the project path
+                if project_imported:
+                    logger.error("`project` must be specified in one config only. Exiting.")
+                    sys.exit()
+                # Import it as a module named 'project'.
+                import_module_from_path("project", config["project"])
+                project_imported = True
     # Run the Trainer method.
     run(method_name, **method_config, **kwargs)

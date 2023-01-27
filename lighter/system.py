@@ -171,7 +171,6 @@ class LighterSystem(pl.LightningModule):
 
         # Predict
         if self._patch_based_inferer and mode in ["val", "test", "predict"]:
-            # TODO: Patch-based inference doesn't support multiple inputs yet
             pred = self._patch_based_inferer(input, self)
         else:
             pred = self(input)
@@ -270,28 +269,24 @@ class LighterSystem(pl.LightningModule):
             collate_fn=collate_fn,
         )
 
-    def configure_optimizers(self) -> Dict:
+    def configure_optimizers(self) -> Union[Optimizer, List[Dict[str, Union[Optimizer, "Scheduler"]]]]:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Single optimizer: If only a optimizer is provided
-            Tuple of dictionaries: a tuple of `dict` with keys `optimizer` and `lr_scheduler`
+            Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
+                optimizers and/or schedulers.
         """
         if not self.optimizers:
-            logger.error("Please specify 'optimizers' in the config. Exiting.")
+            logger.error("Please specify 'system.optimizers' in the config. Exiting.")
             sys.exit()
         if not self.schedulers:
             return self.optimizers
 
         if len(self.optimizers) != len(self.schedulers):
-            logger.error("'optimizers' and 'schedulers' should be paired")
+            logger.error("Each optimizer must have its own scheduler.")
             sys.exit()
 
-        optim_sched_paired = []
-        for optimizer, scheduler in zip(self.optimizers, self.schedulers):
-            optim_sched_paired.append({"optimizer": optimizer, "lr_scheduler": scheduler})
-
-        return tuple(optim_sched_paired)
+        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizers, self.schedulers)]
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.
