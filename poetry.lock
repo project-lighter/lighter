@@ -1549,7 +1549,7 @@ transformers = ["transformers (<4.22)"]
 type = "git"
 url = "https://github.com/Project-MONAI/MONAI.git"
 reference = "dev"
-resolved_reference = "86c7ecdc1225529a379e2cd58c23fe53aa79b0d0"
+resolved_reference = "8a5a55093aebdf631b2fec14b2111a3c980ef584"
 
 [[package]]
 name = "more-itertools"
