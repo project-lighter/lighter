@@ -152,7 +152,7 @@ class LighterSystem(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
-        """Base step for all modes ('train', 'val', 'test', 'predict')
+        """Base step for all modes ("train", "val", "test", "predict")
 
         Args:
             batch (Tuple):
@@ -226,14 +226,14 @@ class LighterSystem(pl.LightningModule):
         return loss
 
     def _base_dataloader(self, mode: str) -> DataLoader:
-        """Instantiate the dataloader for a mode (train/val/test).
+        """Instantiate the dataloader for a mode (train/val/test/predict).
         Includes a collate function that enables the DataLoader to replace
         None's (alias for corrupted examples) in the batch with valid examples.
         To make use of it, write a try-except in your Dataset that handles
         corrupted data by returning None instead.
 
         Args:
-            mode (str): mode for which to create the dataloader ['train', 'val', 'test'].
+            mode (str): mode for which to create the dataloader ["train", "val", "test", "predict"].
 
         Returns:
             DataLoader: instantiated DataLoader.
@@ -294,7 +294,7 @@ class LighterSystem(pl.LightningModule):
         sets up LightningModule methods for the stage in which the system is.
 
         Args:
-            stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test'].
+            stage (str): passed by PyTorch Lightning. ["fit", "validate", "test"].
         """
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
