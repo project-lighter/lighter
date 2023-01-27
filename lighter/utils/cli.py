@@ -14,11 +14,11 @@ from lighter.utils.misc import ensure_list
 
 def interface():
     """Defines the command line interface for running Trainer's methods. The available methods are:
-     - fit
-     - validate
-     - test
-     - predict
-     - tune
+    - fit
+    - validate
+    - test
+    - predict
+    - tune
     """
     commands = {}
     # All Trainer methods' names
