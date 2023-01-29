@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import ensure_list, get_name, hasarg
+from lighter.utils.misc import ensure_list, get_name, hasarg, countargs
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -148,16 +148,19 @@ class LighterSystem(pl.LightningModule):
             # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
-        # Perform the forward method
-        if torch.is_tensor(input):
-            return self.model(input, **kwargs)
-        elif isinstance(input, list):
-            return self.model(*input, **kwargs)
-        elif isinstance(input, dict):
-            return self.model(**input, **kwargs)
-        else:
+        # Type not supported.
+        if not isinstance(input, (torch.Tensor, tuple, list, dict)):
             logger.error(f"Input type '{type(input)}' not supported.")
             sys.exit()
+
+        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
+        if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
+            return self.model(*input, **kwargs)
+        # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
+        elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
+            return self.model(**input, **kwargs)
+        # Tensor, List, or Dict, as-is, not unpacked.
+        return self.model(input, **kwargs)
 
 
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
@@ -240,15 +243,19 @@ class LighterSystem(pl.LightningModule):
                             "behavior you expected, redefine your criterion "
                             "so that it has a `target` argument.")
 
-        if torch.is_tensor(pred):
-            return self.criterion(pred, **kwargs)
-        elif isinstance(pred, list):
-            return self.criterion(*pred, **kwargs)
-        elif isinstance(pred, dict):
-            return self.criterion(**pred, **kwargs)
-        else:
+        # Type not supported.
+        if not isinstance(pred, (torch.Tensor, tuple, list, dict)):
             logger.error(f"Pred type '{type(pred)}' not supported.")
             sys.exit()
+
+        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
+        if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
+            return self.criterion(*pred, **kwargs)
+        # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
+        elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
+            return self.criterion(**pred, **kwargs)
+        # Tensor, List, or Dict, as-is, not unpacked.
+        return self.criterion(pred, **kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
