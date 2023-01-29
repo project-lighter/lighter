@@ -13,17 +13,16 @@ from lighter.utils.dynamic_imports import import_module_from_path
 # Trainer methods calls in YAML format with support for command line arguments.
 # Waiting for https://github.com/Project-MONAI/MONAI/pull/5854#issuecomment-1384800886.
 trainer_methods = {
-    "fit": yaml.safe_load(
-        """
+    "fit":
+        yaml.safe_load("""
         fit:
             _method_: >
                 $@trainer.fit(model=@fit#model,
                               ckpt_path=@fit#ckpt_path)
             model: "@system"
-            ckpt_path: null"""
-    ),
-    "validate": yaml.safe_load(
-        """
+            ckpt_path: null"""),
+    "validate":
+        yaml.safe_load("""
         validate:
             _method_: > 
                 $@trainer.validate(model=@validate#model,
@@ -31,19 +30,17 @@ trainer_methods = {
                                    verbose=@validate#verbose)
             model: "@system"
             ckpt_path: null
-            verbose: True"""
-    ),
-    "predict": yaml.safe_load(
-        """
+            verbose: True"""),
+    "predict":
+        yaml.safe_load("""
         predict:
             _method_: >
                 $@trainer.predict(model=@predict#model,
                                   ckpt_path=@predict#ckpt_path)
             model: "@system"
-            ckpt_path: null"""
-    ),
-    "test": yaml.safe_load(
-        """
+            ckpt_path: null"""),
+    "test":
+        yaml.safe_load("""
         test:
             _method_: >
                 $@trainer.test(model=@test#model,
@@ -51,10 +48,9 @@ trainer_methods = {
                                verbose=@test#verbose)
             model: "@system"
             ckpt_path: null
-            verbose: True"""
-    ),
-    "tune": yaml.safe_load(
-        """
+            verbose: True"""),
+    "tune":
+        yaml.safe_load("""
         tune:
             _method_: > 
                 $@trainer.tune(model=@tune#model,
@@ -67,8 +63,7 @@ trainer_methods = {
             scale_batch_size_kwargs: null
             lr_find_kwargs: null
             method: fit
-    """
-    ),
+    """),
 }
 
 
@@ -93,7 +88,7 @@ def run_trainer_method(trainer_method: Dict, **kwargs: Any):
             if "project" in config:
                 # Only one config file can specify the project path
                 if project_imported:
-                    logger.error("`project` must be specified in one config only.")
+                    logger.error("`project` must be specified in one config only. Exiting.")
                     sys.exit()
                 import_module_from_path("project", config["project"])
                 project_imported = True
