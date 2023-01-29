@@ -169,7 +169,7 @@ class LighterSystem(pl.LightningModule):
         """
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 
-        # Predict
+        # Forward
         if self._patch_based_inferer and mode in ["val", "test", "predict"]:
             pred = self._patch_based_inferer(input, self)
         else:
@@ -177,7 +177,7 @@ class LighterSystem(pl.LightningModule):
 
         pred = reshape_pred_if_single_value_prediction(pred, target)
 
-        # Calculate the loss
+        # Calculate the loss.
         loss = None
         if mode in ["train", "val"]:
             loss = self._calculate_loss(pred, target)
@@ -188,11 +188,11 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # In predict mode, skip metrics and logging parts and return the predicted value
+        # In predict mode, skip metrics and logging parts and return the predicted value.
         if mode == "predict":
             return pred
 
-        # Calculate the metrics for the step
+        # Calculate the metrics for the step.
         step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
         return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
