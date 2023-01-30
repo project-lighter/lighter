@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import ensure_list, get_name, hasarg
+from lighter.utils.misc import ensure_list, get_name, hasarg, countargs
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -141,15 +141,30 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Union[torch.Tensor, List, Tuple]: output of the model.
         """
+        # Keyword arguments to pass to the forward method
         kwargs = {}
         if hasarg(self.model.forward, "epoch"):
+            # Add `epoch` argument if forward accepts it
             kwargs["epoch"] = self.current_epoch
         if hasarg(self.model.forward, "step"):
+            # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
-        if isinstance(input, list):
+        # Type not supported.
+        if not isinstance(input, (torch.Tensor, tuple, list, dict)):
+            logger.error(f"Input type '{type(input)}' not supported.")
+            sys.exit()
+
+        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
+        if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
             return self.model(*input, **kwargs)
-        return self.model(input, **kwargs)
+        # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
+        elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
+            return self.model(**input, **kwargs)
+        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
+        else:
+            return self.model(input, **kwargs)
+
 
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ('train', 'val', 'test', 'predict')
@@ -208,23 +223,36 @@ class LighterSystem(pl.LightningModule):
         Returns:
             torch.Tensor: the calculated loss.
         """
+        # Keyword arguments to pass to the loss/criterion function
+        kwargs = {}
         if hasarg(self.criterion.forward, "target"):
-            loss = self.criterion(pred, target.to(self._cast_target_dtype_to))
+            # Add `target` argument if forward accepts it. Casting performed if specified.
+            kwargs["target"] = target.to(self._cast_target_dtype_to)
         else:
-            loss = self.criterion(*pred if isinstance(pred, (list, tuple)) else pred)
-
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
-                logger.info(
-                    f"The criterion `{get_name(self.criterion, True)}` "
-                    "has no `target` argument. In such cases, the LighterSystem "
-                    "passes only the predicted values to the criterion. "
-                    "This is intended as a support for self-supervised "
-                    "losses where target is not used. If this is not the "
-                    "behavior you expected, redefine your criterion "
-                    "so that it has a `target` argument."
-                )
-        return loss
+                logger.info(f"The criterion `{get_name(self.criterion, True)}` "
+                            "has no `target` argument. In such cases, the LighterSystem "
+                            "passes only the predicted values to the criterion. "
+                            "This is intended as a support for self-supervised "
+                            "losses where target is not used. If this is not the "
+                            "behavior you expected, redefine your criterion "
+                            "so that it has a `target` argument.")
+
+        # Type not supported.
+        if not isinstance(pred, (torch.Tensor, tuple, list, dict)):
+            logger.error(f"Pred type '{type(pred)}' not supported.")
+            sys.exit()
+
+        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
+        if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
+            return self.criterion(*pred, **kwargs)
+        # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
+        elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
+            return self.criterion(**pred, **kwargs)
+        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
+        else:
+            return self.criterion(pred, **kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
