@@ -1474,14 +1474,16 @@ files = [
 ]
 
 [[package]]
-name = "monai"
-version = "1.1.0+40.g86c7ecdc1"
+name = "monai-weekly"
+version = "1.2.dev2305"
 description = "AI Toolkit for Healthcare Imaging"
 category = "main"
 optional = false
 python-versions = ">=3.7"
-files = []
-develop = false
+files = [
+    {file = "monai-weekly-1.2.dev2305.tar.gz", hash = "sha256:e397e419e55d64206fb661288a075a7f0fc0db848331b5cd832eb741dfcb8030"},
+    {file = "monai_weekly-1.2.dev2305-py3-none-any.whl", hash = "sha256:71efebfa9b0706d7366c816cb7c9b6e76230e7b6d3dcf46df94667159e01ebe1"},
+]
 
 [package.dependencies]
 numpy = ">=1.17"
@@ -1517,12 +1519,6 @@ tifffile = ["tifffile"]
 torchvision = ["torchvision"]
 tqdm = ["tqdm (>=4.47.0)"]
 transformers = ["transformers (<4.22)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Project-MONAI/MONAI.git"
-reference = "dev"
-resolved_reference = "86c7ecdc1225529a379e2cd58c23fe53aa79b0d0"
 
 [[package]]
 name = "more-itertools"
@@ -3725,4 +3721,4 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "6c54f70dd84f2d9f403e7a287c62ea9685d2003f9ba8678aa6427f1a5577eb4b"
+content-hash = "004e475a763270e649625ef85c90c30597c28ed76cfd68b47f0151f2146e07c0"
