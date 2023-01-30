@@ -159,8 +159,9 @@ class LighterSystem(pl.LightningModule):
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
         elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
             return self.model(**input, **kwargs)
-        # Tensor, List, or Dict, as-is, not unpacked.
-        return self.model(input, **kwargs)
+        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
+        else:
+            return self.model(input, **kwargs)
 
 
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
@@ -254,8 +255,9 @@ class LighterSystem(pl.LightningModule):
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
         elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
             return self.criterion(**pred, **kwargs)
-        # Tensor, List, or Dict, as-is, not unpacked.
-        return self.criterion(pred, **kwargs)
+        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
+        else:
+            return self.criterion(pred, **kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test).
