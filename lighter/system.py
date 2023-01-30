@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import ensure_list, get_name, hasarg, countargs
+from lighter.utils.misc import countargs, ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -165,7 +165,6 @@ class LighterSystem(pl.LightningModule):
         else:
             return self.model(input, **kwargs)
 
-
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ('train', 'val', 'test', 'predict')
 
@@ -231,13 +230,15 @@ class LighterSystem(pl.LightningModule):
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
-                logger.info(f"The criterion `{get_name(self.criterion, True)}` "
-                            "has no `target` argument. In such cases, the LighterSystem "
-                            "passes only the predicted values to the criterion. "
-                            "This is intended as a support for self-supervised "
-                            "losses where target is not used. If this is not the "
-                            "behavior you expected, redefine your criterion "
-                            "so that it has a `target` argument.")
+                logger.info(
+                    f"The criterion `{get_name(self.criterion, True)}` "
+                    "has no `target` argument. In such cases, the LighterSystem "
+                    "passes only the predicted values to the criterion. "
+                    "This is intended as a support for self-supervised "
+                    "losses where target is not used. If this is not the "
+                    "behavior you expected, redefine your criterion "
+                    "so that it has a `target` argument."
+                )
 
         # Type not supported.
         if not isinstance(pred, (torch.Tensor, tuple, list, dict)):
