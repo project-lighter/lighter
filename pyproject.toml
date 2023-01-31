@@ -7,7 +7,7 @@ build-backend = "poetry.core.masonry.api"
 lighter = "lighter.utils.cli:interface"
 
 [tool.poetry]
-name = "lighter"
+name = "project-lighter"
 version = "0.0.1"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 readme = "README.md"
@@ -20,6 +20,9 @@ homepage = "https://github.com/lighter/lighter"
 
 # Keywords description https://python-poetry.org/docs/pyproject/#keywords
 keywords = []  #! Update me
+packages = [
+    { include = "lighter" },
+]
 
 # Pypi classifiers: https://pypi.org/classifiers/
 classifiers = [  #! Update me
@@ -40,7 +43,6 @@ classifiers = [  #! Update me
 [tool.poetry.dependencies]
 python = "^3.8"
 torch = "^1.13.1"
-monai = { git = "https://github.com/Project-MONAI/MONAI.git", branch = "dev" }
 pandas = "^1.5.3"
 torchvision = "^0.14.1"
 pytorch-lightning = "^1.9.0"
@@ -50,6 +52,7 @@ lightly = "^1.2.43"
 torchmetrics = "^0.11.0"
 py = "^1.11.0"
 tensorboard = "^2.11.2"
+monai-weekly = "^1.2.dev2305"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"
@@ -152,6 +155,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "serial",
 ]
+
 
 [tool.coverage.run]
 source = ["tests"]

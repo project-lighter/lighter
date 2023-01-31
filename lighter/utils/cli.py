@@ -11,7 +11,6 @@ from monai.bundle.scripts import run
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.misc import ensure_list
 
-
 def interface():
     """Defines the command line interface for running Trainer's methods. The available methods are:
     - fit
