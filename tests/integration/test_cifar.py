@@ -9,9 +9,11 @@ test_overrides = "./tests/integration/test_overrides.yaml"
 @pytest.mark.parametrize(
     ("method_name", "method_config", "config_file"),
     [
-        (
+        (  # Method name
             "fit",
+            # Method config
             {"fit": {"_target_": "$@trainer.fit", "model": "@system"}},
+            # Config fiile
             "./projects/cifar10/experiments/monai_bundle_prototype.yaml",
         )
     ],
