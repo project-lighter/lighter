@@ -1,7 +1,7 @@
 import torch
 from torch.nn import Identity, Module, Sequential
 
-from lighter.utils.misc import dot_notation_setattr
+from lighter.utils.misc import setattr_dot_notation
 
 
 def reshape_pred_if_single_value_prediction(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -33,7 +33,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
     Returns:
         Module: PyTorch model with the new layer set at the specified location.
     """
-    dot_notation_setattr(model, layer_name, new_layer)
+    setattr_dot_notation(model, layer_name, new_layer)
     return model
 
 

@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -11,8 +10,6 @@ import torchvision
 from loguru import logger
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
-from torch.utils import tensorboard
-from yaml import safe_load
 
 from lighter import LighterSystem
 
@@ -71,16 +68,18 @@ class LighterLogger(Callback):
         self.log_dir.mkdir(parents=True)
 
         # Load the dumped config file to log it to the loggers.
-        # config = safe_load(open(self.log_dir / "config.yaml"))
+        # config = yaml.safe_load(open(self.log_dir / "config.yaml"))
 
         # Loguru log file.
         # logger.add(sink=self.log_dir / f"{stage}.log")
 
         # Tensorboard initialization.
         if self.tensorboard:
+            # Tensorboard is a part of PyTorch, no need to check if it is not available.
+            OPTIONAL_IMPORTS["tensorboard"], _ = optional_import("torch.utils.tensorboard")
             tensorboard_dir = self.log_dir / "tensorboard"
             tensorboard_dir.mkdir()
-            self.tensorboard = tensorboard.SummaryWriter(log_dir=tensorboard_dir)
+            self.tensorboard = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter(log_dir=tensorboard_dir)
             # self.tensorboard.add_hparams(config)
 
         # Wandb initialization.
@@ -343,9 +342,9 @@ def check_image_data_type(data: Any, name: str) -> None:
         name (str): name of the image data, for logging purposes.
     """
     if isinstance(data, dict):
-        is_valid = all(check_image_data_type(elem) for elem in data.values())
+        is_valid = all(check_image_data_type(elem, name) for elem in data.values())
     elif isinstance(data, list):
-        is_valid = all(check_image_data_type(elem) for elem in data)
+        is_valid = all(check_image_data_type(elem, name) for elem in data)
     elif isinstance(data, torch.Tensor):
         is_valid = True
     else:
@@ -353,7 +352,7 @@ def check_image_data_type(data: Any, name: str) -> None:
 
     if not is_valid:
         logger.error(
-            f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
+            f"`{name}` has to be a Tensor, List[Tensor], Dict[str, Tensor]"
             f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported."
         )
         sys.exit()
@@ -366,7 +365,8 @@ def parse_image_data(
     each tuple contains an identifier and a tensor.
 
     Args:
-        data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]): image tensor(s).
+        data (Union[torch.Tensor, List[torch.Tensor], Dict[str, torch.Tensor],
+                    Dict[str, List[torch.Tensor]]]): image tensor(s).
 
     Returns:
         List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is
