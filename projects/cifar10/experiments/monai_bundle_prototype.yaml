@@ -17,11 +17,16 @@ trainer:
           input_type: image
           max_samples: 10
 
+        - _target_: lighter.callbacks.LighterWriter
+          write_dir: "$@project + '/predictions' "
+          write_as: "tensor"
+          write_on: "epoch" # "step"
+
 system:
     _target_: lighter.LighterSystem
     batch_size: 512
     pin_memory: True
-    num_workers: 1
+    num_workers: 2
 
     model:
         _target_: "project.models.net.Net"
@@ -106,3 +111,5 @@ system:
                   mean: [0.5, 0.5, 0.5]
                   std: [0.5, 0.5, 0.5]
         target_transform: null
+
+    predict_dataset: "%system#test_dataset"

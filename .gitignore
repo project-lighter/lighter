@@ -143,6 +143,10 @@ tensorboard/
 prototyping.ipynb
 checkpoints/
 
+# Our ignores
 projects/*
 !projects/README.md
 !projects/cifar10
+contrib/
+**/predictions/
+

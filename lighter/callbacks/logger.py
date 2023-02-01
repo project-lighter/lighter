@@ -1,13 +1,11 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Union
 
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import torch
 import torch.distributed as dist
-import torchvision
 from loguru import logger
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
@@ -15,22 +13,22 @@ from torch.utils import tensorboard
 from yaml import safe_load
 
 from lighter import LighterSystem
+from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, parse_data, check_supported_data_type, preprocess_image
 
-LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test"}
 OPTIONAL_IMPORTS = {}
 
 
 class LighterLogger(Callback):
     def __init__(
         self,
-        project,
-        log_dir,
-        tensorboard=False,
-        wandb=False,
-        input_type=None,
-        target_type=None,
-        pred_type=None,
-        max_samples=None,
+        project: str,
+        log_dir: str,
+        tensorboard: bool = False,
+        wandb: bool = False,
+        input_type: str = None,
+        target_type: str = None,
+        pred_type: str = None,
+        max_samples: int = None,
     ) -> None:
         self.project = project
         # Only used on rank 0, the dir is created in setup().
@@ -146,8 +144,8 @@ class LighterLogger(Callback):
             # Image
             elif data_type == "image":
                 # Check if the data type is valid.
-                check_image_data_type(data, data_name)
-                for identifier, image in parse_image_data(data):
+                check_supported_data_type(data, data_name)
+                for identifier, image in parse_data(data):
                     name = name if identifier is None else f"{name}_{identifier}"
                     # Slice to `max_samples` only if it less than the batch size.
                     if self.max_samples is not None and self.max_samples < image.shape[0]:
@@ -304,85 +302,3 @@ class LighterLogger(Callback):
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         self._on_epoch_end(trainer, pl_module)
 
-
-def preprocess_image(image: torch.Tensor) -> torch.Tensor:
-    """Preprocess the image before logging it. If it is a batch of multiple images,
-    it will create a grid image of them. In case of 3D, a single image is displayed
-    with slices stacked vertically, while a batch as a grid where each column is
-    a different 3D image.
-    Args:
-        image (torch.Tensor): 2D or 3D image tensor.
-    Returns:
-        torch.Tensor: image ready for logging.
-    """
-    image = image.detach().cpu()
-    # 3D image (NCDHW)
-    has_three_dims = image.ndim == 5
-    if has_three_dims:
-        # Reshape 3D image from NCDHW to NC(D*H)W format
-        shape = image.shape
-        image = image.view(shape[0], shape[1], shape[2] * shape[3], shape[4])
-    if image.shape[0] == 1:
-        image = image[0]
-    else:
-        # If more than one image, create a grid
-        nrow = image.shape[0] if has_three_dims else 8
-        image = torchvision.utils.make_grid(image, nrow=nrow)
-    return image
-
-
-def check_image_data_type(data: Any, name: str) -> None:
-    """Check the input image data for its type. Valid image data types are:
-        - torch.Tensor
-        - List[torch.Tensor]
-        - Dict[str, torch.Tensor]
-        - Dict[str, List[torch.Tensor]]
-
-    Args:
-        data (Any): image data to check
-        name (str): name of the image data, for logging purposes.
-    """
-    if isinstance(data, dict):
-        is_valid = all(check_image_data_type(elem) for elem in data.values())
-    elif isinstance(data, list):
-        is_valid = all(check_image_data_type(elem) for elem in data)
-    elif isinstance(data, torch.Tensor):
-        is_valid = True
-    else:
-        is_valid = False
-
-    if not is_valid:
-        logger.error(
-            f"`{name}` has to be a Tensor, List[Tensors], Dict[str, Tensor]"
-            f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported."
-        )
-        sys.exit()
-
-
-def parse_image_data(
-    data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]
-) -> List[Tuple[Optional[str], torch.Tensor]]:
-    """Given input data, this function will parse it and return a list of tuples where
-    each tuple contains an identifier and a tensor.
-
-    Args:
-        data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]): image tensor(s).
-
-    Returns:
-        List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is
-            a string identifier (or `None` if there is only one image) and the second an image tensor.
-    """
-    result = []
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if isinstance(value, list):
-                for i, tensor in enumerate(value):
-                    result.append((f"{key}_{i}", tensor) if len(value > 1) else (key, tensor))
-            else:
-                result.append((key, value))
-    elif isinstance(data, list):
-        for i, tensor in enumerate(data):
-            result.append((str(i), tensor))
-    else:
-        result.append((None, data))
-    return result
