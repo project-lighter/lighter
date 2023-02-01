@@ -147,6 +147,4 @@ checkpoints/
 projects/*
 !projects/README.md
 !projects/cifar10
-contrib/
 **/predictions/
-

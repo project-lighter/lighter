@@ -13,7 +13,7 @@ from torch.utils import tensorboard
 from yaml import safe_load
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, parse_data, check_supported_data_type, preprocess_image
+from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, check_supported_data_type, parse_data, preprocess_image
 
 OPTIONAL_IMPORTS = {}
 
@@ -301,4 +301,3 @@ class LighterLogger(Callback):
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         self._on_epoch_end(trainer, pl_module)
-

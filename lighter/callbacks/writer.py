@@ -1,16 +1,17 @@
-import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
-import itertools
-from pathlib import Path
-from datetime import datetime
 
-from loguru import logger
+import itertools
+import sys
+from datetime import datetime
+from pathlib import Path
+
 import torch
 import torchvision
+from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, parse_data, concatenate, preprocess_image
+from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, concatenate, parse_data, preprocess_image
 
 
 class LighterWriter(Callback):
@@ -26,7 +27,9 @@ class LighterWriter(Callback):
             sys.exit()
 
         if self.write_to_csv and self.write_as in ["image", "tensor"]:
-            logger.error(f"`write_as={self.write_as}` cannot be written to a CSV. Change `write_as` or disable `write_to_csv`.")
+            logger.error(
+                f"`write_as={self.write_as}` cannot be written to a CSV. Change `write_as` or disable `write_to_csv`."
+            )
             sys.exit()
 
         self.write_dir.mkdir(parents=True)
@@ -34,7 +37,7 @@ class LighterWriter(Callback):
     def _write(self, outputs, indices):
         for identifier, data in parse_data(outputs):
             for idx, tensor in zip(indices, data):
-                name = f"step_{idx}" if identifier is None else  f"step_{idx}_{identifier}"
+                name = f"step_{idx}" if identifier is None else f"step_{idx}_{identifier}"
                 if self.write_as == "tensor":
                     path = self.write_dir / f"{self.write_as}_{name}.pt"
                     torch.save(tensor, path)
@@ -51,7 +54,9 @@ class LighterWriter(Callback):
                     logger.error(f"`write_as` does not support '{self.write_as}'.")
                     sys.exit()
 
-    def on_predict_batch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int) -> None:
+    def on_predict_batch_end(
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+    ) -> None:
         if self.write_on != "step":
             return
         indices = trainer.predict_loop.epoch_loop.current_batch_indices
@@ -71,8 +76,7 @@ class LighterWriter(Callback):
         outputs = concatenate(outputs)
 
         self._write(outputs, indices)
-    
+
     def on_predict_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         # Dump the CSV
         pass
-

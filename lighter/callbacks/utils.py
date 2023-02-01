@@ -1,5 +1,6 @@
-import sys
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import sys
 
 import torch
 import torchvision
@@ -9,7 +10,13 @@ LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test
 
 
 def parse_data(
-    data: Union[torch.Tensor, List[torch.Tensor], Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], Dict[str, Tuple[torch.Tensor]]]
+    data: Union[
+        torch.Tensor,
+        List[torch.Tensor],
+        Dict[str, torch.Tensor],
+        Dict[str, List[torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor]],
+    ]
 ) -> List[Tuple[Optional[str], torch.Tensor]]:
     """Given input data, this function will parse it and return a list of tuples where
     each tuple contains an identifier and a tensor.
@@ -36,7 +43,6 @@ def parse_data(
     else:
         result.append((None, data))
     return result
-
 
 
 def check_supported_data_type(data: Any, name: str) -> None:
