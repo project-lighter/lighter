@@ -32,7 +32,18 @@ class LighterWriter(Callback):
             )
             sys.exit()
 
-        self.write_dir.mkdir(parents=True)
+        # Broadcast the `write_dir` so that all ranks write their predictions there.
+        self.write_dir = trainer.strategy.broadcast(self.write_dir)
+        # Let rank 0 create the `write_dir`.
+        if trainer.is_global_zero:
+            self.write_dir.mkdir(parents=True)
+        # If `write_dir` does not exist, the ranks are not on the same storage.
+        if not self.write_dir.exists():
+            logger.error(
+                f"Rank {trainer.global_rank} is not on the same storage as rank 0."
+                "Please run the prediction only on nodes that are on the same storage."
+            )
+            sys.exit()
 
     def _write(self, outputs, indices):
         for identifier, data in parse_data(outputs):
