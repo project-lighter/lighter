@@ -9,8 +9,6 @@ import torch.distributed as dist
 from loguru import logger
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
-from torch.utils import tensorboard
-from yaml import safe_load
 
 from lighter import LighterSystem
 from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, check_supported_data_type, parse_data, preprocess_image
@@ -69,16 +67,18 @@ class LighterLogger(Callback):
         self.log_dir.mkdir(parents=True)
 
         # Load the dumped config file to log it to the loggers.
-        # config = safe_load(open(self.log_dir / "config.yaml"))
+        # config = yaml.safe_load(open(self.log_dir / "config.yaml"))
 
         # Loguru log file.
         # logger.add(sink=self.log_dir / f"{stage}.log")
 
         # Tensorboard initialization.
         if self.tensorboard:
+            # Tensorboard is a part of PyTorch, no need to check if it is not available.
+            OPTIONAL_IMPORTS["tensorboard"], _ = optional_import("torch.utils.tensorboard")
             tensorboard_dir = self.log_dir / "tensorboard"
             tensorboard_dir.mkdir()
-            self.tensorboard = tensorboard.SummaryWriter(log_dir=tensorboard_dir)
+            self.tensorboard = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter(log_dir=tensorboard_dir)
             # self.tensorboard.add_hparams(config)
 
         # Wandb initialization.

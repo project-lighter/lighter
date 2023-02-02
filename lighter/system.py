@@ -166,7 +166,7 @@ class LighterSystem(pl.LightningModule):
             return self.model(input, **kwargs)
 
     def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
-        """Base step for all modes ('train', 'val', 'test', 'predict')
+        """Base step for all modes ("train", "val", "test", "predict")
 
         Args:
             batch (Tuple):
@@ -183,16 +183,15 @@ class LighterSystem(pl.LightningModule):
         """
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 
-        # Predict
+        # Forward
         if self._patch_based_inferer and mode in ["val", "test", "predict"]:
-            # TODO: Patch-based inference doesn't support multiple inputs yet
             pred = self._patch_based_inferer(input, self)
         else:
             pred = self(input)
 
         pred = reshape_pred_if_single_value_prediction(pred, target)
 
-        # Calculate the loss
+        # Calculate the loss.
         loss = None
         if mode in ["train", "val"]:
             loss = self._calculate_loss(pred, target)
@@ -203,11 +202,11 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # In predict mode, skip metrics and logging parts and return the predicted value
+        # In predict mode, skip metrics and logging parts and return the predicted value.
         if mode == "predict":
             return pred
 
-        # Calculate the metrics for the step
+        # Calculate the metrics for the step.
         step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
 
         return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
@@ -256,14 +255,14 @@ class LighterSystem(pl.LightningModule):
             return self.criterion(pred, **kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
-        """Instantiate the dataloader for a mode (train/val/test).
+        """Instantiate the dataloader for a mode (train/val/test/predict).
         Includes a collate function that enables the DataLoader to replace
         None's (alias for corrupted examples) in the batch with valid examples.
         To make use of it, write a try-except in your Dataset that handles
         corrupted data by returning None instead.
 
         Args:
-            mode (str): mode for which to create the dataloader ['train', 'val', 'test'].
+            mode (str): mode for which to create the dataloader ["train", "val", "test", "predict"].
 
         Returns:
             DataLoader: instantiated DataLoader.
@@ -299,28 +298,24 @@ class LighterSystem(pl.LightningModule):
             collate_fn=collate_fn,
         )
 
-    def configure_optimizers(self) -> Dict:
+    def configure_optimizers(self) -> Union[Optimizer, List[Dict[str, Union[Optimizer, "Scheduler"]]]]:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Single optimizer: If only a optimizer is provided
-            Tuple of dictionaries: a tuple of `dict` with keys `optimizer` and `lr_scheduler`
+            Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
+                optimizers and/or schedulers.
         """
         if not self.optimizers:
-            logger.error("Please specify 'optimizers' in the config. Exiting.")
+            logger.error("Please specify 'system.optimizers' in the config. Exiting.")
             sys.exit()
         if not self.schedulers:
             return self.optimizers
 
         if len(self.optimizers) != len(self.schedulers):
-            logger.error("'optimizers' and 'schedulers' should be paired")
+            logger.error("Each optimizer must have its own scheduler.")
             sys.exit()
 
-        optim_sched_paired = []
-        for optimizer, scheduler in zip(self.optimizers, self.schedulers):
-            optim_sched_paired.append({"optimizer": optimizer, "lr_scheduler": scheduler})
-
-        return tuple(optim_sched_paired)
+        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizers, self.schedulers)]
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.
@@ -328,7 +323,7 @@ class LighterSystem(pl.LightningModule):
         sets up LightningModule methods for the stage in which the system is.
 
         Args:
-            stage (str): passed by PyTorch Lightning. ['fit', 'validate', 'test'].
+            stage (str): passed by PyTorch Lightning. ["fit", "validate", "test"].
         """
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.
