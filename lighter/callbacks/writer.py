@@ -11,25 +11,31 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, concatenate, parse_data, preprocess_image
+from lighter.callbacks.utils import concatenate, parse_data, preprocess_image
 
 
 class LighterWriter(Callback):
-    def __init__(self, write_dir: str, write_as: str, write_on: str = "step", write_to_csv: bool = False) -> None:
+    def __init__(
+        self,
+        write_dir: str,
+        write_as: Union[str, List[str], Dict[str, str], Dict[str, List[str]]],
+        write_on: str = "step",
+        write_to_csv: bool = False,
+    ) -> None:
         self.write_dir = Path(write_dir) / datetime.now().strftime("%Y%m%d_%H%M%S")
         self.write_as = write_as
         self.write_on = write_on
         self.write_to_csv = write_to_csv
+
+        self.parsed_write_as = None
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if self.write_on not in ["step", "epoch"]:
             logger.error("`write_on` must be either 'step' or 'epoch'.")
             sys.exit()
 
-        if self.write_to_csv and self.write_as in ["image", "tensor"]:
-            logger.error(
-                f"`write_as={self.write_as}` cannot be written to a CSV. Change `write_as` or disable `write_to_csv`."
-            )
+        if self.write_on != "epoch" and self.write_to_csv:
+            logger.error("`write_to_csv=True` supports `write_on='epoch'` only.")
             sys.exit()
 
         # Broadcast the `write_dir` so that all ranks write their predictions there.
@@ -46,24 +52,44 @@ class LighterWriter(Callback):
             sys.exit()
 
     def _write(self, outputs, indices):
-        for identifier, data in parse_data(outputs):
-            for idx, tensor in zip(indices, data):
+        parsed_outputs = parse_data(outputs)
+        parsed_write_as = self._parse_write_as(self.write_as, parsed_outputs)
+        for idx in indices:
+            for identifier in parsed_outputs:
+                # Unlike a list/tuple/dict of Tensors, a single Tensor has 'None' as identifier since it doesn't need one.
                 name = f"step_{idx}" if identifier is None else f"step_{idx}_{identifier}"
-                if self.write_as == "tensor":
-                    path = self.write_dir / f"{self.write_as}_{name}.pt"
-                    torch.save(tensor, path)
-                elif self.write_as == "image":
-                    path = self.write_dir / f"{self.write_as}_{name}.png"
-                    torchvision.utils.save_image(preprocess_image(tensor), path)
-                elif self.write_as == "scalar":
-                    raise NotImplementedError
-                elif self.write_as == "audio":
-                    raise NotImplementedError
-                elif self.write_as == "video":
-                    raise NotImplementedError
-                else:
-                    logger.error(f"`write_as` does not support '{self.write_as}'.")
+                self._write_by_type(name, parsed_outputs[identifier], parsed_write_as[identifier])
+
+    def _write_by_type(self, name, tensor, write_as):
+        if write_as == "tensor":
+            path = self.write_dir / f"{name}_{write_as}.pt"
+            torch.save(tensor, path)
+        elif write_as == "image":
+            path = self.write_dir / f"{name}_{write_as}.png"
+            torchvision.io.write_png(preprocess_image(tensor), path)
+        elif write_as == "video":
+            path = self.write_dir / f"{name}_{write_as}.mp4"
+            torchvision.io.write_video(path, tensor, fps=24)
+        elif write_as == "scalar":
+            raise NotImplementedError
+        elif write_as == "audio":
+            raise NotImplementedError
+        else:
+            logger.error(f"`write_as` does not support '{write_as}'.")
+            sys.exit()
+
+    def _parse_write_as(self, write_as, parsed_outputs: Dict[str, Any]):
+        if self.parsed_write_as is None:
+            # If `write_as` is a string (single value), all outputs will be saved in that specified format.
+            if isinstance(write_as, str):
+                self.parsed_write_as = {key: write_as for key in parsed_outputs}
+            # Otherwise, `write_as` needs to match the structure of the outputs in order to assign each tensor its specified type.
+            else:
+                self.parsed_write_as = parse_data(write_as)
+                if not set(self.parsed_write_as) == set(parsed_outputs):
+                    logger.error("`write_as` structure does not match the prediction's structure.")
                     sys.exit()
+        return self.parsed_write_as
 
     def on_predict_batch_end(
         self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
@@ -76,18 +102,12 @@ class LighterWriter(Callback):
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: List[Any]) -> None:
         if self.write_on != "epoch":
             return
-
         # Only one epoch when predicting, index the lists of outputs and batch indices accordingly.
         indices = trainer.predict_loop.epoch_batch_indices[0]
         outputs = outputs[0]
-
-        # Concatenate/flatten into a list of indices.
+        # Concatenate/flatten so that each output corresponds to its index.
         indices = list(itertools.chain(*indices))
-        # Concatenate/flatten the outputs so that each output corresponds to its index in `indices`.
         outputs = concatenate(outputs)
-
         self._write(outputs, indices)
 
-    def on_predict_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         # Dump the CSV
-        pass

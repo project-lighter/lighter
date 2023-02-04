@@ -141,7 +141,7 @@ class LighterLogger(Callback):
             elif data_type == "image":
                 # Check if the data type is valid.
                 check_supported_data_type(data, data_name)
-                for identifier, image in parse_data(data):
+                for identifier, image in parse_data(data).items():
                     name = name if identifier is None else f"{name}_{identifier}"
                     # Slice to `max_samples` only if it less than the batch size.
                     if self.max_samples is not None and self.max_samples < image.shape[0]:

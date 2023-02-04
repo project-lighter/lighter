@@ -11,37 +11,41 @@ LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test
 
 def parse_data(
     data: Union[
-        torch.Tensor,
-        List[torch.Tensor],
-        Dict[str, torch.Tensor],
-        Dict[str, List[torch.Tensor]],
-        Dict[str, Tuple[torch.Tensor]],
+        Any,
+        List[Any],
+        Dict[str, Any],
+        Dict[str, List[Any]],
+        Dict[str, Tuple[Any]],
     ]
-) -> List[Tuple[Optional[str], torch.Tensor]]:
-    """Given input data, this function will parse it and return a list of tuples where
-    each tuple contains an identifier and a tensor.
+) -> Dict[Optional[str], Any]:
+    """Parse the input data as follows:
+        - If dict, go over all keys and values, unpacking list and tuples, and assigning them all
+          a unique identifier based on the original key and their position if they were a list/tuple.
+        - If list/tuple, enumerate them and use their position as key for each value of the list/tuple.
+        - If any other type, return it as-is with the key set to 'None'. A 'None' key indicates that no
+          identifier is needed because no parsing ocurred.
 
     Args:
-        data (Union[torch.Tensor, List[torch.Tensor], Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], Dict[str, Tuple[torch.Tensor]]]):
+        data (Union[Any, List[Any], Dict[str, Any], Dict[str, List[Any]], Dict[str, Tuple[Any]]]):
             input data to parse.
 
     Returns:
-        List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is the string
-            identifier (`None` if there is only one tensor), and the second is the actual tensor.
+        Dict[Optional[str], Any]: a dict where key is either a string
+            identifier or `None`, and value the parsed output.
     """
-    result = []
+    result = {}
     if isinstance(data, dict):
         for key, value in data.items():
             if isinstance(value, (list, tuple)):
-                for i, tensor in enumerate(value):
-                    result.append((f"{key}_{i}", tensor) if len(value > 1) else (key, tensor))
+                for idx, singular in enumerate(value):
+                    result[key] = f"{key}_{idx}", singular if len(value > 1) else key, singular
             else:
                 result.append((key, value))
     elif isinstance(data, (list, tuple)):
-        for i, tensor in enumerate(data):
-            result.append((str(i), tensor))
+        for idx, singular in enumerate(data):
+            result[str(idx)] = singular
     else:
-        result.append((None, data))
+        result[None] = data
     return result
 
 
