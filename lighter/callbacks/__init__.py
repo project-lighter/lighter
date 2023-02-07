@@ -1,2 +1,2 @@
 from .logger import LighterLogger
-from .writer import LighterWriter
+from .writer import LighterFileWriter, LighterTableWriter

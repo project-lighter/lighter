@@ -40,7 +40,7 @@ def parse_data(
                 for idx, singular in enumerate(value):
                     result[key] = f"{key}_{idx}", singular if len(value > 1) else key, singular
             else:
-                result.append((key, value))
+                result[key] = value
     elif isinstance(data, (list, tuple)):
         for idx, singular in enumerate(data):
             result[str(idx)] = singular
@@ -63,9 +63,9 @@ def check_supported_data_type(data: Any, name: str) -> None:
         name (str): name of the data, for identification purposes.
     """
     if isinstance(data, dict):
-        is_valid = all(check_supported_data_type(elem) for elem in data.values())
+        is_valid = all(check_supported_data_type(elem, name) for elem in data.values())
     elif isinstance(data, (list, tuple)):
-        is_valid = all(check_supported_data_type(elem) for elem in data)
+        is_valid = all(check_supported_data_type(elem, name) for elem in data)
     elif isinstance(data, torch.Tensor):
         is_valid = True
     else:
