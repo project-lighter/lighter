@@ -10,7 +10,7 @@ from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import LIGHTNING_TO_LIGHTER_STAGE, check_supported_data_type, parse_data, preprocess_image
+from lighter.callbacks.utils import check_supported_data_type, get_lighter_mode, parse_data, preprocess_image
 
 OPTIONAL_IMPORTS = {}
 
@@ -193,7 +193,7 @@ class LighterLogger(Callback):
             trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
         """
         if not trainer.sanity_checking:
-            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            mode = get_lighter_mode(trainer.state.stage)
             # Accumulate the loss.
             if mode in ["train", "val"]:
                 self.loss[mode] += outputs["loss"].item()
@@ -215,7 +215,7 @@ class LighterLogger(Callback):
             pl_module (LighterSystem): LighterSystem, passed automatically by PyTorch Lightning.
         """
         if not trainer.sanity_checking:
-            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            mode = get_lighter_mode(trainer.state.stage)
             outputs = {"loss": None, "metrics": None}
 
             # Loss
@@ -253,7 +253,7 @@ class LighterLogger(Callback):
         Returns:
             int: global step.
         """
-        mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+        mode = get_lighter_mode(trainer.state.stage)
         # When validating in Trainer.fit(), return the train steps instead of the
         # val steps to correctly
         if mode == "val" and trainer.state.fn == "fit":

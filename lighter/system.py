@@ -17,6 +17,53 @@ from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
 class LighterSystem(pl.LightningModule):
+    """_summary_
+
+    Args:
+        model (Module): the model.
+        batch_size (int): batch size.
+        drop_last_batch (bool, optional): whether the last batch in the dataloader
+            should be dropped. Defaults to False.
+        num_workers (int, optional): number of dataloader workers. Defaults to 0.
+        pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
+        optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
+            a single or a list of optimizers. Defaults to None.
+        schedulers (Optional[Union[Callable, List[Callable]]], optional):
+            a single or a list of schedulers. Defaults to None.
+        criterion (Optional[Callable], optional):
+            criterion/loss function. Defaults to None.
+        cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
+            specified type before calculating the loss. May be necessary for some criterions.
+            Defaults to None.
+        post_criterion_activation (Optional[str], optional): some criterions
+            (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
+            However, to calculate the metrics and log the data, it may be necessary to activate
+            the predictions. Defaults to None.
+        patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
+            either a class with a `__call__` method or function that accepts two arguments -
+            first one is the input tensor, and the other one the model itself. It should
+            perform the inference over the patches and return the aggregated/averaged output.
+            Defaults to None.
+        train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
+            They have to be implemented using `torchmetrics`. Defaults to None.
+        val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
+            They have to be implemented using `torchmetrics`. Defaults to None.
+        test_metrics (Optional[Union[Metric, List[Metric]]], optional): test metric(s).
+            They have to be implemented using `torchmetrics`. Defaults to None.
+        train_dataset (Optional[Union[Dataset, List[Dataset]]], optional): training dataset(s).
+            Defaults to None.
+        val_dataset (Optional[Union[Dataset, List[Dataset]]], optional): validation dataset(s).
+            Defaults to None.
+        test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
+            Defaults to None.
+        predict_dataset (Optional[Union[Dataset, List[Dataset]]], optional): predict dataset(s).
+            Defaults to None.
+        train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
+        val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
+        test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
+        predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
+    """
+
     def __init__(
         self,
         model: Module,
@@ -42,52 +89,6 @@ class LighterSystem(pl.LightningModule):
         test_sampler: Optional[Sampler] = None,
         predict_sampler: Optional[Sampler] = None,
     ) -> None:
-        """_summary_
-
-        Args:
-            model (Module): the model.
-            batch_size (int): batch size.
-            drop_last_batch (bool, optional): whether the last batch in the dataloader
-                should be dropped. Defaults to False.
-            num_workers (int, optional): number of dataloader workers. Defaults to 0.
-            pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
-            optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
-                a single or a list of optimizers. Defaults to None.
-            schedulers (Optional[Union[Callable, List[Callable]]], optional):
-                a single or a list of schedulers. Defaults to None.
-            criterion (Optional[Callable], optional):
-                criterion/loss function. Defaults to None.
-            cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
-                specified type before calculating the loss. May be necessary for some criterions.
-                Defaults to None.
-            post_criterion_activation (Optional[str], optional): some criterions
-                (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
-                However, to calculate the metrics and log the data, it may be necessary to activate
-                the predictions. Defaults to None.
-            patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
-                either a class with a `__call__` method or function that accepts two arguments -
-                first one is the input tensor, and the other one the model itself. It should
-                perform the inference over the patches and return the aggregated/averaged output.
-                Defaults to None.
-            train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
-                They have to be implemented using `torchmetrics`. Defaults to None.
-            val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
-                They have to be implemented using `torchmetrics`. Defaults to None.
-            test_metrics (Optional[Union[Metric, List[Metric]]], optional): test metric(s).
-                They have to be implemented using `torchmetrics`. Defaults to None.
-            train_dataset (Optional[Union[Dataset, List[Dataset]]], optional): training dataset(s).
-                Defaults to None.
-            val_dataset (Optional[Union[Dataset, List[Dataset]]], optional): validation dataset(s).
-                Defaults to None.
-            test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
-                Defaults to None.
-            predict_dataset (Optional[Union[Dataset, List[Dataset]]], optional): predict dataset(s).
-                Defaults to None.
-            train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
-            val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
-            test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
-            predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
-        """
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
         self._init_placeholders_for_dataloader_and_step_methods()

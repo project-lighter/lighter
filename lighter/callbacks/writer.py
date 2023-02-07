@@ -17,6 +17,22 @@ from lighter.callbacks.utils import concatenate, parse_data, preprocess_image
 
 
 class LighterBaseWriter(ABC, Callback):
+    """Base class for a Writer. Override `self.write()` to define how a prediction should be saved.
+    `LighterBaseWriter` sets up the write directory, and defines `on_predict_batch_end` and
+    `on_predict_epoch_end`. `write_on` specifies which of the two should the writer call.
+
+    Args:
+        write_dir (str): the Writer will create a directory inside of `write_dir` with date
+            and time as its name and store the predictions there.
+        write_as (Optional[Union[str, List[str], Dict[str, str], Dict[str, List[str]]]]):
+            type in which the predictions will be stored. Passed automatically to the `write()`
+            abstract method and can be used to support writing different types. Should the Writer
+            support only one type, this argument can be removed from the overriden `__init__()`'s
+            arguments and set `self.write_as = None`.
+        write_on (str, optional): whether to write on each step or at the end of the prediction epoch.
+            Defaults to "step".
+    """
+
     def __init__(
         self,
         write_dir: str,
@@ -37,11 +53,11 @@ class LighterBaseWriter(ABC, Callback):
         tensor: torch.Tensor,
         write_as: Optional[Union[str, List[str], Dict[str, str], Dict[str, List[str]]]],
     ):
-        """This method should be overridden to specify how a tensor should be saved. If the Writer
+        """This method must be overridden to specify how a tensor should be saved. If the Writer
         supports multiple types of saving, handle the `write_as` argument with an if-else statement.
 
-        If the Writer only supports one type, `write_as` can be ignored and `write_as=None` can be
-        set in the overridden `__init__()` method.
+        If the Writer only supports one type, remove `write_as` from the overridden
+        `__init__()` method and set `self.write_as=None`.
 
         The `idx` and `identifier` arguments can be used to specify the name of the file
         or the row and column of a table for the prediction.
@@ -102,27 +118,28 @@ class LighterBaseWriter(ABC, Callback):
     def _on_batch_or_epoch_end(self, outputs, indices):
         # Parse the outputs into a structure ready for writing.
         parsed_outputs = parse_data(outputs)
-        # Parse `write_as`. If multi-value, check if its structure matches `parsed_output`'s  structure.
-        parsed_write_as = self._parse_write_as(self.write_as, parsed_outputs)
+        # Runs only on the first step.
+        if self.parsed_write_as is None:
+            # Parse `self.write_as`. If multi-value, check if its structure matches `parsed_output`'s  structure.
+            self.parsed_write_as = self._parse_write_as(self.write_as, parsed_outputs)
 
         for idx in indices:
             for identifier in parsed_outputs:  # pylint: disable=consider-using-dict-items
                 tensor = parsed_outputs[identifier]
-                write_as = parsed_write_as[identifier]
+                write_as = self.parsed_write_as[identifier]
                 self.write(idx, identifier, tensor, write_as)
 
     def _parse_write_as(self, write_as, parsed_outputs: Dict[str, Any]):
-        if self.parsed_write_as is None:
-            # If `write_as` is a string (single value), all outputs will be saved in that specified format.
-            if isinstance(write_as, str):
-                self.parsed_write_as = {key: write_as for key in parsed_outputs}
-            # Otherwise, `write_as` needs to match the structure of the outputs in order to assign each tensor its type.
-            else:
-                self.parsed_write_as = parse_data(write_as)
-                if not set(self.parsed_write_as) == set(parsed_outputs):
-                    logger.error("`write_as` structure does not match the prediction's structure.")
-                    sys.exit()
-        return self.parsed_write_as
+        # If `write_as` is a string (single value), all outputs will be saved in that specified format.
+        if isinstance(write_as, str):
+            parsed_write_as = {key: write_as for key in parsed_outputs}
+        # Otherwise, `write_as` needs to match the structure of the outputs in order to assign each tensor its type.
+        else:
+            parsed_write_as = parse_data(write_as)
+            if not set(parsed_write_as) == set(parsed_outputs):
+                logger.error("`write_as` structure does not match the prediction's structure.")
+                sys.exit()
+        return parsed_write_as
 
 
 class LighterFileWriter(LighterBaseWriter):

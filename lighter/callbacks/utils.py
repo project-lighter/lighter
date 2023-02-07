@@ -6,7 +6,18 @@ import torch
 import torchvision
 from loguru import logger
 
-LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test"}
+
+def get_lighter_mode(lightning_stage: str) -> str:
+    """Converts the name of a PyTorch Lightnig stage to the name of its corresponding Lighter mode.
+
+    Args:
+        lightning_stage (str): stage in which PyTorch Lightning Trainer is. Can be accessed using `trainer.state.stage`.
+
+    Returns:
+        str: name of the Lighter mode.
+    """
+    lightning_to_lighter = {"train": "train", "validate": "val", "test": "test"}
+    return lightning_to_lighter[lightning_stage]
 
 
 def parse_data(
@@ -79,20 +90,38 @@ def check_supported_data_type(data: Any, name: str) -> None:
         sys.exit()
 
 
-def concatenate(outputs: Union[List[Any], Tuple[Any]]) -> Union[torch.Tensor, List[Union[str, int, float]]]:
+def structure_preserving_concatenate(
+    inputs: Union[List[Any], Tuple[Any]]
+) -> Union[torch.Tensor, List[Union[str, int, float]]]:
+    """Recursively concatenate tensors that are either on their own or inside of other data structures (list/tuple/dict).
+    An input list of tensors is reduced to a single concatenated tensor, while an input list of data structures with tensors
+    will be reduced to a single data structure with its tensors concatenated along the key or position.
+
+    Assumes that all elements of the input list have the same type and structure.
+
+    Args:
+        inputs (Union[List[Any], Tuple[Any]]): A list or tuple of either:
+            - Dictionaries, each containing tensors to be concatenated by key.
+            - Lists/tuples, each containing tensors to be concatenated by their position.
+            - Tensors, which are concatenated along the first dimension.
+
+    Returns:
+        Union[torch.Tensor, List[Union[str, int, float]]]: The concatenated result in the same format as the input's elements.
+    """
     # List of dicts.
-    if isinstance(outputs[0], dict):
+    if isinstance(inputs[0], dict):
         # Go over dictionaries and concatenate tensors by key.
-        result = {key: concatenate([output[key] for output in outputs]) for key in outputs[0]}
+        keys = inputs[0].keys()
+        result = {key: structure_preserving_concatenate([input[key] for input in inputs]) for key in keys}
     # List of lists or tuples.
-    elif isinstance(outputs[0], (list, tuple)):
+    elif isinstance(inputs[0], (list, tuple)):
         # Go over lists/tuples and concatenate tensors by their position.
-        result = [concatenate([output[idx] for output in outputs]) for idx in range(len(outputs[0]))]
+        result = [structure_preserving_concatenate([input[idx] for input in inputs]) for idx in range(len(inputs[0]))]
     # List of tensors.
-    elif isinstance(outputs[0], torch.Tensor):
-        result = torch.cat(outputs)
+    elif isinstance(inputs[0], torch.Tensor):
+        result = torch.cat(inputs)
     else:
-        logger.error(f"Type `{type(outputs[0])}` not supported.")
+        logger.error(f"Type `{type(inputs[0])}` not supported.")
         sys.exit()
     return result
 
