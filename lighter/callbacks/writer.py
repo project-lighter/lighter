@@ -13,7 +13,7 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import concatenate, parse_data, preprocess_image
+from lighter.callbacks.utils import parse_data, preprocess_image, structure_preserving_concatenate
 
 
 class LighterBaseWriter(ABC, Callback):
@@ -112,7 +112,7 @@ class LighterBaseWriter(ABC, Callback):
         outputs = outputs[0]
         # Concatenate/flatten so that each output corresponds to its index.
         indices = list(itertools.chain(*indices))
-        outputs = concatenate(outputs)
+        outputs = structure_preserving_concatenate(outputs)
         self._on_batch_or_epoch_end(outputs, indices)
 
     def _on_batch_or_epoch_end(self, outputs, indices):
