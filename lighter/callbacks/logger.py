@@ -136,7 +136,7 @@ class LighterLogger(Callback):
 
             data_type = self.data_types[data_name]
             data = outputs[data_name]
-            name = f"{mode}/data/{data_name}_{step_or_epoch}"
+            name = f"{mode}/data/{data_name}/{step_or_epoch}"
 
             # Scalar
             if data_type == "scalar":
@@ -147,13 +147,13 @@ class LighterLogger(Callback):
                 # Check if the data type is valid.
                 check_image_data_type(data, data_name)
                 for identifier, image in parse_image_data(data):
-                    name = name if identifier is None else f"{name}_{identifier}"
+                    item_name = name if identifier is None else f"{name}_{identifier}"
                     # Slice to `max_samples` only if it less than the batch size.
                     if self.max_samples is not None and self.max_samples < image.shape[0]:
                         image = image[: self.max_samples]
                     # Preprocess a batch of images into a single, loggable, image.
                     image = preprocess_image(image)
-                    self._log_image(name, image, global_step)
+                    self._log_image(item_name, image, global_step)
             else:
                 logger.error(f"`{data_name}_type` does not support `{data_type}`.")
                 sys.exit()
@@ -357,6 +357,8 @@ def check_image_data_type(data: Any, name: str) -> None:
         )
         sys.exit()
 
+    return is_valid
+
 
 def parse_image_data(
     data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]
@@ -377,7 +379,7 @@ def parse_image_data(
         for key, value in data.items():
             if isinstance(value, list):
                 for i, tensor in enumerate(value):
-                    result.append((f"{key}_{i}", tensor) if len(value > 1) else (key, tensor))
+                    result.append((f"{key}_{i}", tensor) if len(value) > 1 else (key, tensor))
             else:
                 result.append((key, value))
     elif isinstance(data, list):

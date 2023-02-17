@@ -70,7 +70,7 @@ def countargs(callable: Callable) -> bool:
     return len(inspect.signature(callable).parameters.keys())
 
 
-def get_name(x: Callable, include_module_name: bool = False) -> str:
+def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     """Get the name of an object, class or function.
 
     Args:
