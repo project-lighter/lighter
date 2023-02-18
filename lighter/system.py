@@ -62,6 +62,10 @@ class LighterSystem(pl.LightningModule):
         val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
         test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
         predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
+        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
+        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
+        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
+        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(
@@ -88,6 +92,10 @@ class LighterSystem(pl.LightningModule):
         val_sampler: Optional[Sampler] = None,
         test_sampler: Optional[Sampler] = None,
         predict_sampler: Optional[Sampler] = None,
+        train_collate: Optional[Callable] = None,
+        val_collate: Optional[Callable] = None,
+        test_collate: Optional[Callable] = None,
+        predict_collate: Optional[Callable] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
@@ -116,6 +124,12 @@ class LighterSystem(pl.LightningModule):
         self.val_sampler = val_sampler
         self.test_sampler = test_sampler
         self.predict_sampler = predict_sampler
+
+        # Collate functions
+        self.train_collate = train_collate
+        self.val_collate = val_collate
+        self.test_collate = test_collate
+        self.predict_collate = predict_collate
 
         # Metrics
         self.train_metrics = MetricCollection(ensure_list(train_metrics))
@@ -270,6 +284,7 @@ class LighterSystem(pl.LightningModule):
         """
         dataset = getattr(self, f"{mode}_dataset")
         sampler = getattr(self, f"{mode}_sampler")
+        collate_fn = getattr(self, f"{mode}_collate")
 
         if dataset is None:
             logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
@@ -287,7 +302,7 @@ class LighterSystem(pl.LightningModule):
 
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
+        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
         return DataLoader(
             dataset,
             sampler=sampler,
