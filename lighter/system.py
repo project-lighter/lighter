@@ -39,11 +39,12 @@ class LighterSystem(pl.LightningModule):
             (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
             However, to calculate the metrics and log the data, it may be necessary to activate
             the predictions. Defaults to None.
-        patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
-            either a class with a `__call__` method or function that accepts two arguments -
-            first one is the input tensor, and the other one the model itself. It should
-            perform the inference over the patches and return the aggregated/averaged output.
-            Defaults to None.
+        inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
+            method that accepts two arguments - the input to infer over, and the model itself.
+            Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
+            is a sliding window or a patch-based inferer that will infer over the smaller parts of
+            the input, combine them, and return a single output. The inferers provided by MONAI
+            cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
         train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
             They have to be implemented using `torchmetrics`. Defaults to None.
         val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
@@ -80,7 +81,7 @@ class LighterSystem(pl.LightningModule):
         criterion: Optional[Callable] = None,
         cast_target_dtype_to: Optional[str] = None,
         post_criterion_activation: Optional[str] = None,
-        patch_based_inferer: Optional[Callable] = None,
+        inferer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
         val_metrics: Optional[Union[Metric, List[Metric]]] = None,
         test_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -140,8 +141,8 @@ class LighterSystem(pl.LightningModule):
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
 
-        # Patch-based inference
-        self._patch_based_inferer = patch_based_inferer
+        # Inferer for val, test, and predict
+        self.inferer = inferer
 
         # Checks
         self._lightning_module_methods_defined = False
@@ -199,8 +200,8 @@ class LighterSystem(pl.LightningModule):
         input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
 
         # Forward
-        if self._patch_based_inferer and mode in ["val", "test", "predict"]:
-            pred = self._patch_based_inferer(input, self)
+        if self.inferer and mode in ["val", "test", "predict"]:
+            pred = self.inferer(input, self)
         else:
             pred = self(input)
 
@@ -290,14 +291,12 @@ class LighterSystem(pl.LightningModule):
             logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
             sys.exit()
 
-        # Batch size is 1 when using patch based inference for two reasons:
-        # 1) Patch based inference splits an input into a batch of patches,
-        # so the batch size will actually be defined for it;
-        # 2) In settings where patch based inference is needed, the input data often
-        # varies in shape, preventing the data loader to stack them into a batch.
+        # Batch size is 1 when using an inference for two reasons:
+        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
+        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
         batch_size = self.batch_size
-        if self._patch_based_inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the general batch size to 1 for {mode} " "mode because a patch-based inferer is used.")
+        if self.inferer is not None and mode in ["val", "test", "predict"]:
+            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
