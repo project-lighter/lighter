@@ -133,30 +133,42 @@ class LighterLogger(Callback):
         for data_name in ["input", "target", "pred"]:
             if self.data_types[data_name] is None:
                 continue
+            self._log_by_type(data_name, outputs, mode, step_or_epoch, global_step)
 
-            data_type = self.data_types[data_name]
-            data = outputs[data_name]
-            name = f"{mode}/data/{data_name}/{step_or_epoch}"
+    def _log_by_type(self, data_name: str, outputs: dict, mode: str, step_or_epoch: str, global_step: int) -> None:
+        """Logs the data to TensorBoard and Weights & Biases (if enabled).
+        The data is logged as scalars, images, or histograms, depending on the configuration.
+        """
+        data_type = self.data_types[data_name]
+        data = outputs[data_name]
+        tag = f"{mode}/data/{data_name}/{step_or_epoch}"
 
-            # Scalar
-            if data_type == "scalar":
-                self._log_scalar(name, data, global_step)
+        # Scalar
+        if data_type == "scalar":
+            self._log_scalar(tag, data, global_step)
 
-            # Image
-            elif data_type == "image":
-                # Check if the data type is valid.
-                check_image_data_type(data, data_name)
-                for identifier, image in parse_image_data(data):
-                    item_name = name if identifier is None else f"{name}_{identifier}"
-                    # Slice to `max_samples` only if it less than the batch size.
-                    if self.max_samples is not None and self.max_samples < image.shape[0]:
-                        image = image[: self.max_samples]
-                    # Preprocess a batch of images into a single, loggable, image.
-                    image = preprocess_image(image)
-                    self._log_image(item_name, image, global_step)
-            else:
-                logger.error(f"`{data_name}_type` does not support `{data_type}`.")
-                sys.exit()
+        # Image
+        elif data_type == "image":
+            # Check if the data type is valid.
+            check_data_type(data, data_name)
+            for identifier, image in parse_data(data):
+                item_name = tag if identifier is None else f"{tag}_{identifier}"
+                # Slice to `max_samples` only if it less than the batch size.
+                if self.max_samples is not None and self.max_samples < image.shape[0]:
+                    image = image[: self.max_samples]
+                # Preprocess a batch of images into a single, loggable, image.
+                image = preprocess_image(image)
+                self._log_image(item_name, image, global_step)
+
+        # Histogram
+        elif data_type == "histogram":
+            check_data_type(data, data_name)
+            for identifier, tensor in parse_data(data):
+                item_name = tag if identifier is None else f"{tag}_{identifier}"
+                self._log_histogram(item_name, tensor, global_step)
+        else:
+            logger.error(f"`{data_name}_type` does not support `{data_type}`.")
+            sys.exit()
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
         """Logs the scalar to TensorBoard and Weights & Biases (if enabled).
@@ -188,6 +200,21 @@ class LighterLogger(Callback):
             self.tensorboard.add_image(name, image, global_step=global_step)
         if self.wandb:
             self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Image(image)}, step=global_step)
+
+    def _log_histogram(self, name: str, tensor: torch.Tensor, global_step: int) -> None:
+        """Logs the histogram to TensorBoard and Weights & Biases (if enabled).
+
+        Args:
+            name (str): name of the image to be logged.
+            tensor (torch.Tensor): tensor to be logged.
+            global_step (int): current global step.
+        """
+        tensor = tensor.detach().cpu()
+
+        if self.tensorboard:
+            self.tensorboard.add_histogram(name, tensor, global_step=global_step)
+        if self.wandb:
+            self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Histogram(tensor)}, step=global_step)
 
     def _on_batch_end(self, outputs: Dict, trainer: Trainer) -> None:
         """Performs logging at the end of a batch/step. It logs the loss and metrics,
@@ -330,21 +357,22 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     return image
 
 
-def check_image_data_type(data: Any, name: str) -> None:
-    """Check the input image data for its type. Valid image data types are:
+def check_data_type(data: Any, name: str) -> None:
+    """Check the input data for supported types. Valid image data types are:
         - torch.Tensor
         - List[torch.Tensor]
+        - Tuple[torch.Tensor]
         - Dict[str, torch.Tensor]
         - Dict[str, List[torch.Tensor]]
 
     Args:
         data (Any): image data to check
-        name (str): name of the image data, for logging purposes.
+        name (str): name of the data, for logging purposes.
     """
     if isinstance(data, dict):
-        is_valid = all(check_image_data_type(elem, name) for elem in data.values())
-    elif isinstance(data, list):
-        is_valid = all(check_image_data_type(elem, name) for elem in data)
+        is_valid = all(check_data_type(elem, name) for elem in data.values())
+    elif isinstance(data, (list, tuple)):
+        is_valid = all(check_data_type(elem, name) for elem in data)
     elif isinstance(data, torch.Tensor):
         is_valid = True
     else:
@@ -360,29 +388,37 @@ def check_image_data_type(data: Any, name: str) -> None:
     return is_valid
 
 
-def parse_image_data(
-    data: Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]], List[torch.Tensor], torch.Tensor]
+def parse_data(
+    data: Union[
+        Dict[str, torch.Tensor],
+        Dict[str, List[torch.Tensor]],
+        Dict[str, Tuple[torch.Tensor]],
+        List[torch.Tensor],
+        Tuple[torch.Tensor],
+        torch.Tensor,
+    ]
 ) -> List[Tuple[Optional[str], torch.Tensor]]:
     """Given input data, this function will parse it and return a list of tuples where
     each tuple contains an identifier and a tensor.
 
     Args:
-        data (Union[torch.Tensor, List[torch.Tensor], Dict[str, torch.Tensor],
-                    Dict[str, List[torch.Tensor]]]): image tensor(s).
+        data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]],
+            Dict[str, Tuple[torch.Tensor]], List[torch.Tensor], Tuple[torch.Tensor], torch.Tensor]):
+
 
     Returns:
         List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is
-            a string identifier (or `None` if there is only one image) and the second an image tensor.
+            a string identifier (or `None` if there is only one) and the second a tensor.
     """
     result = []
     if isinstance(data, dict):
         for key, value in data.items():
-            if isinstance(value, list):
+            if isinstance(value, (list, tuple)):
                 for i, tensor in enumerate(value):
                     result.append((f"{key}_{i}", tensor) if len(value) > 1 else (key, tensor))
             else:
                 result.append((key, value))
-    elif isinstance(data, list):
+    elif isinstance(data, (list, tuple)):
         for i, tensor in enumerate(data):
             result.append((str(i), tensor))
     else:
