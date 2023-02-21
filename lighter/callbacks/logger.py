@@ -94,7 +94,8 @@ class LighterLogger(Callback):
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if not trainer.is_global_zero:
             return
-        self.tensorboard.close()
+        if self.tensorboard:
+            self.tensorboard.close()
 
     def _log(self, outputs: dict, mode: str, global_step: int, is_epoch=False) -> None:
         """Logs the outputs to TensorBoard and Weights & Biases (if enabled).
@@ -165,6 +166,9 @@ class LighterLogger(Callback):
             raise NotImplementedError("LighterLogger currently supports only single scalars.")
         if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
             raise NotImplementedError("LighterLogger currently supports only single scalars.")
+
+        if isinstance(scalar, torch.Tensor):
+            scalar = scalar.item()
 
         if self.tensorboard:
             self.tensorboard.add_scalar(name, scalar, global_step=global_step)
