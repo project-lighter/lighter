@@ -218,14 +218,17 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # In predict mode, skip metrics and logging parts and return the predicted value.
         if mode == "predict":
+            # In predict mode, skip the metrics and return the predicted value only.
             return pred
-
-        # Calculate the metrics for the step.
-        step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
-
-        return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
+        else:
+            # Calculate the metrics for the step.
+            metrics = getattr(self, f"{mode}_metrics")(pred, target)
+            # Log the loss and metrics for monitoring purposes only.
+            self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
+            self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
+            # Return the loss, metrics, input, target, and pred.
+            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
     def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]) -> torch.Tensor:
         """_summary_
