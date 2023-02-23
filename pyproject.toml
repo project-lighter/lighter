@@ -175,7 +175,7 @@ show_missing = true
 max-line-length = 127
 disable = """
     too-many-arguments,
-    not-callable
+    no-else-return,
 """
 generated-members = "torch.*"
 

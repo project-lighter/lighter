@@ -7,6 +7,7 @@ import fire
 import yaml
 from loguru import logger
 from monai.bundle.scripts import run
+from pytorch_lightning import seed_everything
 
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.misc import ensure_list
@@ -39,12 +40,15 @@ def run_trainer_method(method_name, method_config: Dict, **kwargs: Any):
         method_config: config definition of the Trainer method.
         **kwargs (Any): keyword arguments passed to the `monai.bundle.run` function.
     """
+    # Sets the random seed to `PL_GLOBAL_SEED` env variable. If not specified, it picks a random seed.
+    seed_everything()
+
     # Import the project as a module.
     if "config_file" in kwargs:
         project_imported = False
         # Handle multiple configs. Start from the config file specified last as it overrides the previous ones.
         for config in reversed(ensure_list(kwargs["config_file"])):
-            with open(config, "r", encoding="utf-8") as config:
+            with open(config, encoding="utf-8") as config:
                 config = yaml.safe_load(config)
                 if "project" not in config:
                     continue
@@ -55,5 +59,6 @@ def run_trainer_method(method_name, method_config: Dict, **kwargs: Any):
                 # Import it as a module named 'project'.
                 import_module_from_path("project", config["project"])
                 project_imported = True
+
     # Run the Trainer method.
     run(method_name, **method_config, **kwargs)
