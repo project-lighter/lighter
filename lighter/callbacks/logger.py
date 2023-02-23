@@ -12,8 +12,8 @@ from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
+from lighter.callbacks.utils import check_supported_data_type, get_lighter_mode, parse_data, preprocess_image
 
-LIGHTNING_TO_LIGHTER_STAGE = {"train": "train", "validate": "val", "test": "test"}
 OPTIONAL_IMPORTS = {}
 
 
@@ -150,7 +150,7 @@ class LighterLogger(Callback):
         # Image
         elif data_type == "image":
             # Check if the data type is valid.
-            check_data_type(data, data_name)
+            check_supported_data_type(data, data_name)
             for identifier, image in parse_data(data):
                 item_name = tag if identifier is None else f"{tag}_{identifier}"
                 # Slice to `max_samples` only if it less than the batch size.
@@ -162,7 +162,7 @@ class LighterLogger(Callback):
 
         # Histogram
         elif data_type == "histogram":
-            check_data_type(data, data_name)
+            check_supported_data_type(data, data_name)
             for identifier, tensor in parse_data(data):
                 item_name = tag if identifier is None else f"{tag}_{identifier}"
                 self._log_histogram(item_name, tensor, global_step)
@@ -225,7 +225,7 @@ class LighterLogger(Callback):
             trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
         """
         if not trainer.sanity_checking:
-            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            mode = get_lighter_mode(trainer.state.stage)
             # Accumulate the loss.
             if mode in ["train", "val"]:
                 self.loss[mode] += outputs["loss"].item()
@@ -248,7 +248,7 @@ class LighterLogger(Callback):
             pl_module (LighterSystem): LighterSystem, passed automatically by PyTorch Lightning.
         """
         if not trainer.sanity_checking:
-            mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+            mode = get_lighter_mode(trainer.state.stage)
             outputs = {"loss": None, "metrics": None}
 
             # Loss
@@ -291,7 +291,7 @@ class LighterLogger(Callback):
         Returns:
             int: global step.
         """
-        mode = LIGHTNING_TO_LIGHTER_STAGE[trainer.state.stage]
+        mode = get_lighter_mode(trainer.state.stage)
         # When validating in Trainer.fit(), return the train steps instead of the
         # val steps to correctly
         if mode == "val" and trainer.state.fn == "fit":
@@ -329,98 +329,3 @@ class LighterLogger(Callback):
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         self._on_epoch_end(trainer, pl_module)
-
-
-def preprocess_image(image: torch.Tensor) -> torch.Tensor:
-    """Preprocess the image before logging it. If it is a batch of multiple images,
-    it will create a grid image of them. In case of 3D, a single image is displayed
-    with slices stacked vertically, while a batch as a grid where each column is
-    a different 3D image.
-    Args:
-        image (torch.Tensor): 2D or 3D image tensor.
-    Returns:
-        torch.Tensor: image ready for logging.
-    """
-    image = image.detach().cpu()
-    # 3D image (NCDHW)
-    has_three_dims = image.ndim == 5
-    if has_three_dims:
-        # Reshape 3D image from NCDHW to NC(D*H)W format
-        shape = image.shape
-        image = image.view(shape[0], shape[1], shape[2] * shape[3], shape[4])
-    if image.shape[0] == 1:
-        image = image[0]
-    else:
-        # If more than one image, create a grid
-        nrow = image.shape[0] if has_three_dims else 8
-        image = torchvision.utils.make_grid(image, nrow=nrow)
-    return image
-
-
-def check_data_type(data: Any, name: str) -> None:
-    """Check the input data for supported types. Valid image data types are:
-        - torch.Tensor
-        - List[torch.Tensor]
-        - Tuple[torch.Tensor]
-        - Dict[str, torch.Tensor]
-        - Dict[str, List[torch.Tensor]]
-
-    Args:
-        data (Any): image data to check
-        name (str): name of the data, for logging purposes.
-    """
-    if isinstance(data, dict):
-        is_valid = all(check_data_type(elem, name) for elem in data.values())
-    elif isinstance(data, (list, tuple)):
-        is_valid = all(check_data_type(elem, name) for elem in data)
-    elif isinstance(data, torch.Tensor):
-        is_valid = True
-    else:
-        is_valid = False
-
-    if not is_valid:
-        logger.error(
-            f"`{name}` has to be a Tensor, List[Tensor], Dict[str, Tensor]"
-            f", or Dict[str, List[Tensor]]. `{type(data)}` is not supported."
-        )
-        sys.exit()
-
-    return is_valid
-
-
-def parse_data(
-    data: Union[
-        Dict[str, torch.Tensor],
-        Dict[str, List[torch.Tensor]],
-        Dict[str, Tuple[torch.Tensor]],
-        List[torch.Tensor],
-        Tuple[torch.Tensor],
-        torch.Tensor,
-    ]
-) -> List[Tuple[Optional[str], torch.Tensor]]:
-    """Given input data, this function will parse it and return a list of tuples where
-    each tuple contains an identifier and a tensor.
-
-    Args:
-        data (Union[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]],
-            Dict[str, Tuple[torch.Tensor]], List[torch.Tensor], Tuple[torch.Tensor], torch.Tensor]):
-
-
-    Returns:
-        List[Tuple[Optional[str], torch.Tensor]]: a list of tuples where the first element is
-            a string identifier (or `None` if there is only one) and the second a tensor.
-    """
-    result = []
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if isinstance(value, (list, tuple)):
-                for i, tensor in enumerate(value):
-                    result.append((f"{key}_{i}", tensor) if len(value) > 1 else (key, tensor))
-            else:
-                result.append((key, value))
-    elif isinstance(data, (list, tuple)):
-        for i, tensor in enumerate(data):
-            result.append((str(i), tensor))
-    else:
-        result.append((None, data))
-    return result
