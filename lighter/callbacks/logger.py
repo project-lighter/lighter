@@ -123,6 +123,7 @@ class LighterLogger(Callback):
 
         # Epoch does not log input, target, and pred.
         if is_epoch:
+            self._log_scalar("epoch", outputs["epoch"], global_step)
             return
 
         # Input, Target, Pred
@@ -220,7 +221,7 @@ class LighterLogger(Callback):
         """
         if not trainer.sanity_checking:
             mode = get_lighter_mode(trainer.state.stage)
-            outputs = {"loss": None, "metrics": None}
+            outputs = {"loss": None, "metrics": None, "epoch": trainer.current_epoch}
 
             # Loss
             if mode in ["train", "val"]:
