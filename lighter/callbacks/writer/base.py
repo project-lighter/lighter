@@ -6,14 +6,12 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 import torch
-import torchvision
 from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import parse_data, preprocess_image, structure_preserving_concatenate
+from lighter.callbacks.utils import parse_data, structure_preserving_concatenate
 
 
 class LighterBaseWriter(ABC, Callback):
@@ -140,75 +138,3 @@ class LighterBaseWriter(ABC, Callback):
                 logger.error("`write_as` structure does not match the prediction's structure.")
                 sys.exit()
         return parsed_write_as
-
-
-class LighterFileWriter(LighterBaseWriter):
-    def write(self, idx, identifier, tensor, write_as):
-        filename = f"{write_as}" if identifier is None else f"{identifier}_{write_as}"
-        write_dir = self.write_dir / str(idx)
-        write_dir.mkdir()
-
-        if write_as is None:
-            pass
-        elif write_as == "tensor":
-            path = write_dir / f"{filename}.pt"
-            torch.save(tensor, path)
-        elif write_as == "image":
-            path = write_dir / f"{filename}.png"
-            torchvision.io.write_png(preprocess_image(tensor), path)
-        elif write_as == "video":
-            path = write_dir / f"{filename}.mp4"
-            torchvision.io.write_video(path, tensor, fps=24)
-        elif write_as == "scalar":
-            raise NotImplementedError
-        elif write_as == "audio":
-            raise NotImplementedError
-        else:
-            logger.error(f"`write_as` '{write_as}' not supported.")
-            sys.exit()
-
-
-class LighterTableWriter(LighterBaseWriter):
-    def __init__(self, write_dir: str, write_as: Union[str, List[str], Dict[str, str], Dict[str, List[str]]]) -> None:
-        super().__init__(write_dir, write_as, write_interval="epoch")
-        self.csv_records = {}
-
-    def write(self, idx, identifier, tensor, write_as):
-        # Column name will be set to 'pred' if the identifier is None.
-        column = "pred" if identifier is None else identifier
-
-        if write_as is None:
-            record = None
-        elif write_as == "tensor":
-            record = tensor.tolist()
-        elif write_as == "scalar":
-            raise NotImplementedError
-        else:
-            logger.error(f"`write_as` '{write_as}' not supported.")
-            sys.exit()
-
-        if idx not in self.csv_records:
-            self.csv_records[idx] = {column: record}
-        else:
-            self.csv_records[idx][column] = record
-
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: List[Any]) -> None:
-        super().on_predict_epoch_end(trainer, pl_module, outputs)
-
-        csv_path = self.write_dir / "predictions.csv"
-        logger.info(f"Saving the predictions to {csv_path}")
-
-        # Sort the dict of dicts by key and turn it into a list of dicts.
-        self.csv_records = [self.csv_records[key] for key in sorted(self.csv_records)]
-        # Gather the records from all ranks when in DDP.
-        if trainer.world_size > 1:
-            # Since `all_gather` supports tensors only, mimic the behavior using `broadcast`.
-            ddp_csv_records = [self.csv_records] * trainer.world_size
-            for rank in range(trainer.world_size):
-                # Broadcast the records from the current rank and save it at its designated position.
-                ddp_csv_records[rank] = trainer.strategy.broadcast(ddp_csv_records[rank], src=rank)
-            # Combine the records from all ranks. List of lists of dicts -> list of dicts.
-            self.csv_records = list(itertools.chain(*ddp_csv_records))
-
-        # Create a dataframe and save it.
-        pd.DataFrame(self.csv_records).to_csv(csv_path)
