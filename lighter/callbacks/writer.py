@@ -19,7 +19,7 @@ from lighter.callbacks.utils import parse_data, preprocess_image, structure_pres
 class LighterBaseWriter(ABC, Callback):
     """Base class for a Writer. Override `self.write()` to define how a prediction should be saved.
     `LighterBaseWriter` sets up the write directory, and defines `on_predict_batch_end` and
-    `on_predict_epoch_end`. `write_on` specifies which of the two should the writer call.
+    `on_predict_epoch_end`. `write_interval` specifies which of the two should the writer call.
 
     Args:
         write_dir (str): the Writer will create a directory inside of `write_dir` with date
@@ -29,7 +29,7 @@ class LighterBaseWriter(ABC, Callback):
             abstract method and can be used to support writing different types. Should the Writer
             support only one type, this argument can be removed from the overriden `__init__()`'s
             arguments and set `self.write_as = None`.
-        write_on (str, optional): whether to write on each step or at the end of the prediction epoch.
+        write_interval (str, optional): whether to write on each step or at the end of the prediction epoch.
             Defaults to "step".
     """
 
@@ -37,11 +37,11 @@ class LighterBaseWriter(ABC, Callback):
         self,
         write_dir: str,
         write_as: Optional[Union[str, List[str], Dict[str, str], Dict[str, List[str]]]],
-        write_on: str = "step",
+        write_interval: str = "step",
     ) -> None:
         self.write_dir = Path(write_dir) / datetime.now().strftime("%Y%m%d_%H%M%S")
         self.write_as = write_as
-        self.write_on = write_on
+        self.write_interval = write_interval
 
         self.parsed_write_as = None
 
@@ -79,8 +79,8 @@ class LighterBaseWriter(ABC, Callback):
         if stage != "predict":
             return
 
-        if self.write_on not in ["step", "epoch"]:
-            logger.error("`write_on` must be either 'step' or 'epoch'.")
+        if self.write_interval not in ["step", "epoch"]:
+            logger.error("`write_interval` must be either 'step' or 'epoch'.")
             sys.exit()
 
         # Broadcast the `write_dir` so that all ranks write their predictions there.
@@ -99,13 +99,13 @@ class LighterBaseWriter(ABC, Callback):
     def on_predict_batch_end(
         self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
     ) -> None:
-        if self.write_on != "step":
+        if self.write_interval != "step":
             return
         indices = trainer.predict_loop.epoch_loop.current_batch_indices
         self._on_batch_or_epoch_end(outputs, indices)
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: List[Any]) -> None:
-        if self.write_on != "epoch":
+        if self.write_interval != "epoch":
             return
         # Only one epoch when predicting, index the lists of outputs and batch indices accordingly.
         indices = trainer.predict_loop.epoch_batch_indices[0]
@@ -170,7 +170,7 @@ class LighterFileWriter(LighterBaseWriter):
 
 class LighterTableWriter(LighterBaseWriter):
     def __init__(self, write_dir: str, write_as: Union[str, List[str], Dict[str, str], Dict[str, List[str]]]) -> None:
-        super().__init__(write_dir, write_as, write_on="epoch")
+        super().__init__(write_dir, write_as, write_interval="epoch")
         self.csv_records = {}
 
     def write(self, idx, identifier, tensor, write_as):
