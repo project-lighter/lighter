@@ -45,6 +45,9 @@ class LighterSystem(pl.LightningModule):
             is a sliding window or a patch-based inferer that will infer over the smaller parts of
             the input, combine them, and return a single output. The inferers provided by MONAI
             cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
+        freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
+            method that accepts three arguments - the model, the step, and the epoch number.
+            Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
         train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
             They have to be implemented using `torchmetrics`. Defaults to None.
         val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
@@ -82,6 +85,7 @@ class LighterSystem(pl.LightningModule):
         cast_target_dtype_to: Optional[str] = None,
         post_criterion_activation: Optional[str] = None,
         inferer: Optional[Callable] = None,
+        freezer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
         val_metrics: Optional[Union[Metric, List[Metric]]] = None,
         test_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -144,6 +148,9 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
+        # Layer freezer
+        self.freezer = freezer
+
         # Checks
         self._lightning_module_methods_defined = False
         self._target_not_used_reported = False
@@ -171,11 +178,15 @@ class LighterSystem(pl.LightningModule):
             logger.error(f"Input type '{type(input)}' not supported.")
             sys.exit()
 
+        # Freeze the layers if specified so.
+        if self.freezer is not None:
+            self.freezer(self.model, self.global_step, self.current_epoch)
+
         # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
         if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
             return self.model(*input, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
-        elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
+        elif isinstance(input, dict) and all(hasarg(self.model, name) for name in input):
             return self.model(**input, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:
@@ -267,7 +278,7 @@ class LighterSystem(pl.LightningModule):
         if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
             return self.criterion(*pred, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
-        elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
+        elif isinstance(pred, dict) and all(hasarg(self.criterion, name) for name in pred):
             return self.criterion(**pred, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:
