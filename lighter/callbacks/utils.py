@@ -91,6 +91,7 @@ def check_supported_data_type(data: Any, name: str) -> None:
 
     return is_valid
 
+
 def structure_preserving_concatenate(
     inputs: Union[List[Any], Tuple[Any]]
 ) -> Union[torch.Tensor, List[Union[str, int, float]]]:
