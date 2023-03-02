@@ -48,13 +48,13 @@ def parse_data(
     if isinstance(data, dict):
         for key, value in data.items():
             if isinstance(value, (list, tuple)):
-                for idx, singular in enumerate(value):
-                    result[key] = f"{key}_{idx}", singular if len(value > 1) else key, singular
+                for idx, element in enumerate(value):
+                    result[f"{key}_{idx}" if len(value) > 1 else key] = element
             else:
                 result[key] = value
     elif isinstance(data, (list, tuple)):
-        for idx, singular in enumerate(data):
-            result[str(idx)] = singular
+        for idx, element in enumerate(data):
+            result[str(idx)] = element
     else:
         result[None] = data
     return result
@@ -89,6 +89,7 @@ def check_supported_data_type(data: Any, name: str) -> None:
         )
         sys.exit()
 
+    return is_valid
 
 def structure_preserving_concatenate(
     inputs: Union[List[Any], Tuple[Any]]
