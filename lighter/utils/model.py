@@ -2,7 +2,7 @@ from typing import Dict
 
 import torch
 from loguru import logger
-from torch.nn import Identity, Module, Sequential
+from torch.nn import Identity, Module
 
 from lighter.utils.misc import setattr_dot_notation
 

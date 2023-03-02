@@ -39,11 +39,15 @@ class LighterSystem(pl.LightningModule):
             (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
             However, to calculate the metrics and log the data, it may be necessary to activate
             the predictions. Defaults to None.
-        patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
-            either a class with a `__call__` method or function that accepts two arguments -
-            first one is the input tensor, and the other one the model itself. It should
-            perform the inference over the patches and return the aggregated/averaged output.
-            Defaults to None.
+        inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
+            method that accepts two arguments - the input to infer over, and the model itself.
+            Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
+            is a sliding window or a patch-based inferer that will infer over the smaller parts of
+            the input, combine them, and return a single output. The inferers provided by MONAI
+            cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
+        freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
+            method that accepts three arguments - the model, the step, and the epoch number.
+            Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
         train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
             They have to be implemented using `torchmetrics`. Defaults to None.
         val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
@@ -62,6 +66,10 @@ class LighterSystem(pl.LightningModule):
         val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
         test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
         predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
+        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
+        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
+        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
+        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(
@@ -77,6 +85,7 @@ class LighterSystem(pl.LightningModule):
         cast_target_dtype_to: Optional[str] = None,
         post_criterion_activation: Optional[str] = None,
         inferer: Optional[Callable] = None,
+        freezer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
         val_metrics: Optional[Union[Metric, List[Metric]]] = None,
         test_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -139,6 +148,9 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
+        # Layer freezer
+        self.freezer = freezer
+
         # Checks
         self._lightning_module_methods_defined = False
         self._target_not_used_reported = False
@@ -166,11 +178,15 @@ class LighterSystem(pl.LightningModule):
             logger.error(f"Input type '{type(input)}' not supported.")
             sys.exit()
 
+        # Freeze the layers if specified so.
+        if self.freezer is not None:
+            self.freezer(self.model, self.global_step, self.current_epoch)
+
         # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
         if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
             return self.model(*input, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
-        elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
+        elif isinstance(input, dict) and all(hasarg(self.model, name) for name in input):
             return self.model(**input, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:
@@ -213,14 +229,17 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # In predict mode, skip metrics and logging parts and return the predicted value.
         if mode == "predict":
+            # In predict mode, skip the metrics and return the predicted value only.
             return pred
-
-        # Calculate the metrics for the step.
-        step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
-
-        return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
+        else:
+            # Calculate the metrics for the step.
+            metrics = getattr(self, f"{mode}_metrics")(pred, target)
+            # Log the loss and metrics for monitoring purposes only.
+            self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
+            self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
+            # Return the loss, metrics, input, target, and pred.
+            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
     def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]) -> torch.Tensor:
         """_summary_
@@ -259,7 +278,7 @@ class LighterSystem(pl.LightningModule):
         if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
             return self.criterion(*pred, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
-        elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
+        elif isinstance(pred, dict) and all(hasarg(self.criterion, name) for name in pred):
             return self.criterion(**pred, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:

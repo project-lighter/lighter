@@ -95,7 +95,8 @@ class LighterLogger(Callback):
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if not trainer.is_global_zero:
             return
-        self.tensorboard.close()
+        if self.tensorboard:
+            self.tensorboard.close()
 
     def _log(self, outputs: dict, mode: str, global_step: int, is_epoch=False) -> None:
         """Logs the outputs to TensorBoard and Weights & Biases (if enabled).
@@ -123,6 +124,7 @@ class LighterLogger(Callback):
 
         # Epoch does not log input, target, and pred.
         if is_epoch:
+            self._log_scalar("epoch", outputs["epoch"], global_step)
             return
 
         # Input, Target, Pred
@@ -247,7 +249,7 @@ class LighterLogger(Callback):
         """
         if not trainer.sanity_checking:
             mode = get_lighter_mode(trainer.state.stage)
-            outputs = {"loss": None, "metrics": None}
+            outputs = {"loss": None, "metrics": None, "epoch": trainer.current_epoch}
 
             # Loss
             if mode in ["train", "val"]:
