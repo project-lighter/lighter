@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
-from torch.nn import Module
 from loguru import logger
+from torch.nn import Module
 
 from lighter.utils.misc import ensure_list
 

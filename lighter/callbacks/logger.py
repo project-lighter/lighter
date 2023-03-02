@@ -10,7 +10,7 @@ from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import is_data_type_supported, get_lighter_mode, parse_data, preprocess_image
+from lighter.callbacks.utils import get_lighter_mode, is_data_type_supported, parse_data, preprocess_image
 
 OPTIONAL_IMPORTS = {}
 

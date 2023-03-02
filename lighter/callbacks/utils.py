@@ -71,7 +71,7 @@ def is_data_type_supported(data: Any) -> bool:
 
     Args:
         data (Any): input data to check
-    
+
     Returns:
         bool: True if the data type is supported, False otherwise.
     """
