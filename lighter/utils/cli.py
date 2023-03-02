@@ -31,6 +31,7 @@ def interface():
     fire.Fire(commands)
 
 
+@logger.catch(onerror=lambda _: sys.exit(1))
 def run_trainer_method(method_name, method_config: Dict, **kwargs: Any):
     """Call monai.bundle.run() on a Trainer method. If a project path
     is defined in the config file(s), import it.
@@ -54,8 +55,7 @@ def run_trainer_method(method_name, method_config: Dict, **kwargs: Any):
                     continue
                 # Only one config file can specify the project path
                 if project_imported:
-                    logger.error("`project` must be specified in one config only. Exiting.")
-                    sys.exit()
+                    raise ValueError("`project` must be specified in one config only. Exiting.")
                 # Import it as a module named 'project'.
                 import_module_from_path("project", config["project"])
                 project_imported = True

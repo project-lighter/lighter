@@ -16,10 +16,7 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     """
     # Based on https://stackoverflow.com/a/41595552.
     module_path = Path(module_path).resolve() / "__init__.py"
-    print(module_path)
-    if not module_path.is_file():
-        logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
-        sys.exit()
+    assert module_path.is_file(), f"No `__init__.py` in `{module_path}`. Exiting."
     spec = importlib.util.spec_from_file_location(module_name, str(module_path))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -77,9 +77,7 @@ class LighterBaseWriter(ABC, Callback):
         if stage != "predict":
             return
 
-        if self.write_interval not in ["step", "epoch"]:
-            logger.error("`write_interval` must be either 'step' or 'epoch'.")
-            sys.exit()
+        assert self.write_interval in ["step", "epoch"], "`write_interval` must be either 'step' or 'epoch'."
 
         # Broadcast the `write_dir` so that all ranks write their predictions there.
         self.write_dir = trainer.strategy.broadcast(self.write_dir)
@@ -87,12 +85,10 @@ class LighterBaseWriter(ABC, Callback):
         if trainer.is_global_zero:
             self.write_dir.mkdir(parents=True)
         # If `write_dir` does not exist, the ranks are not on the same storage.
-        if not self.write_dir.exists():
-            logger.error(
-                f"Rank {trainer.global_rank} is not on the same storage as rank 0."
-                "Please run the prediction only on nodes that are on the same storage."
-            )
-            sys.exit()
+        assert self.write_dir.exists(), (
+            f"Rank {trainer.global_rank} is not on the same storage as rank 0."
+            "Please run the prediction only on nodes that are on the same storage."
+        )
 
     def on_predict_batch_end(
         self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
@@ -134,7 +130,8 @@ class LighterBaseWriter(ABC, Callback):
         # Otherwise, `write_as` needs to match the structure of the outputs in order to assign each tensor its type.
         else:
             parsed_write_as = parse_data(write_as)
-            if not set(parsed_write_as) == set(parsed_outputs):
-                logger.error("`write_as` structure does not match the prediction's structure.")
-                sys.exit()
+            assert set(parsed_write_as) == set(
+                parsed_outputs
+            ), "`write_as` structure does not match the prediction's structure."
+
         return parsed_write_as

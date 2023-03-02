@@ -6,6 +6,8 @@ import torch
 import torchvision
 from loguru import logger
 
+from lighter.utils.misc import NotSupportedError
+
 
 def get_lighter_mode(lightning_stage: str) -> str:
     """Converts the name of a PyTorch Lightnig stage to the name of its corresponding Lighter mode.
@@ -83,11 +85,11 @@ def check_supported_data_type(data: Any, name: str) -> None:
         is_valid = False
 
     if not is_valid:
-        logger.error(
-            f"`{name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
-            f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(data)}` is not supported."
+        raise NotSupportedError(
+            f"`{name}` has to be a Tensor, List[Tensor], Tuple[Tensor], "
+            f"Dict[str, Tensor], Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. "
+            f"`{type(data)}` is not supported."
         )
-        sys.exit()
 
     return is_valid
 
@@ -123,8 +125,8 @@ def structure_preserving_concatenate(
     elif isinstance(inputs[0], torch.Tensor):
         result = torch.cat(inputs)
     else:
-        logger.error(f"Type `{type(inputs[0])}` not supported.")
-        sys.exit()
+        raise NotSupportedError(f"Type `{type(inputs[0])}` not supported.")
+
     return result
 
 

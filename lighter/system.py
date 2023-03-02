@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import countargs, ensure_list, get_name, hasarg
+from lighter.utils.misc import NotSupportedError, countargs, ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -175,8 +175,7 @@ class LighterSystem(pl.LightningModule):
 
         # Type not supported.
         if not isinstance(input, (torch.Tensor, tuple, list, dict)):
-            logger.error(f"Input type '{type(input)}' not supported.")
-            sys.exit()
+            raise NotSupportedError(f"Input type '{type(input)}' not supported.")
 
         # Freeze the layers if specified so.
         if self.freezer is not None:
@@ -259,7 +258,7 @@ class LighterSystem(pl.LightningModule):
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
-                logger.info(
+                logger.warning(
                     f"The criterion `{get_name(self.criterion, True)}` "
                     "has no `target` argument. In such cases, the LighterSystem "
                     "passes only the predicted values to the criterion. "
@@ -271,8 +270,7 @@ class LighterSystem(pl.LightningModule):
 
         # Type not supported.
         if not isinstance(pred, (torch.Tensor, tuple, list, dict)):
-            logger.error(f"Pred type '{type(pred)}' not supported.")
-            sys.exit()
+            raise NotSupportedError(f"Pred type '{type(pred)}' not supported.")
 
         # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
         if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
@@ -302,8 +300,7 @@ class LighterSystem(pl.LightningModule):
         collate_fn = getattr(self, f"{mode}_collate")
 
         if dataset is None:
-            logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
-            sys.exit()
+            raise ValueError(f"Please specify '{mode}_dataset' in the config. Exiting")
 
         # Batch size is 1 when using an inference for two reasons:
         # 1) Inferer separates an input into multiple parts, forming a batch of its own.
@@ -334,16 +331,12 @@ class LighterSystem(pl.LightningModule):
             Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
                 optimizers and/or schedulers.
         """
-        if not self.optimizers:
-            logger.error("Please specify 'system.optimizers' in the config. Exiting.")
-            sys.exit()
+        assert self.optimizers, "Please specify 'system.optimizers' in the config."
+
         if not self.schedulers:
             return self.optimizers
 
-        if len(self.optimizers) != len(self.schedulers):
-            logger.error("Each optimizer must have its own scheduler.")
-            sys.exit()
-
+        assert len(self.optimizers) == len(self.schedulers), "Each optimizer must have its own scheduler."
         return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizers, self.schedulers)]
 
     def setup(self, stage: str) -> None:

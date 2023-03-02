@@ -9,6 +9,7 @@ from pytorch_lightning import Trainer
 
 from lighter import LighterSystem
 from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter.utils.misc import NotSupportedError
 
 
 class LighterTableWriter(LighterBaseWriter):
@@ -27,8 +28,7 @@ class LighterTableWriter(LighterBaseWriter):
         elif write_as == "scalar":
             raise NotImplementedError
         else:
-            logger.error(f"`write_as` '{write_as}' not supported.")
-            sys.exit()
+            raise NotSupportedError(f"`write_as` '{write_as}' not supported.")
 
         if idx not in self.csv_records:
             self.csv_records[idx] = {column: record}

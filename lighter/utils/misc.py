@@ -33,9 +33,7 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any):
         value (Any): value to set the attribute to.
     """
     if "." not in attr:
-        if not hasattr(obj, attr):
-            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`. Exiting.")
-            sys.exit()
+        assert hasattr(obj, attr), f"`{get_name(obj, True)}` has no attribute `{attr}`."
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
     else:
@@ -86,3 +84,19 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
         module = type(_callable).__module__ if isinstance(_callable, object) else _callable.__module__
         name = f"{module}.{name}"
     return name
+
+
+class NotSupportedError(Exception):
+    """
+    Exception raised when a feature is not supported.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(message):
+        message = (
+            f"{message} \n"
+            "Please open an issue on https://github.com/project-lighter/lighter if you think this features is important."
+        )
+        super().__init__(message)

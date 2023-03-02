@@ -6,6 +6,7 @@ from loguru import logger
 
 from lighter.callbacks.utils import preprocess_image
 from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter.utils.misc import NotSupportedError
 
 
 class LighterFileWriter(LighterBaseWriter):
@@ -30,5 +31,4 @@ class LighterFileWriter(LighterBaseWriter):
         elif write_as == "audio":
             raise NotImplementedError
         else:
-            logger.error(f"`write_as` '{write_as}' not supported.")
-            sys.exit()
+            raise NotSupportedError(f"`write_as` '{write_as}' not supported.")

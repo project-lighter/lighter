@@ -12,6 +12,7 @@ from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
 from lighter.callbacks.utils import check_supported_data_type, get_lighter_mode, parse_data, preprocess_image
+from lighter.utils.misc import NotSupportedError
 
 OPTIONAL_IMPORTS = {}
 
@@ -58,8 +59,7 @@ class LighterLogger(Callback):
             stage (str): stage of the training process. Passed automatically by PyTorch Lightning.
         """
         if trainer.logger is not None:
-            logger.error("When using LighterLogger, set Trainer(logger=None).")
-            sys.exit()
+            raise ValueError("When using LighterLogger, set Trainer(logger=None).")
 
         if not trainer.is_global_zero:
             return
@@ -70,7 +70,7 @@ class LighterLogger(Callback):
         # config = yaml.safe_load(open(self.log_dir / "config.yaml"))
 
         # Loguru log file.
-        # logger.add(sink=self.log_dir / f"{stage}.log")
+        logger.add(sink=self.log_dir / f"{stage}.log", backtrace=False)
 
         # Tensorboard initialization.
         if self.tensorboard:
@@ -85,8 +85,8 @@ class LighterLogger(Callback):
         if self.wandb:
             OPTIONAL_IMPORTS["wandb"], wandb_available = optional_import("wandb")
             if not wandb_available:
-                logger.error("Weights & Biases not installed. To install it, run `pip install wandb`. Exiting.")
-                sys.exit()
+                raise ModuleNotFoundError("Weights & Biases not installed. To install it, run `pip install wandb`. Exiting.")
+
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
             self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir)
@@ -165,8 +165,7 @@ class LighterLogger(Callback):
                 item_name = tag if identifier is None else f"{tag}_{identifier}"
                 self._log_histogram(item_name, tensor, global_step)
         else:
-            logger.error(f"`{data_name}_type` does not support `{data_type}`.")
-            sys.exit()
+            raise NotSupportedError(f"`{data_name}_type` does not support `{data_type}`.")
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
         """Logs the scalar to TensorBoard and Weights & Biases (if enabled).
@@ -177,9 +176,10 @@ class LighterLogger(Callback):
             global_step (int): current global step.
         """
         if not isinstance(scalar, (int, float, torch.Tensor)):
-            raise NotImplementedError("LighterLogger currently supports only single scalars.")
+            raise NotSupportedError("LighterLogger currently supports only single scalars.")
+
         if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
-            raise NotImplementedError("LighterLogger currently supports only single scalars.")
+            raise NotSupportedError("LighterLogger currently supports only single scalars.")
 
         if isinstance(scalar, torch.Tensor):
             scalar = scalar.item()
