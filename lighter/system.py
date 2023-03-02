@@ -39,12 +39,11 @@ class LighterSystem(pl.LightningModule):
             (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
             However, to calculate the metrics and log the data, it may be necessary to activate
             the predictions. Defaults to None.
-        inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
-            method that accepts two arguments - the input to infer over, and the model itself.
-            Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
-            is a sliding window or a patch-based inferer that will infer over the smaller parts of
-            the input, combine them, and return a single output. The inferers provided by MONAI
-            cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
+        patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
+            either a class with a `__call__` method or function that accepts two arguments -
+            first one is the input tensor, and the other one the model itself. It should
+            perform the inference over the patches and return the aggregated/averaged output.
+            Defaults to None.
         train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
             They have to be implemented using `torchmetrics`. Defaults to None.
         val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
@@ -63,10 +62,6 @@ class LighterSystem(pl.LightningModule):
         val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
         test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
         predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
-        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
-        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
-        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
-        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(

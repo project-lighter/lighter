@@ -61,7 +61,7 @@ class LighterLogger(Callback):
             logger.error("When using LighterLogger, set Trainer(logger=None).")
             sys.exit()
 
-        if dist.is_initialized() and dist.get_rank() != 0:
+        if not trainer.is_global_zero:
             return
 
         self.log_dir.mkdir(parents=True)
@@ -93,7 +93,7 @@ class LighterLogger(Callback):
             # self.wandb.config.update(config)
 
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
-        if dist.is_initialized() and dist.get_rank() != 0:
+        if not trainer.is_global_zero:
             return
         self.tensorboard.close()
 
@@ -108,9 +108,6 @@ class LighterLogger(Callback):
             is_epoch (bool): whether the log is being done at the end
                 of an epoch or astep. Default is False.
         """
-        if dist.is_initialized() and dist.get_rank() != 0:
-            return
-
         step_or_epoch = "epoch" if is_epoch else "step"
 
         # Loss
