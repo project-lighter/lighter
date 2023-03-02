@@ -177,6 +177,7 @@ disable = """
     too-many-arguments,
     not-callable
 """
+generated-members = "torch.*"
 
 [tool.pylint.master]
 fail-under=8

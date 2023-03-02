@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Union
 
 import sys
 from datetime import datetime
@@ -6,7 +6,6 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-import torchvision
 from loguru import logger
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
@@ -20,14 +19,14 @@ OPTIONAL_IMPORTS = {}
 class LighterLogger(Callback):
     def __init__(
         self,
-        project,
-        log_dir,
-        tensorboard=False,
-        wandb=False,
-        input_type=None,
-        target_type=None,
-        pred_type=None,
-        max_samples=None,
+        project: str,
+        log_dir: str,
+        tensorboard: bool = False,
+        wandb: bool = False,
+        input_type: str = None,
+        target_type: str = None,
+        pred_type: str = None,
+        max_samples: int = None,
     ) -> None:
         self.project = project
         # Only used on rank 0, the dir is created in setup().
@@ -183,6 +182,9 @@ class LighterLogger(Callback):
         if isinstance(scalar, torch.Tensor) and scalar.dim() > 0:
             raise NotImplementedError("LighterLogger currently supports only single scalars.")
 
+        if isinstance(scalar, torch.Tensor):
+            scalar = scalar.item()
+
         if self.tensorboard:
             self.tensorboard.add_scalar(name, scalar, global_step=global_step)
         if self.wandb:
@@ -229,9 +231,8 @@ class LighterLogger(Callback):
             # Accumulate the loss.
             if mode in ["train", "val"]:
                 self.loss[mode] += outputs["loss"].item()
-            # Logging frequency.
-            if self.global_step_counter[mode] % trainer.log_every_n_steps == 0:
-                # Log. Done only on rank 0.
+            # Logging frequency. Log only on rank 0.
+            if trainer.is_global_zero and self.global_step_counter[mode] % trainer.log_every_n_steps == 0:
                 self._log(outputs, mode, global_step=self._get_global_step(trainer))
             # Increment the step counters.
             self.global_step_counter[mode] += 1
@@ -241,7 +242,7 @@ class LighterLogger(Callback):
     def _on_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         """Performs logging at the end of an epoch. It calculates the average
         loss and metrics for the epoch and logs them. In distributed mode, it averages
-        the losses and metrics from all processes.
+        the losses and metrics from all ranks.
 
         Args:
             trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
@@ -255,14 +256,8 @@ class LighterLogger(Callback):
             if mode in ["train", "val"]:
                 # Get the accumulated loss.
                 loss = self.loss[mode]
-                # Reduce the loss to rank 0 and average it.
-                if dist.is_initialized():
-                    # Distributed communication works only tensors.
-                    loss = torch.tensor(loss).to(pl_module.device)
-                    # On rank 0, sum the losses from all ranks. Other ranks remain with the same loss as before.
-                    dist.reduce(loss, dst=0)
-                    # On rank 0, average the loss sum by dividing it with the number of processes.
-                    loss = loss.item() / dist.get_world_size() if dist.get_rank() == 0 else loss.item()
+                # Reduce the loss and average it on each rank.
+                loss = trainer.strategy.reduce(loss, reduce_op="mean")
                 # Divide the accumulated loss by the number of steps in the epoch.
                 loss /= self.epoch_step_counter[mode]
                 outputs["loss"] = loss
@@ -276,8 +271,9 @@ class LighterLogger(Callback):
                 # Reset the metrics for the next epoch.
                 metrics.reset()
 
-            # Log. Done only on rank 0.
-            self._log(outputs, mode, is_epoch=True, global_step=self._get_global_step(trainer))
+            # Log. Only on rank 0.
+            if trainer.is_global_zero:
+                self._log(outputs, mode, is_epoch=True, global_step=self._get_global_step(trainer))
 
     def _get_global_step(self, trainer: Trainer) -> int:
         """Return the global step for the current mode. Note that when Trainer
