@@ -20,7 +20,7 @@ trainer:
         - _target_: lighter.callbacks.LighterFileWriter
           write_dir: "$@project + '/predictions' "
           write_as: "tensor"
-          write_on: "step" # "epoch"
+          write_interval: "step" # "epoch"
 
 system:
     _target_: lighter.LighterSystem

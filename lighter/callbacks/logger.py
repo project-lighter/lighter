@@ -130,30 +130,42 @@ class LighterLogger(Callback):
         for data_name in ["input", "target", "pred"]:
             if self.data_types[data_name] is None:
                 continue
+            self._log_by_type(data_name, outputs, mode, step_or_epoch, global_step)
 
-            data_type = self.data_types[data_name]
-            data = outputs[data_name]
-            name = f"{mode}/data/{data_name}_{step_or_epoch}"
+    def _log_by_type(self, data_name: str, outputs: dict, mode: str, step_or_epoch: str, global_step: int) -> None:
+        """Logs the data to TensorBoard and Weights & Biases (if enabled).
+        The data is logged as scalars, images, or histograms, depending on the configuration.
+        """
+        data_type = self.data_types[data_name]
+        data = outputs[data_name]
+        tag = f"{mode}/data/{data_name}/{step_or_epoch}"
 
-            # Scalar
-            if data_type == "scalar":
-                self._log_scalar(name, data, global_step)
+        # Scalar
+        if data_type == "scalar":
+            self._log_scalar(tag, data, global_step)
 
-            # Image
-            elif data_type == "image":
-                # Check if the data type is valid.
-                check_supported_data_type(data, data_name)
-                for identifier, image in parse_data(data).items():
-                    name = name if identifier is None else f"{name}_{identifier}"
-                    # Slice to `max_samples` only if it less than the batch size.
-                    if self.max_samples is not None and self.max_samples < image.shape[0]:
-                        image = image[: self.max_samples]
-                    # Preprocess a batch of images into a single, loggable, image.
-                    image = preprocess_image(image)
-                    self._log_image(name, image, global_step)
-            else:
-                logger.error(f"`{data_name}_type` does not support `{data_type}`.")
-                sys.exit()
+        # Image
+        elif data_type == "image":
+            # Check if the data type is valid.
+            check_supported_data_type(data, data_name)
+            for identifier, image in parse_data(data).items():
+                item_name = tag if identifier is None else f"{tag}_{identifier}"
+                # Slice to `max_samples` only if it less than the batch size.
+                if self.max_samples is not None and self.max_samples < image.shape[0]:
+                    image = image[: self.max_samples]
+                # Preprocess a batch of images into a single, loggable, image.
+                image = preprocess_image(image)
+                self._log_image(item_name, image, global_step)
+
+        # Histogram
+        elif data_type == "histogram":
+            check_supported_data_type(data, data_name)
+            for identifier, tensor in parse_data(data).items():
+                item_name = tag if identifier is None else f"{tag}_{identifier}"
+                self._log_histogram(item_name, tensor, global_step)
+        else:
+            logger.error(f"`{data_name}_type` does not support `{data_type}`.")
+            sys.exit()
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
         """Logs the scalar to TensorBoard and Weights & Biases (if enabled).
@@ -188,6 +200,21 @@ class LighterLogger(Callback):
             self.tensorboard.add_image(name, image, global_step=global_step)
         if self.wandb:
             self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Image(image)}, step=global_step)
+
+    def _log_histogram(self, name: str, tensor: torch.Tensor, global_step: int) -> None:
+        """Logs the histogram to TensorBoard and Weights & Biases (if enabled).
+
+        Args:
+            name (str): name of the image to be logged.
+            tensor (torch.Tensor): tensor to be logged.
+            global_step (int): current global step.
+        """
+        tensor = tensor.detach().cpu()
+
+        if self.tensorboard:
+            self.tensorboard.add_histogram(name, tensor, global_step=global_step)
+        if self.wandb:
+            self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Histogram(tensor)}, step=global_step)
 
     def _on_batch_end(self, outputs: Dict, trainer: Trainer) -> None:
         """Performs logging at the end of a batch/step. It logs the loss and metrics,
