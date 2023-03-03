@@ -2,7 +2,7 @@ from typing import Dict
 
 import torch
 from loguru import logger
-from torch.nn import Identity, Module
+from torch.nn import Identity, Module, Sequential
 
 from lighter.utils.misc import setattr_dot_notation
 
@@ -54,6 +54,20 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
         Module: PyTorch model with Identity layer at the specified location.
     """
     return replace_layer_with(model, layer_name, Identity())
+
+
+def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequential:
+    """Remove a number of last layers of a network and return it as an nn.Sequential model.
+    Useful when a network is used as a backbone of an SSL model.
+
+    Args:
+        model (Module): PyTorch model object.
+        num_layers (int, optional): Number of last layers to be removed. Defaults to 1.
+
+    Returns:
+        Sequential: PyTorch Sequential model with the last layer removed.
+    """
+    return Sequential(*list(model.children())[:-num_layers])
 
 
 def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_model_prefix: Dict[str, str] = None) -> Module:

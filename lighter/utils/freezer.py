@@ -1,6 +1,7 @@
 from typing import List, Optional, Union
 
 from loguru import logger
+from torch.nn import Module
 
 from lighter.utils.misc import ensure_list
 
@@ -29,7 +30,7 @@ class LighterFreezer:
         name_starts_with: Optional[Union[str, List[str]]] = None,
         until_step: int = None,
         until_epoch: int = None,
-    ):
+    ) -> None:
         if names is None and name_starts_with is None:
             raise ValueError("At least one of `names` or `name_starts_with` must be specified.")
 
@@ -43,17 +44,16 @@ class LighterFreezer:
 
         self._frozen_layers_reported = False
 
-    def __call__(self, model, current_step, current_epoch):
+    def __call__(self, model: Module, current_step: int, current_epoch: int) -> None:
         """
         Freezes the parameters of the model.
 
         Args:
-            model: The PyTorch model whose parameters need to be frozen.
+            model (Module): The PyTorch model whose parameters need to be frozen.
             current_step (int): The current step.
             current_epoch (int): The current epoch.
 
         """
-        # If both `until_step` and `until_epoch` are specified, raise an error.
         if self.until_step is not None and current_step > self.until_step:
             return
         if self.until_epoch is not None and current_epoch > self.until_epoch:

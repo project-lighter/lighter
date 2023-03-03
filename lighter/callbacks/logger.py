@@ -11,7 +11,7 @@ from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import check_supported_data_type, get_lighter_mode, parse_data, preprocess_image
+from lighter.callbacks.utils import get_lighter_mode, is_data_type_supported, parse_data, preprocess_image
 from lighter.utils.misc import NotSupportedError
 
 OPTIONAL_IMPORTS = {}
@@ -33,7 +33,7 @@ class LighterLogger(Callback):
         # Only used on rank 0, the dir is created in setup().
         self.log_dir = Path(log_dir) / project / datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.data_types = {"input": input_type, "target": target_type, "pred": pred_type}
+        self.log_types = {"input": input_type, "target": target_type, "pred": pred_type}
         # Max number of samples from the batch to log.
         self.max_samples = max_samples
 
@@ -99,11 +99,10 @@ class LighterLogger(Callback):
             self.tensorboard.close()
 
     def _log(self, outputs: dict, mode: str, global_step: int, is_epoch=False) -> None:
-        """Logs the outputs to TensorBoard and Weights & Biases (if enabled).
-        The outputs are logged as scalars and images, depending on the configuration.
+        """Log all the outputs.
 
         Args:
-            outputs (dict): model outputs.
+            outputs (dict): model outputs. Can include loss, metrics, input, target, and/or pred.
             mode (str): current mode (train/val/test).
             global_step (int): current global step.
             is_epoch (bool): whether the log is being done at the end
@@ -111,64 +110,65 @@ class LighterLogger(Callback):
         """
         step_or_epoch = "epoch" if is_epoch else "step"
 
-        # Loss
+        # Log loss.
         if outputs["loss"] is not None:
             name = f"{mode}/loss/{step_or_epoch}"
             self._log_scalar(name, outputs["loss"], global_step)
 
-        # Metrics
+        # Log metrics.
         if outputs["metrics"] is not None:
             for name, metric in outputs["metrics"].items():
                 name = f"{mode}/metrics/{name}_{step_or_epoch}"
                 self._log_scalar(name, metric, global_step)
 
-        # Epoch does not log input, target, and pred.
+        # If this is an epoch log, we're done here, input, target, and pred tensors aren't logged.
         if is_epoch:
             self._log_scalar("epoch", outputs["epoch"], global_step)
             return
 
-        # Input, Target, Pred
+        # Log input, target, and pred tensors
         for data_name in ["input", "target", "pred"]:
-            if self.data_types[data_name] is None:
+            if self.log_types[data_name] is None:
                 continue
-            self._log_by_type(data_name, outputs, mode, step_or_epoch, global_step)
 
-    def _log_by_type(self, data_name: str, outputs: dict, mode: str, step_or_epoch: str, global_step: int) -> None:
-        """Logs the data to TensorBoard and Weights & Biases (if enabled).
-        The data is logged as scalars, images, or histograms, depending on the configuration.
-        """
-        data_type = self.data_types[data_name]
-        data = outputs[data_name]
-        tag = f"{mode}/data/{data_name}/{step_or_epoch}"
+            name = f"{mode}/data/{data_name}/{step_or_epoch}"
+            data = outputs[data_name]
+            log_type = self.log_types[data_name]
 
-        # Scalar
-        if data_type == "scalar":
-            self._log_scalar(tag, data, global_step)
+            # Ensure data is of a valid type
+            if not is_data_type_supported(data):
+                raise ValueError(
+                    f"`{data_name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
+                    f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(data)}` is not supported."
+                )
 
-        # Image
-        elif data_type == "image":
-            # Check if the data type is valid.
-            check_supported_data_type(data, data_name)
-            for identifier, image in parse_data(data).items():
-                item_name = tag if identifier is None else f"{tag}_{identifier}"
-                # Slice to `max_samples` only if it less than the batch size.
-                if self.max_samples is not None and self.max_samples < image.shape[0]:
-                    image = image[: self.max_samples]
-                # Preprocess a batch of images into a single, loggable, image.
-                image = preprocess_image(image)
-                self._log_image(item_name, image, global_step)
+            # Process and log data.
+            for identifier, item in parse_data(data).items():
+                item_name = name if identifier is None else f"{name}_{identifier}"
 
-        # Histogram
-        elif data_type == "histogram":
-            check_supported_data_type(data, data_name)
-            for identifier, tensor in parse_data(data).items():
-                item_name = tag if identifier is None else f"{tag}_{identifier}"
-                self._log_histogram(item_name, tensor, global_step)
-        else:
-            raise NotSupportedError(f"`{data_name}_type` does not support `{data_type}`.")
+                # Log scalar
+                if log_type == "scalar":
+                    self._log_scalar(item_name, item, global_step)
+
+                # Log image
+                elif log_type == "image":
+                    # Slice to `max_samples` only if it less than the batch size.
+                    if self.max_samples is not None and self.max_samples < item.shape[0]:
+                        item = item[: self.max_samples]
+                    # Preprocess a batch of images into a single, loggable, image.
+                    item = preprocess_image(item)
+                    self._log_image(item_name, item, global_step)
+
+                # Log histogram
+                elif log_type == "histogram":
+                    self._log_histogram(item_name, item, global_step)
+
+                else:
+                    logger.error(f"`{data_name}_type` does not support `{log_type}`.")
+                    sys.exit()
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
-        """Logs the scalar to TensorBoard and Weights & Biases (if enabled).
+        """Logs the scalar.
 
         Args:
             name (str): name of the image to be logged.
@@ -190,7 +190,7 @@ class LighterLogger(Callback):
             self.wandb.log({name: scalar}, step=global_step)
 
     def _log_image(self, name: str, image: torch.Tensor, global_step: int) -> None:
-        """Logs the image to TensorBoard and Weights & Biases (if enabled).
+        """Logs the image.
 
         Args:
             name (str): name of the image to be logged.
@@ -203,7 +203,7 @@ class LighterLogger(Callback):
             self.wandb.log({name: OPTIONAL_IMPORTS["wandb"].Image(image)}, step=global_step)
 
     def _log_histogram(self, name: str, tensor: torch.Tensor, global_step: int) -> None:
-        """Logs the histogram to TensorBoard and Weights & Biases (if enabled).
+        """Logs the histogram.
 
         Args:
             name (str): name of the image to be logged.
