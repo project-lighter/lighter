@@ -34,8 +34,7 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any):
     """
     if "." not in attr:
         if not hasattr(obj, attr):
-            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`. Exiting.")
-            sys.exit()
+            raise AttributeError(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
     else:
@@ -60,6 +59,7 @@ def hasarg(_callable: Callable, arg_name: str) -> bool:
 
 def countargs(_callable: Callable) -> bool:
     """Count the number of arguments that a function, class, or method accepts.
+    Will not count the `self` argument.
 
     Args:
         callable (Callable): function, class, or method to inspect.
@@ -67,7 +67,7 @@ def countargs(_callable: Callable) -> bool:
     Returns:
         int: number of arguments that it accepts.
     """
-    return len(inspect.signature(_callable).parameters.keys())
+    return len([arg for arg in inspect.signature(_callable).parameters.keys() if arg != "self"])
 
 
 def get_name(_callable: Callable, include_module_name: bool = False) -> str:
@@ -81,8 +81,12 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     Returns:
         str: name
     """
-    name = type(_callable).__name__ if isinstance(_callable, object) else _callable.__name__
-    if include_module_name:
-        module = type(_callable).__module__ if isinstance(_callable, object) else _callable.__module__
-        name = f"{module}.{name}"
+    if isinstance(_callable, object) and type(_callable).__module__ != "builtins":
+        name = _callable.__class__.__name__
+        if include_module_name:
+            name = f"{_callable.__class__.__module__}.{name}"
+    else:
+        name = _callable.__name__
+        if include_module_name:
+            name = f"{_callable.__module__}.{name}"
     return name
