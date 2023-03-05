@@ -48,19 +48,19 @@ def parse_data(
     if isinstance(data, dict):
         for key, value in data.items():
             if isinstance(value, (list, tuple)):
-                for idx, singular in enumerate(value):
-                    result[key] = f"{key}_{idx}", singular if len(value > 1) else key, singular
+                for idx, element in enumerate(value):
+                    result[f"{key}_{idx}" if len(value) > 1 else key] = element
             else:
                 result[key] = value
     elif isinstance(data, (list, tuple)):
-        for idx, singular in enumerate(data):
-            result[str(idx)] = singular
+        for idx, element in enumerate(data):
+            result[str(idx)] = element
     else:
         result[None] = data
     return result
 
 
-def check_supported_data_type(data: Any, name: str) -> None:
+def is_data_type_supported(data: Any) -> bool:
     """Check the input data for its type. Valid data types are:
         - torch.Tensor
         - List[torch.Tensor]
@@ -71,23 +71,19 @@ def check_supported_data_type(data: Any, name: str) -> None:
 
     Args:
         data (Any): input data to check
-        name (str): name of the data, for identification purposes.
+
+    Returns:
+        bool: True if the data type is supported, False otherwise.
     """
     if isinstance(data, dict):
-        is_valid = all(check_supported_data_type(elem, name) for elem in data.values())
+        is_valid = all(is_data_type_supported(elem) for elem in data.values())
     elif isinstance(data, (list, tuple)):
-        is_valid = all(check_supported_data_type(elem, name) for elem in data)
+        is_valid = all(is_data_type_supported(elem) for elem in data)
     elif isinstance(data, torch.Tensor):
         is_valid = True
     else:
         is_valid = False
-
-    if not is_valid:
-        logger.error(
-            f"`{name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
-            f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(data)}` is not supported."
-        )
-        sys.exit()
+    return is_valid
 
 
 def structure_preserving_concatenate(

@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Any, Callable, List
 
 import random
 
@@ -7,15 +7,13 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 
 
-def collate_fn_replace_corrupted(
-    batch: torch.Tensor, dataset: DataLoader, default_collate_fn: Callable = None
-) -> torch.Tensor:
+def collate_fn_replace_corrupted(batch: List[Any], dataset: DataLoader, default_collate_fn: Callable = None) -> torch.Tensor:
     """Collate function that allows to replace corrupted examples in the batch.
     The dataloader should return `None` when that occurs.
     The `None`s in the batch are replaced with other, randomly-selected, examples.
 
     Args:
-        batch (torch.Tensor): batch from the DataLoader.
+        batch (List[Any]): batch from the DataLoader.
         dataset (Dataset): dataset that the DataLoader is passing through. Needs to be fixed
             in place with functools.partial before passing it to DataLoader's 'collate_fn' option
             as 'collate_fn' should only have a single argument - batch. Example:
