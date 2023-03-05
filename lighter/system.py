@@ -154,6 +154,7 @@ class LighterSystem(pl.LightningModule):
         # Checks
         self._lightning_module_methods_defined = False
         self._target_not_used_reported = False
+        self._batch_type_reported = False
 
     def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
         """Forward pass. Multi-input models are supported.
@@ -208,7 +209,21 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
-        input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
+        # Split the batch into input and target.
+        if len(batch) == 1:
+            input, target = batch, None
+            batch_split_type = "No target found in the batch. Using `None` as target. Ignore if this is intended."
+        elif len(batch) == 2:
+            input, target = batch
+            batch_split_type = "Found 2 items in the batch. Using the first item as input and the second item as target."
+        else:
+            input, target = batch[:-1], batch[-1]
+            batch_split_type = "Found more than 2 items in the batch. Using the last item as target."
+
+        # Report the batch split type. Only on the first call.
+        if not self._batch_type_reported:
+            self._batch_type_reported = True
+            logger.info(batch_split_type)
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
