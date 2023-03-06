@@ -21,7 +21,7 @@ trainer:
 
         - _target_: lighter.callbacks.LighterFileWriter
           write_dir: "$@project + '/predictions' "
-          write_as: "tensor"
+          write_format: "tensor"
           write_interval: "step" # "epoch"
 
 system:

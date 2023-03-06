@@ -11,8 +11,7 @@ from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
 from lighter.callbacks.utils import get_lighter_mode, is_data_type_supported, parse_data, preprocess_image
-
-OPTIONAL_IMPORTS = {}
+from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
 
 
 class LighterLogger(Callback):
