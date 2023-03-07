@@ -96,74 +96,37 @@ class LighterLogger(Callback):
         if self.tensorboard:
             self.tensorboard.close()
 
-    def _log(self, outputs: dict, mode: str, global_step: int, is_epoch=False) -> None:
-        """Log all the outputs.
+    def _log_by_type(self, name: str, data: Any, log_type: str, global_step: int) -> None:
+        """Logs data according to the specified type.
 
         Args:
-            outputs (dict): model outputs. Can include loss, metrics, input, target, and/or pred.
-            mode (str): current mode (train/val/test).
+            name (str): name of the data being logged.
+            data (Any): data to be logged.
+            log_type (str): type of the data. Supported types are 'scalar', 'image', and 'histogram'.
             global_step (int): current global step.
-            is_epoch (bool): whether the log is being done at the end
-                of an epoch or astep. Default is False.
+
+        Raises:
+            TypeError: if the specified `log_type` is not supported.
         """
-        step_or_epoch = "epoch" if is_epoch else "step"
+        # Log scalar
+        if log_type == "scalar":
+            self._log_scalar(name, data, global_step)
 
-        # Log loss.
-        if outputs["loss"] is not None:
-            name = f"{mode}/loss/{step_or_epoch}"
-            self._log_scalar(name, outputs["loss"], global_step)
+        # Log image
+        elif log_type == "image":
+            # Slice to `max_samples` only if it less than the batch size.
+            if self.max_samples is not None and self.max_samples < data.shape[0]:
+                data = data[: self.max_samples]
+            # Preprocess a batch of images into a single, loggable, image.
+            data = preprocess_image(data)
+            self._log_image(name, data, global_step)
 
-        # Log metrics.
-        if outputs["metrics"] is not None:
-            for name, metric in outputs["metrics"].items():
-                name = f"{mode}/metrics/{name}_{step_or_epoch}"
-                self._log_scalar(name, metric, global_step)
+        # Log histogram
+        elif log_type == "histogram":
+            self._log_histogram(name, data, global_step)
 
-        # If this is an epoch log, we're done here, input, target, and pred tensors aren't logged.
-        if is_epoch:
-            self._log_scalar("epoch", outputs["epoch"], global_step)
-            return
-
-        # Log input, target, and pred tensors
-        for data_name in ["input", "target", "pred"]:
-            if self.log_types[data_name] is None:
-                continue
-
-            name = f"{mode}/data/{data_name}/{step_or_epoch}"
-            data = outputs[data_name]
-            log_type = self.log_types[data_name]
-
-            # Ensure data is of a valid type
-            if not is_data_type_supported(data):
-                raise ValueError(
-                    f"`{data_name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
-                    f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(data)}` is not supported."
-                )
-
-            # Process and log data.
-            for identifier, item in parse_data(data).items():
-                item_name = name if identifier is None else f"{name}_{identifier}"
-
-                # Log scalar
-                if log_type == "scalar":
-                    self._log_scalar(item_name, item, global_step)
-
-                # Log image
-                elif log_type == "image":
-                    # Slice to `max_samples` only if it less than the batch size.
-                    if self.max_samples is not None and self.max_samples < item.shape[0]:
-                        item = item[: self.max_samples]
-                    # Preprocess a batch of images into a single, loggable, image.
-                    item = preprocess_image(item)
-                    self._log_image(item_name, item, global_step)
-
-                # Log histogram
-                elif log_type == "histogram":
-                    self._log_histogram(item_name, item, global_step)
-
-                else:
-                    logger.error(f"`{data_name}_type` does not support `{log_type}`.")
-                    sys.exit()
+        else:
+            raise TypeError(f"`{log_type}` not supported for logging.")
 
     def _log_scalar(self, name: str, scalar: Union[int, float, torch.Tensor], global_step: int) -> None:
         """Logs the scalar.
@@ -216,7 +179,7 @@ class LighterLogger(Callback):
 
     def _on_batch_end(self, outputs: Dict, trainer: Trainer) -> None:
         """Performs logging at the end of a batch/step. It logs the loss and metrics,
-        and, if specified how, the input, target, and pred data.
+        and, if their logging type is specified, the input, target, and pred data.
 
         Args:
             outputs (Dict): output dict from the model.
@@ -229,16 +192,40 @@ class LighterLogger(Callback):
                 self.loss[mode] += outputs["loss"].item()
             # Logging frequency. Log only on rank 0.
             if trainer.is_global_zero and self.global_step_counter[mode] % trainer.log_every_n_steps == 0:
-                self._log(outputs, mode, global_step=self._get_global_step(trainer))
+                # Get global step.
+                global_step = self._get_global_step(trainer)
+
+                # Log loss.
+                if outputs["loss"] is not None:
+                    self._log_scalar(f"{mode}/loss/step", outputs["loss"], global_step)
+
+                # Log metrics.
+                if outputs["metrics"] is not None:
+                    for name, metric in outputs["metrics"].items():
+                        self._log_scalar(f"{mode}/metrics/{name}/step", metric, global_step)
+
+                # Log input, target, and pred.
+                for name in ["input", "target", "pred"]:
+                    if self.log_types[name] is None:
+                        continue
+                    # Ensure data is of a valid type.
+                    if not is_data_type_supported(outputs[name]):
+                        raise ValueError(
+                            f"`{name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
+                            f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(outputs[name])}` is not supported."
+                        )
+                    for identifier, item in parse_data(outputs[name]).items():
+                        item_name = f"{mode}/data/{name}" if identifier is None else f"{mode}/data/{name}_{identifier}"
+                        self._log_by_type(item_name, item, self.log_types[name], global_step)
+
             # Increment the step counters.
             self.global_step_counter[mode] += 1
             if mode in ["train", "val"]:
                 self.epoch_step_counter[mode] += 1
 
     def _on_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
-        """Performs logging at the end of an epoch. It calculates the average
-        loss and metrics for the epoch and logs them. In distributed mode, it averages
-        the losses and metrics from all ranks.
+        """Performs logging at the end of an epoch. Logs the epoch number, the loss, and the metrics.
+        It averages the loss and metrics over the epoch. In distributed mode, it averages over all ranks.
 
         Args:
             trainer (Trainer): Trainer, passed automatically by PyTorch Lightning.
@@ -246,7 +233,7 @@ class LighterLogger(Callback):
         """
         if not trainer.sanity_checking:
             mode = get_lighter_mode(trainer.state.stage)
-            outputs = {"loss": None, "metrics": None, "epoch": trainer.current_epoch}
+            loss, metrics = None, None
 
             # Loss
             if mode in ["train", "val"]:
@@ -256,20 +243,32 @@ class LighterLogger(Callback):
                 loss = trainer.strategy.reduce(loss, reduce_op="mean")
                 # Divide the accumulated loss by the number of steps in the epoch.
                 loss /= self.epoch_step_counter[mode]
-                outputs["loss"] = loss
 
             # Metrics
             # Get the torchmetrics.
-            metrics = getattr(pl_module, f"{mode}_metrics")
-            if metrics is not None:
+            metric_collection = getattr(pl_module, f"{mode}_metrics")
+            if metric_collection is not None:
                 # Compute the epoch metrics.
-                outputs["metrics"] = metrics.compute()
+                metrics = metric_collection.compute()
                 # Reset the metrics for the next epoch.
-                metrics.reset()
+                metric_collection.reset()
 
             # Log. Only on rank 0.
             if trainer.is_global_zero:
-                self._log(outputs, mode, is_epoch=True, global_step=self._get_global_step(trainer))
+                # Get global step.
+                global_step = self._get_global_step(trainer)
+
+                # Log epoch number.
+                self._log_scalar("epoch", trainer.current_epoch, global_step)
+
+                # Log loss.
+                if loss is not None:
+                    self._log_scalar(f"{mode}/loss/epoch", loss, global_step)
+
+                # Log metrics.
+                if metrics is not None:
+                    for name, metric in metrics.items():
+                        self._log_scalar(f"{mode}/metrics/{name}/epoch", metric, global_step)
 
     def _get_global_step(self, trainer: Trainer) -> int:
         """Return the global step for the current mode. Note that when Trainer
