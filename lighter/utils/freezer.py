@@ -13,8 +13,8 @@ class LighterFreezer:
     If both are specified, the parameters that match any of the two will be frozen.
 
     Args:
-        names (Union[str, List[str]], optional): The names of the parameters to be frozen. Defaults to None.
-        name_starts_with (Union[str, List[str]], optional): The prefixes of the parameter names to be frozen. Defaults to None.
+        names (str, List[str], optional): The names of the parameters to be frozen. Defaults to None.
+        name_starts_with (str, List[str], optional): The prefixes of the parameter names to be frozen. Defaults to None.
         until_step (int, optional): The maximum step to freeze parameters until. Defaults to None.
         until_epoch (int, optional): The maximum epoch to freeze parameters until. Defaults to None.
 

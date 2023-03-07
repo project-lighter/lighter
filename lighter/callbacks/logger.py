@@ -170,7 +170,7 @@ class LighterLogger(Callback):
 
         Args:
             name (str): name of the image to be logged.
-            scalar (Union[int, float, torch.Tensor]): image to be logged.
+            scalar (int, float, torch.Tensor): image to be logged.
             global_step (int): current global step.
         """
         if not isinstance(scalar, (int, float, torch.Tensor)):

@@ -156,14 +156,14 @@ class LighterSystem(pl.LightningModule):
         self._target_not_used_reported = False
         self._batch_type_reported = False
 
-    def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
+    def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
-            input (Union[torch.Tensor, List, Tuple]): input to the model.
+            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): input to the model.
 
         Returns:
-            Union[torch.Tensor, List, Tuple]: output of the model.
+            Any: output of the model.
         """
         # Keyword arguments to pass to the forward method
         kwargs = {}
@@ -193,11 +193,11 @@ class LighterSystem(pl.LightningModule):
         else:
             return self.model(input, **kwargs)
 
-    def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
+    def _base_step(self, batch: Union[List, Tuple], batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ("train", "val", "test", "predict")
 
         Args:
-            batch (Tuple):
+            batch (List, Tuple):
                 output of the DataLoader and input to the model.
             batch_idx (int): index of the batch. Not used, but PyTorch Lightning requires it.
             mode (str): mode in which the system is.
@@ -256,12 +256,14 @@ class LighterSystem(pl.LightningModule):
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
-    def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]) -> torch.Tensor:
+    def _calculate_loss(
+        self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
+    ) -> torch.Tensor:
         """_summary_
 
         Args:
-            pred (Union[torch.Tensor, List, Tuple]): the predicted values from the model.
-            target (Union[torch.Tensor, None]): the target/label.
+            pred (torch.Tensor, List, Tuple, Dict, None): the predicted values from the model.
+            target (torch.Tensor, List, Tuple, Dict, None): the target/label.
 
         Returns:
             torch.Tensor: the calculated loss.

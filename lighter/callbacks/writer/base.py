@@ -11,7 +11,7 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import parse_data, structure_preserving_concatenate
+from lighter.callbacks.utils import gather_tensors, parse_data
 
 
 class LighterBaseWriter(ABC, Callback):
@@ -108,27 +108,30 @@ class LighterBaseWriter(ABC, Callback):
         # Only one epoch when predicting, index the lists of outputs and batch indices accordingly.
         indices = trainer.predict_loop.epoch_batch_indices[0]
         outputs = outputs[0]
-        # Concatenate/flatten so that each output corresponds to its index.
+        # Flatten so that each output sample corresponds to its index.
         indices = list(itertools.chain(*indices))
-        outputs = structure_preserving_concatenate(outputs)
+        # Remove the batch dimension since every output is a single sample.
+        outputs = [output.squeeze(0) for output in outputs]
+        # Gather the output tensors from all samples into a single structure rather than having one structures for each sample.
+        outputs = gather_tensors(outputs)
         self._on_batch_or_epoch_end(outputs, indices)
 
     def _on_batch_or_epoch_end(self, outputs, indices):
-        # Parse the outputs into a structure ready for writing.
-        parsed_outputs = parse_data(outputs)
-        # Runs only on the first step.
-        if self.parsed_write_format is None:
-            # Parse `self.write_format`. If multi-value, check if its structure matches `parsed_output`'s  structure.
-            self.parsed_write_format = self._parse_write_format(self.write_format, parsed_outputs)
-
-        # Iterate through each prediction step.
-        for idx in indices:
-            # Save each output of the prediction step individually.
-            for identifier, tensor in parsed_outputs:
-                # Remove the batch dimension since we are iterating through each sample individually.
-                tensor = tensor.squeeze(0)
+        """Iterate through each output and save it in the specified format. The outputs and indices are automatically
+        split individually by PyTorch Lightning."""
+        # Sanity check. Should never happen. If it does, something is wrong with the Trainer.
+        assert len(indices) == len(outputs)
+        # `idx` is the index of the input sample, `output` is the output of the model for that sample.
+        for idx, output in zip(indices, outputs):
+            # Parse the outputs into a structure ready for writing.
+            parsed_output = parse_data(output)
+            # Parse `self.write_format`. If multi-value, check if its structure matches `parsed_output`'s structure.
+            if self.parsed_write_format is None:
+                self.parsed_write_format = self._parse_write_format(self.write_format, parsed_output)
+            # Iterate through each prediction for the `idx`-th input sample.
+            for identifier, tensor in parsed_output.items():
                 # Save the prediction in the specified format.
-                self.write(idx, identifier, tensor, self.parsed_write_format[identifier])
+                self.write(idx, identifier, tensor.detach().cpu(), self.parsed_write_format[identifier])
 
     def _parse_write_format(self, write_format, parsed_outputs: Dict[str, Any]):
         # If `write_format` is a string (single value), all outputs will be saved in that specified format.
