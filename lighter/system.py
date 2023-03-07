@@ -209,21 +209,8 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
-        # Split the batch into input and target.
-        if len(batch) == 1:
-            input, target = batch, None
-            batch_split_type = "No target found in the batch. Using `None` as target. Ignore if this is intended."
-        elif len(batch) == 2:
-            input, target = batch
-            batch_split_type = "Found 2 items in the batch. Using the first item as input and the second item as target."
-        else:
-            input, target = batch[:-1], batch[-1]
-            batch_split_type = "Found more than 2 items in the batch. Using the last item as target."
-
-        # Report the batch split type. Only on the first call.
-        if not self._batch_type_reported:
-            self._batch_type_reported = True
-            logger.info(batch_split_type)
+        # Split the batch into input and target. Target will be `None` if not provided.
+        input, target = self._split_batch(batch)
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
@@ -407,6 +394,34 @@ class LighterSystem(pl.LightningModule):
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
+
+    def _split_batch(self, batch) -> Tuple[torch.Tensor, Optional[Any]]:
+        """Split the batch into input and target. Target will be `None` if not provided.
+
+        Args:
+            batch (List, Tuple): output of the DataLoader and input to the model.
+
+        Returns:
+            Tuple(torch.Tensor, Optional[Any]): input and target.
+        """
+        # Check if the batch format is correct.
+        if len(batch) > 2:
+            raise ValueError(
+                "Found more than 2 items in the batch. `LighterSystem` requires the dataloader to return either "
+                "input tensor(s) only, or a two-element tuple/list consisting of input tensor(s) and target(s)."
+            )
+
+        # Report the batch split type. Only on the first call.
+        if not self._batch_type_reported:
+            self._batch_type_reported = True
+            if len(batch) == 1:
+                logger.info("Target not provided. Using `None` as target. Ignore if intended.")
+            else:
+                logger.info("Using the first item as input and the second item as target.")
+
+        # Split the batch into input and target. Target will be `None` if not provided.
+        input, target = (batch, None) if len(batch) == 1 else batch
+        return input, target
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
