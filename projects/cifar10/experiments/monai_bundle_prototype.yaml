@@ -9,17 +9,19 @@ trainer:
     log_every_n_steps: 10
     logger: null
     callbacks:
-        # - _target_: lighter.callbacks.LighterLogger
-        #   project: CIFAR10
-        #   log_dir: "$@project + '/logs' "
-        #   tensorboard: True
-        #   wandb: True
-        #   input_type: image
-        #   max_samples: 10
+        - _target_: lighter.callbacks.LighterLogger
+          project: CIFAR10
+          log_dir: "$@project + '/logs' "
+          tensorboard: True
+          wandb: True
+          input_type: image
+          # pred_type: scalar
+          # target_type: scalar
+          max_samples: 10
 
         - _target_: lighter.callbacks.LighterFileWriter
           write_dir: "$@project + '/predictions' "
-          write_as: "tensor"
+          write_format: "tensor"
           write_interval: "step" # "epoch"
 
 system:
