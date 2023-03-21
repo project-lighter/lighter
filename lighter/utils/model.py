@@ -1,5 +1,7 @@
 from typing import Dict
 
+from copy import deepcopy
+
 import torch
 from loguru import logger
 from torch.nn import Identity, Module, Sequential
@@ -76,7 +78,8 @@ def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_mod
     so that they match those of the model's state_dict. This is often needed when a model was trained
     as a backbone of another model, so its state_dict keys won't be the same to those of a standalone
     version of that model. Prior to defining the `ckpt_to_model_prefix`, it is advised to manually check
-    for mismatch between the names and specify them accordingly.
+    for mismatch between the names and specify them accordingly. The input model is not modified, a copy
+    of it is returned with the state_dict loaded.
 
     Args:
         model (Module): The PyTorch model instance to load the state_dict into.
@@ -90,10 +93,11 @@ def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_mod
     Raises:
         ValueError: If there is no overlap between checkpoint's and model's state_dict.
     """
+    # Copy the model to prevent in-place checkpoint loading. Only the returned model has the checkpoint's state_dict loaded.
+    model = deepcopy(model)
 
     # Load checkpoint
     ckpt = torch.load(ckpt_path)
-
     # Check if the checkpoint is a model's state_dict or a Lightning checkpoint.
     # A Lightning checkpoint contains the model’s entire internal state, we only need its state_dict.
     if "state_dict" in ckpt:
@@ -105,12 +109,17 @@ def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_mod
             # Add a dot at the end of the prefix if necessary.
             ckpt_prefix = ckpt_prefix if ckpt_prefix == "" or ckpt_prefix.endswith(".") else f"{ckpt_prefix}."
             model_prefix = model_prefix if model_prefix == "" or model_prefix.endswith(".") else f"{model_prefix}."
-            if ckpt_prefix != "":
-                # Replace ckpt_prefix with model_prefix in the checkpoint state_dict
-                ckpt = {key.replace(ckpt_prefix, model_prefix): value for key, value in ckpt.items() if ckpt_prefix in key}
-            else:
-                # Add the model_prefix before the current key name if there's no specific ckpt_prefix
-                ckpt = {f"{model_prefix}{key}": value for key, value in ckpt.items() if ckpt_prefix in key}
+            # Iterate over the checkpoint's state_dict keys and values (layers).
+            for key, value in list(ckpt.items()):
+                if key.startswith(ckpt_prefix):
+                    # Add model_prefix to the checkpoint state_dict if ckpt_prefix is empty.
+                    if ckpt_prefix == "":
+                        ckpt[f"{model_prefix}{key}"] = value
+                    # Replace ckpt_prefix with model_prefix in the checkpoint state_dict.
+                    else:
+                        ckpt[key.replace(ckpt_prefix, model_prefix)] = value
+                    # Delete the old key
+                    del ckpt[key]
     # Check if there is no overlap between the checkpoint's and model's state_dict.
     if not set(ckpt.keys()) & set(model.state_dict().keys()):
         raise ValueError(

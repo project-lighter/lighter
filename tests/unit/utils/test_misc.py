@@ -7,6 +7,7 @@ from lighter.utils.misc import countargs, ensure_list, get_name, hasarg, setattr
 
 
 def test_ensure_list():
+    """Test the ensure_list function."""
     # Test with list
     assert ensure_list([1, 2, 3]) == [1, 2, 3]
 
@@ -39,6 +40,8 @@ def test_ensure_list():
 
 
 def test_setattr_dot_notation():
+    """Test the setattr_dot_notation function."""
+
     class TestObject:
         def __init__(self):
             self.foo = "bar"
@@ -64,6 +67,8 @@ def test_setattr_dot_notation():
 
 
 def test_hasarg():
+    """Test the hasarg function. Tests with a function, a class and a class method."""
+
     def my_func(arg1, arg2, *, arg3=None):
         pass
 
@@ -96,6 +101,11 @@ def test_hasarg():
 
 
 def test_countargs():
+    """Test the countargs function.
+    Tests with a function, a class and a class method,
+    an object's method,and a lambda function.
+    """
+
     # Test with a function
     def my_function(x, y, z=3):
         pass
@@ -113,6 +123,7 @@ def test_countargs():
     assert countargs(MyClass) == 4
     assert countargs(MyClass.my_method) == 2
 
+    # Test with an object's method
     my_class = MyClass(1, 2, 3, 4)
     assert countargs(my_class.my_method) == 2
 
@@ -122,6 +133,9 @@ def test_countargs():
 
 
 def test_get_name():
+    """Test the get_name function.
+    Tests with a function, a class and an object.
+    """
     # Test with a function
     assert get_name(get_name) == "get_name"
     assert get_name(get_name, include_module_name=True) == "lighter.utils.misc.get_name"
