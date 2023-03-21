@@ -39,11 +39,15 @@ class LighterSystem(pl.LightningModule):
             (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
             However, to calculate the metrics and log the data, it may be necessary to activate
             the predictions. Defaults to None.
-        patch_based_inferer (Optional[Callable], optional): the patch based inferer needs to be
-            either a class with a `__call__` method or function that accepts two arguments -
-            first one is the input tensor, and the other one the model itself. It should
-            perform the inference over the patches and return the aggregated/averaged output.
-            Defaults to None.
+        inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
+            method that accepts two arguments - the input to infer over, and the model itself.
+            Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
+            is a sliding window or a patch-based inferer that will infer over the smaller parts of
+            the input, combine them, and return a single output. The inferers provided by MONAI
+            cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
+        freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
+            method that accepts three arguments - the model, the step, and the epoch number.
+            Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
         train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
             They have to be implemented using `torchmetrics`. Defaults to None.
         val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
@@ -62,6 +66,10 @@ class LighterSystem(pl.LightningModule):
         val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
         test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
         predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
+        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
+        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
+        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
+        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(
@@ -76,7 +84,8 @@ class LighterSystem(pl.LightningModule):
         criterion: Optional[Callable] = None,
         cast_target_dtype_to: Optional[str] = None,
         post_criterion_activation: Optional[str] = None,
-        patch_based_inferer: Optional[Callable] = None,
+        inferer: Optional[Callable] = None,
+        freezer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
         val_metrics: Optional[Union[Metric, List[Metric]]] = None,
         test_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -88,6 +97,10 @@ class LighterSystem(pl.LightningModule):
         val_sampler: Optional[Sampler] = None,
         test_sampler: Optional[Sampler] = None,
         predict_sampler: Optional[Sampler] = None,
+        train_collate: Optional[Callable] = None,
+        val_collate: Optional[Callable] = None,
+        test_collate: Optional[Callable] = None,
+        predict_collate: Optional[Callable] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
@@ -117,6 +130,12 @@ class LighterSystem(pl.LightningModule):
         self.test_sampler = test_sampler
         self.predict_sampler = predict_sampler
 
+        # Collate functions
+        self.train_collate = train_collate
+        self.val_collate = val_collate
+        self.test_collate = test_collate
+        self.predict_collate = predict_collate
+
         # Metrics
         self.train_metrics = MetricCollection(ensure_list(train_metrics))
         self.val_metrics = MetricCollection(ensure_list(val_metrics))
@@ -126,21 +145,25 @@ class LighterSystem(pl.LightningModule):
         self._post_criterion_activation = post_criterion_activation
         self._cast_target_dtype_to = cast_target_dtype_to
 
-        # Patch-based inference
-        self._patch_based_inferer = patch_based_inferer
+        # Inferer for val, test, and predict
+        self.inferer = inferer
+
+        # Layer freezer
+        self.freezer = freezer
 
         # Checks
         self._lightning_module_methods_defined = False
         self._target_not_used_reported = False
+        self._batch_type_reported = False
 
-    def forward(self, input: Union[torch.Tensor, List, Tuple]) -> Union[torch.Tensor, List, Tuple]:
+    def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
-            input (Union[torch.Tensor, List, Tuple]): input to the model.
+            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): input to the model.
 
         Returns:
-            Union[torch.Tensor, List, Tuple]: output of the model.
+            Any: output of the model.
         """
         # Keyword arguments to pass to the forward method
         kwargs = {}
@@ -156,21 +179,25 @@ class LighterSystem(pl.LightningModule):
             logger.error(f"Input type '{type(input)}' not supported.")
             sys.exit()
 
+        # Freeze the layers if specified so.
+        if self.freezer is not None:
+            self.freezer(self.model, self.global_step, self.current_epoch)
+
         # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
         if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
             return self.model(*input, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
-        elif isinstance(input, dict) and all([hasarg(self.model, name) for name in input]):
+        elif isinstance(input, dict) and all(hasarg(self.model, name) for name in input):
             return self.model(**input, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:
             return self.model(input, **kwargs)
 
-    def _base_step(self, batch: Tuple, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
+    def _base_step(self, batch: Union[List, Tuple], batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ("train", "val", "test", "predict")
 
         Args:
-            batch (Tuple):
+            batch (List, Tuple):
                 output of the DataLoader and input to the model.
             batch_idx (int): index of the batch. Not used, but PyTorch Lightning requires it.
             mode (str): mode in which the system is.
@@ -182,11 +209,12 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
-        input, target = batch if len(batch) == 2 else (batch[:-1], batch[-1])
+        # Split the batch into input and target. Target will be `None` if not provided.
+        input, target = self._split_batch(batch)
 
         # Forward
-        if self._patch_based_inferer and mode in ["val", "test", "predict"]:
-            pred = self._patch_based_inferer(input, self)
+        if self.inferer and mode in ["val", "test", "predict"]:
+            pred = self.inferer(input, self)
         else:
             pred = self(input)
 
@@ -203,21 +231,26 @@ class LighterSystem(pl.LightningModule):
         if self._post_criterion_activation is not None:
             pred = self._post_criterion_activation(pred)
 
-        # In predict mode, skip metrics and logging parts and return the predicted value.
         if mode == "predict":
+            # In predict mode, skip the metrics and return the predicted value only.
             return pred
+        else:
+            # Calculate the metrics for the step.
+            metrics = getattr(self, f"{mode}_metrics")(pred, target)
+            # Log the loss and metrics for monitoring purposes only.
+            self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
+            self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
+            # Return the loss, metrics, input, target, and pred.
+            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
-        # Calculate the metrics for the step.
-        step_metrics = getattr(self, f"{mode}_metrics")(pred, target)
-
-        return {"loss": loss, "metrics": step_metrics, "input": input, "target": target, "pred": pred}
-
-    def _calculate_loss(self, pred: Union[torch.Tensor, List, Tuple], target: Union[torch.Tensor, None]) -> torch.Tensor:
+    def _calculate_loss(
+        self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
+    ) -> torch.Tensor:
         """_summary_
 
         Args:
-            pred (Union[torch.Tensor, List, Tuple]): the predicted values from the model.
-            target (Union[torch.Tensor, None]): the target/label.
+            pred (torch.Tensor, List, Tuple, Dict, None): the predicted values from the model.
+            target (torch.Tensor, List, Tuple, Dict, None): the target/label.
 
         Returns:
             torch.Tensor: the calculated loss.
@@ -249,7 +282,7 @@ class LighterSystem(pl.LightningModule):
         if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
             return self.criterion(*pred, **kwargs)
         # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
-        elif isinstance(pred, dict) and all([hasarg(self.criterion, name) for name in pred]):
+        elif isinstance(pred, dict) and all(hasarg(self.criterion, name) for name in pred):
             return self.criterion(**pred, **kwargs)
         # Tensor, Tuple, List, or Dict, as-is, not unpacked.
         else:
@@ -270,24 +303,23 @@ class LighterSystem(pl.LightningModule):
         """
         dataset = getattr(self, f"{mode}_dataset")
         sampler = getattr(self, f"{mode}_sampler")
+        collate_fn = getattr(self, f"{mode}_collate")
 
         if dataset is None:
             logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
             sys.exit()
 
-        # Batch size is 1 when using patch based inference for two reasons:
-        # 1) Patch based inference splits an input into a batch of patches,
-        # so the batch size will actually be defined for it;
-        # 2) In settings where patch based inference is needed, the input data often
-        # varies in shape, preventing the data loader to stack them into a batch.
+        # Batch size is 1 when using an inference for two reasons:
+        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
+        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
         batch_size = self.batch_size
-        if self._patch_based_inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the general batch size to 1 for {mode} " "mode because a patch-based inferer is used.")
+        if self.inferer is not None and mode in ["val", "test", "predict"]:
+            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
             batch_size = 1
 
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset)
+        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
         return DataLoader(
             dataset,
             sampler=sampler,
@@ -362,6 +394,34 @@ class LighterSystem(pl.LightningModule):
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
+
+    def _split_batch(self, batch) -> Tuple[torch.Tensor, Optional[Any]]:
+        """Split the batch into input and target. Target will be `None` if not provided.
+
+        Args:
+            batch (List, Tuple): output of the DataLoader and input to the model.
+
+        Returns:
+            Tuple(torch.Tensor, Optional[Any]): input and target.
+        """
+        # Check if the batch format is correct.
+        if len(batch) > 2:
+            raise ValueError(
+                "Found more than 2 items in the batch. `LighterSystem` requires the dataloader to return either "
+                "input tensor(s) only, or a two-element tuple/list consisting of input tensor(s) and target(s)."
+            )
+
+        # Report the batch split type. Only on the first call.
+        if not self._batch_type_reported:
+            self._batch_type_reported = True
+            if len(batch) == 1:
+                logger.info("Target not provided. Using `None` as target. Ignore if intended.")
+            else:
+                logger.info("Using the first item as input and the second item as target.")
+
+        # Split the batch into input and target. Target will be `None` if not provided.
+        input, target = (batch, None) if len(batch) == 1 else batch
+        return input, target
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods

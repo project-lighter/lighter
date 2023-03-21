@@ -12,22 +12,22 @@ from lighter.callbacks.writer.base import LighterBaseWriter
 
 
 class LighterTableWriter(LighterBaseWriter):
-    def __init__(self, write_dir: str, write_as: Union[str, List[str], Dict[str, str], Dict[str, List[str]]]) -> None:
-        super().__init__(write_dir, write_as, write_interval="epoch")
+    def __init__(self, write_dir: str, write_format: Union[str, List[str], Dict[str, str], Dict[str, List[str]]]) -> None:
+        super().__init__(write_dir, write_format, write_interval="epoch")
         self.csv_records = {}
 
-    def write(self, idx, identifier, tensor, write_as):
+    def write(self, idx, identifier, tensor, write_format):
         # Column name will be set to 'pred' if the identifier is None.
         column = "pred" if identifier is None else identifier
 
-        if write_as is None:
+        if write_format is None:
             record = None
-        elif write_as == "tensor":
+        elif write_format == "tensor":
             record = tensor.tolist()
-        elif write_as == "scalar":
+        elif write_format == "scalar":
             raise NotImplementedError
         else:
-            logger.error(f"`write_as` '{write_as}' not supported.")
+            logger.error(f"`write_format` '{write_format}' not supported.")
             sys.exit()
 
         if idx not in self.csv_records:
