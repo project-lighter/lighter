@@ -1,5 +1,3 @@
-from typing import Any
-
 import importlib
 import sys
 from pathlib import Path
@@ -25,20 +23,3 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     spec.loader.exec_module(module)
     sys.modules[module_name] = module
     logger.info(f"{module_path.parent} imported as '{module_name}' module.")
-
-
-def import_attr(module_attr: str) -> Any:
-    """Import using dot-notation string, e.g., 'torch.nn.Module'.
-
-    Args:
-        module_attr (str): dot-notation path to the attribute.
-
-    Returns:
-        Any: imported attribute.
-    """
-    # Split module from attribute name
-    module, attr = module_attr.rsplit(".", 1)
-    # Import the module
-    module = __import__(module, fromlist=[attr])
-    # Get the attribute from the module
-    return getattr(module, attr)
