@@ -37,7 +37,7 @@ def collate_fn_replace_corrupted(batch: List[Any], dataset: DataLoader, default_
     num_corrupted = original_batch_len - filtered_batch_len
     if num_corrupted > 0:
         # Replace a corrupted example with another randomly selected example.
-        batch.extend([dataset[random.randint(0, len(dataset)-1)] for _ in range(num_corrupted)])
+        batch.extend([dataset[random.randint(0, len(dataset) - 1)] for _ in range(num_corrupted)])
         # Recursive call to replace the replacements if they are corrupted.
         return collate_fn_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, apply the default collate function.
