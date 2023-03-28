@@ -6,6 +6,8 @@ from pathlib import Path
 
 from loguru import logger
 
+OPTIONAL_IMPORTS = {}
+
 
 def import_module_from_path(module_name: str, module_path: str) -> None:
     """Given the path to a module, import it, and name it as specified.

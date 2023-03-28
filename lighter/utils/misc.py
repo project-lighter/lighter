@@ -58,7 +58,7 @@ def hasarg(_callable: Callable, arg_name: str) -> bool:
     return arg_name in args
 
 
-def countargs(callable: Callable) -> bool:
+def countargs(_callable: Callable) -> bool:
     """Count the number of arguments that a function, class, or method accepts.
 
     Args:
@@ -67,7 +67,7 @@ def countargs(callable: Callable) -> bool:
     Returns:
         int: number of arguments that it accepts.
     """
-    return len(inspect.signature(callable).parameters.keys())
+    return len(inspect.signature(_callable).parameters.keys())
 
 
 def get_name(_callable: Callable, include_module_name: bool = False) -> str:

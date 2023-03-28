@@ -3,8 +3,8 @@ project: ./projects/cifar10
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 100
-    accelerator: gpu
-    devices: 1
+    accelerator: cpu
+    #devices: 1  # 2
     # strategy: ddp
     log_every_n_steps: 10
     logger: null
@@ -15,13 +15,20 @@ trainer:
           tensorboard: True
           wandb: True
           input_type: image
+          # pred_type: scalar
+          # target_type: scalar
           max_samples: 10
+
+        - _target_: lighter.callbacks.LighterFileWriter
+          write_dir: "$@project + '/predictions' "
+          write_format: "tensor"
+          write_interval: "step" # "epoch"
 
 system:
     _target_: lighter.LighterSystem
     batch_size: 512
     pin_memory: True
-    num_workers: 1
+    num_workers: 2
 
     model:
         _target_: "project.models.net.Net"
@@ -106,3 +113,5 @@ system:
                   mean: [0.5, 0.5, 0.5]
                   std: [0.5, 0.5, 0.5]
         target_transform: null
+
+    predict_dataset: "%system#test_dataset"
