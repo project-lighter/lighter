@@ -42,10 +42,10 @@ classifiers = [  #! Update me
 
 [tool.poetry.dependencies]
 python = "^3.8"
-torch = "^1.13.1"
+torch = "^2.0"
 pandas = "^1.5.3"
-torchvision = "^0.14.1"
-pytorch-lightning = "^1.9.0"
+torchvision = "^0.15"
+pytorch-lightning = "^2.0.0"
 fire = "^0.5.0"
 loguru = "^0.6.0"
 lightly = "^1.2.43"
@@ -175,8 +175,9 @@ show_missing = true
 max-line-length = 127
 disable = """
     too-many-arguments,
-    not-callable
+    no-else-return,
 """
+generated-members = "torch.*"
 
 [tool.pylint.master]
 fail-under=8
