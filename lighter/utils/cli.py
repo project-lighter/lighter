@@ -33,20 +33,17 @@ def interface():
 
 def parse_config(**kwargs):
     """
-    This function parses configuration files and updates the provided parser with given keyword arguments.
-    Returns an updated parser object.
+    Parses configuration files and updates the provided parser
+    with given keyword arguments. Returns an updated parser object.
 
-    :param kwargs: dictionary
-        keyword arguments with config data
-        Mandatory:
-            - config_file: str
-                path to the main configuration file
-        Optional:
-            - args_file: str
-                path to a secondary configuration file for additional arguments
-            - any additional key-value pairs to be added to/updated in the parser
-    :return: ConfigParser
-        an instance of ConfigParser with parsed and merged configuration data
+    Args:
+        **kwargs (dict): Keyword arguments containing configuration data.
+            config_file (str): Path to the main configuration file.
+            args_file (str, optional): Path to secondary configuration file for additional arguments.
+            Additional key-value pairs can also be provided to be added or updated in the parser.
+
+    Returns:
+        ConfigParser: An instance of ConfigParser with parsed and merged configuration data.
     """
     parser = ConfigParser()
     parser.read_config(kwargs["config_file"])
