@@ -31,6 +31,35 @@ def interface():
     fire.Fire(commands)
 
 
+def parse_config(**kwargs):
+    """
+    This function parses configuration files and updates the provided parser with given keyword arguments.
+    Returns an updated parser object.
+
+    :param kwargs: dictionary
+        keyword arguments with config data
+        Mandatory:
+            - config_file: str
+                path to the main configuration file
+        Optional:
+            - args_file: str
+                path to a secondary configuration file for additional arguments
+            - any additional key-value pairs to be added to/updated in the parser
+    :return: ConfigParser
+        an instance of ConfigParser with parsed and merged configuration data
+    """
+    parser = ConfigParser()
+    parser.read_config(kwargs["config_file"])
+
+    if "args_file" in kwargs:
+        args = ConfigParser.load_config_file(kwargs["args_file"])
+        parser.update(pairs=args)
+
+    parser.update(pairs=kwargs)
+
+    return parser
+
+
 def run_trainer_method(method: Dict, **kwargs: Any):
     """Call monai.bundle.run() on a Trainer method. If a project path
     is defined in the config file(s), import it.
@@ -63,13 +92,12 @@ def run_trainer_method(method: Dict, **kwargs: Any):
             project_imported = True
 
     # Parse the config file(s).
-    parser = ConfigParser()
-    parser.read_config(kwargs["config_file"])
-    parser.update(pairs=kwargs)
-
+    parser = parse_config(**kwargs)
     trainer = parser.get_parsed_content("trainer")
     system = parser.get_parsed_content("system")
 
     # Run the Trainer method.
-    assert hasattr(trainer, method), f"Trainer has no method named {method}."
+    if not hasattr(trainer, method):
+        raise ValueError(f"Trainer has no method named {method}.")
+
     getattr(trainer, method)(system)
