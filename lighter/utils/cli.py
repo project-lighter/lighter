@@ -43,7 +43,8 @@ def run_trainer_method(method: Dict, **kwargs: Any):
     seed_everything()
 
     # Check that a config file is specified.
-    assert "config_file" in kwargs, "No config file specified. Exiting."
+    if "config_file" not in kwargs:
+        raise ValueError("No config file specified. Exiting.")
 
     # Import the project as a module.
     project_imported = False
