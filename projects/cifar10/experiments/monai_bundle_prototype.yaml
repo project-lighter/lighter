@@ -7,7 +7,7 @@ trainer:
     #devices: 1  # 2
     # strategy: ddp
     log_every_n_steps: 10
-    logger: null
+    logger: False
     callbacks:
         - _target_: lighter.callbacks.LighterLogger
           project: CIFAR10
@@ -88,7 +88,7 @@ system:
     
     val_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: False
+        download: True
         root: ./.datasets/
         train:  False  # Same as test, for prototyping purposes only
         transform:
@@ -102,7 +102,7 @@ system:
     
     test_dataset:
         _target_: torchvision.datasets.CIFAR10
-        download: False
+        download: True
         root: ./.datasets/
         train: False
         transform:
