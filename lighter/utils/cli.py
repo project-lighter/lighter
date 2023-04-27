@@ -45,6 +45,16 @@ def parse_config(**kwargs):
     Returns:
         ConfigParser: An instance of ConfigParser with parsed and merged configuration data.
     """
+
+    # Check that a config file is specified.
+    if "config_file" not in kwargs:
+        raise ValueError("No config file specified. Exiting.")
+
+    # Load config from `config_file`
+    config = ConfigParser.load_config_files(kwargs["config_file"])
+    if "project" in config:
+        import_module_from_path("project", config["project"])
+
     parser = ConfigParser()
     parser.read_config(kwargs["config_file"])
 
@@ -68,30 +78,15 @@ def run_trainer_method(method: Dict, **kwargs: Any):
     # Sets the random seed to `PL_GLOBAL_SEED` env variable. If not specified, it picks a random seed.
     seed_everything()
 
-    # Check that a config file is specified.
-    if "config_file" not in kwargs:
-        raise ValueError("No config file specified. Exiting.")
-
-    # Import the project as a module.
-    project_imported = False
-    # Handle multiple configs. Start from the config file specified last as it overrides the previous ones.
-    for config in reversed(ensure_list(kwargs["config_file"])):
-        with open(config, encoding="utf-8") as config:
-            config = yaml.safe_load(config)
-            if "project" not in config:
-                continue
-            # Only one config file can specify the project path
-            if project_imported:
-                logger.error("`project` must be specified in one config only. Exiting.")
-                sys.exit()
-            # Import it as a module named 'project'.
-            import_module_from_path("project", config["project"])
-            project_imported = True
-
     # Parse the config file(s).
     parser = parse_config(**kwargs)
+
+    # Get trainer and system
     trainer = parser.get_parsed_content("trainer")
     system = parser.get_parsed_content("system")
+
+    # Export config to be loaded by other modules, if neccessary
+    parser.export_config_file(parser.get(), f"{trainer.default_root_dir}/config.yaml")
 
     # Run the Trainer method.
     if not hasattr(trainer, method):

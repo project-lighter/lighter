@@ -5,7 +5,9 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+import yaml
 from loguru import logger
+from monai.bundle.config_parser import ConfigParser
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
 
@@ -64,11 +66,11 @@ class LighterLogger(Callback):
 
         self.log_dir.mkdir(parents=True)
 
-        # Load the dumped config file to log it to the loggers.
-        # config = yaml.safe_load(open(self.log_dir / "config.yaml"))
+        # Load config
+        config = ConfigParser.load_config_file(f"{trainer.default_root_dir}/config.yaml")
 
         # Loguru log file.
-        # logger.add(sink=self.log_dir / f"{stage}.log")
+        logger.add(sink=self.log_dir / f"{stage}.log")
 
         # Tensorboard initialization.
         if self.tensorboard:
@@ -77,7 +79,8 @@ class LighterLogger(Callback):
             tensorboard_dir = self.log_dir / "tensorboard"
             tensorboard_dir.mkdir()
             self.tensorboard = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter(log_dir=tensorboard_dir)
-            # self.tensorboard.add_hparams(config)
+            # self.tensorboard.add_hparams(config, {}) # TODO: Tensorboard asks for a metric dict along with hparam dict
+            # https://pytorch.org/docs/stable/tensorboard.html#torch.utils.tensorboard.writer.SummaryWriter.add_hparams
 
         # Wandb initialization.
         if self.wandb:
@@ -87,8 +90,7 @@ class LighterLogger(Callback):
                 sys.exit()
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
-            self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir)
-            # self.wandb.config.update(config)
+            self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir, config=config)
 
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if not trainer.is_global_zero:

@@ -17,8 +17,12 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
         module_path (str): path to the module to load.
     """
     # Based on https://stackoverflow.com/a/41595552.
+
+    if module_name in sys.modules:
+        logger.error(f"{module_path} has already been imported as module: {module_name}")
+        sys.exit()
+
     module_path = Path(module_path).resolve() / "__init__.py"
-    print(module_path)
     if not module_path.is_file():
         logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
         sys.exit()
