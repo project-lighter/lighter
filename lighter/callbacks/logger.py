@@ -48,7 +48,7 @@ class LighterLogger(Callback):
         self.global_step_counter = {"train": 0, "val": 0, "test": 0}
 
         # Initialized from runner module
-        self.config = None 
+        self.config = None
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         """
