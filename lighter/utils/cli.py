@@ -1,9 +1,10 @@
-
 import sys
 from functools import partial
 
 import fire
+
 from lighter.utils.runner import run_trainer_method
+
 
 def interface():
     """Defines the command line interface for running Trainer's methods. The available methods are:
