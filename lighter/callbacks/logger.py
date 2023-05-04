@@ -47,6 +47,9 @@ class LighterLogger(Callback):
         # instead of batch steps, which can be problematic when using gradient accumulation.
         self.global_step_counter = {"train": 0, "val": 0, "test": 0}
 
+        # Initialized from runner module
+        self.config = None 
+
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         """
         Initialize logging for the LighterSystem.
@@ -65,9 +68,6 @@ class LighterLogger(Callback):
             return
 
         self.log_dir.mkdir(parents=True)
-
-        # Load config
-        config = ConfigParser.load_config_file(f"{trainer.default_root_dir}/config.yaml")
 
         # Loguru log file.
         logger.add(sink=self.log_dir / f"{stage}.log")
@@ -90,7 +90,7 @@ class LighterLogger(Callback):
                 sys.exit()
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
-            self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir, config=config)
+            self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir, config=self.config)
 
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if not trainer.is_global_zero:
