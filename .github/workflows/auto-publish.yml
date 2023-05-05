@@ -1,0 +1,43 @@
+name: Auto Publish
+on:
+  push:
+    branches:
+      - auto-publish
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+
+    steps:
+        - uses: actions/checkout@v2
+        - name: Set up Python ${{ matrix.python-version }}
+          uses: actions/setup-python@v2.2.2
+          with:
+            python-version: ${{ matrix.python-version }}
+
+        - name: Install poetry
+          run: make setup
+
+        - name: Set up cache
+          uses: actions/cache@v2.1.6
+          with:
+            path: .venv
+            key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('poetry.lock') }}
+        
+        - name: Install dependencies
+          run: |
+            poetry config virtualenvs.in-project true
+            poetry install
+
+        - name: Bump version
+          run: |
+            poetry version prerelease
+
+        - name: Build and publish to pypi
+          uses: JRubics/poetry-publish@v1.16
+          with:
+            pypi_token: ${{ secrets.PYPI_TOKEN }}
+            allow_poetry_pre_release: "yes"
+            ignore_dev_requirements: "yes"
