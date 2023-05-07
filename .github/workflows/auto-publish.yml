@@ -2,7 +2,8 @@ name: Auto Publish
 on:
   push:
     branches:
-      - auto-publish
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
