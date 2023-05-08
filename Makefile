@@ -16,7 +16,7 @@ setup: poetry-download
 	@echo export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring >> ~/.profile
 	source ~/.bashrc
 	source ~/.profile
-	poetry self add poetry-bumpversion
+	poetry self add poetry-bumpversion@latest
 	
 	
 .PHONY: poetry-download

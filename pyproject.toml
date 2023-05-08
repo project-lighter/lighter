@@ -8,7 +8,7 @@ lighter = "lighter.utils.cli:interface"
 
 [tool.poetry]
 name = "project-lighter"
-version = "0.0.1"
+version = "0.0.2a1"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 readme = "README.md"
 authors = ["Ibrahim Hadzic <ibrahimhadzic45@gmail.com>" ,
@@ -182,4 +182,4 @@ generated-members = "torch.*"
 [tool.pylint.master]
 fail-under=8
 
-[tool.poetry_bumpversion.file."lighter/__init__.py"]
+[tool.poetry_bumpversion.file."lighter/version.py"]
