@@ -1,2 +1,2 @@
-__version__ = "0.0.1"
 from .system import LighterSystem
+from .version import __version__
