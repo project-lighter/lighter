@@ -264,12 +264,6 @@ class LighterSystem(pl.LightningModule):
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
         if hasarg(self.criterion.forward, "target"):
-            if None in target:
-                raise ValueError(
-                    "The specified loss function requires the target to be specified, but the target is or contains None. "
-                    "Either make sure that you are using the correct loss function that does not use a target "
-                    "or that the target is an actual value."
-                )
             # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
             kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(self._cast_target_dtype_to)
         else:
