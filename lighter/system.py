@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import countargs, ensure_list, get_name, hasarg
+from lighter.utils.collate import collate_replace_corrupted
+from lighter.utils.misc import ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -196,11 +196,27 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
+        # Ensure that the batch is a list, a tuple, or a dict.
+        if not isinstance(batch, (list, tuple, dict)):
+            raise TypeError(
+                "A batch must be a list, a tuple, or a dict."
+                "A batch dict must have 'input' and 'target' as keys."
+                "A batch list or a tuple must have 2 elements - input and target."
+                "If target does not exist, return `None` as target."
+            )
+        # Ensure that a dict batch has input and target keys exclusively.
+        if isinstance(batch, dict) and set(batch.keys()) != {"input", "target"}:
+            raise ValueError("A batch must be a dict with 'input' and 'target' as keys.")
+        # Ensure that a list/tuple batch has 2 elements (input and target).
+        if len(batch) == 1:
+            raise ValueError(
+                "A batch must consist of 2 elements - input and target. If target does not exist, return `None` as target."
+            )
+        if len(batch) > 2:
+            raise ValueError(f"A batch must consist of 2 elements - input and target, but found {len(batch)} elements.")
 
         # Split the batch into input and target.
-        input = batch
-        target = None
-        # input, target = batch
+        input, target = batch if not isinstance(batch, dict) else (batch["input"], batch["target"])
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
@@ -248,8 +264,14 @@ class LighterSystem(pl.LightningModule):
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
         if hasarg(self.criterion.forward, "target"):
-            # Add `target` argument if forward accepts it. Casting performed if specified.
-            kwargs["target"] = target.to(self._cast_target_dtype_to)
+            if None in target:
+                raise ValueError(
+                    "The specified loss function requires the target to be specified, but the target is or contains None. "
+                    "Either make sure that you are using the correct loss function that does not use a target "
+                    "or that the target is an actual value."
+                )
+            # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
+            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(self._cast_target_dtype_to)
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
@@ -295,7 +317,7 @@ class LighterSystem(pl.LightningModule):
 
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
+        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
         return DataLoader(
             dataset,
             sampler=sampler,

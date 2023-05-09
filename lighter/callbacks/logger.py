@@ -63,6 +63,8 @@ class LighterLogger(Callback):
             return
 
         self.log_dir.mkdir(parents=True)
+        if trainer.is_global_zero:
+            logger.info(f"Logging to {self.log_dir}")
 
         # Load the dumped config file to log it to the loggers.
         # config = yaml.safe_load(open(self.log_dir / "config.yaml"))
