@@ -68,8 +68,7 @@ class LighterLogger(Callback):
             return
 
         self.log_dir.mkdir(parents=True)
-        if trainer.is_global_zero:
-            logger.info(f"Logging to {self.log_dir}")
+        logger.info(f"Logging to {self.log_dir}")
 
         # Loguru log file.
         logger.add(sink=self.log_dir / f"{stage}.log")
