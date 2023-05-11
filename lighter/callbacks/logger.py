@@ -1,15 +1,15 @@
 from typing import Any, Dict, Union
 
+import itertools
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import torch
-import yaml
 from loguru import logger
-from monai.bundle.config_parser import ConfigParser
 from monai.utils.module import optional_import
 from pytorch_lightning import Callback, Trainer
+from pytorch_lightning.callbacks.lr_monitor import LearningRateMonitor
 
 from lighter import LighterSystem
 from lighter.callbacks.utils import get_lighter_mode, is_data_type_supported, parse_data, preprocess_image
@@ -38,6 +38,7 @@ class LighterLogger(Callback):
 
         self.tensorboard = tensorboard
         self.wandb = wandb
+        self.lr_monitor = LighterLearningRateMonitor()
 
         # Running loss. Resets at each epoch. Loss is not calculated for `test` mode.
         self.loss = {"train": 0, "val": 0}
@@ -92,6 +93,10 @@ class LighterLogger(Callback):
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
             self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir, config=self.config)
+
+    def on_train_start(self, trainer: Trainer, pl_module: LighterSystem):
+        # Setup the learning rate monitor.
+        self.lr_monitor.on_train_start(trainer=trainer)
 
     def teardown(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         if not trainer.is_global_zero:
@@ -221,6 +226,12 @@ class LighterLogger(Callback):
                         item_name = f"{mode}/data/{name}" if identifier is None else f"{mode}/data/{name}_{identifier}"
                         self._log_by_type(item_name, item, self.log_types[name], global_step)
 
+                # Log learning rate stats. Logs at step if a scheduler's interval is step-based.
+                if mode == "train":
+                    lr_stats = self.lr_monitor.get_stats(trainer, "step")
+                    for name, value in lr_stats.items():
+                        self._log_scalar(f"{mode}/optimizer/{name}/step", value, global_step)
+
             # Increment the step counters.
             self.global_step_counter[mode] += 1
             if mode in ["train", "val"]:
@@ -273,6 +284,12 @@ class LighterLogger(Callback):
                     for name, metric in metrics.items():
                         self._log_scalar(f"{mode}/metrics/{name}/epoch", metric, global_step)
 
+                # Log learning rate stats. Logs at epoch if a scheduler's interval is epoch-based, or if no scheduler is used.
+                if mode == "train":
+                    lr_stats = self.lr_monitor.get_stats(trainer, "epoch")
+                    for name, value in lr_stats.items():
+                        self._log_scalar(f"{mode}/optimizer/{name}/epoch", value, global_step)
+
     def _get_global_step(self, trainer: Trainer) -> int:
         """Return the global step for the current mode. Note that when Trainer
         is running Trainer.fit() and is in `val` mode, this method will return
@@ -306,12 +323,12 @@ class LighterLogger(Callback):
         self._on_batch_end(outputs, trainer)
 
     def on_validation_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_end(outputs, trainer)
 
     def on_test_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_end(outputs, trainer)
 
@@ -323,3 +340,51 @@ class LighterLogger(Callback):
 
     def on_test_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         self._on_epoch_end(trainer, pl_module)
+
+
+class LighterLearningRateMonitor(LearningRateMonitor):
+    def __init__(self) -> None:
+        # Instantiate LearningRateMonitor with default values.
+        super().__init__()
+
+    def on_train_start(self, trainer: Trainer) -> None:
+        # Set the `self.log_momentum` flag based on the optimizers instead of manually through __init__().
+        for key in ["momentum", "betas"]:
+            if trainer.lr_scheduler_configs:
+                self.log_momentum = any(key not in conf.scheduler.optimizer.defaults for conf in trainer.lr_scheduler_configs)
+            else:
+                self.log_momentum = any(key not in optimizer.defaults for optimizer in trainer.optimizers)
+            if self.log_momentum:
+                break
+
+        # Find names for schedulers
+        names = []
+        result = self._find_names_from_schedulers(trainer.lr_scheduler_configs)
+        sched_hparam_keys = result[0]
+        optimizers_with_scheduler = result[1]
+        optimizers_with_scheduler_types = result[2]
+        names.extend(sched_hparam_keys)
+
+        # Find names for leftover optimizers
+        optimizer_hparam_keys, _ = self._find_names_from_optimizers(
+            trainer.optimizers,
+            seen_optimizers=optimizers_with_scheduler,
+            seen_optimizer_types=optimizers_with_scheduler_types,
+        )
+        names.extend(optimizer_hparam_keys)
+
+        # Initialize for storing values
+        names_flatten = list(itertools.chain.from_iterable(names))
+        self.lrs = {name: [] for name in names_flatten}
+        self.last_momentum_values = {f"{name}-momentum": None for name in names_flatten}
+
+    def get_stats(self, trainer: Trainer, interval: str) -> Dict[str, float]:
+        # If a scheduler is not defined, log the learning rate over epochs.
+        if not trainer.lr_scheduler_configs and interval == "step":
+            return {}
+        lr_stats = self._extract_stats(trainer, interval)
+        # Remove 'lr-' prefix from keys and replace '-' with '/'.
+        lr_stats = {k[3:].replace("-", "/"): v for k, v in lr_stats.items()}
+        # Add '/lr' to the end of the keys that don't end with 'momentum'.
+        lr_stats = {k if k.endswith("momentum") else f"{k}/lr": v for k, v in lr_stats.items()}
+        return lr_stats
