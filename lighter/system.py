@@ -11,8 +11,8 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.collate import collate_fn_replace_corrupted
-from lighter.utils.misc import countargs, ensure_list, get_name, hasarg
+from lighter.utils.collate import collate_replace_corrupted
+from lighter.utils.misc import ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
 
 
@@ -165,6 +165,10 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Any: output of the model.
         """
+        # Freeze the layers if specified so.
+        if self.freezer is not None:
+            self.freezer(self.model, self.global_step, self.current_epoch)
+
         # Keyword arguments to pass to the forward method
         kwargs = {}
         if hasarg(self.model.forward, "epoch"):
@@ -174,24 +178,7 @@ class LighterSystem(pl.LightningModule):
             # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
-        # Type not supported.
-        if not isinstance(input, (torch.Tensor, tuple, list, dict)):
-            logger.error(f"Input type '{type(input)}' not supported.")
-            sys.exit()
-
-        # Freeze the layers if specified so.
-        if self.freezer is not None:
-            self.freezer(self.model, self.global_step, self.current_epoch)
-
-        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
-        if isinstance(input, (tuple, list)) and (len(input) + len(kwargs)) <= countargs(self.model):
-            return self.model(*input, **kwargs)
-        # Unpack Dict. Only if dict's keys match criterion's keyword arguments.
-        elif isinstance(input, dict) and all(hasarg(self.model, name) for name in input):
-            return self.model(**input, **kwargs)
-        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
-        else:
-            return self.model(input, **kwargs)
+        return self.model(input, **kwargs)
 
     def _base_step(self, batch: Union[List, Tuple], batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes ("train", "val", "test", "predict")
@@ -209,8 +196,27 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
-        # Split the batch into input and target. Target will be `None` if not provided.
-        input, target = self._split_batch(batch)
+        # Ensure that the batch is a list, a tuple, or a dict.
+        if not isinstance(batch, (list, tuple, dict)):
+            raise TypeError(
+                "A batch must be a list, a tuple, or a dict."
+                "A batch dict must have 'input' and 'target' as keys."
+                "A batch list or a tuple must have 2 elements - input and target."
+                "If target does not exist, return `None` as target."
+            )
+        # Ensure that a dict batch has input and target keys exclusively.
+        if isinstance(batch, dict) and set(batch.keys()) != {"input", "target"}:
+            raise ValueError("A batch must be a dict with 'input' and 'target' as keys.")
+        # Ensure that a list/tuple batch has 2 elements (input and target).
+        if len(batch) == 1:
+            raise ValueError(
+                "A batch must consist of 2 elements - input and target. If target does not exist, return `None` as target."
+            )
+        if len(batch) > 2:
+            raise ValueError(f"A batch must consist of 2 elements - input and target, but found {len(batch)} elements.")
+
+        # Split the batch into input and target.
+        input, target = batch if not isinstance(batch, dict) else (batch["input"], batch["target"])
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
@@ -258,8 +264,8 @@ class LighterSystem(pl.LightningModule):
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
         if hasarg(self.criterion.forward, "target"):
-            # Add `target` argument if forward accepts it. Casting performed if specified.
-            kwargs["target"] = target.to(self._cast_target_dtype_to)
+            # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
+            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(self._cast_target_dtype_to)
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
@@ -272,21 +278,7 @@ class LighterSystem(pl.LightningModule):
                     "behavior you expected, redefine your criterion "
                     "so that it has a `target` argument."
                 )
-
-        # Type not supported.
-        if not isinstance(pred, (torch.Tensor, tuple, list, dict)):
-            logger.error(f"Pred type '{type(pred)}' not supported.")
-            sys.exit()
-
-        # Unpack Tuple or List. Only if num of args passed is less than or equal to num of args accepted.
-        if isinstance(pred, (tuple, list)) and (len(pred) + len(kwargs)) <= countargs(self.criterion):
-            return self.criterion(*pred, **kwargs)
-        # Unpack Dict. Only if dict's keys match criterion's keyword arguments' names.
-        elif isinstance(pred, dict) and all(hasarg(self.criterion, name) for name in pred):
-            return self.criterion(**pred, **kwargs)
-        # Tensor, Tuple, List, or Dict, as-is, not unpacked.
-        else:
-            return self.criterion(pred, **kwargs)
+        return self.criterion(pred, **kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
@@ -319,7 +311,7 @@ class LighterSystem(pl.LightningModule):
 
         # A dataset can return None when a corrupted example occurs. This collate
         # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_fn_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
+        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
         return DataLoader(
             dataset,
             sampler=sampler,
@@ -394,34 +386,6 @@ class LighterSystem(pl.LightningModule):
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
-
-    def _split_batch(self, batch) -> Tuple[torch.Tensor, Optional[Any]]:
-        """Split the batch into input and target. Target will be `None` if not provided.
-
-        Args:
-            batch (List, Tuple): output of the DataLoader and input to the model.
-
-        Returns:
-            Tuple(torch.Tensor, Optional[Any]): input and target.
-        """
-        # Check if the batch format is correct.
-        if len(batch) > 2:
-            raise ValueError(
-                "Found more than 2 items in the batch. `LighterSystem` requires the dataloader to return either "
-                "input tensor(s) only, or a two-element tuple/list consisting of input tensor(s) and target(s)."
-            )
-
-        # Report the batch split type. Only on the first call.
-        if not self._batch_type_reported:
-            self._batch_type_reported = True
-            if len(batch) == 1:
-                logger.info("Target not provided. Using `None` as target. Ignore if intended.")
-            else:
-                logger.info("Using the first item as input and the second item as target.")
-
-        # Split the batch into input and target. Target will be `None` if not provided.
-        input, target = (batch, None) if len(batch) == 1 else batch
-        return input, target
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods

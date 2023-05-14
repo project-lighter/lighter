@@ -17,17 +17,19 @@ def get_lighter_mode(lightning_stage: str) -> str:
     return lightning_to_lighter[lightning_stage]
 
 
-def is_data_type_supported(data: Any) -> bool:
-    """Check the input data for its type. Valid data types are:
+def is_data_type_supported(data: Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]) -> bool:
+    """
+    Check the input data recursively for its type. Valid data types are:
         - torch.Tensor
         - List[torch.Tensor]
         - Tuple[torch.Tensor]
         - Dict[str, torch.Tensor]
         - Dict[str, List[torch.Tensor]]
         - Dict[str, Tuple[torch.Tensor]]
+        - Nested combinations of the above
 
     Args:
-        data (Any): input data to check
+        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]): Input data to check.
 
     Returns:
         bool: True if the data type is supported, False otherwise.
@@ -44,36 +46,51 @@ def is_data_type_supported(data: Any) -> bool:
 
 
 def parse_data(
-    data: Union[Any, List[Any], Dict[str, Any], Dict[str, List[Any]], Dict[str, Tuple[Any]]]
+    data: Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]], prefix: Optional[str] = None
 ) -> Dict[Optional[str], Any]:
-    """Parse the input data as follows:
-        - If dict, go over all keys and values, unpacking list and tuples, and assigning them all
-          a unique identifier based on the original key and their position if they were a list/tuple.
-        - If list/tuple, enumerate them and use their position as key for each value of the list/tuple.
-        - If any other type, return it as-is with the key set to 'None'. A 'None' key indicates that no
-          identifier is needed because no parsing ocurred.
+    """
+    Parse the input data recursively, handling nested dictionaries, lists, and tuples.
+
+    This function will recursively parse the input data, unpacking nested dictionaries, lists, and tuples. The result
+    will be a dictionary where each key is a unique identifier reflecting the data's original structure (dict keys
+    or list/tuple positions) and each value is a non-container data type from the input data.
 
     Args:
-        data (Any, List[Any], Dict[str, Any], Dict[str, List[Any]], Dict[str, Tuple[Any]):
-            input data to parse.
+        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]): Input data to parse.
+        prefix (Optional[str]): Current prefix for keys in the result dictionary. Defaults to None.
 
     Returns:
-        Dict[Optional[str], Any]: a dict where key is either a string
-            identifier or `None`, and value the parsed output.
+        Dict[Optional[str], Any]: A dictionary where key is either a string identifier or `None`, and value is the parsed output.
+
+    Example:
+        input_data = {
+            "a": [1, 2],
+            "b": {"c": (3, 4), "d": 5}
+        }
+        output_data = parse_data(input_data)
+        # Output:
+        # {
+        #     'a_0': 1,
+        #     'a_1': 2,
+        #     'b_c_0': 3,
+        #     'b_c_1': 4,
+        #     'b_d': 5
+        # }
     """
     result = {}
     if isinstance(data, dict):
         for key, value in data.items():
-            if isinstance(value, (list, tuple)):
-                for idx, element in enumerate(value):
-                    result[f"{key}_{idx}" if len(value) > 1 else key] = element
-            else:
-                result[key] = value
+            # Recursively parse the value with an updated prefix
+            sub_result = parse_data(value, prefix=f"{prefix}_{key}" if prefix else key)
+            result.update(sub_result)
     elif isinstance(data, (list, tuple)):
         for idx, element in enumerate(data):
-            result[str(idx)] = element
+            # Recursively parse the element with an updated prefix
+            sub_result = parse_data(element, prefix=f"{prefix}_{idx}" if prefix else str(idx))
+            result.update(sub_result)
     else:
-        result[None] = data
+        # Assign the value to the result dictionary using the current prefix as its key
+        result[prefix] = data
     return result
 
 
