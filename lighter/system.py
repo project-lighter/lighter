@@ -230,6 +230,10 @@ class LighterSystem(pl.LightningModule):
         loss = None
         if mode in ["train", "val"]:
             loss = self._calculate_loss(pred, target)
+            loss_name = "loss" if mode == "train" else f"{mode}_loss"
+            # Log the loss and for monitoring purposes.
+            self.log(loss_name, loss, on_step=True, on_epoch=False, sync_dist=False, logger=False, batch_size=self.batch_size)
+            self.log(loss_name, loss, on_step=False, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
 
         # Apply the post-criterion activation. Necessary for measuring the metrics
         # correctly in cases when using a criterion such as `BCELossWithLogits`` which
@@ -243,9 +247,9 @@ class LighterSystem(pl.LightningModule):
         else:
             # Calculate the metrics for the step.
             metrics = getattr(self, f"{mode}_metrics")(pred, target)
-            # Log the loss and metrics for monitoring purposes only.
-            self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
-            self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
+            # Log the metrics for monitoring purposes.
+            self.log_dict(metrics, on_step=True, on_epoch=False, sync_dist=False, logger=False, batch_size=self.batch_size)
+            self.log_dict(metrics, on_step=False, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
