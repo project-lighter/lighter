@@ -15,7 +15,7 @@
 Welcome to `lighter`, an elegant and powerful wrapper for [PyTorch Lightning](https://github.com/Lightning-AI/lightning) that simplifies the way you build and manage your deep learning experiments. Unleash your model's potential through a unified, **configuration-based** approach that streamlines the experimentation process, empowering both beginners and experts in the field.
 
 
-### 🚀 Install
+## 🚀 Install
 
 Current release:
 ````
@@ -35,12 +35,12 @@ make pre-commit-install  # Set up the pre-commit hook for code formatting
 poetry shell             # Once installed, activate the poetry shell
 ````
 
-### 📖 Usage
+## 📖 Usage
 
 - [Documentation]()
 - [Video Tutorials]()
 
-### 💡 Projects
+## 💡 Projects
 List of projects that use `lighter`:
 
 | Project | Description |
@@ -48,7 +48,7 @@ List of projects that use `lighter`:
 | [FMCBI]() | |
 
 
-### 📄 Cite:
+## 📄 Cite:
 
 If you find `lighter` useful in your research or project, please consider citing it. Here's an example BibTeX citation entry:
 
