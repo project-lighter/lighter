@@ -53,13 +53,15 @@ List of projects that use `lighter`:
 If you find `lighter` useful in your research or project, please consider citing it. Here's an example BibTeX citation entry:
 
 ```bibtex
-@misc{lighter,
-  author = {},
-  title = {Lighter},
-  year = {},
-  publisher = {},
-  journal = {},
-  howpublished = {},
+@software{lighter,
+  author       = {Ibrahim Hadzic and
+                  Suraj Pai and
+                  Keno Bressem and
+                  Hugo Aerts},
+  title        = {Lighter},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.8007711},
+  url          = {https://doi.org/10.5281/zenodo.8007711}
 }
 ```
 
