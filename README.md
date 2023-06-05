@@ -1,7 +1,7 @@
 <div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/images/lighter_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="/assets/images/lighter_light.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/images/lighter_light.png">
   <img align="center" alt="Shows an illustrated sun in light mode and a moon with stars in dark mode." src="h/assets/images/lighter_dark.png">
 </picture>
 </div>
