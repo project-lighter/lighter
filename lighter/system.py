@@ -267,7 +267,7 @@ class LighterSystem(pl.LightningModule):
         kwargs = {}
         if hasarg(self.criterion.forward, "target"):
             # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
-            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(self._cast_target_dtype_to)
+            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(dtype=self._cast_target_dtype_to)
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
