@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import torch
 from loguru import logger
@@ -70,7 +70,9 @@ def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequenti
     return Sequential(*list(model.children())[:-num_layers])
 
 
-def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_model_prefix: Dict[str, str] = None) -> Module:
+def adjust_prefix_and_load_state_dict(
+    model: Module, ckpt_path: str, ckpt_to_model_prefix: Dict[str, str] = None, layers_to_ignore: List[str] = None
+) -> Module:
     """Load state_dict from a checkpoint into a model using `torch.load(strict=False`).
     `ckpt_to_model_prefix` mapping allows to rename the prefix of the checkpoint's state_dict keys
     so that they match those of the model's state_dict. This is often needed when a model was trained
@@ -83,7 +85,8 @@ def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_mod
         ckpt_path (str): Path to the checkpoint.
         ckpt_to_model_prefix (Dict[str, str], optional): A dictionary that maps keys in the checkpoint's
             state_dict to keys in the model's state_dict. If None, no key mapping is performed. Defaults to None.
-
+        layers_to_ignore (List[str], optional): A list of layer names that won't be loaded into the model.
+            Specify the names as they are after `ckpt_to_model_prefix` is applied. Defaults to None.
     Returns:
         Module: The model instance with the state_dict loaded.
 
@@ -111,12 +114,18 @@ def adjust_prefix_and_load_state_dict(model: Module, ckpt_path: str, ckpt_to_mod
             else:
                 # Add the model_prefix before the current key name if there's no specific ckpt_prefix
                 ckpt = {f"{model_prefix}{key}": value for key, value in ckpt.items() if ckpt_prefix in key}
+
     # Check if there is no overlap between the checkpoint's and model's state_dict.
     if not set(ckpt.keys()) & set(model.state_dict().keys()):
         raise ValueError(
             "There is no overlap between checkpoint's and model's state_dict. Check their "
             "`state_dict` keys and adjust accordingly using `ckpt_prefix` and `model_prefix`."
         )
+
+    # Remove the layers that are not to be loaded.
+    if layers_to_ignore is not None:
+        for layer in layers_to_ignore:
+            ckpt.pop(layer)
 
     # Load the adjusted state_dict into the model instance.
     incompatible_keys = model.load_state_dict(ckpt, strict=False)
