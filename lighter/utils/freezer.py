@@ -42,7 +42,7 @@ class LighterFreezer:
         self.until_step = until_step
         self.until_epoch = until_epoch
 
-        self._frozen_layers_reported = False
+        self._frozen_state = False
 
     def __call__(self, model: Module, current_step: int, current_epoch: int) -> None:
         """
@@ -55,30 +55,44 @@ class LighterFreezer:
 
         """
         if self.until_step is not None and current_step > self.until_step:
+            if self._frozen_state:
+                self.set_model_requires_grad(model, True)
             return
+
         if self.until_epoch is not None and current_epoch > self.until_epoch:
+            if self._frozen_state:
+                self.set_model_requires_grad(model, True)
             return
 
-        # Keep track of the frozen layers to log them on the first call.
-        frozen_layers = []
+        if not self._frozen_state:
+            self.set_model_requires_grad(model, False)
 
+    def set_model_requires_grad(self, model, requires_grad):
+        """
+        Sets the requires_grad attribute of the model's parameters.
+
+        Args:
+            model (Module): The PyTorch model whose parameters need to be frozen.
+            requires_grad (bool): Whether to freeze the parameters or not.
+
+        """
+        frozen_layers = []
         # Freeze the specified parameters.
         for name, param in model.named_parameters():
             if self.names and name in self.names:
-                param.requires_grad = False
+                param.requires_grad = requires_grad
                 frozen_layers.append(name)
             elif self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
-                param.requires_grad = False
+                param.requires_grad = requires_grad
                 frozen_layers.append(name)
             else:
                 param.requires_grad = True
 
-        # Log the frozen layers' names, only on the first call.
-        if not self._frozen_layers_reported:
-            self._frozen_layers_reported = True
-            logger.info(
-                "Freezing the following layers"
-                + (f" until step {self.until_step}" if self.until_step is not None else "")
-                + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
-                + f": {frozen_layers}"
-            )
+        logger.info(
+            f"Setting requires_grad={requires_grad} the following layers"
+            + (f" until step {self.until_step}" if self.until_step is not None else "")
+            + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
+            + f": {frozen_layers}"
+        )
+
+        self._frozen_state = not (requires_grad)
