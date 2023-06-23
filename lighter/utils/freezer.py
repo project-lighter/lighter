@@ -54,13 +54,6 @@ class LighterFreezer:
             current_epoch (int): The current epoch.
 
         """
-
-        grad_list = []
-        for name, param in model.named_parameters():
-            grad_list.append(param.requires_grad)
-
-        logger.info("Total positive gradients: {}".format(sum(grad_list)))
-
         if self.until_step is not None and current_step > self.until_step:
             if self._frozen_state:
                 self.set_model_requires_grad(model, True)
