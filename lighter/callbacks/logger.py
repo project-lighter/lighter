@@ -306,12 +306,12 @@ class LighterLogger(Callback):
         self._on_batch_end(outputs, trainer)
 
     def on_validation_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_end(outputs, trainer)
 
     def on_test_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_end(outputs, trainer)
 
