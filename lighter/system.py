@@ -32,13 +32,6 @@ class LighterSystem(pl.LightningModule):
             a single or a list of schedulers. Defaults to None.
         criterion (Optional[Callable], optional):
             criterion/loss function. Defaults to None.
-        cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
-            specified type before calculating the loss. May be necessary for some criterions.
-            Defaults to None.
-        post_criterion_activation (Optional[str], optional): some criterions
-            (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
-            However, to calculate the metrics and log the data, it may be necessary to activate
-            the predictions. Defaults to None.
         inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
@@ -82,8 +75,6 @@ class LighterSystem(pl.LightningModule):
         optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
         schedulers: Optional[Union[Callable, List[Callable]]] = None,
         criterion: Optional[Callable] = None,
-        cast_target_dtype_to: Optional[str] = None,
-        post_criterion_activation: Optional[str] = None,
         inferer: Optional[Callable] = None,
         freezer: Optional[Callable] = None,
         train_metrics: Optional[Union[Metric, List[Metric]]] = None,
@@ -231,12 +222,6 @@ class LighterSystem(pl.LightningModule):
         if mode in ["train", "val"]:
             loss = self._calculate_loss(pred, target)
 
-        # Apply the post-criterion activation. Necessary for measuring the metrics
-        # correctly in cases when using a criterion such as `BCELossWithLogits`` which
-        # requires the model to output logits, i.e. non-activated outputs.
-        if self._post_criterion_activation is not None:
-            pred = self._post_criterion_activation(pred)
-
         if mode == "predict":
             # In predict mode, skip the metrics and return the predicted value only.
             return pred
@@ -263,9 +248,9 @@ class LighterSystem(pl.LightningModule):
         """
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
+        # Add `target` argument if forward accepts it.
         if hasarg(self.criterion.forward, "target"):
-            # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
-            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(dtype=self._cast_target_dtype_to)
+            kwargs["target"] = target
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
