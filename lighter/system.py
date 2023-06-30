@@ -26,9 +26,9 @@ class LighterSystem(pl.LightningModule):
             should be dropped. Defaults to False.
         num_workers (int, optional): number of dataloader workers. Defaults to 0.
         pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
-        optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
+        optimizer (Optional[Union[Optimizer, List[Optimizer]]], optional):
             a single or a list of optimizers. Defaults to None.
-        schedulers (Optional[Union[Callable, List[Callable]]], optional):
+        scheduler (Optional[Union[Callable, List[Callable]]], optional):
             a single or a list of schedulers. Defaults to None.
         criterion (Optional[Callable], optional):
             criterion/loss function. Defaults to None.
@@ -72,8 +72,8 @@ class LighterSystem(pl.LightningModule):
         drop_last_batch: bool = False,
         num_workers: int = 0,
         pin_memory: bool = True,
-        optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
-        schedulers: Optional[Union[Callable, List[Callable]]] = None,
+        optimizer: Optional[Union[Optimizer, List[Optimizer]]] = None,
+        scheduler: Optional[Union[Callable, List[Callable]]] = None,
         criterion: Optional[Callable] = None,
         inferer: Optional[Callable] = None,
         freezer: Optional[Callable] = None,
@@ -104,8 +104,8 @@ class LighterSystem(pl.LightningModule):
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
-        self.optimizers = ensure_list(optimizers)
-        self.schedulers = ensure_list(schedulers)
+        self.optimizer = ensure_list(optimizer)
+        self.scheduler = ensure_list(scheduler)
 
         # Datasets
         self.train_dataset = train_dataset
@@ -162,11 +162,11 @@ class LighterSystem(pl.LightningModule):
 
         # Keyword arguments to pass to the forward method
         kwargs = {}
+        # Add `epoch` argument if forward accepts it
         if hasarg(self.model.forward, "epoch"):
-            # Add `epoch` argument if forward accepts it
             kwargs["epoch"] = self.current_epoch
+        # Add `step` argument if forward accepts it
         if hasarg(self.model.forward, "step"):
-            # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
         return self.model(input, **kwargs)
@@ -315,17 +315,17 @@ class LighterSystem(pl.LightningModule):
             Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
                 optimizers and/or schedulers.
         """
-        if not self.optimizers:
-            logger.error("Please specify 'system.optimizers' in the config. Exiting.")
+        if not self.optimizer:
+            logger.error("Please specify 'system.optimizer' in the config. Exiting.")
             sys.exit()
-        if not self.schedulers:
-            return self.optimizers
+        if not self.scheduler:
+            return self.optimizer
 
-        if len(self.optimizers) != len(self.schedulers):
+        if len(self.optimizer) != len(self.scheduler):
             logger.error("Each optimizer must have its own scheduler.")
             sys.exit()
 
-        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizers, self.schedulers)]
+        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizer, self.scheduler)]
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.
