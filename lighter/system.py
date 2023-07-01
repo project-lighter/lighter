@@ -14,7 +14,7 @@ from torchmetrics import Metric, MetricCollection
 from lighter.utils.collate import collate_replace_corrupted
 from lighter.utils.misc import ensure_list, get_name, hasarg
 from lighter.utils.model import reshape_pred_if_single_value_prediction
-
+from lighter.typing import Datasets, Samplers, CollateFunctions, Metrics
 
 class LighterSystem(pl.LightningModule):
     """_summary_
@@ -41,28 +41,6 @@ class LighterSystem(pl.LightningModule):
         freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
             method that accepts three arguments - the model, the step, and the epoch number.
             Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
-        train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        test_metrics (Optional[Union[Metric, List[Metric]]], optional): test metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        train_dataset (Optional[Union[Dataset, List[Dataset]]], optional): training dataset(s).
-            Defaults to None.
-        val_dataset (Optional[Union[Dataset, List[Dataset]]], optional): validation dataset(s).
-            Defaults to None.
-        test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
-            Defaults to None.
-        predict_dataset (Optional[Union[Dataset, List[Dataset]]], optional): predict dataset(s).
-            Defaults to None.
-        train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
-        val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
-        test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
-        predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
-        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
-        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
-        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
-        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(
@@ -77,21 +55,10 @@ class LighterSystem(pl.LightningModule):
         criterion: Optional[Callable] = None,
         inferer: Optional[Callable] = None,
         freezer: Optional[Callable] = None,
-        train_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        val_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        test_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        predict_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        train_sampler: Optional[Sampler] = None,
-        val_sampler: Optional[Sampler] = None,
-        test_sampler: Optional[Sampler] = None,
-        predict_sampler: Optional[Sampler] = None,
-        train_collate: Optional[Callable] = None,
-        val_collate: Optional[Callable] = None,
-        test_collate: Optional[Callable] = None,
-        predict_collate: Optional[Callable] = None,
+        metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
+        datasets: Optional[Dict[str, Optional[Union[Dataset, List[Dataset]]]]] = None,
+        samplers: Optional[Dict[str, Optional[Sampler]]] = None,
+        collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
@@ -107,38 +74,17 @@ class LighterSystem(pl.LightningModule):
         self.optimizer = ensure_list(optimizer)
         self.scheduler = ensure_list(scheduler)
 
-        # Datasets
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        self.test_dataset = test_dataset
-        self.predict_dataset = predict_dataset
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-        # Samplers
-        self.train_sampler = train_sampler
-        self.val_sampler = val_sampler
-        self.test_sampler = test_sampler
-        self.predict_sampler = predict_sampler
-
-        # Collate functions
-        self.train_collate = train_collate
-        self.val_collate = val_collate
-        self.test_collate = test_collate
-        self.predict_collate = predict_collate
-
-        # Metrics
-        self.train_metrics = MetricCollection(ensure_list(train_metrics))
-        self.val_metrics = MetricCollection(ensure_list(val_metrics))
-        self.test_metrics = MetricCollection(ensure_list(test_metrics))
-
-        # Criterion-specific activation function and data type casting
-        self._post_criterion_activation = post_criterion_activation
-        self._cast_target_dtype_to = cast_target_dtype_to
+        # Datasets, samplers, collate functions, and metrics
+        self.datasets = Datasets(**datasets) if datasets is not None else Datasets()
+        self.samplers = Samplers(**samplers) if samplers is not None else Samplers()
+        self.collate_fns = CollateFunctions(**collate_fns) if collate_fns is not None else CollateFunctions()
+        self.metrics = Metrics(**metrics) if metrics is not None else Metrics()
 
         # Inferer for val, test, and predict
         self.inferer = inferer
-
         # Layer freezer
         self.freezer = freezer
 
@@ -227,7 +173,7 @@ class LighterSystem(pl.LightningModule):
             return pred
         else:
             # Calculate the metrics for the step.
-            metrics = getattr(self, f"{mode}_metrics")(pred, target)
+            metrics = self.metrics[mode](pred, target)
             # Log the loss and metrics for monitoring purposes only.
             self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
             self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
@@ -278,13 +224,12 @@ class LighterSystem(pl.LightningModule):
         Returns:
             DataLoader: instantiated DataLoader.
         """
-        dataset = getattr(self, f"{mode}_dataset")
-        sampler = getattr(self, f"{mode}_sampler")
-        collate_fn = getattr(self, f"{mode}_collate")
+        dataset = self.dataset[mode]
+        sampler = self.samplers[mode]
+        collate_fn = self.collate_fns[mode]
 
         if dataset is None:
-            logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
-            sys.exit()
+            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
 
         # Batch size is 1 when using an inference for two reasons:
         # 1) Inferer separates an input into multiple parts, forming a batch of its own.
