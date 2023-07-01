@@ -6,15 +6,13 @@ from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.misc import ensure_list
 
-# Define a dataclass Datasets that will hold the datasets for train, val, test, and predict. Defaults to None.
 @dataclass
 class Datasets:
-    train: Optional[Union[Dataset, List[Dataset]]] = None
-    val: Optional[Union[Dataset, List[Dataset]]] = None
-    test: Optional[Union[Dataset, List[Dataset]]] = None
-    predict: Optional[Union[Dataset, List[Dataset]]] = None 
+    train: Optional[Dataset] = None
+    val: Optional[Dataset] = None
+    test: Optional[Dataset] = None
+    predict: Optional[Dataset] = None 
 
-# Define a dataclass Samplers that will hold the samplers for train, val, test, and predict. Defaults to None.
 @dataclass
 class Samplers:
     train: Optional[Sampler] = None
@@ -22,7 +20,6 @@ class Samplers:
     test: Optional[Sampler] = None
     predict: Optional[Sampler] = None
 
-# Define a dataclass Collate that will hold the collate functions for train, val, test, and predict. Defaults to None.
 @dataclass
 class CollateFunctions:
     train: Optional[Callable] = None
@@ -30,14 +27,14 @@ class CollateFunctions:
     test: Optional[Callable] = None
     predict: Optional[Callable] = None
 
-# Define a dataclass Metrics that will hold the metrics for train, val, test,. Defaults to None.
 @dataclass
 class Metrics:
     train: Optional[Union[Metric, List[Metric]]] = None
     val: Optional[Union[Metric, List[Metric]]] = None
     test: Optional[Union[Metric, List[Metric]]] = None
 
-    def _post_init(self):
+    def __post_init__(self):
+        """Converts a list of metrics to MetricCollection after it has been assigned.""" 
         self.train = MetricCollection(ensure_list(self.train))
         self.val = MetricCollection(ensure_list(self.val))
         self.test = MetricCollection(ensure_list(self.test))

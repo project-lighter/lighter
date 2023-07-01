@@ -32,6 +32,15 @@ class LighterSystem(pl.LightningModule):
             a single or a list of schedulers. Defaults to None.
         criterion (Optional[Callable], optional):
             criterion/loss function. Defaults to None.
+        datasets (Optional[Dict[str, Optional[Dataset]]], optional):
+            datasets for train, val, test, and predict. Supports Defaults to None.
+        samplers (Optional[Dict[str, Optional[Sampler]]], optional):
+            samplers for train, val, test, and predict. Defaults to None.
+        collate_fns (Optional[Dict[str, Optional[Callable]]], optional):
+            collate functions for train, val, test, and predict. Defaults to None.
+        metrics (Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]], optional):
+            metrics for train, val, and test. Supports a single metric or a list of metrics,
+            implemented using `torchmetrics`. Defaults to None.
         inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
@@ -53,12 +62,12 @@ class LighterSystem(pl.LightningModule):
         optimizer: Optional[Union[Optimizer, List[Optimizer]]] = None,
         scheduler: Optional[Union[Callable, List[Callable]]] = None,
         criterion: Optional[Callable] = None,
-        inferer: Optional[Callable] = None,
-        freezer: Optional[Callable] = None,
-        metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
-        datasets: Optional[Dict[str, Optional[Union[Dataset, List[Dataset]]]]] = None,
+        datasets: Optional[Dict[str, Optional[Dataset]]] = None,
         samplers: Optional[Dict[str, Optional[Sampler]]] = None,
         collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
+        metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
+        inferer: Optional[Callable] = None,
+        freezer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
