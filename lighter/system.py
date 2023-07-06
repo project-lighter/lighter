@@ -46,9 +46,6 @@ class LighterSystem(pl.LightningModule):
             is a sliding window or a patch-based inferer that will infer over the smaller parts of
             the input, combine them, and return a single output. The inferers provided by MONAI
             cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
-        freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
-            method that accepts three arguments - the model, the step, and the epoch number.
-            Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
     """
 
     def __init__(
@@ -66,7 +63,6 @@ class LighterSystem(pl.LightningModule):
         collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
         metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
         inferer: Optional[Callable] = None,
-        freezer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
@@ -103,8 +99,6 @@ class LighterSystem(pl.LightningModule):
 
         # Inferer for val, test, and predict
         self.inferer = inferer
-        # Layer freezer
-        self.freezer = freezer
 
         # Checks
         self._lightning_module_methods_defined = False
@@ -120,9 +114,6 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Any: output of the model.
         """
-        # Freeze the layers if specified so.
-        if self.freezer is not None:
-            self.freezer(self.model, self.global_step, self.current_epoch)
 
         # Keyword arguments to pass to the forward method
         kwargs = {}
