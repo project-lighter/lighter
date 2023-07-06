@@ -39,8 +39,9 @@ def ensure_dict_schema(input_dict: Dict, schema_keys: List[Union[str, List]]) ->
         ValueError: If the input dictionary has other keys than the specified schema keys.
 
     """
-    schema = {key: None for key in schema_keys}
-    output_dict = schema.update(input_dict) if input_dict is not None else schema
+    output_dict = {key: None for key in schema_keys}
+    if input_dict is not None:
+        output_dict.update(input_dict)
     if set(output_dict.keys()) != set(schema_keys):
         raise ValueError(f"Following keys are defined by the schema: {schema_keys}, found: {list(output_dict.keys())}.")
     return output_dict
