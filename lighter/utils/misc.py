@@ -1,4 +1,4 @@
-from typing import Any, Callable, List
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import inspect
 import sys
@@ -22,6 +22,28 @@ def ensure_list(vals: Any) -> List:
     if vals is None:
         return []
     return [vals]
+
+
+def ensure_dict_schema(input_dict: Dict, schema_keys: List[Union[str, List]]) -> Dict:
+    """
+    Ensure that the input dict has the schema keys. If no value is set for a key, set it to None.
+
+    Args:
+        schema_keys (List[Union[str, List]]): A list of keys for the schema dictionary.
+        input_dict (Optional[Dict]): The input dictionary to merge with the schema.
+
+    Returns:
+        Dict: The merged dictionary. If input_dict is None, returns the schema dictionary.
+
+    Raises:
+        ValueError: If the input dictionary has other keys than the specified schema keys.
+
+    """
+    schema = {key: None for key in schema_keys}
+    output_dict = (schema | input_dict) if input_dict is not None else schema
+    if set(output_dict.keys()) != set(schema_keys):
+        raise ValueError(f"Following keys are defined by the schema: {schema_keys}, found: {list(output_dict.keys())}.")
+    return output_dict
 
 
 def setattr_dot_notation(obj: Callable, attr: str, value: Any):

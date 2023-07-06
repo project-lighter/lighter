@@ -249,7 +249,7 @@ class LighterLogger(Callback):
 
             # Metrics
             # Get the torchmetrics.
-            metric_collection = getattr(pl_module, f"{mode}_metrics")
+            metric_collection = pl_module.metrics[mode]
             if metric_collection is not None:
                 # Compute the epoch metrics.
                 metrics = metric_collection.compute()

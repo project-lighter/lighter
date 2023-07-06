@@ -7,24 +7,6 @@ from torch.nn import Identity, Module, Sequential
 from lighter.utils.misc import setattr_dot_notation
 
 
-def reshape_pred_if_single_value_prediction(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """When the task is to predict a single value, pred and target dimensions often
-    mismatch - dataloader returns the value in the (B) shape, while the network
-    returns predictions in the (B, 1) shape, where the second dim is redundant.
-
-    Args:
-        pred (torch.Tensor): predicted tensor.
-        target (torch.Tensor): target tensor.
-
-    Returns:
-        torch.Tensor: reshaped predicted tensor if that was necessary.
-    """
-    if isinstance(pred, torch.Tensor) and target is not None:
-        if len(pred.shape) == 2 and len(target.shape) == 1 == pred.shape[1]:
-            return pred.flatten()
-    return pred
-
-
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
     """Replaces the specified layer of the network with another layer.
 

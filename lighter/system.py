@@ -12,9 +12,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import ensure_list, get_name, hasarg
-from lighter.utils.model import reshape_pred_if_single_value_prediction
-from lighter.typing import Datasets, Samplers, CollateFunctions, Metrics
+from lighter.utils.misc import ensure_dict_schema, ensure_list, get_name, hasarg
+
 
 class LighterSystem(pl.LightningModule):
     """_summary_
@@ -83,14 +82,24 @@ class LighterSystem(pl.LightningModule):
         self.optimizer = ensure_list(optimizer)
         self.scheduler = ensure_list(scheduler)
 
+        # DataLoader specifics
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-        # Datasets, samplers, collate functions, and metrics
-        self.datasets = Datasets(**datasets) if datasets is not None else Datasets()
-        self.samplers = Samplers(**samplers) if samplers is not None else Samplers()
-        self.collate_fns = CollateFunctions(**collate_fns) if collate_fns is not None else CollateFunctions()
-        self.metrics = Metrics(**metrics) if metrics is not None else Metrics()
+        # Datasets, samplers, and collate functions
+        self.datasets = ensure_dict_schema(datasets, schema_keys=["train", "val", "test", "predict"])
+        self.samplers = ensure_dict_schema(samplers, schema_keys=["train", "val", "test", "predict"])
+        self.collate_fns = ensure_dict_schema(collate_fns, schema_keys=["train", "val", "test", "predict"])
+
+        # Metrics
+        self.metrics = ensure_dict_schema(metrics, schema_keys=["train", "val", "test"])
+        self.metrics = {mode: MetricCollection(ensure_list(metric)) for mode, metric in self.metrics.items()}
+        # Register the metrics, which allows the LightningModule, to automatically move them to the correct device.
+        # Currently, a workaround is needed because of https://github.com/pytorch/pytorch/issues/71203.
+        # Once it's fixed, we can set `self.metrics = ModuleDict(self.metrics)` directly.
+        for mode, mode_metrics in self.metrics.items():
+            setattr(self, f"{mode}_metric", mode_metrics)
+            self.metrics[mode] = getattr(self, f"{mode}_metric")
 
         # Inferer for val, test, and predict
         self.inferer = inferer
@@ -170,15 +179,11 @@ class LighterSystem(pl.LightningModule):
         else:
             pred = self(input)
 
-        pred = reshape_pred_if_single_value_prediction(pred, target)
-
         # Calculate the loss.
-        loss = None
-        if mode in ["train", "val"]:
-            loss = self._calculate_loss(pred, target)
+        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
 
+        # Log and return the results.
         if mode == "predict":
-            # In predict mode, skip the metrics and return the predicted value only.
             return pred
         else:
             # Calculate the metrics for the step.
@@ -201,6 +206,7 @@ class LighterSystem(pl.LightningModule):
         Returns:
             torch.Tensor: the calculated loss.
         """
+
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
         # Add `target` argument if forward accepts it.
@@ -233,7 +239,7 @@ class LighterSystem(pl.LightningModule):
         Returns:
             DataLoader: instantiated DataLoader.
         """
-        dataset = self.dataset[mode]
+        dataset = self.datasets[mode]
         sampler = self.samplers[mode]
         collate_fn = self.collate_fns[mode]
 
@@ -302,8 +308,8 @@ class LighterSystem(pl.LightningModule):
                 self.predict_dataloader,
                 self.predict_step,
             )
-            # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
-            #  parameter, and deleting the above methods again breaks it. This flag prevents it.
+            # Prevents the methods from being defined again. This is needed because `Trainer.tune()`
+            # calls the `self.setup()` method whenever it runs for a new parameter.
             self._lightning_module_methods_defined = True
 
         # Training methods.
@@ -312,7 +318,7 @@ class LighterSystem(pl.LightningModule):
             self.training_step = partial(self._base_step, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.val_dataset is not None):
+        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
             self.val_dataloader = partial(self._base_dataloader, mode="val")
             self.validation_step = partial(self._base_step, mode="val")
 
