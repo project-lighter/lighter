@@ -17,6 +17,9 @@ class LighterFreezer(Callback):
     Args:
         names (str, List[str], optional): The names of the parameters to be frozen. Defaults to None.
         name_starts_with (str, List[str], optional): The prefixes of the parameter names to be frozen. Defaults to None.
+        except_names (str, List[str], optional): The names of the parameters to be excluded from freezing. Defaults to None.
+        except_name_starts_with (str, List[str], optional): The prefixes of the parameter names to be excluded from freezing.
+            Defaults to None.
         until_step (int, optional): The maximum step to freeze parameters until. Defaults to None.
         until_epoch (int, optional): The maximum epoch to freeze parameters until. Defaults to None.
 
@@ -30,6 +33,8 @@ class LighterFreezer(Callback):
         self,
         names: Optional[Union[str, List[str]]] = None,
         name_starts_with: Optional[Union[str, List[str]]] = None,
+        except_names: Optional[Union[str, List[str]]] = None,
+        except_name_starts_with: Optional[Union[str, List[str]]] = None,
         until_step: int = None,
         until_epoch: int = None,
     ) -> None:
@@ -43,6 +48,8 @@ class LighterFreezer(Callback):
 
         self.names = ensure_list(names)
         self.name_starts_with = ensure_list(name_starts_with)
+        self.except_names = ensure_list(except_names)
+        self.except_name_starts_with = ensure_list(except_name_starts_with)
         self.until_step = until_step
         self.until_epoch = until_epoch
 
@@ -110,7 +117,13 @@ class LighterFreezer(Callback):
         frozen_layers = []
         # Freeze the specified parameters.
         for name, param in model.named_parameters():
-            if self.names and name in self.names:
+            # Skip the parameters that are excluded from freezing.
+            if self.except_names and name in self.except_names:
+                param.requires_grad = True
+            elif self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with):
+                param.requires_grad = True
+            # Freeze the specified parameters.
+            elif self.names and name in self.names:
                 param.requires_grad = requires_grad
                 frozen_layers.append(name)
             elif self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
