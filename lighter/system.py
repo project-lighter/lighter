@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import ensure_dict_schema, ensure_list, get_name, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, ensure_list, get_name, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -41,10 +41,11 @@ class LighterSystem(pl.LightningModule):
             metrics for train, val, and test. Supports a single metric or a list of metrics,
             implemented using `torchmetrics`. Defaults to None.
         postprocessing (Optional[Dict[str, Optional[Callable]]], optional):
-            Postprocessing functions for input, target, and pred, for two stages - criterion and logging.
-            The criterion postprocessing is applied prior to loss and metrics calculation.
-            The logging postprocessing is applied after the loss and metrics, and before logging the data.
-            The logging postprocessing is done on top of the criterion postprocessing. Defaults to None.
+            Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
+            and logging. The postprocessing is done before each stage - for example, criterion postprocessing
+            will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
+            top of the previous one(s) - for example, the logging postprocessing will be done on the data that
+            has been postprocessed for the criterion and metrics earlier. Defaults to None.
         inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
@@ -67,6 +68,7 @@ class LighterSystem(pl.LightningModule):
         samplers: Optional[Dict[str, Optional[Sampler]]] = None,
         collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
         metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
+        postprocessing: Optional[Dict[str, Optional[Callable]]] = None,
         inferer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
@@ -88,19 +90,25 @@ class LighterSystem(pl.LightningModule):
         self.pin_memory = pin_memory
 
         # Datasets, samplers, and collate functions
-        self.datasets = ensure_dict_schema(datasets, schema_keys=["train", "val", "test", "predict"])
-        self.samplers = ensure_dict_schema(samplers, schema_keys=["train", "val", "test", "predict"])
-        self.collate_fns = ensure_dict_schema(collate_fns, schema_keys=["train", "val", "test", "predict"])
+        schema = {"train": None, "val": None, "test": None, "predict": None}
+        self.datasets = ensure_dict_schema(datasets, schema)
+        self.samplers = ensure_dict_schema(samplers, schema)
+        self.collate_fns = ensure_dict_schema(collate_fns, schema)
 
         # Metrics
-        self.metrics = ensure_dict_schema(metrics, schema_keys=["train", "val", "test"])
+        self.metrics = ensure_dict_schema(metrics, schema={"train": None, "val": None, "test": None})
         self.metrics = {mode: MetricCollection(ensure_list(metric)) for mode, metric in self.metrics.items()}
-        # Register the metrics, which allows the LightningModule, to automatically move them to the correct device.
+        # Register the metrics to allow the LightningModule to automatically move them to the correct device.
         # Currently, a workaround is needed because of https://github.com/pytorch/pytorch/issues/71203.
         # Once it's fixed, we can set `self.metrics = ModuleDict(self.metrics)` directly.
         for mode, mode_metrics in self.metrics.items():
             setattr(self, f"{mode}_metric", mode_metrics)
             self.metrics[mode] = getattr(self, f"{mode}_metric")
+
+        # Postprocessing
+        schema = {"input": None, "target": None, "pred": None}
+        schema = {"criterion": schema, "metrics": schema, "logging": schema}
+        self.postprocessing = ensure_dict_schema(postprocessing, schema)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
@@ -175,6 +183,8 @@ class LighterSystem(pl.LightningModule):
         else:
             pred = self(input)
 
+        # Data postprocessing for criterion.
+        input, target, pred = self._postprocess_data(input, target, pred, stage="criterion")
         # Calculate the loss.
         loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
         # Log the loss for monitoring purposes.
@@ -192,10 +202,14 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             return pred
         else:
+            # Data postprocessing for metrics.
+            input, target, pred = self._postprocess_data(input, target, pred, stage="metrics")
             # Calculate the metrics for the step.
             metrics = self.metrics[mode](pred, target)
             # Log the metrics for monitoring purposes.
             self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+            # Data postprocessing for logging.
+            input, target, pred = self._postprocess_data(input, target, pred, stage="logging")
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
@@ -226,12 +240,30 @@ class LighterSystem(pl.LightningModule):
                     f"The criterion `{get_name(self.criterion, True)}` "
                     "has no `target` argument. In such cases, the LighterSystem "
                     "passes only the predicted values to the criterion. "
-                    "This is intended as a support for self-supervised "
-                    "losses where target is not used. If this is not the "
-                    "behavior you expected, redefine your criterion "
-                    "so that it has a `target` argument."
+                    "If this is not the behavior you expected, redefine your "
+                    "criterion so that it has a `target` argument."
                 )
         return self.criterion(pred, **kwargs)
+
+    def _postprocess_data(
+        self,
+        input: Union[torch.Tensor, List, Tuple, Dict],
+        target: Union[torch.Tensor, List, Tuple, Dict, None],
+        pred: Union[torch.Tensor, List, Tuple, Dict],
+        stage: str,
+    ):
+        """Postprocess the input, target, and pred data for criterion, metrics, or logging.
+
+        Args:
+            input (Union[torch.Tensor, List, Tuple, Dict]): input data.
+            target (Union[torch.Tensor, List, Tuple, Dict, None]): target data.
+            pred (Union[torch.Tensor, List, Tuple, Dict]): predicted data.
+            stage (str): stage for which to postprocess the data ["criterion", "metrics", "logging"].
+        """
+        input = apply_fns(input, self.postprocessing[stage]["input"])
+        target = apply_fns(target, self.postprocessing[stage]["target"])
+        pred = apply_fns(pred, self.postprocessing[stage]["pred"])
+        return input, target, pred
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).

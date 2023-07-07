@@ -24,26 +24,32 @@ def ensure_list(vals: Any) -> List:
     return [vals]
 
 
-def ensure_dict_schema(input_dict: Dict, schema_keys: List[Union[str, List]]) -> Dict:
+def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Ensure that the input dict has the schema keys. If no value is set for a key, set it to None.
+    Ensure that the input dict has the specified schema. If no value is set
+    for a key in the input dict, the default value from the schema is used.
+    This function supports nested dictionaries.
 
     Args:
-        schema_keys (List[Union[str, List]]): A list of keys for the schema dictionary.
-        input_dict (Optional[Dict]): The input dictionary to merge with the schema.
+        input_dict (Dict[str, Any]): The input dictionary to merge with the schema.
+        schema (Dict[str, Any]): A schema dictionary with default values specified.
 
     Returns:
-        Dict: The merged dictionary. If input_dict is None, returns the schema dictionary.
+        Dict[str, Any]: The merged dictionary. If input_dict is None, returns the schema dictionary.
 
     Raises:
         ValueError: If the input dictionary has other keys than the specified schema keys.
 
     """
-    output_dict = {key: None for key in schema_keys}
+    output_dict = schema.copy()
     if input_dict is not None:
-        output_dict.update(input_dict)
-    if set(output_dict.keys()) != set(schema_keys):
-        raise ValueError(f"Following keys are defined by the schema: {schema_keys}, found: {list(output_dict.keys())}.")
+        for key, value in input_dict.items():
+            if key not in schema:
+                raise ValueError(f"Key {key} is not defined in the schema.")
+            if isinstance(value, dict) and isinstance(schema[key], dict):
+                output_dict[key] = ensure_dict_schema(value, schema[key])
+            else:
+                output_dict[key] = value
     return output_dict
 
 
@@ -97,3 +103,18 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
         module = type(_callable).__module__ if isinstance(_callable, object) else _callable.__module__
         name = f"{module}.{name}"
     return name
+
+
+def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
+    """Apply a function or a list of functions on the input.
+
+    Args:
+        data (Any): input to apply the function(s) on.
+        fns (Union[Callable, List[Callable]]): function or list of functions to apply on the input.
+
+    Returns:
+        Any: output of the function(s).
+    """
+    for fn in ensure_list(fns):
+        data = fn(data)
+    return data
