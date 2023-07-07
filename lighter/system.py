@@ -40,6 +40,11 @@ class LighterSystem(pl.LightningModule):
         metrics (Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]], optional):
             metrics for train, val, and test. Supports a single metric or a list of metrics,
             implemented using `torchmetrics`. Defaults to None.
+        postprocessing (Optional[Dict[str, Optional[Callable]]], optional):
+            Postprocessing functions for input, target, and pred, for two stages - criterion and logging.
+            The criterion postprocessing is applied prior to loss and metrics calculation.
+            The logging postprocessing is applied after the loss and metrics, and before logging the data.
+            The logging postprocessing is done on top of the criterion postprocessing. Defaults to None.
         inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
@@ -172,6 +177,16 @@ class LighterSystem(pl.LightningModule):
 
         # Calculate the loss.
         loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
+        # Log the loss for monitoring purposes.
+        self.log(
+            "loss" if mode == "train" else f"{mode}_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            sync_dist=True,
+            logger=False,
+            batch_size=self.batch_size,
+        )
 
         # Log and return the results.
         if mode == "predict":
@@ -179,19 +194,20 @@ class LighterSystem(pl.LightningModule):
         else:
             # Calculate the metrics for the step.
             metrics = self.metrics[mode](pred, target)
-            # Log the loss and metrics for monitoring purposes only.
-            self.log("loss" if mode == "train" else f"{mode}_loss", loss, on_step=True, on_epoch=True, logger=False)
-            self.log_dict(metrics, on_step=True, on_epoch=True, logger=False)
+            # Log the metrics for monitoring purposes.
+            self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
     ) -> torch.Tensor:
-        """_summary_
+        """Calculates the loss.
+        The method handles cases where the criterion function does not accept a `target` argument. If the criterion
+        function does not accept a `target` argument, the LighterSystem passes only the predicted values to the criterion.
 
         Args:
-            pred (torch.Tensor, List, Tuple, Dict, None): the predicted values from the model.
+            pred (torch.Tensor, List, Tuple, Dict): the predicted values from the model.
             target (torch.Tensor, List, Tuple, Dict, None): the target/label.
 
         Returns:
