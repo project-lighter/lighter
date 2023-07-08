@@ -24,8 +24,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
 
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.
-    Useful for removing the last layer of a network to be used as a backbone
-    of an SSL model.
+    Useful for removing layers of a network to be used as a backbone.
 
     Args:
         model (Module): PyTorch model to be edited
@@ -79,10 +78,12 @@ def adjust_prefix_and_load_state_dict(
     # Load checkpoint
     ckpt = torch.load(ckpt_path)
 
-    # Check if the checkpoint is a model's state_dict or a Lightning checkpoint.
-    # A Lightning checkpoint contains the model’s entire internal state, we only need its state_dict.
+    # Check if the checkpoint is a model's state_dict or a LighterSystem checkpoint.
+    # A LighterSystem checkpoint contains the model’s entire internal state, we only need its state_dict.
     if "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
+        # Remove the "model." prefix from the checkpoint's state_dict keys. This is characteristic to LighterSystem.
+        ckpt = {key.replace("model.", ""): value for key, value in ckpt.items()}
 
     # Adjust the keys in the checkpoint's state_dict to match the the model's state_dict's keys.
     if ckpt_to_model_prefix is not None:

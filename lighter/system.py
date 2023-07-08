@@ -301,7 +301,7 @@ class LighterSystem(pl.LightningModule):
             sampler=sampler,
             shuffle=(mode == "train" and sampler is None),
             batch_size=batch_size,
-            drop_last=self.drop_last_batch,
+            drop_last=(self.drop_last_batch if mode == "train" else False),
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             collate_fn=collate_fn,
