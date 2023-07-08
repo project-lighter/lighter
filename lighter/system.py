@@ -184,7 +184,10 @@ class LighterSystem(pl.LightningModule):
             pred = self(input)
 
         # Data postprocessing for criterion.
-        input, target, pred = self._postprocess_data(input, target, pred, stage="criterion")
+        input = apply_fns(input, self.postprocessing["criterion"]["input"])
+        target = apply_fns(target, self.postprocessing["criterion"]["target"])
+        pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
+
         # Calculate the loss.
         loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
         # Log the loss for monitoring purposes.
@@ -202,14 +205,21 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             return pred
         else:
-            # Data postprocessing for metrics.
-            input, target, pred = self._postprocess_data(input, target, pred, stage="metrics")
+            # Data postprocessing for metrics
+            input = apply_fns(input, self.postprocessing["metrics"]["input"])
+            target = apply_fns(target, self.postprocessing["metrics"]["target"])
+            pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
+
             # Calculate the metrics for the step.
             metrics = self.metrics[mode](pred, target)
             # Log the metrics for monitoring purposes.
             self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+
             # Data postprocessing for logging.
-            input, target, pred = self._postprocess_data(input, target, pred, stage="logging")
+            input = apply_fns(input, self.postprocessing["logging"]["input"])
+            target = apply_fns(target, self.postprocessing["logging"]["target"])
+            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
@@ -244,26 +254,6 @@ class LighterSystem(pl.LightningModule):
                     "criterion so that it has a `target` argument."
                 )
         return self.criterion(pred, **kwargs)
-
-    def _postprocess_data(
-        self,
-        input: Union[torch.Tensor, List, Tuple, Dict],
-        target: Union[torch.Tensor, List, Tuple, Dict, None],
-        pred: Union[torch.Tensor, List, Tuple, Dict],
-        stage: str,
-    ):
-        """Postprocess the input, target, and pred data for criterion, metrics, or logging.
-
-        Args:
-            input (Union[torch.Tensor, List, Tuple, Dict]): input data.
-            target (Union[torch.Tensor, List, Tuple, Dict, None]): target data.
-            pred (Union[torch.Tensor, List, Tuple, Dict]): predicted data.
-            stage (str): stage for which to postprocess the data ["criterion", "metrics", "logging"].
-        """
-        input = apply_fns(input, self.postprocessing[stage]["input"])
-        target = apply_fns(target, self.postprocessing[stage]["target"])
-        pred = apply_fns(pred, self.postprocessing[stage]["pred"])
-        return input, target, pred
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
@@ -373,9 +363,9 @@ class LighterSystem(pl.LightningModule):
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
-        in the `self.setup()` method. However, `LightningModule` excepts them to be defined at
-        the initialization. To prevent it from throwing an error, the `..._dataloader()` and
-        `..._step()` are initially defined as `lambda: None`, before `self.setup()` is called.
+        in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
+        at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
+        are initially defined as `lambda: None`, before `self.setup()` is called.
         """
         self.train_dataloader = self.training_step = lambda: None
         self.val_dataloader = self.validation_step = lambda: None
