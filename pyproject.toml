@@ -50,13 +50,24 @@ fire = "^0.5.0"
 loguru = "^0.6.0"
 lightly = "^1.2.43"
 torchmetrics = "^0.11.0"
-py = "^1.11.0"
 tensorboard = "^2.11.2"
 monai-weekly = "^1.2.dev2305"
 requests = "^2.31.0"
 
-[tool.poetry.group.dev.dependencies]
-bandit = "^1.7.4"
+[tool.poetry.group.safety]
+optional = true
+
+[tool.poetry.group.style]
+optional = true
+
+[tool.poetry.group.tests]
+optional = true
+
+[tool.poetry.group.safety.dependencies]
+bandit = "^1.7.5"
+safety = "^2.3.5"
+
+[tool.poetry.group.style.dependencies]
 black = {version = "^23.1a1", allow-prereleases = true}
 isort = {extras = ["colors"], version = "^5.11.4"}
 mypy = "^0.991"
@@ -64,17 +75,20 @@ mypy-extensions = "^0.4.3"
 pre-commit = "^2.21.0"
 pydocstyle = "^6.3.0"
 pylint = "^2.15.10"
-pytest = "^7.2.1"
 pyupgrade = "^3.3.1"
-safety = "^2.3.5"
-coverage = "^7.0.5"
-coverage-badge = "^1.1.0"
+
+[tool.poetry.group.tests.dependencies]
+pytest = "^7.4.0"
 pytest-html = "^3.2.0"
 pytest-cov = "^4.0.0"
-aiohttp = "^3.8.3"
-py = "^1.11.0"
+coverage = "^7.0.5"
+coverage-badge = "^1.1.0"
+
+[tool.poetry.group.dev.dependencies]
 poetry-bumpversion = "^0.3.0"
 typing-extensions = "^4.4.0"
+aiohttp = "^3.8.3"
+
 
 [tool.black]
 # https://github.com/psf/black
