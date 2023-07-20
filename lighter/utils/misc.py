@@ -1,4 +1,4 @@
-from typing import Any, Callable, List
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import inspect
 import sys
@@ -22,6 +22,35 @@ def ensure_list(vals: Any) -> List:
     if vals is None:
         return []
     return [vals]
+
+
+def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Ensure that the input dict has the specified schema. If no value is set
+    for a key in the input dict, the default value from the schema is used.
+    This function supports nested dictionaries.
+
+    Args:
+        input_dict (Dict[str, Any]): The input dictionary to merge with the schema.
+        schema (Dict[str, Any]): A schema dictionary with default values specified.
+
+    Returns:
+        Dict[str, Any]: The merged dictionary. If input_dict is None, returns the schema dictionary.
+
+    Raises:
+        ValueError: If the input dictionary has other keys than the specified schema keys.
+
+    """
+    output_dict = schema.copy()
+    if input_dict is not None:
+        for key, value in input_dict.items():
+            if key not in schema:
+                raise ValueError(f"Key {key} is not defined in the schema.")
+            if isinstance(value, dict) and isinstance(schema[key], dict):
+                output_dict[key] = ensure_dict_schema(value, schema[key])
+            else:
+                output_dict[key] = value
+    return output_dict
 
 
 def setattr_dot_notation(obj: Callable, attr: str, value: Any):
@@ -74,3 +103,18 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
         module = type(_callable).__module__ if isinstance(_callable, object) else _callable.__module__
         name = f"{module}.{name}"
     return name
+
+
+def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
+    """Apply a function or a list of functions on the input.
+
+    Args:
+        data (Any): input to apply the function(s) on.
+        fns (Union[Callable, List[Callable]]): function or list of functions to apply on the input.
+
+    Returns:
+        Any: output of the function(s).
+    """
+    for fn in ensure_list(fns):
+        data = fn(data)
+    return data

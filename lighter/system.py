@@ -12,8 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import ensure_list, get_name, hasarg
-from lighter.utils.model import reshape_pred_if_single_value_prediction
+from lighter.utils.misc import apply_fns, ensure_dict_schema, ensure_list, get_name, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -26,50 +25,33 @@ class LighterSystem(pl.LightningModule):
             should be dropped. Defaults to False.
         num_workers (int, optional): number of dataloader workers. Defaults to 0.
         pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
-        optimizers (Optional[Union[Optimizer, List[Optimizer]]], optional):
+        optimizer (Optional[Union[Optimizer, List[Optimizer]]], optional):
             a single or a list of optimizers. Defaults to None.
-        schedulers (Optional[Union[Callable, List[Callable]]], optional):
+        scheduler (Optional[Union[Callable, List[Callable]]], optional):
             a single or a list of schedulers. Defaults to None.
         criterion (Optional[Callable], optional):
             criterion/loss function. Defaults to None.
-        cast_target_dtype_to (Optional[str], optional): whether to cast the target to the
-            specified type before calculating the loss. May be necessary for some criterions.
-            Defaults to None.
-        post_criterion_activation (Optional[str], optional): some criterions
-            (e.g. BCEWithLogitsLoss) require non-activated prediction for their calculaiton.
-            However, to calculate the metrics and log the data, it may be necessary to activate
-            the predictions. Defaults to None.
+        datasets (Optional[Dict[str, Optional[Dataset]]], optional):
+            datasets for train, val, test, and predict. Supports Defaults to None.
+        samplers (Optional[Dict[str, Optional[Sampler]]], optional):
+            samplers for train, val, test, and predict. Defaults to None.
+        collate_fns (Optional[Dict[str, Optional[Callable]]], optional):
+            collate functions for train, val, test, and predict. Defaults to None.
+        metrics (Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]], optional):
+            metrics for train, val, and test. Supports a single metric or a list of metrics,
+            implemented using `torchmetrics`. Defaults to None.
+        postprocessing (Optional[Dict[str, Optional[Callable]]], optional):
+            Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
+            and logging. The postprocessing is done before each stage - for example, criterion postprocessing
+            will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
+            top of the previous one(s) - for example, the logging postprocessing will be done on the data that
+            has been postprocessed for the criterion and metrics earlier. Defaults to None.
         inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
             is a sliding window or a patch-based inferer that will infer over the smaller parts of
             the input, combine them, and return a single output. The inferers provided by MONAI
             cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
-        freezer (Optional[Callable], optional): the freezer must be a class with a `__call__`
-            method that accepts three arguments - the model, the step, and the epoch number.
-            Use `lighter.utils.freezer.LighterFreezer` or implement your own based on it. Defaults to None.
-        train_metrics (Optional[Union[Metric, List[Metric]]], optional): training metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        val_metrics (Optional[Union[Metric, List[Metric]]], optional): validation metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        test_metrics (Optional[Union[Metric, List[Metric]]], optional): test metric(s).
-            They have to be implemented using `torchmetrics`. Defaults to None.
-        train_dataset (Optional[Union[Dataset, List[Dataset]]], optional): training dataset(s).
-            Defaults to None.
-        val_dataset (Optional[Union[Dataset, List[Dataset]]], optional): validation dataset(s).
-            Defaults to None.
-        test_dataset (Optional[Union[Dataset, List[Dataset]]], optional): test dataset(s).
-            Defaults to None.
-        predict_dataset (Optional[Union[Dataset, List[Dataset]]], optional): predict dataset(s).
-            Defaults to None.
-        train_sampler (Optional[Sampler], optional): training sampler(s). Defaults to None.
-        val_sampler (Optional[Sampler], optional): validation sampler(s). Defaults to None.
-        test_sampler (Optional[Sampler], optional):  test sampler(s). Defaults to None.
-        predict_sampler (Optional[Sampler], optional):  predict sampler(s). Defaults to None.
-        train_collate (Optional[Callable], optional): custom training collate function. Defaults to None.
-        val_collate (Optional[Callable], optional): custom validation collate function. Defaults to None.
-        test_collate (Optional[Callable], optional):  custom test collate function. Defaults to None.
-        predict_collate (Optional[Callable], optional):  custom predict collate function. Defaults to None.
     """
 
     def __init__(
@@ -79,28 +61,15 @@ class LighterSystem(pl.LightningModule):
         drop_last_batch: bool = False,
         num_workers: int = 0,
         pin_memory: bool = True,
-        optimizers: Optional[Union[Optimizer, List[Optimizer]]] = None,
-        schedulers: Optional[Union[Callable, List[Callable]]] = None,
+        optimizer: Optional[Union[Optimizer, List[Optimizer]]] = None,
+        scheduler: Optional[Union[Callable, List[Callable]]] = None,
         criterion: Optional[Callable] = None,
-        cast_target_dtype_to: Optional[str] = None,
-        post_criterion_activation: Optional[str] = None,
+        datasets: Optional[Dict[str, Optional[Dataset]]] = None,
+        samplers: Optional[Dict[str, Optional[Sampler]]] = None,
+        collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
+        metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
+        postprocessing: Optional[Dict[str, Optional[Callable]]] = None,
         inferer: Optional[Callable] = None,
-        freezer: Optional[Callable] = None,
-        train_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        val_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        test_metrics: Optional[Union[Metric, List[Metric]]] = None,
-        train_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        val_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        test_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        predict_dataset: Optional[Union[Dataset, List[Dataset]]] = None,
-        train_sampler: Optional[Sampler] = None,
-        val_sampler: Optional[Sampler] = None,
-        test_sampler: Optional[Sampler] = None,
-        predict_sampler: Optional[Sampler] = None,
-        train_collate: Optional[Callable] = None,
-        val_collate: Optional[Callable] = None,
-        test_collate: Optional[Callable] = None,
-        predict_collate: Optional[Callable] = None,
     ) -> None:
         super().__init__()
         # Bypass LightningModule's check for default methods. We define them in self.setup().
@@ -113,43 +82,36 @@ class LighterSystem(pl.LightningModule):
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
-        self.optimizers = ensure_list(optimizers)
-        self.schedulers = ensure_list(schedulers)
+        self.optimizer = ensure_list(optimizer)
+        self.scheduler = ensure_list(scheduler)
 
-        # Datasets
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        self.test_dataset = test_dataset
-        self.predict_dataset = predict_dataset
+        # DataLoader specifics
         self.num_workers = num_workers
         self.pin_memory = pin_memory
 
-        # Samplers
-        self.train_sampler = train_sampler
-        self.val_sampler = val_sampler
-        self.test_sampler = test_sampler
-        self.predict_sampler = predict_sampler
-
-        # Collate functions
-        self.train_collate = train_collate
-        self.val_collate = val_collate
-        self.test_collate = test_collate
-        self.predict_collate = predict_collate
+        # Datasets, samplers, and collate functions
+        schema = {"train": None, "val": None, "test": None, "predict": None}
+        self.datasets = ensure_dict_schema(datasets, schema)
+        self.samplers = ensure_dict_schema(samplers, schema)
+        self.collate_fns = ensure_dict_schema(collate_fns, schema)
 
         # Metrics
-        self.train_metrics = MetricCollection(ensure_list(train_metrics))
-        self.val_metrics = MetricCollection(ensure_list(val_metrics))
-        self.test_metrics = MetricCollection(ensure_list(test_metrics))
+        self.metrics = ensure_dict_schema(metrics, schema={"train": None, "val": None, "test": None})
+        self.metrics = {mode: MetricCollection(ensure_list(metric)) for mode, metric in self.metrics.items()}
+        # Register the metrics to allow the LightningModule to automatically move them to the correct device.
+        # Currently, a workaround is needed because of https://github.com/pytorch/pytorch/issues/71203.
+        # Once it's fixed, we can set `self.metrics = ModuleDict(self.metrics)` directly.
+        for mode, mode_metrics in self.metrics.items():
+            setattr(self, f"{mode}_metric", mode_metrics)
+            self.metrics[mode] = getattr(self, f"{mode}_metric")
 
-        # Criterion-specific activation function and data type casting
-        self._post_criterion_activation = post_criterion_activation
-        self._cast_target_dtype_to = cast_target_dtype_to
+        # Postprocessing
+        schema = {"input": None, "target": None, "pred": None}
+        schema = {"criterion": schema, "metrics": schema, "logging": schema}
+        self.postprocessing = ensure_dict_schema(postprocessing, schema)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
-
-        # Layer freezer
-        self.freezer = freezer
 
         # Checks
         self._lightning_module_methods_defined = False
@@ -165,17 +127,14 @@ class LighterSystem(pl.LightningModule):
         Returns:
             Any: output of the model.
         """
-        # Freeze the layers if specified so.
-        if self.freezer is not None:
-            self.freezer(self.model, self.global_step, self.current_epoch)
 
         # Keyword arguments to pass to the forward method
         kwargs = {}
+        # Add `epoch` argument if forward accepts it
         if hasarg(self.model.forward, "epoch"):
-            # Add `epoch` argument if forward accepts it
             kwargs["epoch"] = self.current_epoch
+        # Add `step` argument if forward accepts it
         if hasarg(self.model.forward, "step"):
-            # Add `step` argument if forward accepts it
             kwargs["step"] = self.global_step
 
         return self.model(input, **kwargs)
@@ -224,50 +183,66 @@ class LighterSystem(pl.LightningModule):
         else:
             pred = self(input)
 
-        pred = reshape_pred_if_single_value_prediction(pred, target)
+        # Data postprocessing for criterion.
+        input = apply_fns(input, self.postprocessing["criterion"]["input"])
+        target = apply_fns(target, self.postprocessing["criterion"]["target"])
+        pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
 
         # Calculate the loss.
-        loss = None
-        if mode in ["train", "val"]:
-            loss = self._calculate_loss(pred, target)
-            loss_name = "loss" if mode == "train" else f"{mode}_loss"
-            # Log the loss and for monitoring purposes.
-            self.log(loss_name, loss, on_step=True, on_epoch=True, sync_dist=False, logger=False, batch_size=self.batch_size)
+        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
+        # Log the loss for monitoring purposes.
+        self.log(
+            "loss" if mode == "train" else f"{mode}_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            sync_dist=True,
+            logger=False,
+            batch_size=self.batch_size,
+        )
 
-        # Apply the post-criterion activation. Necessary for measuring the metrics
-        # correctly in cases when using a criterion such as `BCELossWithLogits`` which
-        # requires the model to output logits, i.e. non-activated outputs.
-        if self._post_criterion_activation is not None:
-            pred = self._post_criterion_activation(pred)
-
+        # Log and return the results.
         if mode == "predict":
-            # In predict mode, skip the metrics and return the predicted value only.
             return pred
         else:
+            # Data postprocessing for metrics
+            input = apply_fns(input, self.postprocessing["metrics"]["input"])
+            target = apply_fns(target, self.postprocessing["metrics"]["target"])
+            pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
+
             # Calculate the metrics for the step.
-            metrics = getattr(self, f"{mode}_metrics")(pred, target)
+            metrics = self.metrics[mode](pred, target)
             # Log the metrics for monitoring purposes.
-            self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=False, logger=False, batch_size=self.batch_size)
+            self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+
+            # Data postprocessing for logging.
+            input = apply_fns(input, self.postprocessing["logging"]["input"])
+            target = apply_fns(target, self.postprocessing["logging"]["target"])
+            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+
             # Return the loss, metrics, input, target, and pred.
             return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
     ) -> torch.Tensor:
-        """_summary_
+        """Calculates the loss.
+        The method handles cases where the criterion function does not accept a `target` argument. If the criterion
+        function does not accept a `target` argument, the LighterSystem passes only the predicted values to the criterion.
 
         Args:
-            pred (torch.Tensor, List, Tuple, Dict, None): the predicted values from the model.
+            pred (torch.Tensor, List, Tuple, Dict): the predicted values from the model.
             target (torch.Tensor, List, Tuple, Dict, None): the target/label.
 
         Returns:
             torch.Tensor: the calculated loss.
         """
+
         # Keyword arguments to pass to the loss/criterion function
         kwargs = {}
+        # Add `target` argument if forward accepts it.
         if hasarg(self.criterion.forward, "target"):
-            # Add `target` argument if forward accepts it. Cast it if it is a tensor and if the target type is specified.
-            kwargs["target"] = target if not isinstance(target, torch.Tensor) else target.to(dtype=self._cast_target_dtype_to)
+            kwargs["target"] = target
         else:
             if not self._target_not_used_reported and not self.trainer.sanity_checking:
                 self._target_not_used_reported = True
@@ -275,10 +250,8 @@ class LighterSystem(pl.LightningModule):
                     f"The criterion `{get_name(self.criterion, True)}` "
                     "has no `target` argument. In such cases, the LighterSystem "
                     "passes only the predicted values to the criterion. "
-                    "This is intended as a support for self-supervised "
-                    "losses where target is not used. If this is not the "
-                    "behavior you expected, redefine your criterion "
-                    "so that it has a `target` argument."
+                    "If this is not the behavior you expected, redefine your "
+                    "criterion so that it has a `target` argument."
                 )
         return self.criterion(pred, **kwargs)
 
@@ -295,13 +268,12 @@ class LighterSystem(pl.LightningModule):
         Returns:
             DataLoader: instantiated DataLoader.
         """
-        dataset = getattr(self, f"{mode}_dataset")
-        sampler = getattr(self, f"{mode}_sampler")
-        collate_fn = getattr(self, f"{mode}_collate")
+        dataset = self.datasets[mode]
+        sampler = self.samplers[mode]
+        collate_fn = self.collate_fns[mode]
 
         if dataset is None:
-            logger.error(f"Please specify '{mode}_dataset' in the config. Exiting")
-            sys.exit()
+            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
 
         # Batch size is 1 when using an inference for two reasons:
         # 1) Inferer separates an input into multiple parts, forming a batch of its own.
@@ -319,7 +291,7 @@ class LighterSystem(pl.LightningModule):
             sampler=sampler,
             shuffle=(mode == "train" and sampler is None),
             batch_size=batch_size,
-            drop_last=self.drop_last_batch,
+            drop_last=(self.drop_last_batch if mode == "train" else False),
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             collate_fn=collate_fn,
@@ -332,17 +304,17 @@ class LighterSystem(pl.LightningModule):
             Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
                 optimizers and/or schedulers.
         """
-        if not self.optimizers:
-            logger.error("Please specify 'system.optimizers' in the config. Exiting.")
+        if not self.optimizer:
+            logger.error("Please specify 'system.optimizer' in the config. Exiting.")
             sys.exit()
-        if not self.schedulers:
-            return self.optimizers
+        if not self.scheduler:
+            return self.optimizer
 
-        if len(self.optimizers) != len(self.schedulers):
+        if len(self.optimizer) != len(self.scheduler):
             logger.error("Each optimizer must have its own scheduler.")
             sys.exit()
 
-        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizers, self.schedulers)]
+        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizer, self.scheduler)]
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.
@@ -365,8 +337,8 @@ class LighterSystem(pl.LightningModule):
                 self.predict_dataloader,
                 self.predict_step,
             )
-            # `Trainer.tune()` calls the `self.setup()` method whenever it runs for a new
-            #  parameter, and deleting the above methods again breaks it. This flag prevents it.
+            # Prevents the methods from being defined again. This is needed because `Trainer.tune()`
+            # calls the `self.setup()` method whenever it runs for a new parameter.
             self._lightning_module_methods_defined = True
 
         # Training methods.
@@ -375,7 +347,7 @@ class LighterSystem(pl.LightningModule):
             self.training_step = partial(self._base_step, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.val_dataset is not None):
+        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
             self.val_dataloader = partial(self._base_dataloader, mode="val")
             self.validation_step = partial(self._base_step, mode="val")
 
@@ -391,9 +363,9 @@ class LighterSystem(pl.LightningModule):
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
-        in the `self.setup()` method. However, `LightningModule` excepts them to be defined at
-        the initialization. To prevent it from throwing an error, the `..._dataloader()` and
-        `..._step()` are initially defined as `lambda: None`, before `self.setup()` is called.
+        in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
+        at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
+        are initially defined as `lambda: None`, before `self.setup()` is called.
         """
         self.train_dataloader = self.training_step = lambda: None
         self.val_dataloader = self.validation_step = lambda: None

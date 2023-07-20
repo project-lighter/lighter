@@ -7,24 +7,6 @@ from torch.nn import Identity, Module, Sequential
 from lighter.utils.misc import setattr_dot_notation
 
 
-def reshape_pred_if_single_value_prediction(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """When the task is to predict a single value, pred and target dimensions often
-    mismatch - dataloader returns the value in the (B) shape, while the network
-    returns predictions in the (B, 1) shape, where the second dim is redundant.
-
-    Args:
-        pred (torch.Tensor): predicted tensor.
-        target (torch.Tensor): target tensor.
-
-    Returns:
-        torch.Tensor: reshaped predicted tensor if that was necessary.
-    """
-    if isinstance(pred, torch.Tensor) and target is not None:
-        if len(pred.shape) == 2 and len(target.shape) == 1 == pred.shape[1]:
-            return pred.flatten()
-    return pred
-
-
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
     """Replaces the specified layer of the network with another layer.
 
@@ -42,8 +24,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
 
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     """Replaces any layer of the network with an Identity layer.
-    Useful for removing the last layer of a network to be used as a backbone
-    of an SSL model.
+    Useful for removing layers of a network to be used as a backbone.
 
     Args:
         model (Module): PyTorch model to be edited
@@ -97,10 +78,12 @@ def adjust_prefix_and_load_state_dict(
     # Load checkpoint
     ckpt = torch.load(ckpt_path)
 
-    # Check if the checkpoint is a model's state_dict or a Lightning checkpoint.
-    # A Lightning checkpoint contains the model’s entire internal state, we only need its state_dict.
+    # Check if the checkpoint is a model's state_dict or a LighterSystem checkpoint.
+    # A LighterSystem checkpoint contains the model’s entire internal state, we only need its state_dict.
     if "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
+        # Remove the "model." prefix from the checkpoint's state_dict keys. This is characteristic to LighterSystem.
+        ckpt = {key.replace("model.", ""): value for key, value in ckpt.items()}
 
     # Adjust the keys in the checkpoint's state_dict to match the the model's state_dict's keys.
     if ckpt_to_model_prefix is not None:
