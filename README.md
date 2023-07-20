@@ -45,7 +45,7 @@ List of projects that use `lighter`:
 
 | Project | Description |
 | --- | --- |
-| [FMCBI]() | |
+| [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://github.com/AIM-Harvard/foundation-cancer-image-biomarker) | A foundation model for CT scans trained by contrasting subvolumes with and without lesions. |
 
 
 ## 📄 Cite:
