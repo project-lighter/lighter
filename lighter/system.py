@@ -190,19 +190,11 @@ class LighterSystem(pl.LightningModule):
 
         # Calculate the loss.
         loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
-        # Log the loss for monitoring purposes.
-        self.log(
-            "loss" if mode == "train" else f"{mode}_loss",
-            loss,
-            on_step=True,
-            on_epoch=True,
-            sync_dist=True,
-            logger=False,
-            batch_size=self.batch_size,
-        )
 
         # Log and return the results.
         if mode == "predict":
+            # Pred postprocessing for logging or writing.
+            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
             return pred
         else:
             # Data postprocessing for metrics
@@ -212,8 +204,19 @@ class LighterSystem(pl.LightningModule):
 
             # Calculate the metrics for the step.
             metrics = self.metrics[mode](pred, target)
+
             # Log the metrics for monitoring purposes.
             self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+            # Log the loss for monitoring purposes.
+            self.log(
+                "loss" if mode == "train" else f"{mode}_loss",
+                loss,
+                on_step=True,
+                on_epoch=True,
+                sync_dist=True,
+                logger=False,
+                batch_size=self.batch_size,
+            )
 
             # Data postprocessing for logging.
             input = apply_fns(input, self.postprocessing["logging"]["input"])
