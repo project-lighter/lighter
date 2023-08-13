@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import itertools
 import sys
+from pathlib import Path
 
 import pandas as pd
 from loguru import logger
@@ -12,46 +13,91 @@ from lighter.callbacks.writer.base import LighterBaseWriter
 
 
 class LighterTableWriter(LighterBaseWriter):
-    def __init__(self, write_dir: str, write_format: Union[str, List[str], Dict[str, str], Dict[str, List[str]]]) -> None:
-        super().__init__(write_dir, write_format, write_interval="epoch")
+    """
+    Writer for saving predictions in a table format. Supports multiple formats, and
+    additional custom formats can be added either through `additional_writers`
+    argument at initialization, or by calling `add_writer` method after initialization.
+
+    Args:
+        directory (Path): The directory where the CSV will be saved.
+        format (str): The format in which the data should be saved in the CSV.
+        additional_writers (Optional[Dict[str, Callable]]): Additional custom writer functions.
+    """
+
+    def __init__(
+        self, directory: Union[str, Path], format: str, additional_writers: Optional[Dict[str, Callable]] = None
+    ) -> None:
+        # Predefined writers for different formats.
+        self._writers = {
+            "tensor": write_tensor,
+        }
+
+        # Initialize the base class.
+        super().__init__(directory, format, "epoch", additional_writers)
+
+        # Create a dictionary to hold CSV records for each ID.
         self.csv_records = {}
 
-    def write(self, idx, identifier, tensor, write_format):
-        # Column name will be set to 'pred' if the identifier is None.
-        column = "pred" if identifier is None else identifier
+    def write(self, tensor: Any, format: str, id: Union[int, str], multi_pred_id: Optional[Union[int, str]]) -> None:
+        """
+        Write the tensor as a table record in the given format.
 
-        if write_format is None:
-            record = None
-        elif write_format == "tensor":
-            record = tensor.tolist()
-        elif write_format == "scalar":
-            raise NotImplementedError
-        else:
-            logger.error(f"`write_format` '{write_format}' not supported.")
-            sys.exit()
+        If there are multiple predictions, there will be a separate column for each prediction,
+        named after the corresponding `multi_pred_id`.
+        If single prediction, there will be a single column named "pred".
 
-        if idx not in self.csv_records:
-            self.csv_records[idx] = {column: record}
+        Args:
+            tensor (Any): The tensor to be written.
+            id (Union[int, str]): The primary identifier for naming.
+            multi_pred_id (Optional[Union[int, str]]): The secondary identifier, used if there are multiple predictions.
+            format (str): Format in which tensor should be written.
+        """
+        # Determine the column name based on the presence of multi_pred_id
+        column = "pred" if multi_pred_id is None else multi_pred_id
+
+        # Get the appropriate writer function for the given format
+        writer = self.get_writer(format)
+
+        # Convert the tensor to the desired format (e.g., list)
+        record = writer(tensor)
+
+        # Store the record in the csv_records dictionary under the specified ID and column
+        if id not in self.csv_records:
+            self.csv_records[id] = {column: record}
         else:
-            self.csv_records[idx][column] = record
+            self.csv_records[id][column] = record
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: List[Any]) -> None:
+        """
+        Callback method triggered at the end of the prediction epoch to dump the CSV table.
+
+        Args:
+            trainer (Trainer): Pytorch Lightning Trainer instance.
+            pl_module (LighterSystem): Lighter system instance.
+            outputs (List[Any]): List of predictions.
+        """
+        # Call the parent class's method to handle additional end-of-epoch logic
         super().on_predict_epoch_end(trainer, pl_module, outputs)
 
-        csv_path = self.write_dir / "predictions.csv"
+        # Set the path where the CSV will be saved
+        csv_path = self.directory / "predictions.csv"
+
+        # Log the save path for user's reference
         logger.info(f"Saving the predictions to {csv_path}")
 
-        # Sort the dict of dicts by key and turn it into a list of dicts.
+        # Sort the records by ID and convert the dictionary to a list
         self.csv_records = [self.csv_records[key] for key in sorted(self.csv_records)]
-        # Gather the records from all ranks when in DDP.
+
+        # If in distributed data parallel mode, gather records from all processes
         if trainer.world_size > 1:
-            # Since `all_gather` supports tensors only, mimic the behavior using `broadcast`.
             ddp_csv_records = [self.csv_records] * trainer.world_size
             for rank in range(trainer.world_size):
-                # Broadcast the records from the current rank and save it at its designated position.
                 ddp_csv_records[rank] = trainer.strategy.broadcast(ddp_csv_records[rank], src=rank)
-            # Combine the records from all ranks. List of lists of dicts -> list of dicts.
             self.csv_records = list(itertools.chain(*ddp_csv_records))
 
-        # Create a dataframe and save it.
+        # Convert the list of records to a dataframe and save it as a CSV file
         pd.DataFrame(self.csv_records).to_csv(csv_path)
+
+
+def write_tensor(tensor: Any) -> List:
+    return tensor.tolist()

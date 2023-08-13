@@ -155,27 +155,34 @@ class LighterSystem(pl.LightningModule):
 
                 For predict step, it returns pred only.
         """
-        # Ensure that the batch is a list, a tuple, or a dict.
-        if not isinstance(batch, (list, tuple, dict)):
+        # Batch type check:
+        # - Dict: must contain "input" and "target" keys, and optionally "id" key.
+        if isinstance(batch, dict):
+            if set(batch.keys()) not in [{"input", "target"}, {"input", "target", "id"}]:
+                raise ValueError(
+                    "A batch dict must have 'input', 'target', and, "
+                    f"optionally 'id', as keys, but found {list(batch.keys())}"
+                )
+            batch["id"] = None if "id" not in batch else batch["id"]
+        # - List/tuple: must contain two elements - input and target. After the check, convert it to dict.
+        elif isinstance(batch, (list, tuple)):
+            if len(batch) != 2:
+                raise ValueError(
+                    f"A batch must consist of 2 elements - input and target. However, {len(batch)} "
+                    "elements wer found. Note: if target does not exist, return `None` as target."
+                )
+            batch = {"input": batch[0], "target": batch[1], "id": None}
+        # - Other types are not allowed.
+        else:
             raise TypeError(
                 "A batch must be a list, a tuple, or a dict."
-                "A batch dict must have 'input' and 'target' as keys."
+                "A batch dict must have 'input' and 'target' keys, and optionally 'id'."
                 "A batch list or a tuple must have 2 elements - input and target."
                 "If target does not exist, return `None` as target."
             )
-        # Ensure that a dict batch has input and target keys exclusively.
-        if isinstance(batch, dict) and set(batch.keys()) != {"input", "target"}:
-            raise ValueError("A batch must be a dict with 'input' and 'target' as keys.")
-        # Ensure that a list/tuple batch has 2 elements (input and target).
-        if len(batch) == 1:
-            raise ValueError(
-                "A batch must consist of 2 elements - input and target. If target does not exist, return `None` as target."
-            )
-        if len(batch) > 2:
-            raise ValueError(f"A batch must consist of 2 elements - input and target, but found {len(batch)} elements.")
 
-        # Split the batch into input and target.
-        input, target = batch if not isinstance(batch, dict) else (batch["input"], batch["target"])
+        # Split the batch into input, target, and id.
+        input, target, id = batch["input"], batch["target"], batch["id"]
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
@@ -195,7 +202,7 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             # Pred postprocessing for logging or writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
-            return pred
+            return {"pred": pred, "id": id}
         else:
             # Data postprocessing for metrics
             input = apply_fns(input, self.postprocessing["metrics"]["input"])
@@ -224,7 +231,7 @@ class LighterSystem(pl.LightningModule):
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
             # Return the loss, metrics, input, target, and pred.
-            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred}
+            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]

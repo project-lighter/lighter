@@ -94,33 +94,33 @@ def parse_data(
     return result
 
 
-def gather_tensors(
+def group_tensors(
     inputs: Union[List[Union[torch.Tensor, List, Tuple, Dict]], Tuple[Union[torch.Tensor, List, Tuple, Dict]]]
 ) -> Union[List, Dict]:
-    """Recursively gather tensors. Tensors can be standalone or inside of other data structures (list/tuple/dict).
+    """Recursively group tensors. Tensors can be standalone or inside of other data structures (list/tuple/dict).
     An input list of tensors is returned as-is. Given an input list of data structures with tensors, this function
-    will gather all tensors into a list and save it under a single data structure. Assumes that all elements of
+    will group all tensors into a list and save it under a single data structure. Assumes that all elements of
     the input list have the same type and structure.
 
     Args:
         inputs (List[Union[torch.Tensor, List, Tuple, Dict]], Tuple[Union[torch.Tensor, List, Tuple, Dict]]):
             They can be:
-            - List/Tuples of Dictionaries, each containing tensors to be gathered by their key.
-            - List/Tuples of Lists/tuples, each containing tensors to be gathered by their position.
+            - List/Tuples of Dictionaries, each containing tensors to be grouped by their key.
+            - List/Tuples of Lists/tuples, each containing tensors to be grouped by their position.
             - List/Tuples of Tensors, returned as-is.
             - Nested versions of the above.
             The input data structure must be the same for all elements of the list. They can be arbitrarily nested.
 
     Returns:
-        Union[List, Dict]: The gathered tensors.
+        Union[List, Dict]: The grouped tensors.
     """
     # List of dicts.
     if isinstance(inputs[0], dict):
         keys = inputs[0].keys()
-        return {key: gather_tensors([input[key] for input in inputs]) for key in keys}
+        return {key: group_tensors([input[key] for input in inputs]) for key in keys}
     # List of lists or tuples.
     elif isinstance(inputs[0], (list, tuple)):
-        return [gather_tensors([input[idx] for input in inputs]) for idx in range(len(inputs[0]))]
+        return [group_tensors([input[idx] for input in inputs]) for idx in range(len(inputs[0]))]
     # List of tensors.
     elif isinstance(inputs[0], torch.Tensor):
         return inputs
