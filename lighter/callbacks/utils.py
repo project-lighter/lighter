@@ -94,51 +94,48 @@ def parse_data(
     return result
 
 
-def group_tensors(
-    inputs: Union[List[Union[torch.Tensor, List, Tuple, Dict]], Tuple[Union[torch.Tensor, List, Tuple, Dict]]]
-) -> Union[List, Dict]:
-    """Recursively group tensors. Tensors can be standalone or inside of other data structures (list/tuple/dict).
-    An input list of tensors is returned as-is. Given an input list of data structures with tensors, this function
-    will group all tensors into a list and save it under a single data structure. Assumes that all elements of
-    the input list have the same type and structure.
+def parse_format(format: str, parsed_preds: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Parse the given format and align it with the structure of the predictions.
+
+    If the format is a single string, all predictions will be saved in this format. If the format has a structure
+    (like a dictionary), it needs to match the structure of the predictions.
 
     Args:
-        inputs (List[Union[torch.Tensor, List, Tuple, Dict]], Tuple[Union[torch.Tensor, List, Tuple, Dict]]):
-            They can be:
-            - List/Tuples of Dictionaries, each containing tensors to be grouped by their key.
-            - List/Tuples of Lists/tuples, each containing tensors to be grouped by their position.
-            - List/Tuples of Tensors, returned as-is.
-            - Nested versions of the above.
-            The input data structure must be the same for all elements of the list. They can be arbitrarily nested.
+        format (str): The storage format for the predictions, either as a string or a structured format.
+        parsed_preds (Dict[str, Any]): Dictionary of parsed prediction data.
 
     Returns:
-        Union[List, Dict]: The grouped tensors.
+        Dict[str, str]: Dictionary of parsed format data corresponding to the prediction structure.
+
+    Raises:
+        ValueError: If the structure of the format does not align with the prediction structure.
     """
-    # List of dicts.
-    if isinstance(inputs[0], dict):
-        keys = inputs[0].keys()
-        return {key: group_tensors([input[key] for input in inputs]) for key in keys}
-    # List of lists or tuples.
-    elif isinstance(inputs[0], (list, tuple)):
-        return [group_tensors([input[idx] for input in inputs]) for idx in range(len(inputs[0]))]
-    # List of tensors.
-    elif isinstance(inputs[0], torch.Tensor):
-        return inputs
+    if isinstance(format, str):
+        # Assign the single format to all prediction keys.
+        parsed_format = {key: format for key in parsed_preds}
     else:
-        raise TypeError(f"Type `{type(inputs[0])}` not supported.")
+        # Ensure the structured format corresponds with the predictions' structure.
+        parsed_format = parse_data(format)
+        if not set(parsed_format) == set(parsed_preds):
+            raise ValueError("`format` structure does not match the prediction's structure.")
+    return parsed_format
 
 
-def preprocess_image(image: torch.Tensor) -> torch.Tensor:
+def preprocess_image(image: torch.Tensor, add_batch_dim=False) -> torch.Tensor:
     """Preprocess the image before logging it. If it is a batch of multiple images,
     it will create a grid image of them. In case of 3D, a single image is displayed
     with slices stacked vertically, while a batch of 3D images as a grid where each
     column is a different 3D image.
     Args:
         image (torch.Tensor): 2D or 3D image tensor.
+        add_batch_dim (bool, optional): Whether to add a batch dimension to the input image.
+            Use only when the input image does not have a batch dimension. Defaults to False.
     Returns:
         torch.Tensor: image ready for logging.
     """
-    image = image.detach().cpu()
+    if add_batch_dim:
+        image = image.unsqueeze(0)
     # If 3D (BCDHW), concat the images vertically and horizontally.
     if image.ndim == 5:
         shape = image.shape

@@ -33,12 +33,14 @@ class LighterTableWriter(LighterBaseWriter):
         }
 
         # Initialize the base class.
-        super().__init__(directory, format, "epoch", additional_writers)
+        super().__init__(directory, format, additional_writers)
 
-        # Create a dictionary to hold CSV records for each ID.
+        # Create a dictionary to hold CSV records for each ID. These are populated at each batch end
+        # by `self.on_predict_batch_end` defined in the base class using the `write` method below.
+        # Finally, the records are dumped to a CSV file at the end of the epoch by `self.on_predict_epoch_end`.
         self.csv_records = {}
 
-    def write(self, tensor: Any, format: str, id: Union[int, str], multi_pred_id: Optional[Union[int, str]]) -> None:
+    def write(self, tensor: Any, id: Union[int, str], multi_pred_id: Optional[Union[int, str]], format: str) -> None:
         """
         Write the tensor as a table record in the given format.
 
@@ -67,7 +69,7 @@ class LighterTableWriter(LighterBaseWriter):
         else:
             self.csv_records[id][column] = record
 
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem, outputs: List[Any]) -> None:
+    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         """
         Callback method triggered at the end of the prediction epoch to dump the CSV table.
 
@@ -76,9 +78,6 @@ class LighterTableWriter(LighterBaseWriter):
             pl_module (LighterSystem): Lighter system instance.
             outputs (List[Any]): List of predictions.
         """
-        # Call the parent class's method to handle additional end-of-epoch logic
-        super().on_predict_epoch_end(trainer, pl_module, outputs)
-
         # Set the path where the CSV will be saved
         csv_path = self.directory / "predictions.csv"
 
