@@ -62,8 +62,7 @@ class LighterLogger(Callback):
             stage (str): stage of the training process. Passed automatically by PyTorch Lightning.
         """
         if trainer.logger is not None:
-            logger.error("When using LighterLogger, set Trainer(logger=None).")
-            sys.exit()
+            raise ValueError("When using LighterLogger, set Trainer(logger=None).")
 
         if not trainer.is_global_zero:
             return
@@ -88,8 +87,7 @@ class LighterLogger(Callback):
         if self.wandb:
             OPTIONAL_IMPORTS["wandb"], wandb_available = optional_import("wandb")
             if not wandb_available:
-                logger.error("Weights & Biases not installed. To install it, run `pip install wandb`. Exiting.")
-                sys.exit()
+                raise ImportError("Weights & Biases not installed. To install it, run `pip install wandb`.")
             wandb_dir = self.log_dir / "wandb"
             wandb_dir.mkdir()
             self.wandb = OPTIONAL_IMPORTS["wandb"].init(project=self.project, dir=wandb_dir, config=self.config)

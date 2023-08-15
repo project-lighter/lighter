@@ -91,7 +91,7 @@ def _write_sitk_image(path: str, tensor: torch.Tensor, suffix) -> None:
     if "sitk" not in OPTIONAL_IMPORTS:
         OPTIONAL_IMPORTS["sitk"], sitk_available = optional_import("SimpleITK")
         if not sitk_available:
-            raise ModuleNotFoundError("SimpleITK not installed. To install it, run `pip install SimpleITK`. Exiting.")
+            raise ImportError("SimpleITK is not available. Install it with `pip install SimpleITK`.")
 
     # Remove the channel dimension if it's equal to 1.
     tensor = tensor.squeeze(0) if (tensor.dim() == 4 and tensor.shape[0] == 1) else tensor

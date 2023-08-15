@@ -25,28 +25,25 @@ class LighterSystem(pl.LightningModule):
             should be dropped. Defaults to False.
         num_workers (int, optional): number of dataloader workers. Defaults to 0.
         pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
-        optimizer (Optional[Union[Optimizer, List[Optimizer]]], optional):
-            a single or a list of optimizers. Defaults to None.
-        scheduler (Optional[Union[Callable, List[Callable]]], optional):
-            a single or a list of schedulers. Defaults to None.
-        criterion (Optional[Callable], optional):
-            criterion/loss function. Defaults to None.
-        datasets (Optional[Dict[str, Optional[Dataset]]], optional):
+        optimizer (Optimizer, optional): optimizers. Defaults to None.
+        scheduler (LRScheduler, optional): learning rate scheduler. Defaults to None.
+        criterion (Callable, optional): criterion/loss function. Defaults to None.
+        datasets (Dict[str, Optional[Dataset]], optional):
             datasets for train, val, test, and predict. Supports Defaults to None.
-        samplers (Optional[Dict[str, Optional[Sampler]]], optional):
+        samplers (Dict[str, Optional[Sampler]], optional):
             samplers for train, val, test, and predict. Defaults to None.
-        collate_fns (Optional[Dict[str, Optional[Callable]]], optional):
+        collate_fns (Dict[str, Optional[Callable]], optional):
             collate functions for train, val, test, and predict. Defaults to None.
-        metrics (Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]], optional):
+        metrics (Dict[str, Optional[Union[Metric, List[Metric]]]], optional):
             metrics for train, val, and test. Supports a single metric or a list of metrics,
             implemented using `torchmetrics`. Defaults to None.
-        postprocessing (Optional[Dict[str, Optional[Callable]]], optional):
+        postprocessing (Dict[str, Optional[Callable]], optional):
             Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
             and logging. The postprocessing is done before each stage - for example, criterion postprocessing
             will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
             top of the previous one(s) - for example, the logging postprocessing will be done on the data that
             has been postprocessed for the criterion and metrics earlier. Defaults to None.
-        inferer (Optional[Callable], optional): the inferer must be a class with a `__call__`
+        inferer (Callable, optional): the inferer must be a class with a `__call__`
             method that accepts two arguments - the input to infer over, and the model itself.
             Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
             is a sliding window or a patch-based inferer that will infer over the smaller parts of
@@ -61,8 +58,8 @@ class LighterSystem(pl.LightningModule):
         drop_last_batch: bool = False,
         num_workers: int = 0,
         pin_memory: bool = True,
-        optimizer: Optional[Union[Optimizer, List[Optimizer]]] = None,
-        scheduler: Optional[Union[Callable, List[Callable]]] = None,
+        optimizer: Optional[Optimizer] = None,
+        scheduler: Optional["LRScheduler"] = None,
         criterion: Optional[Callable] = None,
         datasets: Optional[Dict[str, Optional[Dataset]]] = None,
         samplers: Optional[Dict[str, Optional[Sampler]]] = None,
@@ -82,8 +79,8 @@ class LighterSystem(pl.LightningModule):
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
-        self.optimizer = ensure_list(optimizer)
-        self.scheduler = ensure_list(scheduler)
+        self.optimizer = optimizer
+        self.scheduler = scheduler
 
         # DataLoader specifics
         self.num_workers = num_workers
@@ -307,24 +304,18 @@ class LighterSystem(pl.LightningModule):
             collate_fn=collate_fn,
         )
 
-    def configure_optimizers(self) -> Union[Optimizer, List[Dict[str, Union[Optimizer, "Scheduler"]]]]:
+    def configure_optimizers(self) -> Union[Optimizer, Tuple[Optimizer, "LRScheduler"]]:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Optimizer or a List of Dict of paired Optimizers and Schedulers: instantiated
-                optimizers and/or schedulers.
+            Optimizer or a tuple of Optimizer and LRScheduler: the optimizer and, if defined, the scheduler.
         """
-        if not self.optimizer:
-            logger.error("Please specify 'system.optimizer' in the config. Exiting.")
-            sys.exit()
-        if not self.scheduler:
-            return self.optimizer
-
-        if len(self.optimizer) != len(self.scheduler):
-            logger.error("Each optimizer must have its own scheduler.")
-            sys.exit()
-
-        return [{"optimizer": opt, "lr_scheduler": sched} for opt, sched in zip(self.optimizer, self.scheduler)]
+        if self.optimizer is None:
+            raise ValueError("Please specify 'system.optimizer' in the config.")
+        if self.scheduler is None:
+            return {"optimizer": self.optimizer}
+        else:
+            return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
     def setup(self, stage: str) -> None:
         """Automatically called by the LightningModule after the initialization.

@@ -63,8 +63,7 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any):
     """
     if "." not in attr:
         if not hasattr(obj, attr):
-            logger.info(f"`{get_name(obj, True)}` has no attribute `{attr}`. Exiting.")
-            sys.exit()
+            raise AttributeError(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
         setattr(obj, attr, value)
     # Solve recursively if the attribute is defined in dot-notation
     else:

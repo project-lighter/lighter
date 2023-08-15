@@ -19,13 +19,11 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     # Based on https://stackoverflow.com/a/41595552.
 
     if module_name in sys.modules:
-        logger.error(f"{module_path} has already been imported as module: {module_name}")
-        sys.exit()
+        raise ValueError(f"{module_name} has already been imported as module.")
 
     module_path = Path(module_path).resolve() / "__init__.py"
     if not module_path.is_file():
-        logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
-        sys.exit()
+        raise FileNotFoundError(f"No `__init__.py` in `{module_path}`.")
     spec = importlib.util.spec_from_file_location(module_name, str(module_path))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
