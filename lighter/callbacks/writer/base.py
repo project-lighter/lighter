@@ -43,8 +43,8 @@ class LighterBaseWriter(ABC, Callback):
         # Placeholder for processed format for quicker access during writes
         self._parsed_format = None
 
-        # Keeps track of last written prediction index for cases when ids aren't provided
-        self._current_pred_index = 0
+        # When IDs are not provided, keep track of the global prediction count. Supports DDP.
+        self._pred_count = None
 
         # Ensure that default writers are defined
         if not hasattr(self, "_writers"):
@@ -86,10 +86,17 @@ class LighterBaseWriter(ABC, Callback):
         if stage != "predict":
             return
 
+        # Initialize the prediction count with the rank of the current process
+        self._pred_count = torch.distributed.get_rank()
+
         # Ensure all distributed nodes write to the same directory
-        self.directory = trainer.strategy.broadcast(self.directory)
+        self.directory = trainer.strategy.broadcast(self.directory, src=0)
         if trainer.is_global_zero:
             self.directory.mkdir(parents=True)
+        # Wait for rank 0 to create the directory
+        trainer.strategy.barrier()
+
+        # Ensure all distributed nodes have access to the directory
         if not self.directory.exists():
             raise RuntimeError(
                 f"Rank {trainer.global_rank} does not share storage with rank 0. Ensure nodes have common storage access."
@@ -104,10 +111,15 @@ class LighterBaseWriter(ABC, Callback):
         # Fetch and decollate IDs if provided.
         if outputs["id"] is not None:
             ids = decollate_batch(outputs["id"], detach=True, pad=False)
-        # Generate IDs if not provided. An ID will be the index of the prediction.
+        # Generate IDs if not provided. An ID will be the global index of the prediction.
         else:
-            ids = list(range(self._current_pred_index, self._current_pred_index + len(preds)))
-            self._current_pred_index += len(preds)
+            ids = []
+            for _ in range(len(preds)):
+                # Append the current prediction count to the IDs list.
+                ids.append(self._pred_count)
+                # Increment the prediction count by the total number of DDP processes.
+                # This ensures each process will generate unique IDs in the next batch.
+                self._pred_count += trainer.world_size
 
         # Iterate over the predictions and save them.
         for id, pred in zip(ids, preds):

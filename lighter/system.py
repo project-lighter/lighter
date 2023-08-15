@@ -166,7 +166,7 @@ class LighterSystem(pl.LightningModule):
             if len(batch) != 2:
                 raise ValueError(
                     f"A batch must consist of 2 elements - input and target. However, {len(batch)} "
-                    "elements wer found. Note: if target does not exist, return `None` as target."
+                    "elements were found. Note: if target does not exist, return `None` as target."
                 )
             batch = {"input": batch[0], "target": batch[1], "id": None}
         # - Other types are not allowed.

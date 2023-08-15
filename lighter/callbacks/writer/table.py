@@ -4,6 +4,7 @@ import itertools
 from pathlib import Path
 
 import pandas as pd
+import torch
 from pytorch_lightning import Trainer
 
 from lighter import LighterSystem
@@ -80,17 +81,21 @@ class LighterTableWriter(LighterBaseWriter):
         csv_path = self.directory / "predictions.csv"
 
         # Sort the records by ID and convert the dictionary to a list
-        self.csv_records = [self.csv_records[key] for key in sorted(self.csv_records)]
+        self.csv_records = [self.csv_records[id] for id in sorted(self.csv_records)]
 
-        # If in distributed data parallel mode, gather records from all processes
+        # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:
-            ddp_csv_records = [self.csv_records] * trainer.world_size
-            for rank in range(trainer.world_size):
-                ddp_csv_records[rank] = trainer.strategy.broadcast(ddp_csv_records[rank], src=rank)
-            self.csv_records = list(itertools.chain(*ddp_csv_records))
+            # Create a list to hold the records from each process. Used on rank 0 only.
+            gather_csv_records = [None] * trainer.world_size if trainer.is_global_zero else None
+            # Each process sends its records to rank 0, which stores them in the `gather_csv_records`.
+            torch.distributed.gather_object(self.csv_records, gather_csv_records, dst=0)
+            # Concatenate the gathered records
+            if trainer.is_global_zero:
+                self.csv_records = list(itertools.chain(*gather_csv_records))
 
-        # Convert the list of records to a dataframe and save it as a CSV file
-        pd.DataFrame(self.csv_records).to_csv(csv_path)
+        # Save the records to a CSV file
+        if trainer.is_global_zero:
+            pd.DataFrame(self.csv_records).to_csv(csv_path)
 
 
 def write_tensor(tensor: Any) -> List:
