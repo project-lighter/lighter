@@ -304,11 +304,11 @@ class LighterSystem(pl.LightningModule):
             collate_fn=collate_fn,
         )
 
-    def configure_optimizers(self) -> Union[Optimizer, Tuple[Optimizer, "LRScheduler"]]:
+    def configure_optimizers(self) -> Dict:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Optimizer or a tuple of Optimizer and LRScheduler: the optimizer and, if defined, the scheduler.
+            Dict: optimizer and, if defined, scheduler.
         """
         if self.optimizer is None:
             raise ValueError("Please specify 'system.optimizer' in the config.")
