@@ -87,7 +87,7 @@ class LighterBaseWriter(ABC, Callback):
             return
 
         # Initialize the prediction count with the rank of the current process
-        self._pred_count = torch.distributed.get_rank()
+        self._pred_count = torch.distributed.get_rank() if trainer.world_size > 1 else 0
 
         # Ensure all distributed nodes write to the same directory
         self.directory = trainer.strategy.broadcast(self.directory, src=0)
