@@ -1,11 +1,9 @@
 from typing import Callable, Dict, Optional, Union
 
-import sys
 from pathlib import Path
 
 import torch
 import torchvision
-from loguru import logger
 from monai.transforms import DivisiblePad
 from monai.utils.module import optional_import
 

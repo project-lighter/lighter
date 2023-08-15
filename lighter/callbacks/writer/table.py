@@ -1,11 +1,9 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import itertools
-import sys
 from pathlib import Path
 
 import pandas as pd
-from loguru import logger
 from pytorch_lightning import Trainer
 
 from lighter import LighterSystem
@@ -80,9 +78,6 @@ class LighterTableWriter(LighterBaseWriter):
         """
         # Set the path where the CSV will be saved
         csv_path = self.directory / "predictions.csv"
-
-        # Log the save path for user's reference
-        logger.info(f"Saving the predictions to {csv_path}")
 
         # Sort the records by ID and convert the dictionary to a list
         self.csv_records = [self.csv_records[key] for key in sorted(self.csv_records)]

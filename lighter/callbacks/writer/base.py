@@ -25,8 +25,8 @@ class LighterBaseWriter(ABC, Callback):
 
     Args:
         directory (str): Base directory for saving. A new sub-directory with current date and time will be created inside.
-        format (Optional[Union[str, List[str], Dict[str, str], Dict[str, List[str]]]]): Desired format(s) for saving predictions.
-            The format will be passed to the `write` method.
+        format (Optional[Union[str, List[str], Dict[str, str], Dict[str, List[str]]]]):
+            Desired format(s) for saving predictions. The format will be passed to the `write` method.
         additional_writers (Optional[Dict[str, Callable]]): Additional writer functions to be registered with the base writer.
     """
 
@@ -41,10 +41,10 @@ class LighterBaseWriter(ABC, Callback):
         self.format = format
 
         # Placeholder for processed format for quicker access during writes
-        self.parsed_format = None
+        self._parsed_format = None
 
         # Keeps track of last written prediction index for cases when ids aren't provided
-        self.last_index = 0
+        self._current_pred_index = 0
 
         # Ensure that default writers are defined
         if not hasattr(self, "_writers"):
@@ -68,7 +68,8 @@ class LighterBaseWriter(ABC, Callback):
         the batch dimension. If the batch dimension is needed, apply `tensor.unsqueeze(0)` before saving,
         either in this method or in the particular writer function.
 
-        Depending on the specified format, this method should contain logic to handle the saving mechanism.
+        For each supported format, there should be a corresponding writer function registered in `self._writers`,
+        and can be retrieved using `self.get_writer(format)`.
 
         Args:
             tensor (torch.Tensor): Tensor to be saved. It will be a single tensor without the batch dimension.
@@ -95,7 +96,7 @@ class LighterBaseWriter(ABC, Callback):
             )
 
     def on_predict_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int = 0
+        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         """Callback method triggered at the end of each prediction batch/step."""
         # Fetch and decollate preds.
@@ -105,20 +106,20 @@ class LighterBaseWriter(ABC, Callback):
             ids = decollate_batch(outputs["id"], detach=True, pad=False)
         # Generate IDs if not provided. An ID will be the index of the prediction.
         else:
-            ids = list(range(self.last_index, self.last_index + len(preds)))
-            self.last_index += len(preds)
+            ids = list(range(self._current_pred_index, self._current_pred_index + len(preds)))
+            self._current_pred_index += len(preds)
 
         # Iterate over the predictions and save them.
         for id, pred in zip(ids, preds):
             # Convert predictions into a structured format suitable for writing.
             parsed_pred = parse_data(pred)
             # If the format hasn't been parsed yet, do it now.
-            if self.parsed_format is None:
-                self.parsed_format = parse_format(self.format, parsed_pred)
+            if self._parsed_format is None:
+                self._parsed_format = parse_format(self.format, parsed_pred)
             # If multiple outputs, parsed_pred will contain multiple keys. For a single output, key will be None.
             for multi_pred_id, tensor in parsed_pred.items():
                 # Save the prediction as per the designated format.
-                self.write(tensor, id, multi_pred_id, format=self.parsed_format[multi_pred_id])
+                self.write(tensor, id, multi_pred_id, format=self._parsed_format[multi_pred_id])
 
     def add_writer(self, format: str, writer_function: Callable) -> None:
         """
