@@ -1,7 +1,6 @@
 from typing import Any, Dict, Union
 
 import itertools
-import sys
 from datetime import datetime
 from pathlib import Path
 

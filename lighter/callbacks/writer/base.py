@@ -1,7 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import itertools
-import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path

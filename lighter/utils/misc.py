@@ -1,7 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import inspect
-import sys
 
 from loguru import logger
 

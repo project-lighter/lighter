@@ -1,54 +1,51 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import sys
 from functools import partial
 
 import pytorch_lightning as pl
 import torch
 from loguru import logger
-from torch.nn import Module
+from torch.nn import Module, ModuleDict
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, ensure_list, get_name, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, hasarg
 
 
 class LighterSystem(pl.LightningModule):
     """_summary_
 
     Args:
-        model (Module): the model.
-        batch_size (int): batch size.
-        drop_last_batch (bool, optional): whether the last batch in the dataloader
-            should be dropped. Defaults to False.
-        num_workers (int, optional): number of dataloader workers. Defaults to 0.
-        pin_memory (bool, optional): whether to pin the dataloaders memory. Defaults to True.
-        optimizer (Optimizer, optional): optimizers. Defaults to None.
-        scheduler (LRScheduler, optional): learning rate scheduler. Defaults to None.
-        criterion (Callable, optional): criterion/loss function. Defaults to None.
-        datasets (Dict[str, Optional[Dataset]], optional):
-            datasets for train, val, test, and predict. Supports Defaults to None.
-        samplers (Dict[str, Optional[Sampler]], optional):
-            samplers for train, val, test, and predict. Defaults to None.
-        collate_fns (Dict[str, Optional[Callable]], optional):
-            collate functions for train, val, test, and predict. Defaults to None.
-        metrics (Dict[str, Optional[Union[Metric, List[Metric]]]], optional):
-            metrics for train, val, and test. Supports a single metric or a list of metrics,
-            implemented using `torchmetrics`. Defaults to None.
-        postprocessing (Dict[str, Optional[Callable]], optional):
+        model (Module): The model.
+        batch_size (int): Batch size.
+        drop_last_batch (bool, optional): Whether the last batch in the dataloader should be dropped. Defaults to False.
+        num_workers (int, optional): Number of dataloader workers. Defaults to 0.
+        pin_memory (bool, optional): Whether to pin the dataloaders memory. Defaults to True.
+        optimizer (Optimizer, optional): Optimizers. Defaults to None.
+        scheduler (LRScheduler, optional): Learning rate scheduler. Defaults to None.
+        criterion (Callable, optional): Criterion/loss function. Defaults to None.
+        datasets (Dict[str, Dataset], optional): Datasets for train, val, test, and predict. Defaults to None.
+        samplers (Dict[str, Sampler], optional): Samplers for train, val, test, and predict. Defaults to None.
+        collate_fns (Dict[str, Union[Callable, List[Callable]]], optional):
+            Collate functions for train, val, test, and predict. Defaults to None.
+        metrics (Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]], optional):
+            Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
+            Defaults to None.
+        postprocessing (Dict[str, Union[Callable, List[Callable]]], optional):
             Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
             and logging. The postprocessing is done before each stage - for example, criterion postprocessing
             will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
             top of the previous one(s) - for example, the logging postprocessing will be done on the data that
             has been postprocessed for the criterion and metrics earlier. Defaults to None.
-        inferer (Callable, optional): the inferer must be a class with a `__call__`
-            method that accepts two arguments - the input to infer over, and the model itself.
-            Used in 'val', 'test', and 'predict' mode, but not in 'train'. Typically, an inferer
-            is a sliding window or a patch-based inferer that will infer over the smaller parts of
-            the input, combine them, and return a single output. The inferers provided by MONAI
-            cover most of such cases (https://docs.monai.io/en/stable/inferers.html). Defaults to None.
+        inferer (Callable, optional): The inferer must be a class with a `__call__` method that accepts two
+            arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
+            mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
+            that will infer over the smaller parts of the input, combine them, and return a single output.
+            The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
+            Defaults to None.
     """
 
     def __init__(
@@ -59,13 +56,13 @@ class LighterSystem(pl.LightningModule):
         num_workers: int = 0,
         pin_memory: bool = True,
         optimizer: Optional[Optimizer] = None,
-        scheduler: Optional["LRScheduler"] = None,
+        scheduler: Optional[LRScheduler] = None,
         criterion: Optional[Callable] = None,
-        datasets: Optional[Dict[str, Optional[Dataset]]] = None,
-        samplers: Optional[Dict[str, Optional[Sampler]]] = None,
-        collate_fns: Optional[Dict[str, Optional[Callable]]] = None,
-        metrics: Optional[Dict[str, Optional[Union[Metric, List[Metric]]]]] = None,
-        postprocessing: Optional[Dict[str, Optional[Callable]]] = None,
+        datasets: Dict[str, Dataset] = None,
+        samplers: Dict[str, Sampler] = None,
+        collate_fns: Dict[str, Union[Callable, List[Callable]]] = None,
+        metrics: Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]] = None,
+        postprocessing: Dict[str, Union[Callable, List[Callable]]] = None,
         inferer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
@@ -87,25 +84,15 @@ class LighterSystem(pl.LightningModule):
         self.pin_memory = pin_memory
 
         # Datasets, samplers, and collate functions
-        schema = {"train": None, "val": None, "test": None, "predict": None}
-        self.datasets = ensure_dict_schema(datasets, schema)
-        self.samplers = ensure_dict_schema(samplers, schema)
-        self.collate_fns = ensure_dict_schema(collate_fns, schema)
+        self.datasets = self._init_datasets(datasets)
+        self.samplers = self._init_samplers(samplers)
+        self.collate_fns = self._init_collate_fns(collate_fns)
 
         # Metrics
-        self.metrics = ensure_dict_schema(metrics, schema={"train": None, "val": None, "test": None})
-        self.metrics = {mode: MetricCollection(ensure_list(metric)) for mode, metric in self.metrics.items()}
-        # Register the metrics to allow the LightningModule to automatically move them to the correct device.
-        # Currently, a workaround is needed because of https://github.com/pytorch/pytorch/issues/71203.
-        # Once it's fixed, we can set `self.metrics = ModuleDict(self.metrics)` directly.
-        for mode, mode_metrics in self.metrics.items():
-            setattr(self, f"{mode}_metric", mode_metrics)
-            self.metrics[mode] = getattr(self, f"{mode}_metric")
+        self.metrics = self._init_metrics(metrics)
 
         # Postprocessing
-        schema = {"input": None, "target": None, "pred": None}
-        schema = {"criterion": schema, "metrics": schema, "logging": schema}
-        self.postprocessing = ensure_dict_schema(postprocessing, schema)
+        self.postprocessing = self._init_postprocessing(postprocessing)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
@@ -194,6 +181,17 @@ class LighterSystem(pl.LightningModule):
 
         # Calculate the loss.
         loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
+        # Log the loss for monitoring purposes.
+        if loss is not None:
+            self.log(
+                "loss" if mode == "train" else f"{mode}_loss",
+                loss,
+                on_step=True,
+                on_epoch=True,
+                sync_dist=True,
+                logger=False,
+                batch_size=self.batch_size,
+            )
 
         # Log and return the results.
         if mode == "predict":
@@ -206,21 +204,12 @@ class LighterSystem(pl.LightningModule):
             target = apply_fns(target, self.postprocessing["metrics"]["target"])
             pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-            # Calculate the metrics for the step.
-            metrics = self.metrics[mode](pred, target)
-
-            # Log the metrics for monitoring purposes.
-            self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
-            # Log the loss for monitoring purposes.
-            self.log(
-                "loss" if mode == "train" else f"{mode}_loss",
-                loss,
-                on_step=True,
-                on_epoch=True,
-                sync_dist=True,
-                logger=False,
-                batch_size=self.batch_size,
-            )
+            # Calculate the step metrics.
+            # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
+            metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
+            # Log the metrics.
+            if metrics is not None:
+                self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
 
             # Data postprocessing for logging.
             input = apply_fns(input, self.postprocessing["logging"]["input"])
@@ -363,7 +352,10 @@ class LighterSystem(pl.LightningModule):
             self.predict_step = partial(self._base_step, mode="predict")
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
-        """`LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
+        """
+        Initializes placeholders for dataloader and step methods.
+
+        `LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
         in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
         at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
         are initially defined as `lambda: None`, before `self.setup()` is called.
@@ -372,3 +364,32 @@ class LighterSystem(pl.LightningModule):
         self.val_dataloader = self.validation_step = lambda: None
         self.test_dataloader = self.test_step = lambda: None
         self.predict_dataloader = self.predict_step = lambda: None
+
+    def _init_datasets(self, datasets: Dict[str, Optional[Dataset]]):
+        """Ensures that the datasets have the predefined schema."""
+        return ensure_dict_schema(datasets, {"train": None, "val": None, "test": None, "predict": None})
+
+    def _init_samplers(self, samplers: Dict[str, Optional[Sampler]]):
+        """Ensures that the samplers have the predefined schema"""
+        return ensure_dict_schema(samplers, {"train": None, "val": None, "test": None, "predict": None})
+
+    def _init_collate_fns(self, collate_fns: Dict[str, Optional[Callable]]):
+        """Ensures that the collate functions have the predefined schema."""
+        return ensure_dict_schema(collate_fns, {"train": None, "val": None, "test": None, "predict": None})
+
+    def _init_metrics(self, metrics: Dict[str, Optional[Union[Metric, List[Metric], Dict[str, Metric]]]]):
+        """Ensures that the metrics have the desired schema. Wraps each mode's metrics in
+        a MetricCollection, and finally registers them with PyTorch using a ModuleDict.
+        """
+        metrics = ensure_dict_schema(metrics, {"train": None, "val": None, "test": None})
+        for mode, metric in metrics.items():
+            metrics[mode] = MetricCollection(metric) if metric is not None else None
+        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
+        metrics = {f"_{k}": v for k, v in metrics.items()}
+        return ModuleDict(metrics)
+
+    def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
+        """Ensures that the postprocessing functions have the predefined schema."""
+        subschema = {"input": None, "target": None, "pred": None}
+        schema = {"criterion": subschema, "metrics": subschema, "logging": subschema}
+        return ensure_dict_schema(postprocessing, schema)
