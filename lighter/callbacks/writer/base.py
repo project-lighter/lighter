@@ -1,12 +1,10 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
-import itertools
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 
 import torch
-from loguru import logger
 from monai.data.utils import decollate_batch
 from pytorch_lightning import Callback, Trainer
 

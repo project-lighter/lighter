@@ -1,8 +1,6 @@
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Union
 
 import inspect
-
-from loguru import logger
 
 
 def ensure_list(vals: Any) -> List:
