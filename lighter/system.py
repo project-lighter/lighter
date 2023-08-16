@@ -378,7 +378,7 @@ class LighterSystem(pl.LightningModule):
         return ensure_dict_schema(collate_fns, {"train": None, "val": None, "test": None, "predict": None})
 
     def _init_metrics(self, metrics: Dict[str, Optional[Union[Metric, List[Metric], Dict[str, Metric]]]]):
-        """Ensures that the metrics have the desired schema. Wraps each mode's metrics in
+        """Ensures that the metrics have the predefined schema. Wraps each mode's metrics in
         a MetricCollection, and finally registers them with PyTorch using a ModuleDict.
         """
         metrics = ensure_dict_schema(metrics, {"train": None, "val": None, "test": None})

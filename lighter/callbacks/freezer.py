@@ -69,7 +69,7 @@ class LighterFreezer(Callback):
         self._on_batch_start(trainer, pl_module)
 
     def on_predict_batch_start(
-        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_start(trainer, pl_module)
 
