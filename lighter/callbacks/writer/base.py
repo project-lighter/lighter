@@ -45,7 +45,7 @@ class LighterBaseWriter(ABC, Callback):
 
         # Ensure that default writers are defined
         if not hasattr(self, "_writers"):
-            raise NotImplementedError("Subclasses of LighterBaseWriter must implement the `_writers` property.")
+            raise NotImplementedError("Subclasses of LighterBaseWriter must implement the `_writers` attribute.")
 
         # Register any additional writers passed during initialization
         if additional_writers:
