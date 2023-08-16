@@ -42,10 +42,8 @@ class LighterTableWriter(LighterBaseWriter):
     def write(self, tensor: Any, id: Union[int, str], multi_pred_id: Optional[Union[int, str]], format: str) -> None:
         """
         Write the tensor as a table record in the given format.
-
-        If there are multiple predictions, there will be a separate column for each prediction,
-        named after the corresponding `multi_pred_id`.
-        If single prediction, there will be a single column named "pred".
+        If there are multiple predictions, there will be a separate column for each prediction, named after
+        the corresponding `multi_pred_id`. If single prediction, there will be a single column named "pred".
 
         Args:
             tensor (Any): The tensor to be written.
@@ -70,12 +68,11 @@ class LighterTableWriter(LighterBaseWriter):
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         """
-        Callback method triggered at the end of the prediction epoch to dump the CSV table.
+        Callback invoked at the end of the prediction epoch to save predictions to a CSV file.
 
-        Args:
-            trainer (Trainer): Pytorch Lightning Trainer instance.
-            pl_module (LighterSystem): Lighter system instance.
-            outputs (List[Any]): List of predictions.
+        This method is responsible for organizing prediction records and saving them as a CSV file.
+        If training was done in a distributed setting, it gathers predictions from all processes
+        and then saves them from the rank 0 process.
         """
         # Set the path where the CSV will be saved
         csv_path = self.directory / "predictions.csv"

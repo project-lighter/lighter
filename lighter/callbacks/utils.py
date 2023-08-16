@@ -45,81 +45,61 @@ def is_data_type_supported(data: Union[Any, List[Any], Dict[str, Union[Any, List
     return is_valid
 
 
-def parse_data(
+def flatten_structure(
     data: Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]], prefix: Optional[str] = None
 ) -> Dict[Optional[str], Any]:
     """
-    Parse the input data recursively, handling nested dictionaries, lists, and tuples.
+    Recursively parse nested data structures into a flat dictionary.
 
-    This function will recursively parse the input data, unpacking nested dictionaries, lists, and tuples. The result
-    will be a dictionary where each key is a unique identifier reflecting the data's original structure (dict keys
-    or list/tuple positions) and each value is a non-container data type from the input data.
+    This function flattens dictionaries, lists, and tuples, returning a dictionary where each key is constructed
+    from the original structure's keys or list/tuple indices. The values in the output dictionary are non-container
+    data types extracted from the input.
 
     Args:
-        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]): Input data to parse.
-        prefix (Optional[str]): Current prefix for keys in the result dictionary. Defaults to None.
+        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]):
+            The input data to parse. Can be of any data type but the function is optimized
+            to handle dictionaries, lists, and tuples. Nested structures are also supported.
+
+        prefix (Optional[str]):
+            A prefix used when constructing keys for the output dictionary. Useful for recursive
+            calls to maintain context. Defaults to None.
 
     Returns:
-        Dict[Optional[str], Any]: A dictionary where key is either a string identifier or `None`, and value is the parsed output.
+        Dict[Optional[str], Any]:
+            A flattened dictionary where keys are unique identifiers built from the original data structure,
+            and values are non-container data extracted from the input.
 
     Example:
         input_data = {
             "a": [1, 2],
             "b": {"c": (3, 4), "d": 5}
         }
-        output_data = parse_data(input_data)
-        # Output:
-        # {
-        #     'a_0': 1,
-        #     'a_1': 2,
-        #     'b_c_0': 3,
-        #     'b_c_1': 4,
-        #     'b_d': 5
-        # }
+        output_data = flatten_structure(input_data)
+
+        Expected output:
+        {
+            'a_0': 1,
+            'a_1': 2,
+            'b_c_0': 3,
+            'b_c_1': 4,
+            'b_d': 5
+        }
     """
     result = {}
     if isinstance(data, dict):
         for key, value in data.items():
             # Recursively parse the value with an updated prefix
-            sub_result = parse_data(value, prefix=f"{prefix}_{key}" if prefix else key)
+            sub_result = flatten_structure(value, prefix=f"{prefix}_{key}" if prefix else key)
             result.update(sub_result)
     elif isinstance(data, (list, tuple)):
         for idx, element in enumerate(data):
             # Recursively parse the element with an updated prefix
-            sub_result = parse_data(element, prefix=f"{prefix}_{idx}" if prefix else str(idx))
+            sub_result = flatten_structure(element, prefix=f"{prefix}_{idx}" if prefix else str(idx))
             result.update(sub_result)
     else:
         # Assign the value to the result dictionary using the current prefix as its key
         result[prefix] = data
     return result
-
-
-def parse_format(format: str, parsed_preds: Dict[str, Any]) -> Dict[str, str]:
-    """
-    Parse the given format and align it with the structure of the predictions.
-
-    If the format is a single string, all predictions will be saved in this format. If the format has a structure
-    (like a dictionary), it needs to match the structure of the predictions.
-
-    Args:
-        format (str): The storage format for the predictions, either as a string or a structured format.
-        parsed_preds (Dict[str, Any]): Dictionary of parsed prediction data.
-
-    Returns:
-        Dict[str, str]: Dictionary of parsed format data corresponding to the prediction structure.
-
-    Raises:
-        ValueError: If the structure of the format does not align with the prediction structure.
-    """
-    if isinstance(format, str):
-        # Assign the single format to all prediction keys.
-        parsed_format = {key: format for key in parsed_preds}
-    else:
-        # Ensure the structured format corresponds with the predictions' structure.
-        parsed_format = parse_data(format)
-        if not set(parsed_format) == set(parsed_preds):
-            raise ValueError("`format` structure does not match the prediction's structure.")
-    return parsed_format
 
 
 def preprocess_image(image: torch.Tensor, add_batch_dim=False) -> torch.Tensor:

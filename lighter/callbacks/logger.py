@@ -12,7 +12,7 @@ from pytorch_lightning import Callback, Trainer
 from pytorch_lightning.callbacks.lr_monitor import LearningRateMonitor
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import get_lighter_mode, is_data_type_supported, parse_data, preprocess_image
+from lighter.callbacks.utils import flatten_structure, get_lighter_mode, is_data_type_supported, preprocess_image
 from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
 
 
@@ -220,7 +220,7 @@ class LighterLogger(Callback):
                             f"`{name}` has to be a Tensor, List[Tensor], Tuple[Tensor],  Dict[str, Tensor], "
                             f"Dict[str, List[Tensor]], or Dict[str, Tuple[Tensor]]. `{type(outputs[name])}` is not supported."
                         )
-                    for identifier, item in parse_data(outputs[name]).items():
+                    for identifier, item in flatten_structure(outputs[name]).items():
                         item_name = f"{mode}/data/{name}" if identifier is None else f"{mode}/data/{name}_{identifier}"
                         self._log_by_type(item_name, item, self.log_types[name], global_step)
 

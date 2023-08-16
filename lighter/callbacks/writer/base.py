@@ -12,7 +12,7 @@ from monai.data.utils import decollate_batch
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
-from lighter.callbacks.utils import parse_data, parse_format
+from lighter.callbacks.utils import flatten_structure
 
 
 class LighterBaseWriter(ABC, Callback):
@@ -40,9 +40,6 @@ class LighterBaseWriter(ABC, Callback):
         self.directory = Path(directory) / datetime.now().strftime("%Y%m%d_%H%M%S")
         self.format = format
 
-        # Placeholder for processed format for quicker access during writes
-        self._parsed_format = None
-
         # When IDs are not provided, keep track of the global prediction count. Supports DDP.
         self._pred_count = None
 
@@ -68,8 +65,8 @@ class LighterBaseWriter(ABC, Callback):
         the batch dimension. If the batch dimension is needed, apply `tensor.unsqueeze(0)` before saving,
         either in this method or in the particular writer function.
 
-        For each supported format, there should be a corresponding writer function registered in `self._writers`,
-        and can be retrieved using `self.get_writer(format)`.
+        For each supported format, there should be a corresponding writer function registered in `self._writers`
+        A specific writer function can be retrieved using `self.get_writer(format)`.
 
         Args:
             tensor (torch.Tensor): Tensor to be saved. It will be a single tensor without the batch dimension.
@@ -82,7 +79,13 @@ class LighterBaseWriter(ABC, Callback):
         pass
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
-        """Callback for setup stage in Pytorch Lightning Trainer."""
+        """
+        Callback function to set up necessary prerequisites: prediction count and prediction directory.
+        When executing in a distributed environment, it ensures that:
+        1. Each distributed node initializes a prediction count based on its rank.
+        2. All distributed nodes write predictions to the same directory.
+        3. The directiory is accessible to all nodes, i.e. that all nodes share the same storage.
+        """
         if stage != "predict":
             return
 
@@ -105,7 +108,13 @@ class LighterBaseWriter(ABC, Callback):
     def on_predict_batch_end(
         self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
-        """Callback method triggered at the end of each prediction batch/step."""
+        """
+        Callback method executed at the end of each prediction batch/step.
+
+        It decollates the predicted outputs and, if provided, the associated IDs.
+        If the IDs are not provided, it generates global unique IDs based on the prediction count.
+        Finally, it writes the predictions according to the specified format.
+        """
         # Fetch and decollate preds.
         preds = decollate_batch(outputs["pred"], detach=True, pad=False)
         # Fetch and decollate IDs if provided.
@@ -124,14 +133,19 @@ class LighterBaseWriter(ABC, Callback):
         # Iterate over the predictions and save them.
         for id, pred in zip(ids, preds):
             # Convert predictions into a structured format suitable for writing.
-            parsed_pred = parse_data(pred)
-            # If the format hasn't been parsed yet, do it now.
-            if self._parsed_format is None:
-                self._parsed_format = parse_format(self.format, parsed_pred)
-            # If multiple outputs, parsed_pred will contain multiple keys. For a single output, key will be None.
-            for multi_pred_id, tensor in parsed_pred.items():
+            pred = flatten_structure(pred)
+
+            # If a single format is provided, assign it to all pred keys. Otherwise, the format must match the pred structure.
+            format = {key: self.format for key in pred} if isinstance(self.format, str) else flatten_structure(self.format)
+            # Ensure that the format structure matches the prediction structure.
+            if not set(format) == set(pred):
+                raise ValueError("`format` structure does not match the prediction's structure.")
+
+            # If pred is multi-output, there will be a `multi_pred_id` for each output.
+            # If single-output, `multi_pred_id` will be None.
+            for multi_pred_id, tensor in pred.items():
                 # Save the prediction as per the designated format.
-                self.write(tensor, id, multi_pred_id, format=self._parsed_format[multi_pred_id])
+                self.write(tensor, id, multi_pred_id, format=format[multi_pred_id])
 
     def add_writer(self, format: str, writer_function: Callable) -> None:
         """
