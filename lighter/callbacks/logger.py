@@ -257,7 +257,8 @@ class LighterLogger(Callback):
 
             # Metrics
             # Get the torchmetrics.
-            metric_collection = pl_module.metrics[mode]
+            # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
+            metric_collection = pl_module.metrics["_" + mode]
             if metric_collection is not None:
                 # Compute the epoch metrics.
                 metrics = metric_collection.compute()
