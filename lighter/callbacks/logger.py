@@ -162,6 +162,7 @@ class LighterLogger(Callback):
             image (torch.Tensor): image to be logged.
             global_step (int): current global step.
         """
+        image = image.detach().cpu()
         if self.tensorboard:
             self.tensorboard.add_image(name, image, global_step=global_step)
         if self.wandb:
