@@ -15,20 +15,16 @@ def get_lighter_mode(lightning_stage: str) -> str:
     return lightning_to_lighter[lightning_stage]
 
 
-def preprocess_image(image: torch.Tensor, add_batch_dim=False) -> torch.Tensor:
+def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     """Preprocess the image before logging it. If it is a batch of multiple images,
     it will create a grid image of them. In case of 3D, a single image is displayed
     with slices stacked vertically, while a batch of 3D images as a grid where each
     column is a different 3D image.
     Args:
         image (torch.Tensor): 2D or 3D image tensor.
-        add_batch_dim (bool, optional): Whether to add a batch dimension to the input image.
-            Use only when the input image does not have a batch dimension. Defaults to False.
     Returns:
         torch.Tensor: image ready for logging.
     """
-    if add_batch_dim:
-        image = image.unsqueeze(0)
     # If 3D (BCDHW), concat the images vertically and horizontally.
     if image.ndim == 5:
         shape = image.shape

@@ -171,7 +171,6 @@ class LighterLogger(Callback):
             global_step (int): current global step.
         """
         tensor = tensor.detach().cpu()
-
         if self.tensorboard:
             self.tensorboard.add_histogram(name, tensor, global_step=global_step)
         if self.wandb:

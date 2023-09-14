@@ -62,7 +62,7 @@ def write_tensor(path, tensor):
 
 def write_image(path, tensor):
     path = path.with_suffix(".png")
-    tensor = preprocess_image(tensor, add_batch_dim=True)
+    tensor = preprocess_image(tensor)
     torchvision.io.write_png(tensor, path)
 
 
