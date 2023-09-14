@@ -1,5 +1,3 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
-
 import torch
 import torchvision
 
@@ -15,91 +13,6 @@ def get_lighter_mode(lightning_stage: str) -> str:
     """
     lightning_to_lighter = {"train": "train", "validate": "val", "test": "test"}
     return lightning_to_lighter[lightning_stage]
-
-
-def is_data_type_supported(data: Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]) -> bool:
-    """
-    Check the input data recursively for its type. Valid data types are:
-        - torch.Tensor
-        - List[torch.Tensor]
-        - Tuple[torch.Tensor]
-        - Dict[str, torch.Tensor]
-        - Dict[str, List[torch.Tensor]]
-        - Dict[str, Tuple[torch.Tensor]]
-        - Nested combinations of the above
-
-    Args:
-        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]): Input data to check.
-
-    Returns:
-        bool: True if the data type is supported, False otherwise.
-    """
-    if isinstance(data, dict):
-        is_valid = all(is_data_type_supported(elem) for elem in data.values())
-    elif isinstance(data, (list, tuple)):
-        is_valid = all(is_data_type_supported(elem) for elem in data)
-    elif isinstance(data, torch.Tensor):
-        is_valid = True
-    else:
-        is_valid = False
-    return is_valid
-
-
-def flatten_structure(
-    data: Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]], prefix: Optional[str] = None
-) -> Dict[Optional[str], Any]:
-    """
-    Recursively parse nested data structures into a flat dictionary.
-
-    This function flattens dictionaries, lists, and tuples, returning a dictionary where each key is constructed
-    from the original structure's keys or list/tuple indices. The values in the output dictionary are non-container
-    data types extracted from the input.
-
-    Args:
-        data (Union[Any, List[Any], Dict[str, Union[Any, List[Any], Tuple[Any]]]]):
-            The input data to parse. Can be of any data type but the function is optimized
-            to handle dictionaries, lists, and tuples. Nested structures are also supported.
-
-        prefix (Optional[str]):
-            A prefix used when constructing keys for the output dictionary. Useful for recursive
-            calls to maintain context. Defaults to None.
-
-    Returns:
-        Dict[Optional[str], Any]:
-            A flattened dictionary where keys are unique identifiers built from the original data structure,
-            and values are non-container data extracted from the input.
-
-    Example:
-        input_data = {
-            "a": [1, 2],
-            "b": {"c": (3, 4), "d": 5}
-        }
-        output_data = flatten_structure(input_data)
-
-        Expected output:
-        {
-            'a_0': 1,
-            'a_1': 2,
-            'b_c_0': 3,
-            'b_c_1': 4,
-            'b_d': 5
-        }
-    """
-    result = {}
-    if isinstance(data, dict):
-        for key, value in data.items():
-            # Recursively parse the value with an updated prefix
-            sub_result = flatten_structure(value, prefix=f"{prefix}_{key}" if prefix else key)
-            result.update(sub_result)
-    elif isinstance(data, (list, tuple)):
-        for idx, element in enumerate(data):
-            # Recursively parse the element with an updated prefix
-            sub_result = flatten_structure(element, prefix=f"{prefix}_{idx}" if prefix else str(idx))
-            result.update(sub_result)
-    else:
-        # Assign the value to the result dictionary using the current prefix as its key
-        result[prefix] = data
-    return result
 
 
 def preprocess_image(image: torch.Tensor, add_batch_dim=False) -> torch.Tensor:

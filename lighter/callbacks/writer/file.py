@@ -1,11 +1,13 @@
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Dict, Union
 
+from functools import partial
 from pathlib import Path
 
+import monai
 import torch
 import torchvision
+from monai.data import metatensor_to_itk_image
 from monai.transforms import DivisiblePad
-from monai.utils.module import optional_import
 
 from lighter.callbacks.utils import preprocess_image
 from lighter.callbacks.writer.base import LighterBaseWriter
@@ -20,45 +22,38 @@ class LighterFileWriter(LighterBaseWriter):
 
     Args:
         directory (Union[str, Path]): The directory where the files should be written.
-        format (str): The format in which the files should be saved.
-        additional_writers (Optional[Dict[str, Callable]]): Additional custom writer functions.
+        writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
+            Available writers: "tensor", "image", "video", "itk_nrrd", "itk_seg_nrrd", "itk_nifti".
     """
 
-    def __init__(
-        self, directory: Union[str, Path], format: str, additional_writers: Optional[Dict[str, Callable]] = None
-    ) -> None:
-        # Predefined writers for different formats.
-        self._writers = {
+    def __init__(self, directory: Union[str, Path], writer: Union[str, Callable]) -> None:
+        super().__init__(directory, writer)
+
+    @property
+    def writers(self) -> Dict[str, Callable]:
+        return {
             "tensor": write_tensor,
             "image": write_image,
             "video": write_video,
-            "sitk_nrrd": write_sitk_nrrd,
-            "sitk_seg_nrrd": write_seg_nrrd,
-            "sitk_nifti": write_sitk_nifti,
+            "itk_nrrd": partial(write_itk_image, suffix=".nrrd"),
+            "itk_seg_nrrd": partial(write_itk_image, suffix=".seg.nrrd"),
+            "itk_nifti": partial(write_itk_image, suffix=".nii.gz"),
         }
-        # Initialize the base class.
-        super().__init__(directory, format, additional_writers)
 
-    def write(self, tensor: torch.Tensor, id: Union[int, str], multi_pred_id: Optional[Union[int, str]], format: str) -> None:
+    def write(self, tensor: torch.Tensor, id: Union[int, str]) -> None:
         """
         Write the tensor to the specified path in the given format.
 
-        If there are multiple predictions, a directory named `id` is created, and each file is named
-        after `multi_pred_id`. If there's a single prediction, the file is named after `id`.
-
         Args:
             tensor (Tensor): The tensor to be written.
-            id (Union[int, str]): The primary identifier for naming.
-            multi_pred_id (Optional[Union[int, str]]): The secondary identifier, used if there are multiple predictions.
+            id (Union[int, str]): The identifier for naming.
             format (str): Format in which tensor should be written.
         """
         # Determine the path for the file based on prediction count. The suffix must be added by the writer function.
-        path = self.directory / str(id) if multi_pred_id is None else self.directory / str(id) / str(multi_pred_id)
+        path = self.directory / str(id)
         path.parent.mkdir(exist_ok=True, parents=True)
-        # Fetch the appropriate writer function for the format.
-        writer = self.get_writer(format)
         # Write the tensor to the file.
-        writer(path, tensor)
+        self.writer(path, tensor)
 
 
 def write_tensor(path, tensor):
@@ -85,27 +80,12 @@ def write_video(path, tensor):
     torchvision.io.write_video(str(path), tensor, fps=24)
 
 
-def _write_sitk_image(path: str, tensor: torch.Tensor, suffix) -> None:
+def write_itk_image(path: str, tensor: torch.Tensor, suffix) -> None:
     path = path.with_suffix(suffix)
 
-    if "sitk" not in OPTIONAL_IMPORTS:
-        OPTIONAL_IMPORTS["sitk"], sitk_available = optional_import("SimpleITK")
-        if not sitk_available:
-            raise ImportError("SimpleITK is not available. Install it with `pip install SimpleITK`.")
+    # TODO: Remove this code when fixed https://github.com/Project-MONAI/MONAI/issues/6985
+    if tensor.meta["space"] == "RAS":
+        tensor.affine = monai.data.utils.orientation_ras_lps(tensor.affine)
 
-    # Remove the channel dimension if it's equal to 1.
-    tensor = tensor.squeeze(0) if (tensor.dim() == 4 and tensor.shape[0] == 1) else tensor
-    sitk_image = OPTIONAL_IMPORTS["sitk"].GetImageFromArray(tensor.cpu().numpy())
-    OPTIONAL_IMPORTS["sitk"].WriteImage(sitk_image, str(path), useCompression=True)
-
-
-def write_sitk_nrrd(path, tensor):
-    _write_sitk_image(path, tensor, suffix=".nrrd")
-
-
-def write_seg_nrrd(path, tensor):
-    _write_sitk_image(path, tensor, suffix=".seg.nrrd")
-
-
-def write_sitk_nifti(path, tensor):
-    _write_sitk_image(path, tensor, suffix=".nii.gz")
+    itk_image = metatensor_to_itk_image(tensor, channel_dim=0, dtype=tensor.dtype)
+    OPTIONAL_IMPORTS["itk"].imwrite(itk_image, str(path), True)
