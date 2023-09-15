@@ -1,8 +1,7 @@
-from typing import Any, Callable, List
+from typing import Any, Callable
 
 import random
 
-import torch
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
 from torch.utils.data.dataloader import default_collate

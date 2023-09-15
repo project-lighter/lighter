@@ -20,9 +20,8 @@ trainer:
           max_samples: 10
 
         - _target_: lighter.callbacks.LighterFileWriter
-          write_dir: "$@project + '/predictions' "
-          write_format: "tensor"
-          write_interval: "step" # "epoch"
+          directory: "$@project + '/predictions' "
+          format: "tensor"
 
 system:
     _target_: lighter.LighterSystem

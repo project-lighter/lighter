@@ -69,7 +69,7 @@ class LighterFreezer(Callback):
         self._on_batch_start(trainer, pl_module)
 
     def on_predict_batch_start(
-        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int
+        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_start(trainer, pl_module)
 
@@ -122,20 +122,23 @@ class LighterFreezer(Callback):
             # Leave the excluded-from-freezing parameters trainable.
             if self.except_names and name in self.except_names:
                 param.requires_grad = True
-            elif self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with):
+                continue
+            if self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with):
                 param.requires_grad = True
+                continue
 
             # Freeze/unfreeze the specified parameters, based on the `requires_grad` argument.
-            elif self.names and name in self.names:
+            if self.names and name in self.names:
                 param.requires_grad = requires_grad
                 frozen_layers.append(name)
-            elif self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
+                continue
+            if self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
                 param.requires_grad = requires_grad
                 frozen_layers.append(name)
+                continue
 
             # Otherwise, leave the parameter trainable.
-            else:
-                param.requires_grad = True
+            param.requires_grad = True
 
         self._frozen_state = not requires_grad
         # Log only when freezing the parameters.

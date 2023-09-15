@@ -1,50 +1,76 @@
-from typing import Any
+from typing import Dict
 
 import importlib
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from loguru import logger
+from monai.utils.module import optional_import
 
-OPTIONAL_IMPORTS = {}
+
+@dataclass
+class OptionalImports:
+    """Dataclass for handling optional imports.
+
+    This class provides a way to handle optional imports in a convenient manner.
+    It allows importing modules that may or may not be available, and raises an ImportError if the module is not available.
+
+    Example: ::
+        from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+        writer = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter()
+
+    Attributes:
+        imports (Dict[str, object]): A dictionary to store the imported modules.
+    """
+
+    imports: Dict[str, object] = field(default_factory=dict)
+
+    def __getitem__(self, module_name: str):
+        """Get the imported module by name.
+
+        Args:
+            module_name (str): The name of the module to import.
+
+        Raises:
+            ImportError: If the module is not available.
+
+        Returns:
+            object: The imported module.
+        """
+        if module_name not in self.imports:
+            self.imports[module_name], module_available = optional_import(module_name)
+            if not module_available:
+                raise ImportError(f"'{module_name}' is not available. Make sure that it is installed and spelled correctly.")
+        return self.imports[module_name]
+
+
+OPTIONAL_IMPORTS = OptionalImports()
 
 
 def import_module_from_path(module_name: str, module_path: str) -> None:
-    """Given the path to a module, import it, and name it as specified.
+    """Import a module from a given path and assign it a specified name.
+
+    This function imports a module from the specified path and assigns it the specified name.
 
     Args:
-        module_name (str): what to name the imported module.
-        module_path (str): path to the module to load.
+        module_name (str): The name to assign to the imported module.
+        module_path (str): The path to the module to import.
+
+    Raises:
+        ValueError: If the module has already been imported.
+        FileNotFoundError: If the `__init__.py` file is not found in the module path.
     """
     # Based on https://stackoverflow.com/a/41595552.
 
     if module_name in sys.modules:
-        logger.error(f"{module_path} has already been imported as module: {module_name}")
-        sys.exit()
+        raise ValueError(f"{module_name} has already been imported as module.")
 
     module_path = Path(module_path).resolve() / "__init__.py"
     if not module_path.is_file():
-        logger.error(f"No `__init__.py` in `{module_path}`. Exiting.")
-        sys.exit()
+        raise FileNotFoundError(f"No `__init__.py` in `{module_path}`.")
     spec = importlib.util.spec_from_file_location(module_name, str(module_path))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules[module_name] = module
     logger.info(f"{module_path.parent} imported as '{module_name}' module.")
-
-
-def import_attr(module_attr: str) -> Any:
-    """Import using dot-notation string, e.g., 'torch.nn.Module'.
-
-    Args:
-        module_attr (str): dot-notation path to the attribute.
-
-    Returns:
-        Any: imported attribute.
-    """
-    # Split module from attribute name
-    module, attr = module_attr.rsplit(".", 1)
-    # Import the module
-    module = __import__(module, fromlist=[attr])
-    # Get the attribute from the module
-    return getattr(module, attr)
