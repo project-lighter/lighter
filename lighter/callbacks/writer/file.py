@@ -3,7 +3,6 @@ from typing import Callable, Dict, Union
 from functools import partial
 from pathlib import Path
 
-import monai
 import torch
 import torchvision
 from monai.data import metatensor_to_itk_image
