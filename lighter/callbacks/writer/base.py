@@ -57,15 +57,14 @@ class LighterBaseWriter(ABC, Callback):
     def write(self, tensor: torch.Tensor, id: int) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
-        the batch dimension. If the batch dimension is needed, apply `tensor.unsqueeze(0)` before saving,
-        either in this method or in the particular writer function.
+        the batch dimension.
 
         For each supported format, there should be a corresponding writer function registered in `self.writers`
         A specific writer function can be retrieved using `self.get_writer(self.format)`.
 
         Args:
-            tensor (torch.Tensor): Tensor to be saved. It will be a single tensor without the batch dimension.
-            id (int): Identifier for the tensor, can be used for naming or indexing.
+            tensor (torch.Tensor): tensor, without the batch dimension, to be saved.
+            id (int): identifier for the tensor, can be used for naming files or adding table records.
         """
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
