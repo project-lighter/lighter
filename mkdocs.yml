@@ -1,0 +1,50 @@
+site_name: Lighter
+theme: 
+  font:
+    code: Roboto Mono
+  name: 'material'
+  favicon: 'assets/lighter_icon_dark.png'
+  logo: 'assets/lighter_icon_dark.png'
+  features:
+    - content.code.copy
+    - content.code.select
+    - header.autohide
+    - content.tooltips
+    - attr_list
+    - footnotes
+    - navigation.tabs
+    - navigation.footer
+
+  palette:
+    - scheme: default    
+
+extra_css:
+  - assets/extra.css
+
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings
+
+nav:
+  - 'index.md'
+  - 'Basics': 
+    - '5 Minute Example': 'basics/5-minute-example.md'
+    - 'Config': 'basics/config.md'
+    - 'System': 'basics/system.md'
+    - 'Trainer': 'basics/trainer.md'
+    - 'Project-specific code': 'basics/project-specific-code.md'
+  - 'Advanced':
+    - 'Postprocessing': 'advanced/postprocessing.md'
+    - 'Inferer': 'advanced/inferer.md'
+    - 'Callbacks': 'advanced/callbacks.md'
+  - 'API': api.md
+  
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
