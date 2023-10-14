@@ -40,7 +40,8 @@ plugins:
   - mkdocstrings
 
 nav:
-  - 'index.md'
+  - Home:
+    - 'Lighter': 'index.md'
   - 'Basics': 
     - '5 Minute Example': 'basics/5-minute-example.md'
     - 'Config': 'basics/config.md'

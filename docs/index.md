@@ -11,6 +11,7 @@ hide:
 
 <!-- pip install -->
 <div style="width:70%; margin:auto; text-align:center">
+</br>
 
 ```bash
 pip install project-lighter
@@ -24,21 +25,18 @@ pip install project-lighter
 
 Say goodbye to messy scripts and notebooks. Lighter is here to help you organize your experiments and make them reproducible.
 
-
-## Demo
-
-Here is a comparison between a PyTorch Lightning script and its Lighter equivalent.
-
-Lighter is:
+## Features
 
 1. **Structured** - the pre-defined structure ensures that your experiments are standardized, organized, and reproducible.
 2. **Boilerplate-free** - forget about writing training logic over and over. `LighterSystem` handles it for you and is compatible with any task, from classification to self-supervised learning.
 3. **Readable** - wondering what learning rate or architecture was used? Just glance at the config.
 4. **Easily modifiable** - override parameters from CLI or using another config. Leave `argparse` and hardcoding in the past.
 
+## Comparison
 
 <div style="display: flex; justify-content: space-between">
     <div style="width: 49%;">
+        <h3 style="text-align: center">PyTorch Lightning</h3>
         ```bash title="Terminal"
         python cifar10.py
         ```
@@ -99,6 +97,7 @@ Lighter is:
     </div>
 
     <div style="width: 49%;">
+        <h3 style="text-align: center">Lighter</h3>
         ```bash title="Terminal"
         lighter fit --config_file cifar10.yaml
         ```
