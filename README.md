@@ -1,8 +1,11 @@
 <div align="center">
 <picture>
+  <!-- old code that allows different pics for light/dark mode -->
+  <!--
   <source media="(prefers-color-scheme: dark)" srcset="./assets/images/lighter_dark.png">
   <source media="(prefers-color-scheme: light)" srcset="./assets/images/lighter_light.png">
-  <img align="center" alt="Lighter logo" src="h/assets/images/lighter_dark.png">
+   -->
+  <img align="center" alt="Lighter logo" src="./assets/images/lighter.png">
 </picture>
 </div>
 <br/>

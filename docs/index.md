@@ -1,24 +1,24 @@
 ---
 hide:
     - title
-    # - navigation
-    # - toc
 ---
 
+<!-- Fake title -->
 #
 
-<!-- ![Lighter](assets/lighter_full_light.png) -->
-<div style="display: flex; justify-content: center;"><img src="assets/lighter_full_light.png" style="width:70%;"/></div>
+<!-- Logo -->
+<div style="display: flex; justify-content: center;"><img src="assets/images/lighter_banner.png" style="width:70%;"/></div>
 
+<!-- pip install -->
 <div style="width:70%; margin:auto; text-align:center">
 
 ```bash
 pip install project-lighter
 ```
-
 </div>
-
 </br>
+
+<!-- Body -->
 
 **Lighter** is a PyTorch/Pytorch Lightning framework for **streamlining deep learning experiments though configuration files**.
 
@@ -139,8 +139,6 @@ Lighter is:
     </div>
 </div>
 
-
-
 ## Cite
 
 If you find Lighter useful in your research or project, please consider citing it:
@@ -157,5 +155,3 @@ If you find Lighter useful in your research or project, please consider citing i
   url          = {https://doi.org/10.5281/zenodo.8007711}
 }
 ```
-
-
