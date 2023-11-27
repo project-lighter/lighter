@@ -1,6 +1,6 @@
 ---
-hide:
-    - title
+title: Title
+template: index.html
 ---
 
 <!-- Fake title -->

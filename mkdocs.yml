@@ -1,5 +1,6 @@
 site_name: Lighter
 theme:
+  custom_dir: docs/overrides
   icon:
     repo: fontawesome/brands/github
   font:
@@ -10,9 +11,9 @@ theme:
   features:
     - content.code.copy
     - content.code.select
+    - content.code.annotate
     - header.autohide
     - content.tooltips
-    - attr_list
     - footnotes
     - navigation.tabs
 
@@ -40,14 +41,13 @@ plugins:
   - mkdocstrings
 
 nav:
-  - Home:
-    - 'Lighter': 'index.md'
-  - 'Basics': 
-    - '5 Minute Example': 'basics/5-minute-example.md'
-    - 'Config': 'basics/config.md'
-    - 'System': 'basics/system.md'
-    - 'Trainer': 'basics/trainer.md'
-    - 'Project-specific code': 'basics/project-specific-code.md'
+  - Home: 'index.md'
+  - 'Basics':
+    - 'Quickstart': 'basics/quickstart.md'
+    - 'Configuration System': 'basics/config.md'
+    - 'Running workflows': 'basics/workflows.md'
+    - 'Integrating your projects': 'basics/projects.md'
+
   - 'Advanced':
     - 'Postprocessing': 'advanced/postprocessing.md'
     - 'Inferer': 'advanced/inferer.md'
@@ -62,7 +62,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
-
+  - pymdownx.tabbed:
+      alternate_style: true
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter
