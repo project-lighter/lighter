@@ -64,6 +64,14 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+  - attr_list
+  - md_in_html      
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true  
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences      
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter

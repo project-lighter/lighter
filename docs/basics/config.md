@@ -167,16 +167,20 @@ Here, the optimizer is passed to the scheduler with the `optimizer` argument. `%
 <br/>
 #### Datasets
 
+The most commonly changed part of the config is often the datasets as common workflows involve training/inferring on your own dataset. We provide a `datasets` key with `train`, `val`, `test` and `predict` keys that generate dataloaders for each of the different workflows provided by pytorch lightning. These are described in detail [here](./workflows.md)
+
+<div class="annotate" markdown>
+
 ```yaml
 LighterSystem:
   ...
   datasets:
     train:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: torchvision.datasets.CIFAR10 (1)
       download: True
       root: .datasets
       train: True
-      transform:
+      transform: (2)
         _target_: torchvision.transforms.Compose
         transforms:
           - _target_: torchvision.transforms.ToTensor
@@ -185,6 +189,10 @@ LighterSystem:
             std: [0.5, 0.5, 0.5]
   ...
 ```
+
+</div>
+1. Define your own dataset class here or use several existing dataset clases. Read more about [this](./projects.md)
+2.  Transforms can be applied to each element of the dataset by initialization a `Compose` object and providing it a list of transforms. This is often the best way to adapt constraints for your data. 
 
 ### Special Syntax and Keywords
 - `_target_`: Indicates the Python class to instantiate. If a function is provided, a partial function is created. Any configuration key set with `_target_` will map to a python object. 

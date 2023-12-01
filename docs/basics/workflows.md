@@ -6,11 +6,10 @@ Once the configuration is establised, Lighter can run different deep learning wo
 2. validate
 3. test
 4. predict
-5. tune
 
 These workflows are inherited from the Pytorch lightning trainer and can be found in the [PL docs](https://lightning.ai/docs/pytorch/stable/common/trainer.html#methods)
 
-We also show below how you can run these workflows and what are some "required" definitions in the config while running these workflows. 
+We also show below how you can run these workflows and what are some "required" definitions in the config while running these workflows.
 
 ## Fit workflow
 
@@ -20,7 +19,3 @@ We also show below how you can run these workflows and what are some "required" 
 ## Test workflow
 
 ## Predict workflow
-
-
-## Tune workflow
-

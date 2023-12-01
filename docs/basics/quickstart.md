@@ -79,11 +79,6 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
 
 === "cifar10.yaml"
     ```yaml
-
-    trainer:
-      _target_: pytorch_lightning.Trainer
-      max_epochs: 100
-
     system:
       _target_: lighter.LighterSystem
       batch_size: 512
