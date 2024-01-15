@@ -174,50 +174,46 @@ class LighterSystem(pl.LightningModule):
         else:
             pred = self(input)
 
-        # Data postprocessing for criterion.
+        # Postprocessing for loss calculation.
         input = apply_fns(input, self.postprocessing["criterion"]["input"])
         target = apply_fns(target, self.postprocessing["criterion"]["target"])
         pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
 
-        # Calculate the loss.
-        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
-        # Log the loss for monitoring purposes.
-        if loss is not None:
-            self.log(
-                "loss" if mode == "train" else f"{mode}_loss",
-                loss,
-                on_step=True,
-                on_epoch=True,
-                sync_dist=True,
-                logger=False,
-                batch_size=self.batch_size,
-            )
-
-        # Log and return the results.
+        # Predict mode stops here.
         if mode == "predict":
-            # Pred postprocessing for logging or writing.
+            # Postprocessing for logging/writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
             return {"pred": pred, "id": id}
-        else:
-            # Data postprocessing for metrics
-            input = apply_fns(input, self.postprocessing["metrics"]["input"])
-            target = apply_fns(target, self.postprocessing["metrics"]["target"])
-            pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-            # Calculate the step metrics.
-            # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
-            metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
-            # Log the metrics.
-            if metrics is not None:
-                self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+        # Calculate the loss.
+        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
 
-            # Data postprocessing for logging.
-            input = apply_fns(input, self.postprocessing["logging"]["input"])
-            target = apply_fns(target, self.postprocessing["logging"]["target"])
-            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+        # Postprocessing for metrics.
+        input = apply_fns(input, self.postprocessing["metrics"]["input"])
+        target = apply_fns(target, self.postprocessing["metrics"]["target"])
+        pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-            # Return the loss, metrics, input, target, and pred.
-            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
+        # Calculate the step metrics. # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
+        metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
+
+        # Postprocessing for logging/writing.
+        input = apply_fns(input, self.postprocessing["logging"]["input"])
+        target = apply_fns(target, self.postprocessing["logging"]["target"])
+        pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+
+        # Logging
+        default_kwargs = {"logger": True, "batch_size": self.batch_size}
+        step_kwargs = {"on_epoch": False, "on_step": True, "sync_dist": False}
+        epoch_kwargs = {"on_epoch": True, "on_step": False, "sync_dist": True}
+        if loss is not None:
+            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs)
+        if metrics is not None:
+            for k, v in metrics.items():
+                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs)
+
+        return loss
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
