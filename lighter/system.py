@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, get_optimizer_stats, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -203,15 +203,21 @@ class LighterSystem(pl.LightningModule):
 
         # Logging
         default_kwargs = {"logger": True, "batch_size": self.batch_size}
-        step_kwargs = {"on_epoch": False, "on_step": True, "sync_dist": False}
-        epoch_kwargs = {"on_epoch": True, "on_step": False, "sync_dist": True}
+        step_kwargs = {"on_epoch": False, "on_step": True}
+        epoch_kwargs = {"on_epoch": True, "on_step": False}
+        # - Loss
         if loss is not None:
             self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
-            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # - Metrics
         if metrics is not None:
             for k, v in metrics.items():
                 self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
-                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # - Optimizer's learning rate, momentum, beta. Logged in train mode and once per epoch.
+        if mode == "train" and batch_idx == 0:
+            for k, v in get_optimizer_stats(self.optimizer).items():
+                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
 
         return loss
 
