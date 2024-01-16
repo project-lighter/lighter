@@ -202,24 +202,9 @@ class LighterSystem(pl.LightningModule):
         pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
         # Logging
-        default_kwargs = {"logger": True, "batch_size": self.batch_size}
-        step_kwargs = {"on_epoch": False, "on_step": True}
-        epoch_kwargs = {"on_epoch": True, "on_step": False}
-        # - Loss
-        if loss is not None:
-            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
-            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
-        # - Metrics
-        if metrics is not None:
-            for k, v in metrics.items():
-                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
-                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
-        # - Optimizer's learning rate, momentum, beta. Logged in train mode and once per epoch.
-        if mode == "train" and batch_idx == 0:
-            for k, v in get_optimizer_stats(self.optimizer).items():
-                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
+        self._log_loss_metrics_and_optimizer(loss, metrics, self.optimizer, mode, batch_idx)
 
-        return loss
+        return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
@@ -252,6 +237,39 @@ class LighterSystem(pl.LightningModule):
                     "criterion so that it has a `target` argument."
                 )
         return self.criterion(pred, **kwargs)
+
+    def _log_loss_metrics_and_optimizer(
+        self, loss: torch.Tensor, metrics: MetricCollection, optimizer: Optimizer, mode: str, batch_idx: int
+    ) -> None:
+        """
+        Logs the loss, metrics, and optimizer statistics.
+
+        Args:
+            loss (torch.Tensor): The calculated loss.
+            metrics (MetricCollection): The calculated metrics.
+            optimizer (Optimizer): The optimizer used in the model.
+            mode (str): The mode of operation (train/val/test/predict).
+            batch_idx (int): The index of the current batch.
+        """
+        if self.trainer.logger is None:
+            return
+
+        default_kwargs = {"logger": True, "batch_size": self.batch_size}
+        step_kwargs = {"on_epoch": False, "on_step": True}
+        epoch_kwargs = {"on_epoch": True, "on_step": False}
+        # Loss
+        if loss is not None:
+            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # Metrics
+        if metrics is not None:
+            for k, v in metrics.items():
+                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
+        if mode == "train" and batch_idx == 0:
+            for k, v in get_optimizer_stats(self.optimizer).items():
+                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).

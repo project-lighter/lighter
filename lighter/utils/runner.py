@@ -61,7 +61,8 @@ def run_trainer_method(method: Dict, **kwargs: Any):
     # Save the config to model checkpoints under the "hyper_parameters" key.
     system.save_hyperparameters(config)
     # Log the config.
-    trainer.logger.log_hyperparams(config)
+    if trainer.logger is not None:
+        trainer.logger.log_hyperparams(config)
 
     # Run the Trainer method.
     if not hasattr(trainer, method):
