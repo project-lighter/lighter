@@ -116,5 +116,7 @@ def adjust_prefix_and_load_state_dict(
     # Log the incompatible keys during checkpoint loading.
     if len(incompatible_keys.missing_keys) > 0 or len(incompatible_keys.unexpected_keys) > 0:
         logger.info(f"Encountered incompatible keys during checkpoint loading. If intended, ignore.\n{incompatible_keys}")
+    else:
+        logger.info("Checkpoint loaded successfully.")
 
     return model

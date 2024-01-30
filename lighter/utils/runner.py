@@ -23,21 +23,17 @@ def parse_config(**kwargs):
 
     # Check that a config file is specified.
     if "config_file" not in kwargs:
-        raise ValueError("No config file specified. Exiting.")
+        raise ValueError("--config_file not specified. Exiting.")
 
-    # Load config from `config_file`
-    config = ConfigParser.load_config_files(kwargs["config_file"])
-    if "project" in config:
-        import_module_from_path("project", config["project"])
-
+    # Parse the config file(s).
     parser = ConfigParser()
-    parser.read_config(kwargs["config_file"])
-
-    if "args_file" in kwargs:
-        args = ConfigParser.load_config_file(kwargs["args_file"])
-        parser.update(pairs=args)
-
+    parser.read_config(kwargs.pop("config_file"))
     parser.update(pairs=kwargs)
+
+    # Import the project folder as a module, if specified.
+    project = parser.get("project", None)
+    if project is not None:
+        import_module_from_path("project", project)
 
     return parser
 
@@ -60,13 +56,15 @@ def run_trainer_method(method: Dict, **kwargs: Any):
     trainer = parser.get_parsed_content("trainer")
     system = parser.get_parsed_content("system")
 
-    # Intialize config to be used by other modules
-    for callback in trainer.callbacks:
-        if hasattr(callback, "config"):
-            callback.config = parser.get()
+    config = parser.get()
+    config.pop("_meta_")
+    # Save the config to model checkpoints under the "hyper_parameters" key.
+    system.save_hyperparameters(config)
+    # Log the config.
+    if trainer.logger is not None:
+        trainer.logger.log_hyperparams(config)
 
     # Run the Trainer method.
     if not hasattr(trainer, method):
         raise ValueError(f"Trainer has no method named {method}.")
-
     getattr(trainer, method)(system)

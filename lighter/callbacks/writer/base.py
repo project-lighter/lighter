@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
@@ -31,8 +32,7 @@ class LighterBaseWriter(ABC, Callback):
             directory (str): Base directory for saving. A new sub-directory with current date and time will be created inside.
             writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
         """
-        # Create a unique directory using the current date and time
-        self.directory = Path(directory) / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.directory = Path(directory)
 
         # Check if the writer is a string and if it exists in the writers dictionary
         if isinstance(writer, str):
@@ -83,8 +83,11 @@ class LighterBaseWriter(ABC, Callback):
 
         # Ensure all distributed nodes write to the same directory
         self.directory = trainer.strategy.broadcast(self.directory, src=0)
+        # Warn if the directory already exists
+        if self.directory.exists():
+            logger.warning(f"{self.directory} already exists, existing predictions will be overwritten.")
         if trainer.is_global_zero:
-            self.directory.mkdir(parents=True)
+            self.directory.mkdir(parents=True, exist_ok=True)
         # Wait for rank 0 to create the directory
         trainer.strategy.barrier()
 

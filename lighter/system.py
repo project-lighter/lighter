@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, get_optimizer_stats, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -174,50 +174,37 @@ class LighterSystem(pl.LightningModule):
         else:
             pred = self(input)
 
-        # Data postprocessing for criterion.
+        # Postprocessing for loss calculation.
         input = apply_fns(input, self.postprocessing["criterion"]["input"])
         target = apply_fns(target, self.postprocessing["criterion"]["target"])
         pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
 
-        # Calculate the loss.
-        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
-        # Log the loss for monitoring purposes.
-        if loss is not None:
-            self.log(
-                "loss" if mode == "train" else f"{mode}_loss",
-                loss,
-                on_step=True,
-                on_epoch=True,
-                sync_dist=True,
-                logger=False,
-                batch_size=self.batch_size,
-            )
-
-        # Log and return the results.
+        # Predict mode stops here.
         if mode == "predict":
-            # Pred postprocessing for logging or writing.
+            # Postprocessing for logging/writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
             return {"pred": pred, "id": id}
-        else:
-            # Data postprocessing for metrics
-            input = apply_fns(input, self.postprocessing["metrics"]["input"])
-            target = apply_fns(target, self.postprocessing["metrics"]["target"])
-            pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-            # Calculate the step metrics.
-            # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
-            metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
-            # Log the metrics.
-            if metrics is not None:
-                self.log_dict(metrics, on_step=True, on_epoch=True, sync_dist=True, logger=False, batch_size=self.batch_size)
+        # Calculate the loss.
+        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
 
-            # Data postprocessing for logging.
-            input = apply_fns(input, self.postprocessing["logging"]["input"])
-            target = apply_fns(target, self.postprocessing["logging"]["target"])
-            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+        # Postprocessing for metrics.
+        input = apply_fns(input, self.postprocessing["metrics"]["input"])
+        target = apply_fns(target, self.postprocessing["metrics"]["target"])
+        pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-            # Return the loss, metrics, input, target, and pred.
-            return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
+        # Calculate the step metrics. # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
+        metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
+
+        # Postprocessing for logging/writing.
+        input = apply_fns(input, self.postprocessing["logging"]["input"])
+        target = apply_fns(target, self.postprocessing["logging"]["target"])
+        pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+
+        # Logging
+        self._log_loss_metrics_and_optimizer(loss, metrics, self.optimizer, mode, batch_idx)
+
+        return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
 
     def _calculate_loss(
         self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
@@ -250,6 +237,39 @@ class LighterSystem(pl.LightningModule):
                     "criterion so that it has a `target` argument."
                 )
         return self.criterion(pred, **kwargs)
+
+    def _log_loss_metrics_and_optimizer(
+        self, loss: torch.Tensor, metrics: MetricCollection, optimizer: Optimizer, mode: str, batch_idx: int
+    ) -> None:
+        """
+        Logs the loss, metrics, and optimizer statistics.
+
+        Args:
+            loss (torch.Tensor): The calculated loss.
+            metrics (MetricCollection): The calculated metrics.
+            optimizer (Optimizer): The optimizer used in the model.
+            mode (str): The mode of operation (train/val/test/predict).
+            batch_idx (int): The index of the current batch.
+        """
+        if self.trainer.logger is None:
+            return
+
+        default_kwargs = {"logger": True, "batch_size": self.batch_size}
+        step_kwargs = {"on_epoch": False, "on_step": True}
+        epoch_kwargs = {"on_epoch": True, "on_step": False}
+        # Loss
+        if loss is not None:
+            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # Metrics
+        if metrics is not None:
+            for k, v in metrics.items():
+                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
+        # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
+        if mode == "train" and batch_idx == 0:
+            for k, v in get_optimizer_stats(self.optimizer).items():
+                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
