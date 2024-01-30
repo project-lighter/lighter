@@ -121,3 +121,7 @@ build-remove:
 
 .PHONY: cleanup
 cleanup: pycache-remove dsstore-remove mypycache-remove ipynbcheckpoints-remove pytestcache-remove
+
+.PHONY: get-latest-deps
+get-latest-deps: 
+	poetry add torch@latest torchvision@latest pytorch_lightning@latest torchmetrics@latest monai@latest
