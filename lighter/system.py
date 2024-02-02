@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from functools import partial
 
+import gc
 import pytorch_lightning as pl
 import torch
 from loguru import logger
@@ -183,6 +184,7 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             # Postprocessing for logging/writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+            gc.collect()
             return {"pred": pred, "id": id}
 
         # Calculate the loss.
