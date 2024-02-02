@@ -184,8 +184,6 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             # Postprocessing for logging/writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
-            self.trainer.predict_loop._predictions = [[] for _ in range(self.trainer.predict_loop.num_dataloaders)]
-            gc.collect()
             return {"pred": pred, "id": id}
 
         # Calculate the loss.
@@ -373,6 +371,10 @@ class LighterSystem(pl.LightningModule):
         if stage == "predict":
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
+
+    def on_predict_batch_end(self, outputs, batch, batch_idx, dataloader_idx=0) -> None:
+        self.trainer.predict_loop._predictions = [[] for _ in range(self.trainer.predict_loop.num_dataloaders)]
+        gc.collect()
 
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """
