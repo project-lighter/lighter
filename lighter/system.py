@@ -1,8 +1,8 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import gc
 from functools import partial
 
-import gc
 import pytorch_lightning as pl
 import torch
 from loguru import logger
