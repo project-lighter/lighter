@@ -184,6 +184,7 @@ class LighterSystem(pl.LightningModule):
         if mode == "predict":
             # Postprocessing for logging/writing.
             pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+            self.trainer.predict_loop._predictions = [[] for _ in range(self.trainer.predict_loop.num_dataloaders)]
             gc.collect()
             return {"pred": pred, "id": id}
 
