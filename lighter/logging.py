@@ -20,16 +20,6 @@ LOGGING_COLOR_MAP = {
 }
 
 
-def _log_formatter(record: dict) -> str:
-    """Format log messages for better readability and clarity. Used to configure Loguru with a Rich handler."""
-    lvl_name = record["level"].name
-    lvl_color = LOGGING_COLOR_MAP.get(lvl_name, "cyan")
-    return (
-        "[not bold green]{time:YYYY/MM/DD HH:mm:ss.SSS}[/not bold green]  |  {level.icon}  "
-        f"[{lvl_color}]{lvl_name:<10}[/{lvl_color}]|  [{lvl_color}]{{message}}[/{lvl_color}]"
-    )
-
-
 def _setup_logging():
     """
     Configures custom logging using Loguru and Rich for visually appealing logs.
@@ -44,9 +34,20 @@ def _setup_logging():
     import rich.traceback
     from loguru import logger
 
-    # Handler to redirect other libraries' logging to Loguru
-    # https://github.com/Delgan/loguru?tab=readme-ov-file#entirely-compatible-with-standard-logging
+    def formatter(record: dict) -> str:
+        """Format log messages for better readability and clarity. Used to configure Loguru with a Rich handler."""
+        lvl_name = record["level"].name
+        lvl_color = LOGGING_COLOR_MAP.get(lvl_name, "cyan")
+        return (
+            "[not bold green]{time:YYYY/MM/DD HH:mm:ss.SSS}[/not bold green]  |  {level.icon}  "
+            f"[{lvl_color}]{lvl_name:<10}[/{lvl_color}]|  [{lvl_color}]{{message}}[/{lvl_color}]"
+        )
+
     class InterceptHandler(logging.Handler):
+        """Handler to redirect other libraries' logging to Loguru. Taken from Loguru's documentation:
+        https://github.com/Delgan/loguru?tab=readme-ov-file#entirely-compatible-with-standard-logging
+        """
+
         def emit(self, record: logging.LogRecord) -> None:
             # Get corresponding Loguru level if it exists.
             level: str | int
@@ -66,17 +67,11 @@ def _setup_logging():
     # Intercept logging and redirect to Loguru. Must be called before importing other libraries to work.
     logging.getLogger().handlers = [InterceptHandler()]
 
-    # Configure Rich traceback
-    rich.traceback.install(show_locals=False, suppress=[__import__(name) for name in SUPPRESSED_MODULES])
-    # Configure Rich for Loguru
-    rich_handler = rich.logging.RichHandler(
-        markup=True,
-        show_time=False,
-        show_level=False,
-        show_path=True,
-        enable_link_path=True,
-    )
-    logger.configure(handlers=[{"sink": rich_handler, "format": _log_formatter}])
+    # Configure Rich traceback.
+    rich.traceback.install(show_locals=False, width=120, suppress=[__import__(name) for name in SUPPRESSED_MODULES])
+    # Rich handler for Loguru. Time and level are handled by the formatter.
+    rich_handler = rich.logging.RichHandler(markup=True, show_time=False, show_level=False)
+    logger.configure(handlers=[{"sink": rich_handler, "format": formatter}])
 
     # Capture the `warnings` standard module with Loguru
     # https://loguru.readthedocs.io/en/stable/resources/recipes.html#capturing-standard-stdout-stderr-and-warnings
