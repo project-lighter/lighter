@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Union
 
+import gc
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -105,7 +106,6 @@ class LighterBaseWriter(ABC, Callback):
         If the IDs are not provided, it generates global unique IDs based on the prediction count.
         Finally, it writes the predictions using the specified writer.
         """
-
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
         if outputs["id"] is None:
             batch_size = len(outputs["pred"])
@@ -115,3 +115,7 @@ class LighterBaseWriter(ABC, Callback):
 
         for id, pred in zip(outputs["id"], outputs["pred"]):
             self.write(tensor=pred, id=id)
+
+        # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/15656
+        trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
+        gc.collect()
