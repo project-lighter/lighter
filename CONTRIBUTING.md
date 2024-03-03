@@ -1,4 +1,17 @@
-# How to contribute
+1. [Code contribution](#code-contribution)
+   - [Dependencies](#dependencies)
+   - [Codestyle](#codestyle)
+     - [Checks](#checks)
+       - [Before submitting](#before-submitting)
+   - [Other help](#other-help)
+
+2. [Documentation contribution](#documentation-contribution)
+   - [Dependencies](#dependencies-1)
+    - [Serving the documentation locally](#serving-the-documentation-locally)
+    - [Deploying the documentation to GitHub Pages](#deploying-the-documentation-to-github-pages)
+
+
+# Code contribution
 
 ## Dependencies
 
@@ -45,3 +58,26 @@ You can contribute by spreading a word about this library.
 It would also be a huge contribution to write
 a short article on how you are using this project.
 You can also share your best practices with us.
+
+
+# Documentation contribution
+Our documentation is located in the `docs/` folder and is built using `mkdocs` and `mkdocs-material`.
+
+##  Dependencies
+To install `mkdocs-material` together with the required dependencies run:
+
+```bash
+pip install mkdocs-material mkdocs-autorefs mkdocstrings
+```
+
+## Serving the documentation locally
+While working on the documentation, you can serve it locally to see the changes in real-time.
+
+```bash
+cd docs/
+mkdocs serve
+```
+
+## Deploying the documentation to GitHub Pages
+
+The documentation is automatically deployed once the changes are merged into the `main` branch.
