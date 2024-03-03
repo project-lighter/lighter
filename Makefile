@@ -17,6 +17,7 @@ setup: poetry-download
 	source ~/.bashrc
 	source ~/.profile
 	poetry self add poetry-bumpversion@latest
+	poetry self add poetry-plugin-export@latest
 	
 	
 .PHONY: poetry-download
@@ -65,7 +66,7 @@ mypy:
 .PHONY: check-safety
 check-safety:
 	poetry check
-	poetry run safety check --full-report
+	poetry export | poetry run safety check --stdin
 	poetry run bandit -ll --recursive lighter tests
 
 .PHONY: lint
@@ -120,3 +121,7 @@ build-remove:
 
 .PHONY: cleanup
 cleanup: pycache-remove dsstore-remove mypycache-remove ipynbcheckpoints-remove pytestcache-remove
+
+.PHONY: get-latest-deps
+get-latest-deps: 
+	poetry add torch@latest torchvision@latest pytorch_lightning@latest torchmetrics@latest monai@latest

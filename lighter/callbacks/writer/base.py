@@ -1,10 +1,12 @@
 from typing import Any, Callable, Dict, Union
 
+import gc
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 
 import torch
+from loguru import logger
 from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
@@ -31,8 +33,7 @@ class LighterBaseWriter(ABC, Callback):
             directory (str): Base directory for saving. A new sub-directory with current date and time will be created inside.
             writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
         """
-        # Create a unique directory using the current date and time
-        self.directory = Path(directory) / datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.directory = Path(directory)
 
         # Check if the writer is a string and if it exists in the writers dictionary
         if isinstance(writer, str):
@@ -57,15 +58,14 @@ class LighterBaseWriter(ABC, Callback):
     def write(self, tensor: torch.Tensor, id: int) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
-        the batch dimension. If the batch dimension is needed, apply `tensor.unsqueeze(0)` before saving,
-        either in this method or in the particular writer function.
+        the batch dimension.
 
         For each supported format, there should be a corresponding writer function registered in `self.writers`
         A specific writer function can be retrieved using `self.get_writer(self.format)`.
 
         Args:
-            tensor (torch.Tensor): Tensor to be saved. It will be a single tensor without the batch dimension.
-            id (int): Identifier for the tensor, can be used for naming or indexing.
+            tensor (torch.Tensor): tensor, without the batch dimension, to be saved.
+            id (int): identifier for the tensor, can be used for naming files or adding table records.
         """
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
@@ -84,8 +84,11 @@ class LighterBaseWriter(ABC, Callback):
 
         # Ensure all distributed nodes write to the same directory
         self.directory = trainer.strategy.broadcast(self.directory, src=0)
+        # Warn if the directory already exists
+        if self.directory.exists():
+            logger.warning(f"{self.directory} already exists, existing predictions will be overwritten.")
         if trainer.is_global_zero:
-            self.directory.mkdir(parents=True)
+            self.directory.mkdir(parents=True, exist_ok=True)
         # Wait for rank 0 to create the directory
         trainer.strategy.barrier()
 
@@ -103,7 +106,6 @@ class LighterBaseWriter(ABC, Callback):
         If the IDs are not provided, it generates global unique IDs based on the prediction count.
         Finally, it writes the predictions using the specified writer.
         """
-
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
         if outputs["id"] is None:
             batch_size = len(outputs["pred"])
@@ -113,3 +115,7 @@ class LighterBaseWriter(ABC, Callback):
 
         for id, pred in zip(outputs["id"], outputs["pred"]):
             self.write(tensor=pred, id=id)
+
+        # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/15656
+        trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
+        gc.collect()

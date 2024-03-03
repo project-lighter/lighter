@@ -137,6 +137,8 @@ wandb/
 tensorboard/
 .vscode/
 *.pkl
+*.csv
+*.npy
 
 # Pytorch models 
 *.torch

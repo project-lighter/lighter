@@ -3,7 +3,6 @@ from typing import Callable, Dict, Union
 from functools import partial
 from pathlib import Path
 
-import monai
 import torch
 import torchvision
 from monai.data import metatensor_to_itk_image
@@ -16,14 +15,16 @@ from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
 
 class LighterFileWriter(LighterBaseWriter):
     """
-    Writer for writing predictions to files. Supports multiple formats, and
-    additional custom formats can be added either through `additional_writers`
-    argument at initialization, or by calling `add_writer` method after initialization.
+    Writer for writing predictions to files. Supports writing tensors, images, videos, and ITK images.
+    To write to other formats, a custom writer function can be provided to the `writer` argument or,
+    for a more permanent solution, it can be added to the `self.writers` dictionary.
 
     Args:
         directory (Union[str, Path]): The directory where the files should be written.
-        writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
+        writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
             Available writers: "tensor", "image", "video", "itk_nrrd", "itk_seg_nrrd", "itk_nifti".
+            A custom writer function must take two arguments: `path` and `tensor`, and write the tensor to the specified path.
+            `tensor` is a single tensor without the batch dimension.
     """
 
     def __init__(self, directory: Union[str, Path], writer: Union[str, Callable]) -> None:
@@ -45,9 +46,9 @@ class LighterFileWriter(LighterBaseWriter):
         Write the tensor to the specified path in the given format.
 
         Args:
-            tensor (Tensor): The tensor to be written.
-            id (Union[int, str]): The identifier for naming.
-            format (str): Format in which tensor should be written.
+            tensor (Tensor): tensor, without the batch dimension, to be written.
+            id (Union[int, str]): identifier, used for file-naming.
+            format (str): format in which tensor should be written.
         """
         # Determine the path for the file based on prediction count. The suffix must be added by the writer function.
         path = self.directory / str(id)
@@ -82,10 +83,5 @@ def write_video(path, tensor):
 
 def write_itk_image(path: str, tensor: torch.Tensor, suffix) -> None:
     path = path.with_suffix(suffix)
-
-    # TODO: Remove this code when fixed https://github.com/Project-MONAI/MONAI/issues/6985
-    if tensor.meta["space"] == "RAS":
-        tensor.affine = monai.data.utils.orientation_ras_lps(tensor.affine)
-
     itk_image = metatensor_to_itk_image(tensor, channel_dim=0, dtype=tensor.dtype)
     OPTIONAL_IMPORTS["itk"].imwrite(itk_image, str(path), True)
