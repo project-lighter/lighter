@@ -93,7 +93,7 @@ class MyXRayDataset(Dataset):
     Lighter works with the default torchvision format of (image, target) and also with `dict` with `input` and `target` keys. The input/target key or tuple can contain complex input/target organization, e.g. multiple images for input and multiple labels for target
 
 
-Now that you have built your dataset, all you need to do is add it to the lighter config! But wait, how will Lighter know where your code is? All lighter configs contain a `project` key that takes the full path to where your python code is located. Once you set this up, call `project.MyXRayDataset` and Lighter will pick up the dataset. 
+Now that you have built your dataset, all you need to do is add it to the lighter config! But wait, how will Lighter know where your code is? All lighter configs contain a `project` key that takes the full path to where your python code is located. Once you set this up, call `project.my_xray_dataset.` and Lighter will pick up the dataset. 
 
 In the above example, the path of the dataset is `/home/user/project/my_xray_dataset.py`. Copy the config shown above, make the following changes and run on the terminal
 
@@ -121,7 +121,7 @@ In the above example, the path of the dataset is `/home/user/project/my_xray_dat
 
     datasets:
         train:
-        _target_: project.MyXRayDataset
+        _target_: project.my_xray_dataset.MyXRayDataset
         root_dir: .
         annotations_file: label.csv
         transform:
