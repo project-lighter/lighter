@@ -16,8 +16,10 @@ class OptionalImports:
     This class provides a way to handle optional imports in a convenient manner.
     It allows importing modules that may or may not be available, and raises an ImportError if the module is not available.
 
-    Example: ::
+    Example:
+
         from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+
         writer = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter()
 
     Attributes:

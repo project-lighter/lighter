@@ -63,11 +63,13 @@ You can also share your best practices with us.
 # Documentation contribution
 Our documentation is located in the `docs/` folder and is built using `mkdocs` and `mkdocs-material`.
 
+The API reference is generated automatically from the docstrings in the code using `mkdocstrings`. Our docstrings follow the `google` style.
+
 ##  Dependencies
 To install `mkdocs-material` together with the required dependencies run:
 
 ```bash
-pip install mkdocs-material mkdocs-autorefs mkdocstrings
+pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
 ```
 
 ## Serving the documentation locally

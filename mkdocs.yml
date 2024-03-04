@@ -35,10 +35,26 @@ theme:
 extra_css:
   - assets/extra.css
 
+# Plugins
+# Auto API reference generation: https://mkdocstrings.github.io/recipes/#automatic-code-reference-pages
 plugins:
   - search
   - autorefs
-  - mkdocstrings
+  - gen-files:
+      scripts:
+      - scripts/generate_api_reference_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          docstring_style: google
+          options:
+            # Removed the default filter that excludes private members (that is, members whose names start with a single underscore).
+            filters: null
+              
+
 
 nav:
   - Home: 'index.md'
@@ -52,7 +68,7 @@ nav:
     - 'Postprocessing': 'advanced/postprocessing.md'
     - 'Inferer': 'advanced/inferer.md'
     - 'Callbacks': 'advanced/callbacks.md'
-  - 'API': api.md
+  - 'API Reference': 'reference/'
   
 markdown_extensions:
   - pymdownx.highlight:
