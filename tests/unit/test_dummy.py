@@ -1,4 +1,5 @@
 """Tests for hello function."""
+
 import pytest
 
 from lighter.utils.misc import ensure_list

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, get_optimizer_stats, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, get_optimizer_stats, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -35,11 +35,25 @@ class LighterSystem(pl.LightningModule):
             Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
             Defaults to None.
         postprocessing (Dict[str, Union[Callable, List[Callable]]], optional):
-            Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
-            and logging. The postprocessing is done before each stage - for example, criterion postprocessing
-            will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
-            top of the previous one(s) - for example, the logging postprocessing will be done on the data that
-            has been postprocessed for the criterion and metrics earlier. Defaults to None.
+            Functions to apply to:
+                1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
+                2) The input, target, or pred data prior to criterion/metrics/logging. Defined separately for each.
+
+            Follow this structure (all keys are optional):
+            ```
+                batch:
+                    train:
+                    val:
+                    test:
+                    predict:
+                criterion / metrics / logging:
+                    input:
+                    target:
+                    pred:
+            ```
+            Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
+            the logging postprocessing will be done on the data that has been postprocessed for the criterion
+            and metrics earlier. Defaults to None.
         inferer (Callable, optional): The inferer must be a class with a `__call__` method that accepts two
             arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
             mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
@@ -135,6 +149,9 @@ class LighterSystem(pl.LightningModule):
                 containing loss, metrics, input, target, pred, and id. Loss is `None`
                 for the test step. Metrics is `None` if no metrics are specified.
         """
+        # Allow postprocessing on batch data. Can be used to restructure the batch data into the required format.
+        batch = apply_fns(batch, self.postprocessing["batch"][mode])
+
         # Verify that the batch is a dict with valid keys.
         batch_err_msg = "Batch must be a dict with keys:\n\t- 'input'\n\t- 'target' (optional)\n\t- 'id' (optional)\n"
         if not isinstance(batch, dict):
@@ -362,6 +379,7 @@ class LighterSystem(pl.LightningModule):
 
     def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
         """Ensures that the postprocessing functions have the predefined schema."""
-        subschema = {"input": None, "target": None, "pred": None}
-        schema = {"criterion": subschema, "metrics": subschema, "logging": subschema}
+        mode_subschema = {"train": None, "val": None, "test": None, "predict": None}
+        data_subschema = {"input": None, "target": None, "pred": None}
+        schema = {"batch": mode_subschema, "criterion": data_subschema, "metrics": data_subschema, "logging": data_subschema}
         return ensure_dict_schema(postprocessing, schema)
