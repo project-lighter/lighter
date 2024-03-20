@@ -223,22 +223,24 @@ class LighterSystem(pl.LightningModule):
         if self.trainer.logger is None:
             return
 
-        default_kwargs = {"logger": True, "batch_size": self.batch_size}
-        step_kwargs = {"on_epoch": False, "on_step": True}
-        epoch_kwargs = {"on_epoch": True, "on_step": False}
+        # Arguments for self.log()
+        log_kwargs = {"logger": True, "batch_size": self.batch_size}
+        on_step_log_kwargs = {"on_epoch": False, "on_step": True, "sync_dist": False}
+        on_epoch_log_kwargs = {"on_epoch": True, "on_step": False, "sync_dist": True}
+
         # Loss
         if loss is not None:
-            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
-            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
+            self.log(f"{mode}/loss/step", loss, **log_kwargs, **on_step_log_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **log_kwargs, **on_epoch_log_kwargs)
         # Metrics
         if metrics is not None:
             for k, v in metrics.items():
-                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
-                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
+                self.log(f"{mode}/metrics/{k}/step", v, **log_kwargs, **on_step_log_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **log_kwargs, **on_epoch_log_kwargs)
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
         if mode == "train" and batch_idx == 0:
             for k, v in get_optimizer_stats(self.optimizer).items():
-                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
+                self.log(f"{mode}/{k}", v, **log_kwargs, **on_epoch_log_kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
