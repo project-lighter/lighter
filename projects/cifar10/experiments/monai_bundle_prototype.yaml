@@ -104,4 +104,11 @@ system:
           target_transform: null
 
         predict: "%#test"
-        
+    
+    postprocessing:
+        # Format the batch as required by Lighter
+        batch:
+            train: '$lambda x: {"input": x[0], "target": x[1]}'
+            val: "%#train"
+            test: "%#train"
+            predict: "%#train"
