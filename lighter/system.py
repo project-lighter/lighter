@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_name, get_optimizer_stats, hasarg
+from lighter.utils.misc import apply_fns, ensure_dict_schema, get_optimizer_stats, hasarg
 
 
 class LighterSystem(pl.LightningModule):
@@ -35,11 +35,25 @@ class LighterSystem(pl.LightningModule):
             Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
             Defaults to None.
         postprocessing (Dict[str, Union[Callable, List[Callable]]], optional):
-            Postprocessing functions for input, target, and pred, for three stages - criterion, metrics,
-            and logging. The postprocessing is done before each stage - for example, criterion postprocessing
-            will be done prior to loss calculation. Note that the postprocessing of a latter stage stacks on
-            top of the previous one(s) - for example, the logging postprocessing will be done on the data that
-            has been postprocessed for the criterion and metrics earlier. Defaults to None.
+            Functions to apply to:
+                1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
+                2) The input, target, or pred data prior to criterion/metrics/logging. Defined separately for each.
+
+            Follow this structure (all keys are optional):
+            ```
+                batch:
+                    train:
+                    val:
+                    test:
+                    predict:
+                criterion / metrics / logging:
+                    input:
+                    target:
+                    pred:
+            ```
+            Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
+            the logging postprocessing will be done on the data that has been postprocessed for the criterion
+            and metrics earlier. Defaults to None.
         inferer (Callable, optional): The inferer must be a class with a `__call__` method that accepts two
             arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
             mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
@@ -99,8 +113,6 @@ class LighterSystem(pl.LightningModule):
 
         # Checks
         self._lightning_module_methods_defined = False
-        self._target_not_used_reported = False
-        self._batch_type_reported = False
 
     def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
@@ -123,50 +135,39 @@ class LighterSystem(pl.LightningModule):
 
         return self.model(input, **kwargs)
 
-    def _base_step(self, batch: Union[List, Tuple], batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
-        """Base step for all modes ("train", "val", "test", "predict")
+    def _base_step(self, batch: Dict, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
+        """Base step for all modes.
 
         Args:
-            batch (List, Tuple):
-                output of the DataLoader and input to the model.
-            batch_idx (int): index of the batch. Not used, but PyTorch Lightning requires it.
-            mode (str): mode in which the system is.
+            batch (Dict): The batch data as a containing "input", and optionally "target" and "id".
+            batch_idx (int): Batch index. Not used, but PyTorch Lightning requires it.
+            mode (str): The operating mode. (train/val/test/predict)
 
         Returns:
-            Union[Dict[str, Any], Any]: For the training, validation and test step, it returns
-                a dict containing loss, metrics, input, target, and pred. Loss will be `None`
-                for the test step. Metrics will be `None` if no metrics are specified.
-
-                For predict step, it returns pred only.
+            Union[Dict[str, Any], Any]: For the predict step, it returns pred only.
+                For the training, validation, and test steps, it returns a dictionary
+                containing loss, metrics, input, target, pred, and id. Loss is `None`
+                for the test step. Metrics is `None` if no metrics are specified.
         """
-        # Batch type check:
-        # - Dict: must contain "input" and "target" keys, and optionally "id" key.
-        if isinstance(batch, dict):
-            if set(batch.keys()) not in [{"input", "target"}, {"input", "target", "id"}]:
-                raise ValueError(
-                    "A batch dict must have 'input', 'target', and, "
-                    f"optionally 'id', as keys, but found {list(batch.keys())}"
-                )
-            batch["id"] = None if "id" not in batch else batch["id"]
-        # - List/tuple: must contain two elements - input and target. After the check, convert it to dict.
-        elif isinstance(batch, (list, tuple)):
-            if len(batch) != 2:
-                raise ValueError(
-                    f"A batch must consist of 2 elements - input and target. However, {len(batch)} "
-                    "elements were found. Note: if target does not exist, return `None` as target."
-                )
-            batch = {"input": batch[0], "target": batch[1], "id": None}
-        # - Other types are not allowed.
-        else:
-            raise TypeError(
-                "A batch must be a list, a tuple, or a dict."
-                "A batch dict must have 'input' and 'target' keys, and optionally 'id'."
-                "A batch list or a tuple must have 2 elements - input and target."
-                "If target does not exist, return `None` as target."
-            )
+        # Allow postprocessing on batch data. Can be used to restructure the batch data into the required format.
+        batch = apply_fns(batch, self.postprocessing["batch"][mode])
 
-        # Split the batch into input, target, and id.
-        input, target, id = batch["input"], batch["target"], batch["id"]
+        # Verify that the batch is a dict with valid keys.
+        batch_err_msg = "Batch must be a dict with keys:\n\t- 'input'\n\t- 'target' (optional)\n\t- 'id' (optional)\n"
+        if not isinstance(batch, dict):
+            raise TypeError(batch_err_msg + f"Batch type found: '{type(batch).__name__}'.")
+        if set(batch.keys()) not in [{"input"}, {"input", "target"}, {"input", "id"}, {"input", "target", "id"}]:
+            raise ValueError(batch_err_msg + f"Batch keys found: {batch.keys()}.")
+
+        # Ensure that the returned values of the optional batch keys are not None.
+        for key in ["target", "id"]:
+            if key in batch and batch[key] is None:
+                raise ValueError(f"Batch's '{key}' value cannot be None. If '{key}' should not exist, omit it.")
+
+        # Unpack the batch. The target and id are optional. If not provided, they are set to None for internal use.
+        input = batch["input"]
+        target = batch.get("target", None)
+        id = batch.get("id", None)
 
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
@@ -186,7 +187,10 @@ class LighterSystem(pl.LightningModule):
             return {"pred": pred, "id": id}
 
         # Calculate the loss.
-        loss = self._calculate_loss(pred, target) if mode in ["train", "val"] else None
+        loss = None
+        if mode in ["train", "val"]:
+            # When target is not provided, pass only the predictions to the criterion.
+            loss = self.criterion(pred) if target is None else self.criterion(pred, target)
 
         # Postprocessing for metrics.
         input = apply_fns(input, self.postprocessing["metrics"]["input"])
@@ -202,74 +206,41 @@ class LighterSystem(pl.LightningModule):
         pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
         # Logging
-        self._log_loss_metrics_and_optimizer(loss, metrics, self.optimizer, mode, batch_idx)
+        self._log_stats(loss, metrics, mode, batch_idx)
 
         return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
 
-    def _calculate_loss(
-        self, pred: Union[torch.Tensor, List, Tuple, Dict], target: Union[torch.Tensor, List, Tuple, Dict, None]
-    ) -> torch.Tensor:
-        """Calculates the loss.
-        The method handles cases where the criterion function does not accept a `target` argument. If the criterion
-        function does not accept a `target` argument, the LighterSystem passes only the predicted values to the criterion.
-
-        Args:
-            pred (torch.Tensor, List, Tuple, Dict): the predicted values from the model.
-            target (torch.Tensor, List, Tuple, Dict, None): the target/label.
-
-        Returns:
-            torch.Tensor: the calculated loss.
-        """
-
-        # Keyword arguments to pass to the loss/criterion function
-        kwargs = {}
-        # Add `target` argument if forward accepts it.
-        if hasarg(self.criterion.forward, "target"):
-            kwargs["target"] = target
-        else:
-            if not self._target_not_used_reported and not self.trainer.sanity_checking:
-                self._target_not_used_reported = True
-                logger.info(
-                    f"The criterion `{get_name(self.criterion, True)}` "
-                    "has no `target` argument. In such cases, the LighterSystem "
-                    "passes only the predicted values to the criterion. "
-                    "If this is not the behavior you expected, redefine your "
-                    "criterion so that it has a `target` argument."
-                )
-        return self.criterion(pred, **kwargs)
-
-    def _log_loss_metrics_and_optimizer(
-        self, loss: torch.Tensor, metrics: MetricCollection, optimizer: Optimizer, mode: str, batch_idx: int
-    ) -> None:
+    def _log_stats(self, loss: torch.Tensor, metrics: MetricCollection, mode: str, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
 
         Args:
             loss (torch.Tensor): The calculated loss.
             metrics (MetricCollection): The calculated metrics.
-            optimizer (Optimizer): The optimizer used in the model.
             mode (str): The mode of operation (train/val/test/predict).
             batch_idx (int): The index of the current batch.
         """
         if self.trainer.logger is None:
             return
 
-        default_kwargs = {"logger": True, "batch_size": self.batch_size}
-        step_kwargs = {"on_epoch": False, "on_step": True}
-        epoch_kwargs = {"on_epoch": True, "on_step": False}
+        # Arguments for self.log()
+        log_kwargs = {"logger": True, "batch_size": self.batch_size}
+        on_step_log_kwargs = {"on_epoch": False, "on_step": True, "sync_dist": False}
+        on_epoch_log_kwargs = {"on_epoch": True, "on_step": False, "sync_dist": True}
+
         # Loss
         if loss is not None:
-            self.log(f"{mode}/loss/step", loss, **default_kwargs, **step_kwargs)
-            self.log(f"{mode}/loss/epoch", loss, **default_kwargs, **epoch_kwargs, sync_dist=True)
+            self.log(f"{mode}/loss/step", loss, **log_kwargs, **on_step_log_kwargs)
+            self.log(f"{mode}/loss/epoch", loss, **log_kwargs, **on_epoch_log_kwargs)
         # Metrics
         if metrics is not None:
             for k, v in metrics.items():
-                self.log(f"{mode}/metrics/{k}/step", v, **default_kwargs, **step_kwargs)
-                self.log(f"{mode}/metrics/{k}/epoch", v, **default_kwargs, **epoch_kwargs, sync_dist=True)
+                self.log(f"{mode}/metrics/{k}/step", v, **log_kwargs, **on_step_log_kwargs)
+                self.log(f"{mode}/metrics/{k}/epoch", v, **log_kwargs, **on_epoch_log_kwargs)
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
         if mode == "train" and batch_idx == 0:
             for k, v in get_optimizer_stats(self.optimizer).items():
-                self.log(f"{mode}/{k}", v, **default_kwargs, **epoch_kwargs)
+                self.log(f"{mode}/{k}", v, **log_kwargs, **on_epoch_log_kwargs)
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
@@ -279,10 +250,10 @@ class LighterSystem(pl.LightningModule):
         corrupted data by returning None instead.
 
         Args:
-            mode (str): mode for which to create the dataloader ["train", "val", "test", "predict"].
+            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
 
         Returns:
-            DataLoader: instantiated DataLoader.
+            DataLoader: Instantiated DataLoader.
         """
         dataset = self.datasets[mode]
         sampler = self.samplers[mode]
@@ -410,6 +381,7 @@ class LighterSystem(pl.LightningModule):
 
     def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
         """Ensures that the postprocessing functions have the predefined schema."""
-        subschema = {"input": None, "target": None, "pred": None}
-        schema = {"criterion": subschema, "metrics": subschema, "logging": subschema}
+        mode_subschema = {"train": None, "val": None, "test": None, "predict": None}
+        data_subschema = {"input": None, "target": None, "pred": None}
+        schema = {"batch": mode_subschema, "criterion": data_subschema, "metrics": data_subschema, "logging": data_subschema}
         return ensure_dict_schema(postprocessing, schema)
