@@ -64,8 +64,8 @@ class LighterBaseWriter(ABC, Callback):
         A specific writer function can be retrieved using `self.get_writer(self.format)`.
 
         Args:
-            tensor (torch.Tensor): tensor, without the batch dimension, to be saved.
-            id (int): identifier for the tensor, can be used for naming files or adding table records.
+            tensor (torch.Tensor): Tensor, without the batch dimension, to be saved.
+            id (int): Identifier for the tensor, can be used for naming files or adding table records.
         """
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
@@ -116,6 +116,6 @@ class LighterBaseWriter(ABC, Callback):
         for id, pred in zip(outputs["id"], outputs["pred"]):
             self.write(tensor=pred, id=id)
 
-        # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/15656
+        # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
         gc.collect()

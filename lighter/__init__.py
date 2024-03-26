@@ -1,6 +1,7 @@
-from .logging import _setup_logging
+__version__ = "0.0.2a23"
+
+from .utils.logging import _setup_logging
 
 _setup_logging()
 
 from .system import LighterSystem
-from .version import __version__

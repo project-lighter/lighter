@@ -19,7 +19,7 @@ class LighterSystem(pl.LightningModule):
     """_summary_
 
     Args:
-        model (Module): The model.
+        model (Module): Model.
         batch_size (int): Batch size.
         drop_last_batch (bool, optional): Whether the last batch in the dataloader should be dropped. Defaults to False.
         num_workers (int, optional): Number of dataloader workers. Defaults to 0.
@@ -54,7 +54,7 @@ class LighterSystem(pl.LightningModule):
             Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
             the logging postprocessing will be done on the data that has been postprocessed for the criterion
             and metrics earlier. Defaults to None.
-        inferer (Callable, optional): The inferer must be a class with a `__call__` method that accepts two
+        inferer (Callable, optional): Inferer must be a class with a `__call__` method that accepts two
             arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
             mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
             that will infer over the smaller parts of the input, combine them, and return a single output.
@@ -86,7 +86,6 @@ class LighterSystem(pl.LightningModule):
         # Model setup
         self.model = model
         self.batch_size = batch_size
-        self.drop_last_batch = drop_last_batch
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
@@ -96,6 +95,7 @@ class LighterSystem(pl.LightningModule):
         # DataLoader specifics
         self.num_workers = num_workers
         self.pin_memory = pin_memory
+        self.drop_last_batch = drop_last_batch
 
         # Datasets, samplers, and collate functions
         self.datasets = self._init_datasets(datasets)
@@ -111,17 +111,17 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Checks
+        # Flag that indicates whether the LightningModule methods have been defined. Used in `self.setup()`.
         self._lightning_module_methods_defined = False
 
     def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
-            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): input to the model.
+            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): Input to the model.
 
         Returns:
-            Any: output of the model.
+            Output of the model.
         """
 
         # Keyword arguments to pass to the forward method
@@ -139,15 +139,15 @@ class LighterSystem(pl.LightningModule):
         """Base step for all modes.
 
         Args:
-            batch (Dict): The batch data as a containing "input", and optionally "target" and "id".
-            batch_idx (int): Batch index. Not used, but PyTorch Lightning requires it.
-            mode (str): The operating mode. (train/val/test/predict)
+            batch (Dict): Batch data as a containing "input", and optionally "target" and "id".
+            batch_idx (int): Batch index. PyTorch Lightning requires it, even though it is not used here.
+            mode (str): Operating mode. (train/val/test/predict)
 
         Returns:
-            Union[Dict[str, Any], Any]: For the predict step, it returns pred only.
-                For the training, validation, and test steps, it returns a dictionary
-                containing loss, metrics, input, target, pred, and id. Loss is `None`
-                for the test step. Metrics is `None` if no metrics are specified.
+            For the predict step, it returns pred only.
+            For the training, validation, and test steps, it returns a dictionary
+            containing loss, metrics, input, target, pred, and id. Loss is `None`
+            for the test step. Metrics is `None` if no metrics are specified.
         """
         # Allow postprocessing on batch data. Can be used to restructure the batch data into the required format.
         batch = apply_fns(batch, self.postprocessing["batch"][mode])
@@ -213,12 +213,11 @@ class LighterSystem(pl.LightningModule):
     def _log_stats(self, loss: torch.Tensor, metrics: MetricCollection, mode: str, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
-
         Args:
-            loss (torch.Tensor): The calculated loss.
-            metrics (MetricCollection): The calculated metrics.
-            mode (str): The mode of operation (train/val/test/predict).
-            batch_idx (int): The index of the current batch.
+            loss (torch.Tensor): Calculated loss.
+            metrics (MetricCollection): Calculated metrics.
+            mode (str): Mode of operation (train/val/test/predict).
+            batch_idx (int): Index of current batch.
         """
         if self.trainer.logger is None:
             return
@@ -253,7 +252,7 @@ class LighterSystem(pl.LightningModule):
             mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
 
         Returns:
-            DataLoader: Instantiated DataLoader.
+            Instantiated DataLoader.
         """
         dataset = self.datasets[mode]
         sampler = self.samplers[mode]
@@ -288,7 +287,7 @@ class LighterSystem(pl.LightningModule):
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
-            Dict: optimizer and, if defined, scheduler.
+            Optimizer and, if defined, scheduler.
         """
         if self.optimizer is None:
             raise ValueError("Please specify 'system.optimizer' in the config.")
@@ -303,7 +302,7 @@ class LighterSystem(pl.LightningModule):
         sets up LightningModule methods for the stage in which the system is.
 
         Args:
-            stage (str): passed by PyTorch Lightning. ["fit", "validate", "test"].
+            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
         """
         # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
         # only has methods used in the stage and for which the configuration was provided.

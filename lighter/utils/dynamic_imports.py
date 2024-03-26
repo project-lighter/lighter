@@ -16,8 +16,10 @@ class OptionalImports:
     This class provides a way to handle optional imports in a convenient manner.
     It allows importing modules that may or may not be available, and raises an ImportError if the module is not available.
 
-    Example: ::
+    Example:
+
         from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+
         writer = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter()
 
     Attributes:
@@ -26,17 +28,17 @@ class OptionalImports:
 
     imports: Dict[str, object] = field(default_factory=dict)
 
-    def __getitem__(self, module_name: str):
+    def __getitem__(self, module_name: str) -> "module":
         """Get the imported module by name.
 
         Args:
-            module_name (str): The name of the module to import.
+            module_name (str): Name of the module to import.
 
         Raises:
             ImportError: If the module is not available.
 
         Returns:
-            object: The imported module.
+            Imported module.
         """
         if module_name not in self.imports:
             self.imports[module_name], module_available = optional_import(module_name)
@@ -54,8 +56,8 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     This function imports a module from the specified path and assigns it the specified name.
 
     Args:
-        module_name (str): The name to assign to the imported module.
-        module_path (str): The path to the module to import.
+        module_name (str): Name to assign to the imported module.
+        module_path (str): Path to the module being imported.
 
     Raises:
         ValueError: If the module has already been imported.

@@ -16,7 +16,7 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
             Dot-notation supported, e.g. "layer10.fc".
 
     Returns:
-        Module: PyTorch model with the new layer set at the specified location.
+        PyTorch model with the new layer set at the specified location.
     """
     setattr_dot_notation(model, layer_name, new_layer)
     return model
@@ -32,7 +32,7 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
             Identity function. Dot-notation supported, e.g. "layer10.fc".
 
     Returns:
-        Module: PyTorch model with Identity layer at the specified location.
+        PyTorch model with Identity layer at the specified location.
     """
     return replace_layer_with(model, layer_name, Identity())
 
@@ -46,7 +46,7 @@ def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequenti
         num_layers (int, optional): Number of last layers to be removed. Defaults to 1.
 
     Returns:
-        Sequential: PyTorch Sequential model with the last layer removed.
+        PyTorch Sequential model with the last layer removed.
     """
     return Sequential(*list(model.children())[:-num_layers])
 
@@ -62,14 +62,14 @@ def adjust_prefix_and_load_state_dict(
     for mismatch between the names and specify them accordingly.
 
     Args:
-        model (Module): The PyTorch model instance to load the state_dict into.
+        model (Module): PyTorch model instance to load the state_dict into.
         ckpt_path (str): Path to the checkpoint.
         ckpt_to_model_prefix (Dict[str, str], optional): A dictionary that maps keys in the checkpoint's
             state_dict to keys in the model's state_dict. If None, no key mapping is performed. Defaults to None.
         layers_to_ignore (List[str], optional): A list of layer names that won't be loaded into the model.
             Specify the names as they are after `ckpt_to_model_prefix` is applied. Defaults to None.
     Returns:
-        Module: The model instance with the state_dict loaded.
+        The model instance with the state_dict loaded.
 
     Raises:
         ValueError: If there is no overlap between checkpoint's and model's state_dict.

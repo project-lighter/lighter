@@ -16,18 +16,19 @@ def collate_replace_corrupted(batch: Any, dataset: DataLoader, default_collate_f
     The `None`s in the batch are replaced with other, randomly-selected, examples.
 
     Args:
-        batch (Any): batch from the DataLoader.
-        dataset (Dataset): dataset that the DataLoader is passing through. Needs to be fixed
+        batch (Any): Batch from the DataLoader.
+        dataset (Dataset): Dataset that the DataLoader is passing through. Needs to be fixed
             in place with functools.partial before passing it to DataLoader's 'collate_fn' option
             as 'collate_fn' should only have a single argument - batch. Example:
                 ```
                 collate_fn = functools.partial(collate_replace_corrupted, dataset=dataset)`
                 loader = DataLoader(dataset, ..., collate_fn=collate_fn).
                 ```
-        default_collate_fn (Callable): the collate function to call once the batch has no corrupted examples.
+        default_collate_fn (Callable): Collate function to call once the batch has no corrupted examples.
             If `None`, `torch.utils.data.dataloader.default_collate` is called. Defaults to None.
+
     Returns:
-        Any: batch with new examples instead of corrupted ones.
+        Batch with the new examples instead of the corrupted ones.
     """
     # Use `torch.utils.data.dataloader.default_collate` if no other default collate function is specified.
     default_collate_fn = default_collate_fn if default_collate_fn is not None else default_collate
