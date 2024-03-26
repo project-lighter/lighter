@@ -1,4 +1,4 @@
-from typing import Dict, ModuleType
+from typing import Dict
 
 import importlib
 import sys
@@ -28,7 +28,7 @@ class OptionalImports:
 
     imports: Dict[str, object] = field(default_factory=dict)
 
-    def __getitem__(self, module_name: str) -> ModuleType:
+    def __getitem__(self, module_name: str) -> "module":
         """Get the imported module by name.
 
         Args:
