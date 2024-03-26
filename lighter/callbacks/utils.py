@@ -6,10 +6,10 @@ def get_lighter_mode(lightning_stage: str) -> str:
     """Converts the name of a PyTorch Lightnig stage to the name of its corresponding Lighter mode.
 
     Args:
-        lightning_stage (str): stage in which PyTorch Lightning Trainer is. Can be accessed using `trainer.state.stage`.
+        lightning_stage (str): Stage in which the Trainer is. Can be accessed using `trainer.state.stage`.
 
     Returns:
-        str: name of the Lighter mode.
+        Lighter mode name.
     """
     lightning_to_lighter = {"train": "train", "validate": "val", "test": "test"}
     return lightning_to_lighter[lightning_stage]
@@ -21,9 +21,9 @@ def preprocess_image(image: torch.Tensor) -> torch.Tensor:
     with slices stacked vertically, while a batch of 3D images as a grid where each
     column is a different 3D image.
     Args:
-        image (torch.Tensor): 2D or 3D image tensor.
+        image (torch.Tensor): A 2D or 3D image tensor.
     Returns:
-        torch.Tensor: image ready for logging.
+        The image ready for logging.
     """
     # If 3D (BCDHW), concat the images vertically and horizontally.
     if image.ndim == 5:

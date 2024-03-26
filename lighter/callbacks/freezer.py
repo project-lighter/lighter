@@ -15,13 +15,13 @@ class LighterFreezer(Callback):
     If both are specified, the parameters that match any of the two will be frozen.
 
     Args:
-        names (str, List[str], optional): The names of the parameters to be frozen. Defaults to None.
-        name_starts_with (str, List[str], optional): The prefixes of the parameter names to be frozen. Defaults to None.
-        except_names (str, List[str], optional): The names of the parameters to be excluded from freezing. Defaults to None.
-        except_name_starts_with (str, List[str], optional): The prefixes of the parameter names to be excluded from freezing.
+        names (str, List[str], optional): Names of the parameters to be frozen. Defaults to None.
+        name_starts_with (str, List[str], optional): Prefixes of the parameter names to be frozen. Defaults to None.
+        except_names (str, List[str], optional): Names of the parameters to be excluded from freezing. Defaults to None.
+        except_name_starts_with (str, List[str], optional): Prefixes of the parameter names to be excluded from freezing.
             Defaults to None.
-        until_step (int, optional): The maximum step to freeze parameters until. Defaults to None.
-        until_epoch (int, optional): The maximum epoch to freeze parameters until. Defaults to None.
+        until_step (int, optional): Maximum step to freeze parameters until. Defaults to None.
+        until_epoch (int, optional): Maximum epoch to freeze parameters until. Defaults to None.
 
     Raises:
         ValueError: If neither `names` nor `name_starts_with` are specified.
@@ -78,7 +78,7 @@ class LighterFreezer(Callback):
         Freezes the parameters of the model at the start of each training batch.
 
         Args:
-            trainer (Trainer): The PyTorch Lightning trainer instance.
+            trainer (Trainer): Trainer instance.
             pl_module (LighterSystem): LighterSystem instance.
         """
         current_step = trainer.global_step
@@ -104,7 +104,7 @@ class LighterFreezer(Callback):
         Sets the requires_grad attribute of the model's parameters.
 
         Args:
-            model (Module): The PyTorch model whose parameters need to be frozen.
+            model (Module): PyTorch model whose parameters need to be frozen.
             requires_grad (bool): Whether to freeze the parameters or not.
 
         """

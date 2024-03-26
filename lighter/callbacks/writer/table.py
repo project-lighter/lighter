@@ -16,7 +16,7 @@ class LighterTableWriter(LighterBaseWriter):
     Writer for saving predictions in a table format.
 
     Args:
-        directory (Path): The directory where the CSV will be saved.
+        directory (Path): Directory where the CSV will be saved.
         writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
             Available writers: "tensor". A custom writer function must take a single argument: `tensor`, and return the record
             to be saved in the CSV file. The tensor will be a single tensor without the batch dimension.
@@ -37,8 +37,8 @@ class LighterTableWriter(LighterBaseWriter):
         Write the tensor as a table record using the specified writer.
 
         Args:
-            tensor (Any): tensor, without the batch dimension, to be recorded.
-            id (Union[int, str]): identifier, used as the key for the record.
+            tensor (Any): Tensor, without the batch dimension, to be recorded.
+            id (Union[int, str]): Identifier, used as the key for the record.
         """
         column = "pred"
         record = self.writer(tensor)
