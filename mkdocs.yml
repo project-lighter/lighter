@@ -5,9 +5,9 @@ theme:
     repo: fontawesome/brands/github
   font:
     code: Roboto Mono
-  name: 'material'
-  favicon: 'assets/images/lighter_favicon.png'
-  logo: 'assets/images/lighter_logo.png'
+  name: material
+  favicon: assets/images/lighter_favicon.png
+  logo: assets/images/lighter_logo.png
   features:
     - content.code.copy
     - content.code.select
@@ -16,6 +16,7 @@ theme:
     - content.tooltips
     - footnotes
     - navigation.tabs
+    - navigation.tabs.sticky
 
   palette:
     # Palette toggle for light mode
@@ -42,7 +43,7 @@ plugins:
   - autorefs
   - gen-files:
       scripts:
-      - scripts/generate_api_reference_pages.py
+      - docs/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
   - section-index
@@ -53,22 +54,20 @@ plugins:
           options:
             # Removed the default filter that excludes private members (that is, members whose names start with a single underscore).
             filters: null
-              
-
 
 nav:
-  - Home: 'index.md'
-  - 'Basics':
-    - 'Quickstart': 'basics/quickstart.md'
-    - 'Configuration System': 'basics/config.md'
-    - 'Running workflows': 'basics/workflows.md'
-    - 'Integrating your projects': 'basics/projects.md'
+  - Home: index.md
+  - Basics:
+    - Quickstart: basics/quickstart.md
+    - Configuration System: basics/config.md
+    - Running workflows: basics/workflows.md
+    - Integrating your projects: basics/projects.md
 
-  - 'Advanced':
-    - 'Postprocessing': 'advanced/postprocessing.md'
-    - 'Inferer': 'advanced/inferer.md'
-    - 'Callbacks': 'advanced/callbacks.md'
-  - 'API Reference': 'reference/'
+  - Advanced:
+    - Postprocessing: advanced/postprocessing.md
+    - Inferer: advanced/inferer.md
+    - Callbacks: advanced/callbacks.md
+  - API Reference: reference/
   
 markdown_extensions:
   - pymdownx.highlight:

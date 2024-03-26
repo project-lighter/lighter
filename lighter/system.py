@@ -86,7 +86,6 @@ class LighterSystem(pl.LightningModule):
         # Model setup
         self.model = model
         self.batch_size = batch_size
-        self.drop_last_batch = drop_last_batch
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
@@ -96,6 +95,7 @@ class LighterSystem(pl.LightningModule):
         # DataLoader specifics
         self.num_workers = num_workers
         self.pin_memory = pin_memory
+        self.drop_last_batch = drop_last_batch
 
         # Datasets, samplers, and collate functions
         self.datasets = self._init_datasets(datasets)
@@ -111,7 +111,7 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Checks
+        # Flag that indicates whether the LightningModule methods have been defined. Used in `self.setup()`.
         self._lightning_module_methods_defined = False
 
     def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:

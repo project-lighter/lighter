@@ -38,7 +38,7 @@ class OptionalImports:
             ImportError: If the module is not available.
 
         Returns:
-            object: The imported module.
+            (object): The imported module.
         """
         if module_name not in self.imports:
             self.imports[module_name], module_available = optional_import(module_name)

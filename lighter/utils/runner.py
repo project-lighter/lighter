@@ -18,7 +18,7 @@ def parse_config(**kwargs):
             Additional key-value pairs can also be provided to be added or updated in the parser.
 
     Returns:
-        ConfigParser: An instance of ConfigParser with parsed and merged configuration data.
+        (ConfigParser): An instance of ConfigParser with parsed and merged configuration data.
     """
 
     # Check that a config file is specified.
@@ -43,7 +43,7 @@ def run_trainer_method(method: Dict, **kwargs: Any):
     is defined in the config file(s), import it.
 
     Args:
-        method_name: name of the Trainer method to run. ["fit", "validate", "test", "predict", "tune"].
+        method (str): name of the Trainer method to run. ["fit", "validate", "test", "predict", "tune"].
         **kwargs (Any): keyword arguments passed to the `monai.bundle.run` function.
     """
     # Sets the random seed to `PL_GLOBAL_SEED` env variable. If not specified, it picks a random seed.

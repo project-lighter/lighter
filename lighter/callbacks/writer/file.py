@@ -43,12 +43,11 @@ class LighterFileWriter(LighterBaseWriter):
 
     def write(self, tensor: torch.Tensor, id: Union[int, str]) -> None:
         """
-        Write the tensor to the specified path in the given format.
+        Write the tensor using the writer specified at the instatiation.
 
         Args:
             tensor (Tensor): tensor, without the batch dimension, to be written.
             id (Union[int, str]): identifier, used for file-naming.
-            format (str): format in which tensor should be written.
         """
         # Determine the path for the file based on prediction count. The suffix must be added by the writer function.
         path = self.directory / str(id)

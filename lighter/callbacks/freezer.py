@@ -79,11 +79,7 @@ class LighterFreezer(Callback):
 
         Args:
             trainer (Trainer): The PyTorch Lightning trainer instance.
-            pl_module (LighterSystem): The PyTorch Lightning module instance.
-            batch (Any): The current batch data.
-            batch_idx (int): The index of the current batch.
-            dataloader_idx (int): The index of the current dataloader.
-
+            pl_module (LighterSystem): LighterSystem instance.
         """
         current_step = trainer.global_step
         current_epoch = trainer.current_epoch
