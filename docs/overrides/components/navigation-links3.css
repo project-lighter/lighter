@@ -4,16 +4,7 @@
   align-items: center;
   flex-direction: row;
 }
-.navigation-links3-text1 {
-  margin-left: var(--dl-space-space-twounits);
-}
-.navigation-links3-text2 {
-  margin-left: var(--dl-space-space-twounits);
-}
-.navigation-links3-text3 {
-  margin-left: var(--dl-space-space-twounits);
-}
-.navigation-links3-text4 {
+.navigation-links3-text1, .navigation-links3-text2, .navigation-links3-text3, .navigation-links3-text4 {
   margin-left: var(--dl-space-space-twounits);
 }
 
