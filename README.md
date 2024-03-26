@@ -15,7 +15,7 @@
 </div>
 
 
-With `lighter`, you can focus on your deep learning experiments instead of writing boilerplate through:
+With `lighter`, focus on your deep learning experiments and forget about boilerplate through:
  1. **Task-agnostic** training logic already implemented for you (classification, segmentation, self-supervised, etc.)
  2. **Configuration-based** approach that will ensure that you can always reproduce your experiments and know what hyperparameters you used.
  3. Extremely **simple integration of custom** models, datasets, transforms, or any other components to your experiments.
@@ -26,7 +26,7 @@ With `lighter`, you can focus on your deep learning experiments instead of writi
  - [MONAI Bundle](https://docs.monai.io/en/stable/bundle_intro.html) - Configuration system. Similar to [Hydra](https://github.com/facebookresearch/hydra), but with additional features.
  - [PyTorch Lightning](https://github.com/Lightning-AI/lightning) - Our [`LighterSystem`](https://project-lighter.github.io/lighter/reference/system/) is based on the PyTorch Lightning [`LightningModule`](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html) and implements all the necessary training logic for you. Couple it with the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and you're good to go.
  
-Simply put, `lighter = config(trainer + system)` 😇.
+Simply put, `lighter = config(trainer + system)` 😇
 
 
 ## 📖 Usage
@@ -64,7 +64,7 @@ Projects that use `lighter`:
 
 ## 📄 Cite:
 
-If you find `lighter` useful in your research or project, please consider citing it.
+If you find `lighter` useful in your research or project, please consider citing it:
 
 ```bibtex
 @software{lighter,
