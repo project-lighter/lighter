@@ -18,7 +18,7 @@ def parse_config(**kwargs):
             Additional key-value pairs can also be provided to be added or updated in the parser.
 
     Returns:
-        (ConfigParser): An instance of ConfigParser with parsed and merged configuration data.
+        ConfigParser: An instance of ConfigParser with parsed and merged configuration data.
     """
 
     # Check that a config file is specified.
