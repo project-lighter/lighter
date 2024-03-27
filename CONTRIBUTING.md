@@ -69,7 +69,7 @@ The API reference is generated automatically from the docstrings in the code usi
 To install `mkdocs-material` together with the required dependencies run:
 
 ```bash
-pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index mkdocstrings-python
 ```
 
 ## Serving the documentation locally
