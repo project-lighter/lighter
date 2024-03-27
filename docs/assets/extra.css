@@ -1,6 +1,7 @@
 [data-md-color-scheme="default"] {
     --md-primary-fg-color:   #459AA3;
-    --md-accent-fg-color:    #459AA3;
+    --md-accent-fg-color:    #24becf;
+    --md-default-bg-color:   #FFFFFF;
     color:                   #14181e;
   }
 
@@ -8,9 +9,15 @@
     --md-primary-fg-color:   #459AA3;
     --md-accent-fg-color:    #459AA3;
     --md-default-bg-color:   #14181e;
+    color:                   #FFFFFF;
 }
+
 [data-md-color-scheme="slate"] .md-nav {
-    --md-typeset-a-color: #459AA3;
+    --md-typeset-a-color: #24becf;
+}
+
+[data-md-color-scheme="slate"] .md-content {
+  --md-typeset-a-color: #24becf;
 }
 
 @media only screen and (min-width: 75.25em) {

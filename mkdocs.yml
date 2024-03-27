@@ -4,6 +4,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
   font:
+    text: Roboto
     code: Roboto Mono
   name: material
   favicon: assets/images/lighter_favicon.png
