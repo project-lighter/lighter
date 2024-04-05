@@ -1,19 +1,113 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from __future__ import annotations
+from abc import ABC
+from enum import StrEnum
+from typing import Any, Callable, Dict, List, Optional, Union, Protocol, Sequence
 
-from functools import partial
+from functools import partial, partialmethod
 
 import pytorch_lightning as pl
 import torch
-from loguru import logger
+from pytorch_lightning.utilities.data import extract_batch_size
 from torch.nn import Module, ModuleDict
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import DataLoader, Dataset
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_optimizer_stats, hasarg
+from lighter.defs import ModeEnum
+from lighter.metrics.metrics import MetricContainerCollection, MetricContainer, MetricResultDims
+from lighter.postprocessing.pipeline import ProcessingPipelineDefinition, ProcessingPipeline
+from lighter.utils.misc import ensure_dict_schema, get_optimizer_stats, hasarg
 
+
+class ModelAdapter(Protocol):
+    def __call__(self, model: Module, batch: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+class DefaultModelAdapter(ModelAdapter):
+    def __call__(self, model: Module, batch: Dict[str, Any]) -> Dict[str, Any]:
+        return model(batch["input"])
+
+class CriterionAdaptor(Protocol):
+    def __call__(self, criterion: Callable, batch: Dict[str, Any]) -> Dict[str, torch.Tensor] | torch.Tensor:
+        pass
+
+class DefaultCriterionAdapter(CriterionAdaptor):
+    def __call__(self, criterion: Callable, batch: Dict[str, Any]) -> Dict[str, torch.Tensor] | torch.Tensor:
+        return criterion(batch["pred"], batch["target"]) if "target" in batch else criterion(batch["pred"])
+
+
+class DataLogger(Protocol):
+    def log_step(self, system: LighterSystem, data: Dict[str, Any], mode: ModeEnum, batch_idx: int | None = None, dataloader_idx: int | None = None) -> None:
+        pass
+    def log_epoch(self, system: LighterSystem, metrics: Dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
+        pass
+
+
+
+class LogStageEnum(StrEnum):
+    STEP = "step"
+    EPOCH = "epoch"
+class BaseMetricLogger(DataLogger):
+
+    def _get_metric_name(self,metric: MetricContainer) -> str:
+        return metric.name
+
+    def _get_log_key(self, mode: ModeEnum, metric: MetricContainer, log_stage: LogStageEnum,class_name:str=None) -> str:
+        key = f"{mode}/{log_stage}/{self._get_metric_name(metric)}"
+        if class_name:
+            key = f"{key}/{class_name}"
+        return key
+
+
+    def check_and_log(self, system: LighterSystem, key: str, value: torch.Tensor,*, on_step: bool, on_epoch:bool, logged_keys: set) -> None:
+        if key in logged_keys:
+            raise ValueError(f"Key '{key}' has already been logged. Please ensure that each key is logged only once.")
+        logged_keys.add(key)
+        system.log(key, value, on_step=on_step, on_epoch=on_epoch, sync_dist=False)
+
+    def log_step(self, system: LighterSystem, data: Dict[str, Any], mode: ModeEnum, batch_idx: int | None = None, dataloader_idx: int | None = None) -> None:
+        logged_keys = set()
+        losses = data.get("losses", None)
+        if losses is None and "loss" in data:
+            losses = {"loss": data["loss"]}
+        if losses:
+            for loss_name, loss_value in losses.items():
+                postfix = f"losses/{loss_name}" if loss_name != "loss" else "loss"
+                key = f"{mode}/{LogStageEnum.STEP}/{postfix}"
+                self.check_and_log(system, key, loss_value, on_step=True, on_epoch=False, logged_keys=logged_keys)
+                key = f"{mode}/{LogStageEnum.EPOCH}/{postfix}"
+                self.check_and_log(system, key, loss_value, on_step=False, on_epoch=True, logged_keys=logged_keys)
+        metrics: Dict[MetricContainer, torch.Tensor | None]
+        if metrics := data.get("metrics", None): # type: ignore
+            for metric, value in metrics.items():
+                if value is not None:
+                    batch_dim_idx = metric.step_dims.index(MetricResultDims.BATCH)
+                    if batch_dim_idx != -1:
+                        value = torch.mean(value, dim=batch_dim_idx)
+                    if MetricResultDims.CLASS in metric.step_dims:
+                        assert value.dim() == 1
+                        for class_name, class_value in zip(metric.class_names, value.unbind(dim=0)):
+                            key = self._get_log_key(mode, metric, LogStageEnum.STEP,class_name)
+                            self.check_and_log(system, key, class_value, on_step=True, on_epoch=False, logged_keys=logged_keys)
+                    else:
+                        key = self._get_log_key(mode, metric, LogStageEnum.STEP)
+                        self.check_and_log(system, key, value, on_step=True, on_epoch=False, logged_keys=logged_keys)
+    def log_epoch(self, system: LighterSystem, metrics: Dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
+        logged_keys = set()
+        for metric, value in metrics.items():
+            if value is not None:
+                batch_dim_idx = metric.step_dims.index(MetricResultDims.BATCH)
+                if batch_dim_idx != -1:
+                    value = torch.mean(value, dim=batch_dim_idx)
+                if MetricResultDims.CLASS in metric.step_dims:
+                    assert value.dim() == 1
+                    for class_name, class_value in zip(metric.class_names, value.unbind(dim=0)):
+                        key = self._get_log_key(mode, metric, LogStageEnum.EPOCH,class_name)
+                        self.check_and_log(system, key, class_value, on_step=False, on_epoch=True, logged_keys=logged_keys)
+                else:
+                    key = self._get_log_key(mode, metric, LogStageEnum.EPOCH)
+                    self.check_and_log(system, key, value, on_step=False, on_epoch=True, logged_keys=logged_keys)
 
 class LighterSystem(pl.LightningModule):
     """_summary_
@@ -28,32 +122,15 @@ class LighterSystem(pl.LightningModule):
         scheduler (LRScheduler, optional): Learning rate scheduler. Defaults to None.
         criterion (Callable, optional): Criterion/loss function. Defaults to None.
         datasets (Dict[str, Dataset], optional): Datasets for train, val, test, and predict. Defaults to None.
+        dataloaders: Dataloaders for train, val, test, and predict. Defaults to None.
         samplers (Dict[str, Sampler], optional): Samplers for train, val, test, and predict. Defaults to None.
         collate_fns (Dict[str, Union[Callable, List[Callable]]], optional):
             Collate functions for train, val, test, and predict. Defaults to None.
         metrics (Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]], optional):
             Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
             Defaults to None.
-        postprocessing (Dict[str, Union[Callable, List[Callable]]], optional):
-            Functions to apply to:
-                1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
-                2) The input, target, or pred data prior to criterion/metrics/logging. Defined separately for each.
-
-            Follow this structure (all keys are optional):
-            ```
-                batch:
-                    train:
-                    val:
-                    test:
-                    predict:
-                criterion / metrics / logging:
-                    input:
-                    target:
-                    pred:
-            ```
-            Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
-            the logging postprocessing will be done on the data that has been postprocessed for the criterion
-            and metrics earlier. Defaults to None.
+        postprocessing (ProcessingPipelineDefinition | dict, optional):
+            Postprocessingpipeline
         inferer (Callable, optional): The inferer must be a class with a `__call__` method that accepts two
             arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
             mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
@@ -61,46 +138,39 @@ class LighterSystem(pl.LightningModule):
             The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
             Defaults to None.
     """
-
+    metrics: MetricContainerCollection
     def __init__(
         self,
         model: Module,
-        batch_size: int,
-        drop_last_batch: bool = False,
-        num_workers: int = 0,
-        pin_memory: bool = True,
         optimizer: Optional[Optimizer] = None,
         scheduler: Optional[LRScheduler] = None,
         criterion: Optional[Callable] = None,
+        criterion_adapter: Optional[CriterionAdaptor] = None,
         datasets: Dict[str, Dataset] = None,
-        samplers: Dict[str, Sampler] = None,
-        collate_fns: Dict[str, Union[Callable, List[Callable]]] = None,
+        dataloaders: Dict[str, Callable] = None,
         metrics: Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]] = None,
-        postprocessing: Dict[str, Union[Callable, List[Callable]]] = None,
+        postprocessing: ProcessingPipelineDefinition | dict = None,
         inferer: Optional[Callable] = None,
+        model_adapter: Optional[ModelAdapter] = None,
+        data_logger: Optional[DataLogger] = None,
     ) -> None:
         super().__init__()
-        # Bypass LightningModule's check for default methods. We define them in self.setup().
-        self._init_placeholders_for_dataloader_and_step_methods()
 
         # Model setup
         self.model = model
-        self.batch_size = batch_size
-        self.drop_last_batch = drop_last_batch
+        self.model_adapter = model_adapter or DefaultModelAdapter()
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
+        self.criterion_adapter = criterion_adapter or DefaultCriterionAdapter()
         self.optimizer = optimizer
         self.scheduler = scheduler
 
         # DataLoader specifics
-        self.num_workers = num_workers
-        self.pin_memory = pin_memory
+        self.dataloaders = dataloaders or {}
 
         # Datasets, samplers, and collate functions
         self.datasets = self._init_datasets(datasets)
-        self.samplers = self._init_samplers(samplers)
-        self.collate_fns = self._init_collate_fns(collate_fns)
 
         # Metrics
         self.metrics = self._init_metrics(metrics)
@@ -111,10 +181,13 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Checks
-        self._lightning_module_methods_defined = False
+        # This is needed to remove the validation step/dataloader if the validation dataset is not provided.
+        if self.datasets.get(ModeEnum.VAL, None) is None:
+            self.validation_step = None
+            self.val_dataloader = None
+        self.data_logger = data_logger or BaseMetricLogger()
 
-    def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
+    def forward(self, *args, **kwargs) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
@@ -124,8 +197,7 @@ class LighterSystem(pl.LightningModule):
             Any: output of the model.
         """
 
-        # Keyword arguments to pass to the forward method
-        kwargs = {}
+        # TODO This seems quite use-case specific, maybe we can add this to a custom adapter?
         # Add `epoch` argument if forward accepts it
         if hasarg(self.model.forward, "epoch"):
             kwargs["epoch"] = self.current_epoch
@@ -133,9 +205,34 @@ class LighterSystem(pl.LightningModule):
         if hasarg(self.model.forward, "step"):
             kwargs["step"] = self.global_step
 
-        return self.model(input, **kwargs)
+        return self.model(*args, **kwargs)
 
-    def _base_step(self, batch: Dict, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
+
+    def calculate_loss(self, result: Dict[str, Any], mode: ModeEnum):
+        """Calculate the loss from the result dictionary.
+
+        Args:
+            result (Dict[str, Any]): Dictionary containing the loss.
+                This will be modified to include the loss value.
+            mode (str): The operating mode.
+        """
+        if mode in ["train", "val"]:
+            # When target is not provided, pass only the predictions to the criterion.
+            loss = self.criterion_adapter(self.criterion, result)
+            if isinstance(loss, dict):
+                if "loss" not in result:
+                    raise ValueError("Criterion must return a dict of tensors."
+                                     " It must contain a 'loss' key, which will be used as the optimization target."
+                                     " Other keys can be used for logging purposes (e.g. CE+Dice loss).")
+                result["losses"] = loss
+                result["loss"] = loss["loss"]
+            elif isinstance(loss, torch.Tensor):
+                result["loss"] = loss
+                result["losses"] = {"loss": loss}
+            else:
+                raise ValueError("Criterion must return a tensor or a dict of tensors.")
+
+    def _base_step(self, batch: Dict, batch_idx: int, mode: ModeEnum) -> Union[Dict[str, Any], Any]:
         """Base step for all modes.
 
         Args:
@@ -150,7 +247,7 @@ class LighterSystem(pl.LightningModule):
                 for the test step. Metrics is `None` if no metrics are specified.
         """
         # Allow postprocessing on batch data. Can be used to restructure the batch data into the required format.
-        batch = apply_fns(batch, self.postprocessing["batch"][mode])
+        # batch = apply_fns(batch, self.postprocessing["batch"][mode])
 
         # Verify that the batch is a dict with valid keys.
         batch_err_msg = "Batch must be a dict with keys:\n\t- 'input'\n\t- 'target' (optional)\n\t- 'id' (optional)\n"
@@ -164,83 +261,38 @@ class LighterSystem(pl.LightningModule):
             if key in batch and batch[key] is None:
                 raise ValueError(f"Batch's '{key}' value cannot be None. If '{key}' should not exist, omit it.")
 
-        # Unpack the batch. The target and id are optional. If not provided, they are set to None for internal use.
-        input = batch["input"]
-        target = batch.get("target", None)
-        id = batch.get("id", None)
-
         # Forward
         if self.inferer and mode in ["val", "test", "predict"]:
-            pred = self.inferer(input, self)
+            raise NotImplementedError("Inferer is not yet implemented.")
         else:
-            pred = self(input)
-
-        # Postprocessing for loss calculation.
-        input = apply_fns(input, self.postprocessing["criterion"]["input"])
-        target = apply_fns(target, self.postprocessing["criterion"]["target"])
-        pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
-
+            pred = self.model_adapter(self, batch)
+        result = {
+            **batch,
+            "pred": pred,
+        }
+        pipeline_instance = ProcessingPipeline(self.postprocessing, dict(result))
+        result["pipeline"] = pipeline_instance
         # Predict mode stops here.
         if mode == "predict":
             # Postprocessing for logging/writing.
-            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
-            return {"pred": pred, "id": id}
+            return result
 
         # Calculate the loss.
-        loss = None
-        if mode in ["train", "val"]:
-            # When target is not provided, pass only the predictions to the criterion.
-            loss = self.criterion(pred) if target is None else self.criterion(pred, target)
+        self.calculate_loss(result, mode)
 
-        # Postprocessing for metrics.
-        input = apply_fns(input, self.postprocessing["metrics"]["input"])
-        target = apply_fns(target, self.postprocessing["metrics"]["target"])
-        pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
-
-        # Calculate the step metrics. # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
-
-        # Postprocessing for logging/writing.
-        input = apply_fns(input, self.postprocessing["logging"]["input"])
-        target = apply_fns(target, self.postprocessing["logging"]["target"])
-        pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
-
-        # Logging
-        self._log_stats(loss, metrics, mode, batch_idx)
-
-        return {"loss": loss, "metrics": metrics, "input": input, "target": target, "pred": pred, "id": id}
-
-    def _log_stats(self, loss: torch.Tensor, metrics: MetricCollection, mode: str, batch_idx: int) -> None:
-        """
-        Logs the loss, metrics, and optimizer statistics.
-
-        Args:
-            loss (torch.Tensor): The calculated loss.
-            metrics (MetricCollection): The calculated metrics.
-            mode (str): The mode of operation (train/val/test/predict).
-            batch_idx (int): The index of the current batch.
-        """
-        if self.trainer.logger is None:
-            return
-
-        # Arguments for self.log()
-        log_kwargs = {"logger": True, "batch_size": self.batch_size}
-        on_step_log_kwargs = {"on_epoch": False, "on_step": True, "sync_dist": False}
-        on_epoch_log_kwargs = {"on_epoch": True, "on_step": False, "sync_dist": True}
-
-        # Loss
-        if loss is not None:
-            self.log(f"{mode}/loss/step", loss, **log_kwargs, **on_step_log_kwargs)
-            self.log(f"{mode}/loss/epoch", loss, **log_kwargs, **on_epoch_log_kwargs)
-        # Metrics
+        metrics = self.metrics(result, mode) if self.metrics is not None else None
         if metrics is not None:
-            for k, v in metrics.items():
-                self.log(f"{mode}/metrics/{k}/step", v, **log_kwargs, **on_step_log_kwargs)
-                self.log(f"{mode}/metrics/{k}/epoch", v, **log_kwargs, **on_epoch_log_kwargs)
-        # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
-        if mode == "train" and batch_idx == 0:
-            for k, v in get_optimizer_stats(self.optimizer).items():
-                self.log(f"{mode}/{k}", v, **log_kwargs, **on_epoch_log_kwargs)
+            result["metrics"] = metrics
+        # Logging
+        self.data_logger.log_step(self, result, mode, batch_idx=batch_idx)
+
+        return result
+
+    training_step = partialmethod(_base_step, mode="train")
+    validation_step = partialmethod(_base_step, mode="val")
+    test_step = partialmethod(_base_step, mode="test")
+    predict_step = partialmethod(_base_step, mode="predict")
+
 
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
@@ -255,35 +307,27 @@ class LighterSystem(pl.LightningModule):
         Returns:
             DataLoader: Instantiated DataLoader.
         """
+
+
+
         dataset = self.datasets[mode]
-        sampler = self.samplers[mode]
-        collate_fn = self.collate_fns[mode]
 
         if dataset is None:
             raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
 
-        # Batch size is 1 when using an inference for two reasons:
-        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
-        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
-        batch_size = self.batch_size
-        if self.inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
-            batch_size = 1
+        if mode in self.dataloaders:
+            return self.dataloaders[mode](dataset)
 
-        # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
+
         return DataLoader(
             dataset,
-            sampler=sampler,
-            shuffle=(mode == "train" and sampler is None),
-            batch_size=batch_size,
+            batch_size=1,
             drop_last=(self.drop_last_batch if mode == "train" else False),
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            collate_fn=collate_fn,
         )
-
+    train_dataloader = partialmethod(_base_dataloader, mode="train")
+    val_dataloader = partialmethod(_base_dataloader, mode="val")
+    test_dataloader = partialmethod(_base_dataloader, mode="test")
+    predict_dataloader = partialmethod(_base_dataloader, mode="predict")
     def configure_optimizers(self) -> Dict:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
@@ -297,91 +341,51 @@ class LighterSystem(pl.LightningModule):
         else:
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
-    def setup(self, stage: str) -> None:
-        """Automatically called by the LightningModule after the initialization.
-        `LighterSystem`'s setup checks if the required dataset is provided in the config and
-        sets up LightningModule methods for the stage in which the system is.
 
-        Args:
-            stage (str): passed by PyTorch Lightning. ["fit", "validate", "test"].
-        """
-        # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
-        # only has methods used in the stage and for which the configuration was provided.
-        if not self._lightning_module_methods_defined:
-            del (
-                self.train_dataloader,
-                self.training_step,
-                self.val_dataloader,
-                self.validation_step,
-                self.test_dataloader,
-                self.test_step,
-                self.predict_dataloader,
-                self.predict_step,
-            )
-            # Prevents the methods from being defined again. This is needed because `Trainer.tune()`
-            # calls the `self.setup()` method whenever it runs for a new parameter.
-            self._lightning_module_methods_defined = True
 
-        # Training methods.
-        if stage in ["fit", "tune"]:
-            self.train_dataloader = partial(self._base_dataloader, mode="train")
-            self.training_step = partial(self._base_step, mode="train")
+    def _base_epoch_start(self, mode: ModeEnum):
+        if self.metrics is not None:
+            self.metrics.reset(mode)
 
-        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
-            self.val_dataloader = partial(self._base_dataloader, mode="val")
-            self.validation_step = partial(self._base_step, mode="val")
+    on_train_epoch_start = partialmethod(_base_epoch_start, mode=ModeEnum.TRAIN)
+    on_validation_epoch_start = partialmethod(_base_epoch_start, mode=ModeEnum.VAL)
+    on_test_epoch_start = partialmethod(_base_epoch_start, mode=ModeEnum.TEST)
+    on_predict_epoch_start = partialmethod(_base_epoch_start, mode=ModeEnum.PREDICT)
 
-        # Test methods.
-        if stage == "test":
-            self.test_dataloader = partial(self._base_dataloader, mode="test")
-            self.test_step = partial(self._base_step, mode="test")
+    def _base_epoch_end(self, mode: ModeEnum):
+        if self.metrics is not None:
+            if metrics := self.metrics.compute(mode):
+                self.data_logger.log_epoch(self, metrics, mode)
 
-        # Predict methods.
-        if stage == "predict":
-            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
-            self.predict_step = partial(self._base_step, mode="predict")
+    on_train_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.TRAIN)
+    on_validation_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.VAL)
+    on_test_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.TEST)
+    on_predict_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.PREDICT)
 
-    def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
-        """
-        Initializes placeholders for dataloader and step methods.
-
-        `LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
-        in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
-        at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
-        are initially defined as `lambda: None`, before `self.setup()` is called.
-        """
-        self.train_dataloader = self.training_step = lambda: None
-        self.val_dataloader = self.validation_step = lambda: None
-        self.test_dataloader = self.test_step = lambda: None
-        self.predict_dataloader = self.predict_step = lambda: None
 
     def _init_datasets(self, datasets: Dict[str, Optional[Dataset]]):
         """Ensures that the datasets have the predefined schema."""
         return ensure_dict_schema(datasets, {"train": None, "val": None, "test": None, "predict": None})
 
-    def _init_samplers(self, samplers: Dict[str, Optional[Sampler]]):
-        """Ensures that the samplers have the predefined schema"""
-        return ensure_dict_schema(samplers, {"train": None, "val": None, "test": None, "predict": None})
 
-    def _init_collate_fns(self, collate_fns: Dict[str, Optional[Callable]]):
-        """Ensures that the collate functions have the predefined schema."""
-        return ensure_dict_schema(collate_fns, {"train": None, "val": None, "test": None, "predict": None})
+    def _init_metrics(self, metrics: Sequence[dict[str,Any]]) -> MetricContainerCollection:
+        instantiated_metrics = []
+        for metric in metrics:
+            try:
+                if isinstance(metric, dict):
+                    instantiated_metrics.append(MetricContainer(**metric))
+                else:
+                    raise ValueError(f"Invalid metric definition: {metric}")
+            except Exception as e:
+                raise ValueError(f"Error while instantiating metric: {metric}") from e
+        return MetricContainerCollection(instantiated_metrics)
 
-    def _init_metrics(self, metrics: Dict[str, Optional[Union[Metric, List[Metric], Dict[str, Metric]]]]):
-        """Ensures that the metrics have the predefined schema. Wraps each mode's metrics in
-        a MetricCollection, and finally registers them with PyTorch using a ModuleDict.
-        """
-        metrics = ensure_dict_schema(metrics, {"train": None, "val": None, "test": None})
-        for mode, metric in metrics.items():
-            metrics[mode] = MetricCollection(metric) if metric is not None else None
-        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = {f"_{k}": v for k, v in metrics.items()}
-        return ModuleDict(metrics)
-
-    def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
+    def _init_postprocessing(self, postprocessing: ProcessingPipelineDefinition | dict) -> ProcessingPipelineDefinition:
         """Ensures that the postprocessing functions have the predefined schema."""
-        mode_subschema = {"train": None, "val": None, "test": None, "predict": None}
-        data_subschema = {"input": None, "target": None, "pred": None}
-        schema = {"batch": mode_subschema, "criterion": data_subschema, "metrics": data_subschema, "logging": data_subschema}
-        return ensure_dict_schema(postprocessing, schema)
+        if postprocessing is None:
+            return ProcessingPipelineDefinition({})
+        if isinstance(postprocessing, ProcessingPipelineDefinition):
+            return postprocessing
+        else:
+            return ProcessingPipelineDefinition(postprocessing)
+
