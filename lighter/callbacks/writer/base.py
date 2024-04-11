@@ -2,12 +2,11 @@ from typing import Any, Callable, Dict, Union
 
 import gc
 from abc import ABC, abstractmethod
-from datetime import datetime
 from pathlib import Path
 
 import torch
+from lightning.pytorch import Callback, Trainer
 from loguru import logger
-from pytorch_lightning import Callback, Trainer
 
 from lighter import LighterSystem
 

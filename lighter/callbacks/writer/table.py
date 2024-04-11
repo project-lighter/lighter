@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 
 from lighter import LighterSystem
 from lighter.callbacks.writer.base import LighterBaseWriter

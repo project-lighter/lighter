@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
+from lightning.pytorch import seed_everything
 from monai.bundle.config_parser import ConfigParser
-from pytorch_lightning import seed_everything
 
 from lighter.utils.dynamic_imports import import_module_from_path
 

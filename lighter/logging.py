@@ -5,6 +5,7 @@ SUPPRESSED_MODULES = [
     "lighter.utils.cli",
     "lighter.utils.runner",
     "pytorch_lightning.trainer",
+    "lightning.pytorch",
     "lightning_utilities",
     "torch.utils.data.dataloader",
 ]

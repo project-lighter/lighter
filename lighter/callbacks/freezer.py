@@ -1,7 +1,7 @@
 from typing import Any, List, Optional, Union
 
+from lightning.pytorch import Callback, Trainer
 from loguru import logger
-from pytorch_lightning import Callback, Trainer
 from torch.nn import Module
 
 from lighter import LighterSystem

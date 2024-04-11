@@ -1,13 +1,14 @@
 from __future__ import annotations
+
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Union
+
 from abc import ABC
 from enum import StrEnum
-from typing import Any, Callable, Dict, List, Optional, Union, Protocol, Sequence
-
 from functools import partial, partialmethod
 
-import pytorch_lightning as pl
 import torch
-from pytorch_lightning.utilities.data import extract_batch_size
+from lightning import pytorch as L
+from lightning.pytorch.utilities.data import extract_batch_size
 from torch.nn import Module, ModuleDict
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -15,58 +16,78 @@ from torch.utils.data import DataLoader, Dataset
 from torchmetrics import Metric, MetricCollection
 
 from lighter.defs import ModeEnum
-from lighter.metrics.metrics import MetricContainerCollection, MetricContainer, MetricResultDims
-from lighter.postprocessing.pipeline import ProcessingPipelineDefinition, ProcessingPipeline
+from lighter.metrics.metrics import MetricContainer, MetricContainerCollection, MetricResultDims
+from lighter.postprocessing.pipeline import ProcessingPipeline, ProcessingPipelineDefinition
 from lighter.utils.misc import ensure_dict_schema, get_optimizer_stats, hasarg
 
 
 class ModelAdapter(Protocol):
-    def __call__(self, model: Module, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def __call__(self, model: Module, batch: dict[str, Any]) -> dict[str, Any]:
         pass
+
 
 class DefaultModelAdapter(ModelAdapter):
-    def __call__(self, model: Module, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def __call__(self, model: Module, batch: dict[str, Any]) -> dict[str, Any]:
         return model(batch["input"])
 
+
 class CriterionAdaptor(Protocol):
-    def __call__(self, criterion: Callable, batch: Dict[str, Any]) -> Dict[str, torch.Tensor] | torch.Tensor:
+    def __call__(self, criterion: Callable, batch: dict[str, Any]) -> dict[str, torch.Tensor] | torch.Tensor:
         pass
 
+
 class DefaultCriterionAdapter(CriterionAdaptor):
-    def __call__(self, criterion: Callable, batch: Dict[str, Any]) -> Dict[str, torch.Tensor] | torch.Tensor:
+    def __call__(self, criterion: Callable, batch: dict[str, Any]) -> dict[str, torch.Tensor] | torch.Tensor:
         return criterion(batch["pred"], batch["target"]) if "target" in batch else criterion(batch["pred"])
 
 
 class DataLogger(Protocol):
-    def log_step(self, system: LighterSystem, data: Dict[str, Any], mode: ModeEnum, batch_idx: int | None = None, dataloader_idx: int | None = None) -> None:
-        pass
-    def log_epoch(self, system: LighterSystem, metrics: Dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
+    def log_step(
+        self,
+        system: LighterSystem,
+        data: dict[str, Any],
+        mode: ModeEnum,
+        batch_idx: int | None = None,
+        dataloader_idx: int | None = None,
+    ) -> None:
         pass
 
+    def log_epoch(self, system: LighterSystem, metrics: dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
+        pass
 
 
 class LogStageEnum(StrEnum):
     STEP = "step"
     EPOCH = "epoch"
+
+
 class BaseMetricLogger(DataLogger):
 
-    def _get_metric_name(self,metric: MetricContainer) -> str:
+    def _get_metric_name(self, metric: MetricContainer) -> str:
         return metric.name
 
-    def _get_log_key(self, mode: ModeEnum, metric: MetricContainer, log_stage: LogStageEnum,class_name:str=None) -> str:
+    def _get_log_key(self, mode: ModeEnum, metric: MetricContainer, log_stage: LogStageEnum, class_name: str = None) -> str:
         key = f"{mode}/{log_stage}/{self._get_metric_name(metric)}"
         if class_name:
             key = f"{key}/{class_name}"
         return key
 
-
-    def check_and_log(self, system: LighterSystem, key: str, value: torch.Tensor,*, on_step: bool, on_epoch:bool, logged_keys: set) -> None:
+    def check_and_log(
+        self, system: LighterSystem, key: str, value: torch.Tensor, *, on_step: bool, on_epoch: bool, logged_keys: set
+    ) -> None:
         if key in logged_keys:
             raise ValueError(f"Key '{key}' has already been logged. Please ensure that each key is logged only once.")
         logged_keys.add(key)
         system.log(key, value, on_step=on_step, on_epoch=on_epoch, sync_dist=False)
 
-    def log_step(self, system: LighterSystem, data: Dict[str, Any], mode: ModeEnum, batch_idx: int | None = None, dataloader_idx: int | None = None) -> None:
+    def log_step(
+        self,
+        system: LighterSystem,
+        data: dict[str, Any],
+        mode: ModeEnum,
+        batch_idx: int | None = None,
+        dataloader_idx: int | None = None,
+    ) -> None:
         logged_keys = set()
         losses = data.get("losses", None)
         if losses is None and "loss" in data:
@@ -78,8 +99,8 @@ class BaseMetricLogger(DataLogger):
                 self.check_and_log(system, key, loss_value, on_step=True, on_epoch=False, logged_keys=logged_keys)
                 key = f"{mode}/{LogStageEnum.EPOCH}/{postfix}"
                 self.check_and_log(system, key, loss_value, on_step=False, on_epoch=True, logged_keys=logged_keys)
-        metrics: Dict[MetricContainer, torch.Tensor | None]
-        if metrics := data.get("metrics", None): # type: ignore
+        metrics: dict[MetricContainer, torch.Tensor | None]
+        if metrics := data.get("metrics", None):  # type: ignore
             for metric, value in metrics.items():
                 if value is not None:
                     batch_dim_idx = metric.step_dims.index(MetricResultDims.BATCH)
@@ -88,12 +109,13 @@ class BaseMetricLogger(DataLogger):
                     if MetricResultDims.CLASS in metric.step_dims:
                         assert value.dim() == 1
                         for class_name, class_value in zip(metric.class_names, value.unbind(dim=0)):
-                            key = self._get_log_key(mode, metric, LogStageEnum.STEP,class_name)
+                            key = self._get_log_key(mode, metric, LogStageEnum.STEP, class_name)
                             self.check_and_log(system, key, class_value, on_step=True, on_epoch=False, logged_keys=logged_keys)
                     else:
                         key = self._get_log_key(mode, metric, LogStageEnum.STEP)
                         self.check_and_log(system, key, value, on_step=True, on_epoch=False, logged_keys=logged_keys)
-    def log_epoch(self, system: LighterSystem, metrics: Dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
+
+    def log_epoch(self, system: LighterSystem, metrics: dict[MetricContainer, torch.Tensor | None], mode: ModeEnum) -> None:
         logged_keys = set()
         for metric, value in metrics.items():
             if value is not None:
@@ -103,13 +125,14 @@ class BaseMetricLogger(DataLogger):
                 if MetricResultDims.CLASS in metric.step_dims:
                     assert value.dim() == 1
                     for class_name, class_value in zip(metric.class_names, value.unbind(dim=0)):
-                        key = self._get_log_key(mode, metric, LogStageEnum.EPOCH,class_name)
+                        key = self._get_log_key(mode, metric, LogStageEnum.EPOCH, class_name)
                         self.check_and_log(system, key, class_value, on_step=False, on_epoch=True, logged_keys=logged_keys)
                 else:
                     key = self._get_log_key(mode, metric, LogStageEnum.EPOCH)
                     self.check_and_log(system, key, value, on_step=False, on_epoch=True, logged_keys=logged_keys)
 
-class LighterSystem(pl.LightningModule):
+
+class LighterSystem(L.LightningModule):
     """_summary_
 
     Args:
@@ -138,21 +161,23 @@ class LighterSystem(pl.LightningModule):
             The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
             Defaults to None.
     """
+
     metrics: MetricContainerCollection
+
     def __init__(
         self,
         model: Module,
-        optimizer: Optional[Optimizer] = None,
-        scheduler: Optional[LRScheduler] = None,
-        criterion: Optional[Callable] = None,
-        criterion_adapter: Optional[CriterionAdaptor] = None,
-        datasets: Dict[str, Dataset] = None,
-        dataloaders: Dict[str, Callable] = None,
-        metrics: Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]] = None,
+        optimizer: Optimizer | None = None,
+        scheduler: LRScheduler | None = None,
+        criterion: Callable | None = None,
+        criterion_adapter: CriterionAdaptor | None = None,
+        datasets: dict[str, Dataset] = None,
+        dataloaders: dict[str, Callable] = None,
+        metrics: dict[str, Metric | list[Metric] | dict[str, Metric]] = None,
         postprocessing: ProcessingPipelineDefinition | dict = None,
-        inferer: Optional[Callable] = None,
-        model_adapter: Optional[ModelAdapter] = None,
-        data_logger: Optional[DataLogger] = None,
+        inferer: Callable | None = None,
+        model_adapter: ModelAdapter | None = None,
+        data_logger: DataLogger | None = None,
     ) -> None:
         super().__init__()
 
@@ -207,8 +232,7 @@ class LighterSystem(pl.LightningModule):
 
         return self.model(*args, **kwargs)
 
-
-    def calculate_loss(self, result: Dict[str, Any], mode: ModeEnum):
+    def calculate_loss(self, result: dict[str, Any], mode: ModeEnum):
         """Calculate the loss from the result dictionary.
 
         Args:
@@ -221,9 +245,11 @@ class LighterSystem(pl.LightningModule):
             loss = self.criterion_adapter(self.criterion, result)
             if isinstance(loss, dict):
                 if "loss" not in result:
-                    raise ValueError("Criterion must return a dict of tensors."
-                                     " It must contain a 'loss' key, which will be used as the optimization target."
-                                     " Other keys can be used for logging purposes (e.g. CE+Dice loss).")
+                    raise ValueError(
+                        "Criterion must return a dict of tensors."
+                        " It must contain a 'loss' key, which will be used as the optimization target."
+                        " Other keys can be used for logging purposes (e.g. CE+Dice loss)."
+                    )
                 result["losses"] = loss
                 result["loss"] = loss["loss"]
             elif isinstance(loss, torch.Tensor):
@@ -232,7 +258,7 @@ class LighterSystem(pl.LightningModule):
             else:
                 raise ValueError("Criterion must return a tensor or a dict of tensors.")
 
-    def _base_step(self, batch: Dict, batch_idx: int, mode: ModeEnum) -> Union[Dict[str, Any], Any]:
+    def _base_step(self, batch: dict, batch_idx: int, mode: ModeEnum) -> dict[str, Any] | Any:
         """Base step for all modes.
 
         Args:
@@ -293,7 +319,6 @@ class LighterSystem(pl.LightningModule):
     test_step = partialmethod(_base_step, mode="test")
     predict_step = partialmethod(_base_step, mode="predict")
 
-
     def _base_dataloader(self, mode: str) -> DataLoader:
         """Instantiate the dataloader for a mode (train/val/test/predict).
         Includes a collate function that enables the DataLoader to replace
@@ -308,8 +333,6 @@ class LighterSystem(pl.LightningModule):
             DataLoader: Instantiated DataLoader.
         """
 
-
-
         dataset = self.datasets[mode]
 
         if dataset is None:
@@ -318,17 +341,18 @@ class LighterSystem(pl.LightningModule):
         if mode in self.dataloaders:
             return self.dataloaders[mode](dataset)
 
-
         return DataLoader(
             dataset,
             batch_size=1,
             drop_last=(self.drop_last_batch if mode == "train" else False),
         )
+
     train_dataloader = partialmethod(_base_dataloader, mode="train")
     val_dataloader = partialmethod(_base_dataloader, mode="val")
     test_dataloader = partialmethod(_base_dataloader, mode="test")
     predict_dataloader = partialmethod(_base_dataloader, mode="predict")
-    def configure_optimizers(self) -> Dict:
+
+    def configure_optimizers(self) -> dict:
         """LightningModule method. Returns optimizers and, if defined, schedulers.
 
         Returns:
@@ -340,8 +364,6 @@ class LighterSystem(pl.LightningModule):
             return {"optimizer": self.optimizer}
         else:
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
-
-
 
     def _base_epoch_start(self, mode: ModeEnum):
         if self.metrics is not None:
@@ -362,13 +384,11 @@ class LighterSystem(pl.LightningModule):
     on_test_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.TEST)
     on_predict_epoch_end = partialmethod(_base_epoch_end, mode=ModeEnum.PREDICT)
 
-
-    def _init_datasets(self, datasets: Dict[str, Optional[Dataset]]):
+    def _init_datasets(self, datasets: dict[str, Dataset | None]):
         """Ensures that the datasets have the predefined schema."""
         return ensure_dict_schema(datasets, {"train": None, "val": None, "test": None, "predict": None})
 
-
-    def _init_metrics(self, metrics: Sequence[dict[str,Any]]) -> MetricContainerCollection:
+    def _init_metrics(self, metrics: Sequence[dict[str, Any]]) -> MetricContainerCollection:
         instantiated_metrics = []
         for metric in metrics:
             try:
@@ -388,4 +408,3 @@ class LighterSystem(pl.LightningModule):
             return postprocessing
         else:
             return ProcessingPipelineDefinition(postprocessing)
-

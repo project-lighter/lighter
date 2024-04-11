@@ -1,10 +1,12 @@
+from typing import Any, Callable, Mapping, Sequence
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Sequence, Mapping, Any
 
 from monai.transforms import Compose
 
 ROOT_NODE_NAME = "initial"
+
 
 class ProcessingStep(ABC):
 
@@ -27,6 +29,7 @@ class ProcessingStep(ABC):
     def should_cache_result(self) -> bool:
         raise NotImplementedError()
 
+
 class TransformConversionDescriptor:
 
     @staticmethod
@@ -38,7 +41,6 @@ class TransformConversionDescriptor:
             return Compose(transforms=value)
         else:
             raise ValueError("Value Callable or Sequence of Callables")
-
 
     def __init__(self, *, default=None):
         if default is None:
@@ -67,13 +69,13 @@ class TransformProcessingStep(ProcessingStep):
     transform: TransformConversionDescriptor = TransformConversionDescriptor()
     requires: Sequence[str] = (ROOT_NODE_NAME,)
     should_cache_result: bool = True
+
     @property
     def is_constant(self) -> bool:
         return False
 
     def __call__(self, data: Any):
         return self.transform(data)
-
 
 
 class ConstantProcessingStep(ProcessingStep):
@@ -88,13 +90,13 @@ class ConstantProcessingStep(ProcessingStep):
 
     def __call__(self, data: Any):
         raise RuntimeError("Cannot call a constant processing step")
+
     @property
     def requires(self) -> Sequence[str]:
         return []
 
 
 class ProcessingPipelineDefinition(Mapping[str, ProcessingStep]):
-
 
     processing_steps: Mapping[str, ProcessingStep]
 
@@ -113,6 +115,7 @@ class ProcessingPipelineDefinition(Mapping[str, ProcessingStep]):
             return TransformProcessingStep(**step)
         else:
             raise ValueError("Step must be a ProcessingStep or a dict")
+
     def _check_graph(self):
         for step_name, step in self.processing_steps.items():
             for required_step in step.requires:
@@ -140,15 +143,18 @@ class ProcessingPipelineDefinition(Mapping[str, ProcessingStep]):
 
     def __iter__(self):
         return iter(self.processing_steps)
+
     def __len__(self):
         return len(self.processing_steps)
+
 
 class ProcessingPipeline:
     pipeline: ProcessingPipelineDefinition
     results: dict[str, Any]
+
     def __init__(self, pipeline: ProcessingPipelineDefinition, start_value: Any, start_node: str = ROOT_NODE_NAME):
         self.pipeline = pipeline
-        self.results = {start_node:start_value}
+        self.results = {start_node: start_value}
 
     def get_result(self, node_name: str):
         if node_name not in self.pipeline:
@@ -167,7 +173,7 @@ class ProcessingPipeline:
             except Exception as e:
                 errors.append(e)
         else:
-            raise ExceptionGroup(f"Could not find any valid required data for step {node_name}",errors)
+            raise ExceptionGroup(f"Could not find any valid required data for step {node_name}", errors)
 
         result = step(data)
         if step.should_cache_result:
