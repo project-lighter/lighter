@@ -158,7 +158,9 @@ class ProcessingPipeline:
 
     def get_result(self, node_name: str):
         if node_name not in self.pipeline:
-            raise ValueError(f"Step {node_name} not found in processing pipeline, defined step are {self.pipeline.keys()}")
+            raise ValueError(
+                f"Step {node_name} not found in processing pipeline, defined step are {list(self.pipeline.keys())}"
+            )
         if node_name in self.results:
             return self.results[node_name]
         step = self.pipeline[node_name]

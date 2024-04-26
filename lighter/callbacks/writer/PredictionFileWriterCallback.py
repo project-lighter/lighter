@@ -31,6 +31,7 @@ class PredictionFormatter(Protocol):
 @dataclass(kw_only=True)
 class BaseRGBPredictionFormatter(PredictionFormatter):
     image_channel: int | None = None
+    label_one_hot: bool = False
 
     def normalize_image(self, image: torch.Tensor) -> torch.Tensor:
         min_v = image.min()
@@ -48,30 +49,53 @@ class BaseRGBPredictionFormatter(PredictionFormatter):
                 f" to specify the channel to use"
             )
         result = repeat(self.normalize_image(image), "c x y z -> z y x ( repeat c )", repeat=3)
-        if label is not None and (n_classes := label.max().item()):
-            label = label[0, ...].to(dtype=torch.int)
-            label = rearrange(label, "x y z -> z y x")
-            n_classes = int(n_classes)
-            edges: torch.Tensor | None = None
-            if label.device.type == "cuda":
-                find_boundaries_cu, has_cucim = optional_import("cucim.skimage.segmentation", name="find_boundaries")
-                cp, has_cp = optional_import("cupy")
+        if label is not None:
+            if self.label_one_hot:
+                n_classes = label.shape[0]
+                colors = np.concatenate(
+                    [np.zeros((1, 3), dtype=np.uint8), distinguishable_colors(n_classes, return_as_uint8=True)]
+                )
+                colors = torch.tensor(colors).to(dtype=torch.uint8)
+                label = rearrange(label, "c x y z -> c z y x")
+                for i in range(n_classes):
+                    edges = self.find_edges(label[i, ...])
+                    label = label.to(device=edges.device)
+                    result = result.to(device=edges.device)
+                    colors = colors.to(device=edges.device)
+                    result[edges] = colors[i]
 
-                if has_cucim and has_cp:
-                    prediction_cp = convert_to_cupy(label)
-                    edges = find_boundaries_cu(prediction_cp, mode="outer")
-            if edges is None:
-                find_boundaries_skimage, _ = optional_import("skimage.segmentation", name="find_boundaries")
-                edges = convert_to_tensor(find_boundaries_skimage(label.cpu().numpy(), mode="inner"))
-            label = label.to(device=edges.device)
-            result = result.to(device=edges.device)
-            # 0 is background, so add a placeholder color for it, it won't be used in the final image because of where
-            colors = np.concatenate(
-                [np.zeros((1, 3), dtype=np.uint8), distinguishable_colors(n_classes, return_as_uint8=True)]
-            )
-            colors = torch.tensor(colors).to(device=edges.device, dtype=torch.uint8)
-            result.masked_scatter_(edges.unsqueeze(-1), colors[label])
+            elif n_classes := label.max().item():
+                if label.shape[0] != 1:
+                    raise ValueError("Label should have a single channel if not one-hot encoded")
+                label = label[0, ...].to(dtype=torch.int)
+                label = rearrange(label, "x y z -> z y x")
+                n_classes = int(n_classes)
+                edges = self.find_edges(label)
+                label = label.to(device=edges.device)
+                result = result.to(device=edges.device)
+                # 0 is background, so add a placeholder color for it, it won't be used in the final image because of where
+                colors = np.concatenate(
+                    [np.zeros((1, 3), dtype=np.uint8), distinguishable_colors(n_classes, return_as_uint8=True)]
+                )
+                colors = torch.tensor(colors).to(device=edges.device, dtype=torch.uint8)
+                result.masked_scatter_(edges.unsqueeze(-1), colors[label])
         return result.cpu()
+
+    def find_edges(self, label):
+        edges: torch.Tensor | None = None
+        boundary_mode = "inner"
+        if label.device.type == "cuda":
+            find_boundaries_cu, has_cucim = optional_import("cucim.skimage.segmentation", name="find_boundaries")
+            cp, has_cp = optional_import("cupy")
+
+            if has_cucim and has_cp:
+                prediction_cp = convert_to_cupy(label)
+
+                edges = convert_to_tensor(find_boundaries_cu(prediction_cp, mode=boundary_mode))
+        if edges is None:
+            find_boundaries_skimage, _ = optional_import("skimage.segmentation", name="find_boundaries")
+            edges = convert_to_tensor(find_boundaries_skimage(label.cpu().numpy(), mode=boundary_mode))
+        return edges
 
     def __call__(self, *, image: torch.Tensor | None = None, label: torch.Tensor | None) -> torch.Tensor:
         return self.convert_to_rgb_tensor(image, label)
@@ -188,7 +212,6 @@ class PredictionWriterCallback(Callback):
         label_extractor: TensorExtractor | str = "prediction",
         **kwargs,
     ):
-        super().__init__(**kwargs)
         self.written_counts = {}
         self.modes = {ModeEnum(mode) for mode in modes}
         self.max_predictions = max_predictions

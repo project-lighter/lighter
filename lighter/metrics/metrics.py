@@ -125,7 +125,7 @@ class MetricContainer:
                 return
             raise ValueError(
                 f"Invalid number of dimensions in result,"
-                f" expected {len(dims)} ({dims}), got {result.dim()}. "
+                f" expected {len(dims)} ({dims}), got {result.dim()} (shape {result.shape}). "
                 "Please check the step_dims and compute_dims attributes of the metric."
             )
         try:

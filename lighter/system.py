@@ -119,10 +119,10 @@ class BaseMetricLogger(DataLogger):
         logged_keys = set()
         for metric, value in metrics.items():
             if value is not None:
-                batch_dim_idx = metric.step_dims.index(MetricResultDims.BATCH)
-                if batch_dim_idx != -1:
+                if MetricResultDims.BATCH in metric.compute_dims:
+                    batch_dim_idx = metric.compute_dims.index(MetricResultDims.BATCH)
                     value = torch.mean(value, dim=batch_dim_idx)
-                if MetricResultDims.CLASS in metric.step_dims:
+                if MetricResultDims.CLASS in metric.compute_dims:
                     assert value.dim() == 1
                     for class_name, class_value in zip(metric.class_names, value.unbind(dim=0)):
                         key = self._get_log_key(mode, metric, LogStageEnum.EPOCH, class_name)
