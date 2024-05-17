@@ -205,18 +205,16 @@ class LighterSystem(pl.LightningModule):
         target = apply_fns(target, self.postprocessing["logging"]["target"])
         pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
-        # If the loss is a dict, sum the sublosses under "combined" key. Any weightings should be applied in the criterion.
-        if isinstance(loss, dict):
-            if "combined" in loss:
-                raise ValueError("The loss dictionary cannot contain a key 'combined'.")
-            loss["combined"] = sum(loss.values())
+        # If the loss is a dict, the sublosses must be combined under "total" key.
+        if isinstance(loss, dict) and "total" not in loss:
+            raise ValueError("The loss dictionary must have 'total' loss, combining all the sublosses.")
 
         # Logging
         self._log_stats(loss, metrics, mode, batch_idx)
 
         # Return the loss as required by Lightning as well as other data that can be used in hooks or callbacks.
         return {
-            "loss": loss["combined"] if isinstance(loss, dict) else loss,
+            "loss": loss["total"] if isinstance(loss, dict) else loss,
             "metrics": metrics,
             "input": input,
             "target": target,
