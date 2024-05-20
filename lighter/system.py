@@ -251,6 +251,8 @@ class LighterSystem(pl.LightningModule):
         # Metrics
         if metrics is not None:
             for name, metric in metrics.items():
+                if not isinstance(metric, Metric):
+                    raise TypeError(f"Expected type for metric is 'Metric', got '{type(metric).__name__}' instead.")
                 on_step_log(f"{mode}/metrics/{name}/step", metric)
                 on_epoch_log(f"{mode}/metrics/{name}/epoch", metric)
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
