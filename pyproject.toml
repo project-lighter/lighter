@@ -41,7 +41,7 @@ classifiers = [  #! Update me
 
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 torch = "^2.1.2"
 pandas = "^1.5.3"
 pytorch-lightning = "^2.1.3"

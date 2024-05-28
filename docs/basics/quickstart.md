@@ -70,6 +70,13 @@ system:
           - _target_: torchvision.transforms.Normalize
             mean: [0.5, 0.5, 0.5]
             std: [0.5, 0.5, 0.5]
+
+  postprocessing:
+      # Format the batch as required by Lighter as lighter 
+      # takes a dictionary as input. 
+      batch:
+          train: '$lambda x: {"input": x[0], "target": x[1]}'
+             
 ```
 
 For more information about each of the LighterSystem components and how to override them, see [here](./config.md)
@@ -79,6 +86,10 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
 
 === "cifar10.yaml"
     ```yaml
+    trainer:
+      _target_: pytorch_lightning.Trainer
+      max_epochs: 100
+      
     system:
       _target_: lighter.LighterSystem
       batch_size: 512
@@ -108,6 +119,12 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
               - _target_: torchvision.transforms.Normalize
                 mean: [0.5, 0.5, 0.5]
                 std: [0.5, 0.5, 0.5]
+
+      postprocessing:
+          # Format the batch as required by Lighter as lighter 
+          # takes a dictionary as input. 
+          batch:
+              train: '$lambda x: {"input": x[0], "target": x[1]}'
 
     ```
 === "Terminal"
