@@ -6,7 +6,7 @@ import fire
 from monai.bundle.config_parser import ConfigParser
 from pytorch_lightning import seed_everything
 
-from lighter import LighterSystem
+from lighter.system import LighterSystem
 from lighter.utils.dynamic_imports import import_module_from_path
 
 CONFIG_STRUCTURE = {"project": None, "system": {}, "trainer": {}, "args": {}, "vars": {}}
@@ -36,7 +36,8 @@ def parse_config(**kwargs) -> ConfigParser:
 
     # Read the config file and update it with overrides.
     parser = ConfigParser(CONFIG_STRUCTURE, globals=False)
-    parser.read_config(config_file).update(kwargs)
+    parser.read_config(config_file)
+    parser.update(kwargs)
     return parser
 
 
@@ -56,7 +57,7 @@ def validate_config(parser: ConfigParser) -> None:
         ValueError: If there are invalid method names specified in the 'args' section.
     """
     # Validate parser keys against structure
-    invalid_keys = set(parser.keys()) - set(CONFIG_STRUCTURE.keys())
+    invalid_keys = set(parser.get().keys()) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
     if invalid_keys:
         raise ValueError(f"Invalid top-level config keys: {list(invalid_keys)}. Allowed keys: {list(CONFIG_STRUCTURE.keys())}")
 
