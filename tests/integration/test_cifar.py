@@ -8,7 +8,7 @@ test_overrides = "./tests/integration/test_overrides.yaml"
 
 
 @pytest.mark.parametrize(
-    ("method_name", "config_file"),
+    ("method_name", "config"),
     [
         (  # Method name
             "fit",
@@ -18,9 +18,9 @@ test_overrides = "./tests/integration/test_overrides.yaml"
     ],
 )
 @pytest.mark.slow
-def test_trainer_method(method_name: str, config_file: str):
+def test_trainer_method(method_name: str, config: str):
     """ """
-    kwargs = {"config_file": config_file, "args_file": test_overrides}
+    kwargs = {"config": [config, test_overrides]}
 
     func_return = run(method_name, **kwargs)
     assert func_return is None

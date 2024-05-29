@@ -99,7 +99,7 @@ Say goodbye to messy scripts and notebooks. Lighter is here to help you organize
     <div style="width: 49%;">
         <h3 style="text-align: center">Lighter</h3>
         ```bash title="Terminal"
-        lighter fit --config_file cifar10.yaml
+        lighter fit --config cifar10.yaml
         ```
         ```yaml title="cifar10.yaml"
         trainer:

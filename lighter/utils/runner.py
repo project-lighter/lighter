@@ -25,18 +25,18 @@ def parse_config(**kwargs) -> ConfigParser:
     with given keyword arguments. Returns an updated parser object.
 
     Args:
-        **kwargs (dict): Keyword arguments containing 'config_file' and, optionally, config overrides.
+        **kwargs (dict): Keyword arguments containing 'config' and, optionally, config overrides.
     Returns:
         An instance of ConfigParser with configuration and overrides merged and parsed.
     """
     # Ensure a config file is specified.
-    config_file = kwargs.pop("config_file", None)
-    if config_file is None:
-        raise ValueError("--config_file not specified. Exiting.")
+    config = kwargs.pop("config", None)
+    if config is None:
+        raise ValueError("'--config' not specified. Exiting.")
 
     # Read the config file and update it with overrides.
     parser = ConfigParser(CONFIG_STRUCTURE, globals=False)
-    parser.read_config(config_file)
+    parser.read_config(config)
     parser.update(kwargs)
     return parser
 
@@ -72,7 +72,7 @@ def run(method: str, **kwargs: Any):
 
     Args:
         method (str): name of the Trainer/Tuner method to run.
-        **kwargs (Any): keyword arguments that include 'config_file' and specific config overrides passed to `parse_config()`.
+        **kwargs (Any): keyword arguments that include 'config' and specific config overrides passed to `parse_config()`.
     """
     seed_everything()
 
