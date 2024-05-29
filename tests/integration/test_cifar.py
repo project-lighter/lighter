@@ -22,5 +22,5 @@ def test_trainer_method(method_name: str, config_file: str):
     """ """
     kwargs = {"config_file": config_file, "args_file": test_overrides}
 
-    func_return = run_trainer_method(method_name, **kwargs)
+    func_return = run(method_name, **kwargs)
     assert func_return is None
