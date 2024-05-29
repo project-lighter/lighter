@@ -205,9 +205,12 @@ class LighterSystem(pl.LightningModule):
         target = apply_fns(target, self.postprocessing["logging"]["target"])
         pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
-        # If the loss is a dict, the sublosses must be combined under "total" key.
+        # Ensure that a dict of losses has a 'total' key.
         if isinstance(loss, dict) and "total" not in loss:
-            raise ValueError("The loss dictionary must have 'total' loss, combining all the sublosses.")
+            raise ValueError(
+                "The loss dictionary must include a 'total' key that combines all sublosses. "
+                "Example: {'total': combined_loss, 'subloss1': loss1, ...}"
+            )
 
         # Logging
         self._log_stats(loss, metrics, mode, batch_idx)
@@ -251,6 +254,8 @@ class LighterSystem(pl.LightningModule):
         # Metrics
         if metrics is not None:
             for name, metric in metrics.items():
+                if not isinstance(metric, Metric):
+                    raise TypeError(f"Expected type for metric is 'Metric', got '{type(metric).__name__}' instead.")
                 on_step_log(f"{mode}/metrics/{name}/step", metric)
                 on_epoch_log(f"{mode}/metrics/{name}/epoch", metric)
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
