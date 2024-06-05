@@ -5,22 +5,22 @@ import inspect
 from torch.optim.optimizer import Optimizer
 
 
-def ensure_list(vals: Any) -> List:
+def ensure_list(input: Any) -> List:
     """Wrap the input into a list if it is not a list. If it is a None, return an empty list.
 
     Args:
-        vals (Any): input to wrap into a list.
+        input (Any): Input to wrap into a list.
 
     Returns:
-        List: output list.
+        Output list.
     """
-    if isinstance(vals, list):
-        return vals
-    if isinstance(vals, tuple):
-        return list(vals)
-    if vals is None:
+    if isinstance(input, list):
+        return input
+    if isinstance(input, tuple):
+        return list(input)
+    if input is None:
         return []
-    return [vals]
+    return [input]
 
 
 def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -30,15 +30,14 @@ def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Di
     This function supports nested dictionaries.
 
     Args:
-        input_dict (Dict[str, Any]): The input dictionary to merge with the schema.
-        schema (Dict[str, Any]): A schema dictionary with default values specified.
-
-    Returns:
-        Dict[str, Any]: The merged dictionary. If input_dict is None, returns the schema dictionary.
+        input_dict (Dict[str, Any]): Dictionary to merge with the schema.
+        schema (Dict[str, Any]): Schema dictionary with default values specified.
 
     Raises:
         ValueError: If the input dictionary has other keys than the specified schema keys.
 
+    Returns:
+        The merged dictionary. If input_dict is None, returns the schema dictionary.
     """
     output_dict = schema.copy()
     if input_dict is not None:
@@ -52,13 +51,13 @@ def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Di
     return output_dict
 
 
-def setattr_dot_notation(obj: Callable, attr: str, value: Any):
+def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
     """Set object's attribute. Supports dot notation.
 
     Args:
-        obj (Callable): object.
-        attr (str): attribute name of the object.
-        value (Any): value to set the attribute to.
+        obj (Callable): Object.
+        attr (str): Attribute name of the object.
+        value (Any): Value to set the attribute to.
     """
     if "." not in attr:
         if not hasattr(obj, attr):
@@ -74,8 +73,8 @@ def hasarg(_callable: Callable, arg_name: str) -> bool:
     """Check if a function, class, or method has an argument with the specified name.
 
     Args:
-        _callable (Callable): function, class, or method to inspect.
-        arg_name (str): argument name to check for.
+        _callable (Callable): Function, class, or method to inspect.
+        arg_name (str): Argument name to check for.
 
     Returns:
         bool: `True` if the argument if the specified name exists.
@@ -89,12 +88,12 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     """Get the name of an object, class or function.
 
     Args:
-        _callable (Callable): object, class or function.
-        include_module_name (bool, optional): whether to include the name of the module from
+        _callable (Callable): Object, class or function.
+        include_module_name (bool, optional): Whether to include the name of the module from
             which it comes. Defaults to False.
 
     Returns:
-        str: name
+        Name of the given object, class or function.
     """
     name = type(_callable).__name__ if isinstance(_callable, object) else _callable.__name__
     if include_module_name:
@@ -107,11 +106,11 @@ def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
     """Apply a function or a list of functions on the input.
 
     Args:
-        data (Any): input to apply the function(s) on.
-        fns (Union[Callable, List[Callable]]): function or list of functions to apply on the input.
+        data (Any): Input to apply the function(s) on.
+        fns (Union[Callable, List[Callable]]): Function or list of functions to apply on the input.
 
     Returns:
-        Any: output of the function(s).
+        Output after applying the function(s).
     """
     for fn in ensure_list(fns):
         data = fn(data)
@@ -126,7 +125,7 @@ def get_optimizer_stats(optimizer: Optimizer) -> Dict[str, float]:
         optimizer (Optimizer): A PyTorch optimizer.
 
     Returns:
-        Dict[str, float]: Dictionary with formatted keys and values for learning rates and momentum.
+        Dictionary with formatted keys and values for learning rates and momentum.
     """
     stats_dict = {}
     for group_idx, group in enumerate(optimizer.param_groups):

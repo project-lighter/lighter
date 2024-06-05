@@ -1,4 +1,5 @@
 """Tests for running CIFAR training to verify integrity of the pipeline"""
+
 import pytest
 
 from lighter.utils.cli import run_trainer_method
