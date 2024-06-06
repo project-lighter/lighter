@@ -57,12 +57,14 @@ def validate_config(parser: ConfigParser) -> None:
         ValueError: If there are invalid method names specified in the 'args' section.
     """
     # Validate parser keys against structure
-    invalid_keys = set(parser.get().keys()) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
+    root_keys = parser.get().keys()
+    invalid_keys = set(root_keys) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
     if invalid_keys:
         raise ValueError(f"Invalid top-level config keys: {list(invalid_keys)}. Allowed keys: {list(CONFIG_STRUCTURE.keys())}")
 
     # Validate that 'args' contains only valid Trainer/Tuner method names.
-    invalid_keys = set(parser.get("args").keys()) - set(TRAINER_METHOD_NAMES)
+    args_keys = parser.get("args", {}).keys()
+    invalid_keys = set(args_keys) - set(TRAINER_METHOD_NAMES)
     if invalid_keys:
         raise ValueError(f"Invalid method names in 'args': {invalid_keys}. Allowed methods are: {TRAINER_METHOD_NAMES}")
 
@@ -88,7 +90,7 @@ def run(method: str, **kwargs: Any):
     # Get the main components from the parsed config.
     system = parser.get_parsed_content("system")
     trainer = parser.get_parsed_content("trainer")
-    trainer_method_args = parser.get_parsed_content(f"args#{method}")
+    trainer_method_args = parser.get_parsed_content(f"args#{method}", default={})
 
     # Checks
     if not isinstance(system, LighterSystem):
