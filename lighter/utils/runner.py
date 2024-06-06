@@ -32,7 +32,7 @@ def parse_config(**kwargs) -> ConfigParser:
     # Ensure a config file is specified.
     config = kwargs.pop("config", None)
     if config is None:
-        raise ValueError("'--config' not specified. Exiting.")
+        raise ValueError("'--config' not specified. Please provide a valid configuration file.")
 
     # Read the config file and update it with overrides.
     parser = ConfigParser(CONFIG_STRUCTURE, globals=False)
@@ -60,7 +60,7 @@ def validate_config(parser: ConfigParser) -> None:
     root_keys = parser.get().keys()
     invalid_keys = set(root_keys) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
     if invalid_keys:
-        raise ValueError(f"Invalid top-level config keys: {list(invalid_keys)}. Allowed keys: {list(CONFIG_STRUCTURE.keys())}")
+        raise ValueError(f"Invalid top-level config keys: {invalid_keys}. Allowed keys: {CONFIG_STRUCTURE.keys()}")
 
     # Validate that 'args' contains only valid Trainer/Tuner method names.
     args_keys = parser.get("args", {}).keys()
