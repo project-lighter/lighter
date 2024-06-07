@@ -14,7 +14,7 @@ TRAINER_METHOD_NAMES = ["fit", "validate", "test", "predict", "lr_find", "scale_
 
 
 def cli() -> None:
-    """Defines the command line interface for running lightning Trainer/Tuner's methods."""
+    """Defines the command line interface for running lightning trainer's methods."""
     commands = {method: partial(run, method) for method in TRAINER_METHOD_NAMES}
     fire.Fire(commands)
 
@@ -47,7 +47,7 @@ def validate_config(parser: ConfigParser) -> None:
 
     This function checks if the keys in the top-level of the configuration parser are valid according to the
     CONFIG_STRUCTURE. It also verifies that the 'args' section of the configuration only contains keys that
-    correspond to valid Trainer/Tuner method names as defined in TRAINER_METHOD_NAMES.
+    correspond to valid trainer method names as defined in TRAINER_METHOD_NAMES.
 
     Args:
         parser (ConfigParser): The configuration parser instance to validate.
@@ -58,22 +58,22 @@ def validate_config(parser: ConfigParser) -> None:
     """
     # Validate parser keys against structure
     root_keys = parser.get().keys()
-    invalid_keys = set(root_keys) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
-    if invalid_keys:
-        raise ValueError(f"Invalid top-level config keys: {invalid_keys}. Allowed keys: {CONFIG_STRUCTURE.keys()}")
+    invalid_root_keys = set(root_keys) - set(CONFIG_STRUCTURE.keys()) - {"_meta_", "_requires_"}
+    if invalid_root_keys:
+        raise ValueError(f"Invalid top-level config keys: {invalid_root_keys}. Allowed keys: {CONFIG_STRUCTURE.keys()}")
 
-    # Validate that 'args' contains only valid Trainer/Tuner method names.
-    args_keys = parser.get("args", {}).keys()
-    invalid_keys = set(args_keys) - set(TRAINER_METHOD_NAMES)
-    if invalid_keys:
-        raise ValueError(f"Invalid method names in 'args': {invalid_keys}. Allowed methods are: {TRAINER_METHOD_NAMES}")
+    # Validate that 'args' contains only valid trainer method names.
+    args_keys = parser.get("args").keys()
+    invalid_args_keys = set(args_keys) - set(TRAINER_METHOD_NAMES)
+    if invalid_args_keys:
+        raise ValueError(f"Invalid trainer method in 'args': {invalid_args_keys}. Allowed methods are: {TRAINER_METHOD_NAMES}")
 
 
 def run(method: str, **kwargs: Any):
-    """Run the Trainer/Tuner method.
+    """Run the trainer method.
 
     Args:
-        method (str): name of the Trainer/Tuner method to run.
+        method (str): name of the trainer method to run.
         **kwargs (Any): keyword arguments that include 'config' and specific config overrides passed to `parse_config()`.
     """
     seed_everything()
@@ -107,5 +107,5 @@ def run(method: str, **kwargs: Any):
     if trainer.logger is not None:
         trainer.logger.log_hyperparams(config)
 
-    # Run the Trainer method.
+    # Run the trainer method.
     getattr(trainer, method)(system, **trainer_method_args)
