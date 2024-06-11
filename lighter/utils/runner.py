@@ -63,7 +63,7 @@ def validate_config(parser: ConfigParser) -> None:
         raise ValueError(f"Invalid top-level config keys: {invalid_root_keys}. Allowed keys: {CONFIG_STRUCTURE.keys()}")
 
     # Validate that 'args' contains only valid trainer method names.
-    args_keys = parser.get("args").keys()
+    args_keys = parser.get("args", {}).keys()
     invalid_args_keys = set(args_keys) - set(TRAINER_METHOD_NAMES)
     if invalid_args_keys:
         raise ValueError(f"Invalid trainer method in 'args': {invalid_args_keys}. Allowed methods are: {TRAINER_METHOD_NAMES}")
