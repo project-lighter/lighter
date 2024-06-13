@@ -129,7 +129,7 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
     ```
 === "Terminal"
     ```
-    lighter fit --config_file cifar10.yaml
+    lighter fit --config cifar10.yaml
     ```
 
 

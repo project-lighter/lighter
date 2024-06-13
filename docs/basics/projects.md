@@ -136,7 +136,7 @@ In the above example, the path of the dataset is `/home/user/project/my_xray_dat
 
 === "Terminal"
     ```
-    lighter fit --config_file xray.yaml
+    lighter fit --config xray.yaml
     ```
 
 </div>   
