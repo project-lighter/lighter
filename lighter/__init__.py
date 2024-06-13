@@ -1,4 +1,4 @@
-__version__ = "0.0.2a30"
+__version__ = "0.0.2a31"
 
 from .utils.logging import _setup_logging
 
