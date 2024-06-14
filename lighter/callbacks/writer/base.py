@@ -21,19 +21,12 @@ class LighterBaseWriter(ABC, Callback):
         2) `self.write()` method to specify the saving strategy for a prediction.
 
     Args:
-        directory (str): Base directory for saving. A new sub-directory with current date and time will be created inside.
+        path (Union[str, Path]): Path for saving. It can be a directory or a specific file.
         writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
     """
 
-    def __init__(self, directory: str, writer: Union[str, Callable]) -> None:
-        """
-        Initialize the LighterBaseWriter.
-
-        Args:
-            directory (str): Base directory for saving. A new sub-directory with current date and time will be created inside.
-            writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
-        """
-        self.directory = Path(directory)
+    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+        self.path = Path(path)
 
         # Check if the writer is a string and if it exists in the writers dictionary
         if isinstance(writer, str):
@@ -70,11 +63,11 @@ class LighterBaseWriter(ABC, Callback):
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         """
-        Callback function to set up necessary prerequisites: prediction count and prediction directory.
+        Callback function to set up necessary prerequisites: prediction count and prediction file or directory.
         When executing in a distributed environment, it ensures that:
         1. Each distributed node initializes a prediction count based on its rank.
-        2. All distributed nodes write predictions to the same directory.
-        3. The directory is accessible to all nodes, i.e., all nodes share the same storage.
+        2. All distributed nodes write predictions to the same path.
+        3. The path is accessible to all nodes, i.e., all nodes share the same storage.
         """
         if stage != "predict":
             return
@@ -82,18 +75,22 @@ class LighterBaseWriter(ABC, Callback):
         # Initialize the prediction count with the rank of the current process
         self._pred_counter = torch.distributed.get_rank() if trainer.world_size > 1 else 0
 
-        # Ensure all distributed nodes write to the same directory
-        self.directory = trainer.strategy.broadcast(self.directory, src=0)
-        # Warn if the directory already exists
-        if self.directory.exists():
-            logger.warning(f"{self.directory} already exists, existing predictions will be overwritten.")
+        # Ensure all distributed nodes write to the same path
+        self.path = trainer.strategy.broadcast(self.path, src=0)
+        directory = self.path.parent if self.path.suffix else self.path
+
+        # Warn if the path already exists
+        if self.path.exists():
+            logger.warning(f"{self.path} already exists, existing predictions will be overwritten.")
+
         if trainer.is_global_zero:
-            self.directory.mkdir(parents=True, exist_ok=True)
+            directory.mkdir(parents=True, exist_ok=True)
+
         # Wait for rank 0 to create the directory
         trainer.strategy.barrier()
 
-        # Ensure all distributed nodes have access to the directory
-        if not self.directory.exists():
+        # Ensure all distributed nodes have access to the path
+        if not directory.exists():
             raise RuntimeError(
                 f"Rank {trainer.global_rank} does not share storage with rank 0. Ensure nodes have common storage access."
             )

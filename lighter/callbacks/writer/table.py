@@ -16,14 +16,14 @@ class LighterTableWriter(LighterBaseWriter):
     Writer for saving predictions in a table format.
 
     Args:
-        directory (Path): Directory where the CSV will be saved.
+        path (Path): CSV filepath.
         writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
             Available writers: "tensor". A custom writer function must take a single argument: `tensor`, and return the record
             to be saved in the CSV file. The tensor will be a single tensor without the batch dimension.
     """
 
-    def __init__(self, directory: Union[str, Path], writer: Union[str, Callable]) -> None:
-        super().__init__(directory, writer)
+    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+        super().__init__(path, writer)
         self.csv_records = {}
 
     @property
@@ -52,8 +52,6 @@ class LighterTableWriter(LighterBaseWriter):
         If training was done in a distributed setting, it gathers predictions from all processes
         and then saves them from the rank 0 process.
         """
-        csv_path = self.directory / "predictions.csv"
-
         # Sort the records by ID and convert the dictionary to a list
         self.csv_records = [self.csv_records[id] for id in sorted(self.csv_records)]
 
@@ -69,4 +67,4 @@ class LighterTableWriter(LighterBaseWriter):
 
         # Save the records to a CSV file
         if trainer.is_global_zero:
-            pd.DataFrame(self.csv_records).to_csv(csv_path)
+            pd.DataFrame(self.csv_records).to_csv(self.path)
