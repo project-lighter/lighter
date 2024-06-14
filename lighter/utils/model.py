@@ -98,11 +98,14 @@ def adjust_prefix_and_load_state_dict(
                 # Add the model_prefix before the current key name if there's no specific ckpt_prefix
                 ckpt = {f"{model_prefix}{key}": value for key, value in ckpt.items() if ckpt_prefix in key}
 
-    # Check if there is no overlap between the checkpoint's and model's state_dict.
-    if not set(ckpt.keys()) & set(model.state_dict().keys()):
+    # Check if the checkpoint's and model's state_dicts have no overlap.
+    model_keys = list(model.state_dict().keys())
+    ckpt_keys = list(ckpt.keys())
+    if not set(ckpt_keys) & set(model_keys):
         raise ValueError(
-            "There is no overlap between checkpoint's and model's state_dict. Check their "
-            "`state_dict` keys and adjust accordingly using `ckpt_prefix` and `model_prefix`."
+            "There is no overlap between checkpoint's and model's state_dict."
+            f"\nModel keys: '{model_keys[0]}', ..., '{model_keys[-1]}', "
+            f"\nCheckpoint keys: '{ckpt_keys[0]}', ..., '{ckpt_keys[-1]}'"
         )
 
     # Remove the layers that are not to be loaded.
