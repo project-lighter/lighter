@@ -75,8 +75,7 @@ Projects that use `lighter`:
       <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
     </a>
   </div>
-  <div style="margin: 0 25px; max-width:600px;">
-<pre><code>@software{lighter,
+<pre style="margin: 0 25px; max-width: 600px; overflow-x: auto;"><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
                 Keno Bressem and
@@ -86,5 +85,4 @@ publisher    = {Zenodo},
 doi          = {10.5281/zenodo.8007711},
 url          = {https://doi.org/10.5281/zenodo.8007711}
 }</code></pre>
-  </div>
 </div>
