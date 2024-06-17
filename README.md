@@ -28,16 +28,16 @@
 
 Focus on your deep learning experiments and forget about (re)writing code. `lighter` is:
  1. **Task-agnostic**
- 
-    Whether you’re working on classification, segmentation, or self-supervised learning, Lighter provides task-agnostic training logic that you can use out-of-the-box.
+
+    Whether you’re working on classification, segmentation, or self-supervised learning, `lighter` provides generalized training logic that you can use out-of-the-box.
 
  2. **Configuration-based**
 
-    Easily define, track, and reproduce experiments with Lighter’s configuration-driven approach, keeping all your hyperparameters organized.
+    Easily define, track, and reproduce experiments with `lighter`’s configuration-driven approach, keeping all your hyperparameters organized.
 
  3. **Customizable**
 
-    Seamlessly integrate your custom models, datasets, or transformations into Lighter’s flexible framework.
+    Seamlessly integrate your custom models, datasets, or transformations into `lighter`’s flexible framework.
 
 &nbsp;
 
