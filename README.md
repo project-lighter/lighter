@@ -38,9 +38,9 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 ## 📖 Getting Started
 <div align="center">
 <p style="text-align: center;">
-  <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
-  <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
-  <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
+  <a target="_blank" rel="noopener noreferrer" href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
+  <a target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
+  <a target="_blank" rel="noopener noreferrer" href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
 </p>
 </div>
 
@@ -67,15 +67,15 @@ Projects that use `lighter`:
 | --- | --- |
 | [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
 
+#### Support
+
 <div style="display: flex; justify-content: left;">
   <div style="margin: 0 25px;">
-    <p style="font-size: 1.5em; font-weight: bold;">User Support</p>
-    <a href="https://discord.gg/zJcnp6KrUp">
+    <a target="_blank" rel="noopener noreferrer" href="https://discord.gg/zJcnp6KrUp">
       <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
     </a>
   </div>
   <div style="margin: 0 25px;">
-    <p style="font-size: 1.5em; font-weight: bold;">Cite</p>
     <div style="max-width:600px;"><pre><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
