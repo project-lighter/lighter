@@ -1,3 +1,5 @@
+
+
 <div align="center">
 <picture>
   <!-- old code that allows different pics for light/dark mode -->
@@ -9,10 +11,19 @@
 </picture>
 </div>
 <br/>
+<br/>
+<br/>
 <div align="center">
 
- [![build](https://github.com/project-lighter/lighter/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/build.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE)
+[![build](https://github.com/project-lighter/lighter/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/build.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE)
+
+<a href="https://discord.gg/zJcnp6KrUp">
+  <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner2" alt="Lighter Discord Server"/>
+</a>
 </div>
+
+
+&nbsp;
 
 
 With `lighter`, focus on your deep learning experiments and forget about boilerplate through:
@@ -22,7 +33,7 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
  2. **Configuration-based**
     Easily define, track, and reproduce experiments with Lighter’s configuration-driven approach, keeping all your hyperparameters organized.
 
- 3. **Customizable**
+ 3. **Customizable**Journal of Clinical Oncology
     Seamlessly integrate your custom models, datasets, or transformations into Lighter’s flexible framework.
 
 &nbsp;
@@ -44,19 +55,18 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 </p>
 </div>
 
-<div style="max-width: 400px;"><pre><code>pip install project-lighter</code></pre></div>
+<code>pip install project-lighter</code>
 <details>
 <summary><b>Pre-release (up-to-date with the main branch):</b></summary>
-<div style="max-width: 400px;"><pre><code>pip install project-lighter --pre</code></pre></div>
+<code>pip install project-lighter --pre</code>
 </details>
 
 <details>
 <summary><b>For development:</b></summary>
-
-<div style="max-width: 750px;"><pre><code>make setup
+<pre><code>make setup
 make install             # Install lighter via Poetry
 make pre-commit-install  # Set up the pre-commit hook for code formatting
-poetry shell             # Once installed, activate the poetry shell</code></pre></div>
+poetry shell             # Once installed, activate the poetry shell</code></pre>
 </details>
 
 
@@ -67,15 +77,8 @@ Projects that use `lighter`:
 | --- | --- |
 | [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
 
-#### Support
-
-<div style="display: flex; justify-content: left;">
-  <div style="margin: 0 25px;">
-    <a href="https://discord.gg/zJcnp6KrUp">
-      <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
-    </a>
-  </div>
-<pre style="margin: 0 25px; max-width: 600px; overflow-x: auto;"><code>@software{lighter,
+## Cite
+<pre><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
                 Keno Bressem and
