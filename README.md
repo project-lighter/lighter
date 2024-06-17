@@ -38,9 +38,9 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 ## 📖 Getting Started
 <div align="center">
 <p style="text-align: center;">
-  <a target="_blank" rel="noopener noreferrer" href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
-  <a target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
-  <a target="_blank" rel="noopener noreferrer" href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
+  <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
+  <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
+  <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
 </p>
 </div>
 
@@ -71,12 +71,12 @@ Projects that use `lighter`:
 
 <div style="display: flex; justify-content: left;">
   <div style="margin: 0 25px;">
-    <a target="_blank" rel="noopener noreferrer" href="https://discord.gg/zJcnp6KrUp">
+    <a href="https://discord.gg/zJcnp6KrUp">
       <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
     </a>
   </div>
-  <div style="margin: 0 25px;">
-    <div style="max-width:600px;"><pre><code>@software{lighter,
+  <div style="margin: 0 25px; max-width:600px;">
+<pre><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
                 Keno Bressem and
@@ -85,6 +85,6 @@ title        = {Lighter},
 publisher    = {Zenodo},
 doi          = {10.5281/zenodo.8007711},
 url          = {https://doi.org/10.5281/zenodo.8007711}
-}</code></pre></div>
+}</code></pre>
   </div>
 </div>
