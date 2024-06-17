@@ -37,19 +37,17 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 
 ## 📖 Getting Started
 <div align="center">
-  <table style="margin-left: auto; margin-right: auto; border: none;">
-    <tr>
-      <td style="border: none">
-        <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>
-      </td>
-      <td style="border: none">
-        <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>
-      </td>
-      <td style="border: none">
-        <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
-      </td>
-    </tr>
-  </table>
+  <div style="display: flex; justify-content: center;">
+    <div style="margin: 0 10px;">
+      <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>
+    </div>
+    <div style="margin: 0 10px;">
+      <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>
+    </div>
+    <div style="margin: 0 10px;">
+      <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
+    </div>
+  </div>
 </div>
 
 <div style="max-width: 750px;">
@@ -77,19 +75,17 @@ Projects that use `lighter`:
 | Project | Description |
 | --- | --- |
 | [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
-<table style="border: none">
-  <tr>
-    <td style="border: none; text-align: center"><h2>User Support</h2></td>
-    <td style="border: none; text-align: center"><h2>Cite</h2></td>
-  </tr>
-  <tr>
-    <td style="border: none">
-      <a href="https://discord.gg/zJcnp6KrUp">
-        <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
-      </a>
-    </td>
-    <td style="border: none">
-<pre><code>@software{lighter,
+
+<div style="display: flex; justify-content: left;">
+  <div style="margin: 0 10px; text-align: center;">
+    <h2>User Support</h2>
+    <a href="https://discord.gg/zJcnp6KrUp">
+      <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
+    </a>
+  </div>
+  <div style="margin: 0 10px; text-align: center;">
+    <h2>Cite</h2>
+    <pre><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
                 Keno Bressem and
@@ -99,6 +95,5 @@ publisher    = {Zenodo},
 doi          = {10.5281/zenodo.8007711},
 url          = {https://doi.org/10.5281/zenodo.8007711}
 }</code></pre>
-    </td>
-  </tr>
-</table>
+  </div>
+</div>
