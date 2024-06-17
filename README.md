@@ -36,38 +36,29 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 &nbsp;
 
 ## 📖 Getting Started
-<div align="center">
-  <div style="display: flex; justify-content: center;">
-    <div style="margin: 0 10px;">
-      <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>
-    </div>
-    <div style="margin: 0 10px;">
-      <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>
-    </div>
-    <div style="margin: 0 10px;">
-      <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
-    </div>
-  </div>
-</div>
 
-<div style="max-width: 750px;">
 
-<pre><code>pip install project-lighter</code></pre>
+<p style="text-align: center;">
+  <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
+  <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
+  <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
+</p>
 
+<div style="max-width: 400px;"><pre><code>pip install project-lighter</code></pre></div>
 <details>
 <summary><b>Pre-release (up-to-date with the main branch):</b></summary>
-<pre><code>pip install project-lighter --pre</code></pre>
+<div style="max-width: 400px;"><pre><code>pip install project-lighter --pre</code></pre></div>
 </details>
 
 <details>
 <summary><b>For development:</b></summary>
-<pre><code>make setup
+
+<div style="max-width: 750px;"><pre><code>make setup
 make install             # Install lighter via Poetry
 make pre-commit-install  # Set up the pre-commit hook for code formatting
-poetry shell             # Once installed, activate the poetry shell</code></pre>
+poetry shell             # Once installed, activate the poetry shell</code></pre></div>
 </details>
 
-</div>
 
 ## 💡 Projects
 Projects that use `lighter`:
@@ -77,15 +68,15 @@ Projects that use `lighter`:
 | [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
 
 <div style="display: flex; justify-content: left;">
-  <div style="margin: 0 10px; text-align: center;">
-    <h2>User Support</h2>
+  <div style="margin: 0 25px;">
+    <p style="font-size: 1.5em; font-weight: bold;">User Support</p>
     <a href="https://discord.gg/zJcnp6KrUp">
       <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner4" alt="Lighter Discord Server"/>
     </a>
   </div>
-  <div style="margin: 0 10px; text-align: center;">
-    <h2>Cite</h2>
-    <pre><code>@software{lighter,
+  <div style="margin: 0 25px;">
+    <p style="font-size: 1.5em; font-weight: bold;">Cite</p>
+    <div style="max-width:600px;"><pre><code>@software{lighter,
 author       = {Ibrahim Hadzic and
                 Suraj Pai and
                 Keno Bressem and
@@ -94,6 +85,6 @@ title        = {Lighter},
 publisher    = {Zenodo},
 doi          = {10.5281/zenodo.8007711},
 url          = {https://doi.org/10.5281/zenodo.8007711}
-}</code></pre>
+}</code></pre></div>
   </div>
 </div>
