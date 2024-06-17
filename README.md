@@ -52,9 +52,9 @@ Focus on your deep learning experiments and forget about (re)writing code. `ligh
 ## 📖 Getting Started
 <div align="center">
 <p style="text-align: center;">
-  <a href="https://project-lighter.github.io/lighter/">📚 Documentation</a>&nbsp;&nbsp;&nbsp;
-  <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">🎥 YouTube Channel</a>&nbsp;&nbsp;&nbsp;
-  <a href="https://discord.gg/zJcnp6KrUp">👾 Discord Server</a>
+  📚 <a href="https://project-lighter.github.io/lighter/"> Documentation</a>&nbsp;&nbsp;&nbsp;
+  🎥 <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">YouTube Channel</a>&nbsp;&nbsp;&nbsp;
+  👾 <a href="https://discord.gg/zJcnp6KrUp">Discord Server</a>
 </p>
 </div>
 
