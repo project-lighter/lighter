@@ -1,5 +1,5 @@
 
-
+<br/>
 <div align="center">
 <picture>
   <!-- old code that allows different pics for light/dark mode -->
@@ -42,9 +42,9 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
  - [MONAI Bundle](https://docs.monai.io/en/stable/bundle_intro.html) - Configuration system. Similar to [Hydra](https://github.com/facebookresearch/hydra), but with additional features.
  - [PyTorch Lightning](https://github.com/Lightning-AI/lightning) - Our [`LighterSystem`](https://project-lighter.github.io/lighter/reference/system/) is based on the PyTorch Lightning [`LightningModule`](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html) and implements all the necessary training logic for you. Couple it with the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and you're good to go.
 
-&nbsp;
+<br/>
 <div align="center">Simply put, <code>lighter = config(trainer + system)</code>  😇</div>
-&nbsp;
+<br/>
 
 ## 📖 Getting Started
 <div align="center">
@@ -55,10 +55,11 @@ With `lighter`, focus on your deep learning experiments and forget about boilerp
 </p>
 </div>
 
-<code>pip install project-lighter</code>
+<b>Install:</b>
+<pre><code>pip install project-lighter</code></pre>
 <details>
 <summary><b>Pre-release (up-to-date with the main branch):</b></summary>
-<code>pip install project-lighter --pre</code>
+<pre><code>pip install project-lighter --pre</code></pre>
 </details>
 
 <details>
@@ -68,6 +69,7 @@ make install             # Install lighter via Poetry
 make pre-commit-install  # Set up the pre-commit hook for code formatting
 poetry shell             # Once installed, activate the poetry shell</code></pre>
 </details>
+<br/>
 
 
 ## 💡 Projects
@@ -76,6 +78,8 @@ Projects that use `lighter`:
 | Project | Description |
 | --- | --- |
 | [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
+
+<br/>
 
 ## Cite
 <pre><code>@software{lighter,
