@@ -10,7 +10,7 @@ trainer:
     logger: False
     callbacks:
         - _target_: lighter.callbacks.LighterFileWriter
-          directory: '$f"{@project}/predictions"'
+          path: '$f"{@project}/predictions"'
           writer: tensor
 
 system:

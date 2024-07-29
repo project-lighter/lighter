@@ -66,7 +66,8 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     # Based on https://stackoverflow.com/a/41595552.
 
     if module_name in sys.modules:
-        raise ValueError(f"{module_name} has already been imported as module.")
+        logger.warning(f"{module_name} has already been imported as module.")
+        return
 
     module_path = Path(module_path).resolve() / "__init__.py"
     if not module_path.is_file():

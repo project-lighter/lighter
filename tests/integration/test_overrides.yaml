@@ -2,4 +2,3 @@ trainer#fast_dev_run: True
 trainer#accelerator: cpu
 system#batch_size: 16
 system#num_workers: 2
-trainer#callbacks: null
