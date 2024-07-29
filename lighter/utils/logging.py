@@ -2,7 +2,6 @@
 SUPPRESSED_MODULES = [
     "fire",
     "monai.bundle",
-    "lighter.utils.cli",
     "lighter.utils.runner",
     "pytorch_lightning.trainer",
     "lightning_utilities",
