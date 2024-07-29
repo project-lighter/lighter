@@ -20,15 +20,15 @@ class LighterFileWriter(LighterBaseWriter):
     for a more permanent solution, it can be added to the `self.writers` dictionary.
 
     Args:
-        directory (Union[str, Path]): Directory where the files should be written.
+        path (Union[str, Path]): Directory where the files should be written.
         writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
             Available writers: "tensor", "image", "video", "itk_nrrd", "itk_seg_nrrd", "itk_nifti".
             A custom writer function must take two arguments: `path` and `tensor`, and write the tensor to the specified path.
             `tensor` is a single tensor without the batch dimension.
     """
 
-    def __init__(self, directory: Union[str, Path], writer: Union[str, Callable]) -> None:
-        super().__init__(directory, writer)
+    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+        super().__init__(path, writer)
 
     @property
     def writers(self) -> Dict[str, Callable]:
@@ -49,9 +49,11 @@ class LighterFileWriter(LighterBaseWriter):
             tensor (Tensor): Tensor, without the batch dimension, to be written.
             id (Union[int, str]): Identifier, used for file-naming.
         """
+        if not self.path.is_dir():
+            raise RuntimeError(f"LighterFileWriter expects a directory path, got {self.path}")
+
         # Determine the path for the file based on prediction count. The suffix must be added by the writer function.
-        path = self.directory / str(id)
-        path.parent.mkdir(exist_ok=True, parents=True)
+        path = self.path / str(id)
         # Write the tensor to the file.
         self.writer(path, tensor)
 
