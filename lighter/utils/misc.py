@@ -119,13 +119,23 @@ def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
 
 def get_optimizer_stats(optimizer: Optimizer) -> Dict[str, float]:
     """
-    Extract learning rates and momentum values from each parameter group of the optimizer.
+    Extract learning rates and momentum values from an optimizer into a dictionary.
+
+    This function iterates over the parameter groups of the given optimizer and collects
+    the learning rate and momentum (or beta values) for each group. The collected values
+    are stored in a dictionary with keys formatted to indicate the optimizer type and
+    parameter group index (if multiple groups are present).
 
     Args:
-        optimizer (Optimizer): A PyTorch optimizer.
+        optimizer (Optimizer): A PyTorch optimizer instance.
 
     Returns:
-        Dictionary with formatted keys and values for learning rates and momentum.
+        Dict[str, float]: A dictionary containing the learning rates and momentum values
+        for each parameter group in the optimizer. The keys are formatted as:
+        - "optimizer/{optimizer_class_name}/lr" for learning rates
+        - "optimizer/{optimizer_class_name}/momentum" for momentum values
+        If there are multiple parameter groups, the keys will include the group index, e.g.,
+        "optimizer/{optimizer_class_name}/lr/group1".
     """
     stats_dict = {}
     for group_idx, group in enumerate(optimizer.param_groups):
