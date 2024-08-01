@@ -361,6 +361,20 @@ class LighterSystem(pl.LightningModule):
             self.predict_dataloader = partial(self._base_dataloader, mode="predict")
             self.predict_step = partial(self._base_step, mode="predict")
 
+    @property
+    def learning_rate(self) -> float:
+        """Get the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
+        if len(self.optimizer.param_groups) > 1:
+            raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
+        return self.optimizer.param_groups[0]["lr"]
+
+    @learning_rate.setter
+    def learning_rate(self, value) -> None:
+        """Set the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
+        if len(self.optimizer.param_groups) > 1:
+            raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
+        self.optimizer.param_groups[0]["lr"] = value
+
     def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
         """
         Initializes placeholders for dataloader and step methods.
