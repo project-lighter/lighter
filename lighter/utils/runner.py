@@ -61,7 +61,7 @@ def parse_config(**kwargs) -> ConfigParser:
     # Initialize the parser with the predefined structure.
     parser = ConfigParser(structure, globals=False)
     # Update the parser with the configuration file.
-    parser.update(parser.load_config_file(config))
+    parser.update(parser.load_config_files(config))
     # Update the parser with the provided cli arguments.
     parser.update(kwargs)
     return parser
