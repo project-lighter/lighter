@@ -363,30 +363,14 @@ class LighterSystem(pl.LightningModule):
 
     @property
     def learning_rate(self) -> float:
-        """
-        Get the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method.
-
-        Raises:
-            ValueError: If there are multiple optimizer parameter groups.
-
-        Returns:
-            float: The learning rate of the optimizer.
-        """
+        """Get the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         return self.optimizer.param_groups[0]["lr"]
 
     @learning_rate.setter
     def learning_rate(self, value) -> None:
-        """
-        Set the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method.
-
-        Args:
-            value (float): The new learning rate to set.
-
-        Raises:
-            ValueError: If there are multiple optimizer parameter groups.
-        """
+        """Set the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         self.optimizer.param_groups[0]["lr"] = value
