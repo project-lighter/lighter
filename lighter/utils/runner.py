@@ -36,8 +36,8 @@ def cli() -> None:
     except TypeError as e:
         if "run() takes 1 positional argument but" in str(e):
             raise ValueError(
-                "Ensure that only one command is run at a time (e.g., 'lighter fit') and "
-                "that command line config overrides start with '--' (e.g., '--system#batch_size=1')."
+                "Ensure that only one command is run at a time (e.g., 'lighter fit') and that "
+                "other command line arguments start with '--' (e.g., '--config', '--system#batch_size=1')."
             ) from e
         raise
 
