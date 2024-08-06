@@ -3,8 +3,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from functools import partial
 
 import pytorch_lightning as pl
-import torch
 from loguru import logger
+from torch import Tensor
 from torch.nn import Module, ModuleDict
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
@@ -12,7 +12,8 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_optimizer_stats, hasarg
+from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
+from lighter.utils.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
 
 
 class LighterSystem(pl.LightningModule):
@@ -97,16 +98,15 @@ class LighterSystem(pl.LightningModule):
         self.pin_memory = pin_memory
         self.drop_last_batch = drop_last_batch
 
-        # Datasets, samplers, and collate functions
-        self.datasets = self._init_datasets(datasets)
-        self.samplers = self._init_samplers(samplers)
-        self.collate_fns = self._init_collate_fns(collate_fns)
+        self.datasets = DatasetSchema(**(datasets or {}))
+        self.samplers = SamplerSchema(**(samplers or {}))
+        self.collate_fns = CollateFnSchema(**(collate_fns or {}))
+        self.postprocessing = PostprocessingSchema(**(postprocessing or {}))
+        self.metrics = MetricsSchema(**(metrics or {}))
 
-        # Metrics
-        self.metrics = self._init_metrics(metrics)
-
-        # Postprocessing
-        self.postprocessing = self._init_postprocessing(postprocessing)
+        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
+        self.metrics = {f"_{k}": v for k, v in self.metrics.dict().items()}
+        self.metrics = ModuleDict(self.metrics)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
@@ -114,11 +114,11 @@ class LighterSystem(pl.LightningModule):
         # Flag that indicates whether the LightningModule methods have been defined. Used in `self.setup()`.
         self._lightning_module_methods_defined = False
 
-    def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
+    def forward(self, input: Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
-            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): Input to the model.
+            input (Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]): Input to the model.
 
         Returns:
             Output of the model.
@@ -225,13 +225,11 @@ class LighterSystem(pl.LightningModule):
             "id": id,
         }
 
-    def _log_stats(
-        self, loss: Union[torch.Tensor, Dict[str, torch.Tensor]], metrics: MetricCollection, mode: str, batch_idx: int
-    ) -> None:
+    def _log_stats(self, loss: Union[Tensor, Dict[str, Tensor]], metrics: MetricCollection, mode: str, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
         Args:
-            loss (Union[torch.Tensor, Dict[str, torch.Tensor]]): Calculated loss or a dict of sublosses.
+            loss (Union[Tensor, Dict[str, Tensor]]): Calculated loss or a dict of sublosses.
             metrics (MetricCollection): Calculated metrics.
             mode (str): Mode of operation (train/val/test/predict).
             batch_idx (int): Index of current batch.
@@ -388,33 +386,3 @@ class LighterSystem(pl.LightningModule):
         self.val_dataloader = self.validation_step = lambda: None
         self.test_dataloader = self.test_step = lambda: None
         self.predict_dataloader = self.predict_step = lambda: None
-
-    def _init_datasets(self, datasets: Dict[str, Optional[Dataset]]):
-        """Ensures that the datasets have the predefined schema."""
-        return ensure_dict_schema(datasets, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_samplers(self, samplers: Dict[str, Optional[Sampler]]):
-        """Ensures that the samplers have the predefined schema"""
-        return ensure_dict_schema(samplers, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_collate_fns(self, collate_fns: Dict[str, Optional[Callable]]):
-        """Ensures that the collate functions have the predefined schema."""
-        return ensure_dict_schema(collate_fns, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_metrics(self, metrics: Dict[str, Optional[Union[Metric, List[Metric], Dict[str, Metric]]]]):
-        """Ensures that the metrics have the predefined schema. Wraps each mode's metrics in
-        a MetricCollection, and finally registers them with PyTorch using a ModuleDict.
-        """
-        metrics = ensure_dict_schema(metrics, {"train": None, "val": None, "test": None})
-        for mode, metric in metrics.items():
-            metrics[mode] = MetricCollection(metric) if metric is not None else None
-        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = {f"_{k}": v for k, v in metrics.items()}
-        return ModuleDict(metrics)
-
-    def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
-        """Ensures that the postprocessing functions have the predefined schema."""
-        mode_subschema = {"train": None, "val": None, "test": None, "predict": None}
-        data_subschema = {"input": None, "target": None, "pred": None}
-        schema = {"batch": mode_subschema, "criterion": data_subschema, "metrics": data_subschema, "logging": data_subschema}
-        return ensure_dict_schema(postprocessing, schema)

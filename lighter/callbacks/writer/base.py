@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from loguru import logger
 from pytorch_lightning import Callback, Trainer
+from torch import Tensor
 
 from lighter import LighterSystem
 
@@ -48,7 +49,7 @@ class LighterBaseWriter(ABC, Callback):
         """
 
     @abstractmethod
-    def write(self, tensor: torch.Tensor, id: int) -> None:
+    def write(self, tensor: Tensor, id: int) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
         the batch dimension.
@@ -57,7 +58,7 @@ class LighterBaseWriter(ABC, Callback):
         A specific writer function can be retrieved using `self.get_writer(self.format)`.
 
         Args:
-            tensor (torch.Tensor): Tensor, without the batch dimension, to be saved.
+            tensor (Tensor): Tensor, without the batch dimension, to be saved.
             id (int): Identifier for the tensor, can be used for naming files or adding table records.
         """
 
