@@ -1,14 +1,14 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, root_validator
-from torch.utils.data import DataLoader, Dataset, Sampler
+from pydantic import BaseModel, root_validator
+from torch.utils.data import Dataset, Sampler
 from torchmetrics import MetricCollection
 
 BaseModel.model_config["arbitrary_types_allowed"] = True
 BaseModel.model_config["hide_input_in_errors"] = True
 
 
-class SubscriptableModel:
+class SubscriptableBaseModel(BaseModel):
     def __getitem__(self, item):
         return getattr(self, item)
 
@@ -48,28 +48,28 @@ class ConfigSchema(BaseModel):
 # ----- LighterSystem schema -----
 
 
-class DatasetSchema(BaseModel, SubscriptableModel):
+class DatasetSchema(SubscriptableBaseModel):
     train: Optional[Dataset] = None
     val: Optional[Dataset] = None
     test: Optional[Dataset] = None
     predict: Optional[Dataset] = None
 
 
-class SamplerSchema(BaseModel, SubscriptableModel):
+class SamplerSchema(SubscriptableBaseModel):
     train: Optional[Sampler] = None
     val: Optional[Sampler] = None
     test: Optional[Sampler] = None
     predict: Optional[Sampler] = None
 
 
-class CollateFnSchema(BaseModel, SubscriptableModel):
+class CollateFnSchema(SubscriptableBaseModel):
     train: Optional[Callable] = None
     val: Optional[Callable] = None
     test: Optional[Callable] = None
     predict: Optional[Callable] = None
 
 
-class MetricsSchema(BaseModel, SubscriptableModel):
+class MetricsSchema(SubscriptableBaseModel):
     train: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     val: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     test: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
@@ -82,14 +82,27 @@ class MetricsSchema(BaseModel, SubscriptableModel):
         return fields
 
 
-class InputTargetPredSchema(BaseModel, SubscriptableModel):
+class InputPredSchema(SubscriptableBaseModel):
     input: Optional[Union[Callable, List[Callable]]] = None
-    target: Optional[Union[Callable, List[Callable]]] = None
     pred: Optional[Union[Callable, List[Callable]]] = None
 
 
-class PostprocessingSchema(BaseModel, SubscriptableModel):
-    batch: Dict[str, Optional[Union[Callable, List[Callable]]]] = Field(default_factory=dict)
-    criterion: InputTargetPredSchema = Field(default_factory=InputTargetPredSchema)
-    metrics: InputTargetPredSchema = Field(default_factory=InputTargetPredSchema)
-    logging: InputTargetPredSchema = Field(default_factory=InputTargetPredSchema)
+class InputTargetPredSchema(InputPredSchema):
+    target: Optional[Union[Callable, List[Callable]]] = None
+
+
+class TrainValTestSchema(SubscriptableBaseModel):
+    train: InputTargetPredSchema = InputTargetPredSchema()
+    val: InputTargetPredSchema = InputTargetPredSchema()
+    test: InputTargetPredSchema = InputTargetPredSchema()
+
+
+class TrainValTestPredictSchema(TrainValTestSchema):
+    predict: InputPredSchema = InputPredSchema()
+
+
+class PostprocessingSchema(SubscriptableBaseModel):
+    batch: TrainValTestPredictSchema = TrainValTestPredictSchema()
+    criterion: TrainValTestPredictSchema = TrainValTestPredictSchema()
+    metrics: TrainValTestSchema = TrainValTestSchema()
+    logging: TrainValTestSchema = TrainValTestSchema()

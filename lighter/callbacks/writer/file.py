@@ -1,7 +1,6 @@
 from typing import Callable, Dict, Union
 
 from functools import partial
-from pathlib import Path
 
 import torch
 import torchvision
@@ -27,9 +26,6 @@ class LighterFileWriter(LighterBaseWriter):
             A custom writer function must take two arguments: `path` and `tensor`, and write the tensor to the specified path.
             `tensor` is a single tensor without the batch dimension.
     """
-
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
-        super().__init__(path, writer)
 
     @property
     def writers(self) -> Dict[str, Callable]:
