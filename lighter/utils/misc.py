@@ -23,34 +23,6 @@ def ensure_list(input: Any) -> List:
     return [input]
 
 
-def ensure_dict_schema(input_dict: Dict[str, Any], schema: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Ensure that the input dict has the specified schema. If no value is set
-    for a key in the input dict, the default value from the schema is used.
-    This function supports nested dictionaries.
-
-    Args:
-        input_dict (Dict[str, Any]): Dictionary to merge with the schema.
-        schema (Dict[str, Any]): Schema dictionary with default values specified.
-
-    Raises:
-        ValueError: If the input dictionary has other keys than the specified schema keys.
-
-    Returns:
-        The merged dictionary. If input_dict is None, returns the schema dictionary.
-    """
-    output_dict = schema.copy()
-    if input_dict is not None:
-        for key, value in input_dict.items():
-            if key not in schema:
-                raise ValueError(f"Key {key} is not defined in the schema.")
-            if isinstance(value, dict) and isinstance(schema[key], dict):
-                output_dict[key] = ensure_dict_schema(value, schema[key])
-            else:
-                output_dict[key] = value
-    return output_dict
-
-
 def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
     """Set object's attribute. Supports dot notation.
 
