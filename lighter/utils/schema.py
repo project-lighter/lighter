@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, model_validator
 from torch.utils.data import Dataset, Sampler
 from torchmetrics import MetricCollection
 
@@ -23,7 +23,7 @@ class ArgsConfigSchema(BaseModel):
     lr_find: Dict[str, Any] = {}
     scale_batch_size: Dict[str, Any] = {}
 
-    @root_validator(skip_on_failure=True)
+    @model_validator(skip_on_failure=True)
     def check_prohibited_args(cls, fields):  # pylint: disable=no-self-argument
         prohibited_keys = ["model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"]
         for method, args in fields.items():
@@ -74,7 +74,7 @@ class MetricsSchema(SubscriptableBaseModel):
     val: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     test: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
 
-    @root_validator(pre=True)
+    @model_validator(pre=True)
     def setup_metrics(cls, fields):  # pylint: disable=no-self-argument
         for mode, metric in fields.items():
             if metric is not None:
@@ -82,27 +82,20 @@ class MetricsSchema(SubscriptableBaseModel):
         return fields
 
 
-class InputPredSchema(SubscriptableBaseModel):
+class ModeSchema(SubscriptableBaseModel):
+    train: Optional[Union[Callable, List[Callable]]] = None
+    val: Optional[Union[Callable, List[Callable]]] = None
+    test: Optional[Union[Callable, List[Callable]]] = None
+
+
+class DataSchema(SubscriptableBaseModel):
     input: Optional[Union[Callable, List[Callable]]] = None
+    target: Optional[Union[Callable, List[Callable]]] = None
     pred: Optional[Union[Callable, List[Callable]]] = None
 
 
-class InputTargetPredSchema(InputPredSchema):
-    target: Optional[Union[Callable, List[Callable]]] = None
-
-
-class TrainValTestSchema(SubscriptableBaseModel):
-    train: InputTargetPredSchema = InputTargetPredSchema()
-    val: InputTargetPredSchema = InputTargetPredSchema()
-    test: InputTargetPredSchema = InputTargetPredSchema()
-
-
-class TrainValTestPredictSchema(TrainValTestSchema):
-    predict: InputPredSchema = InputPredSchema()
-
-
 class PostprocessingSchema(SubscriptableBaseModel):
-    batch: TrainValTestPredictSchema = TrainValTestPredictSchema()
-    criterion: TrainValTestPredictSchema = TrainValTestPredictSchema()
-    metrics: TrainValTestSchema = TrainValTestSchema()
-    logging: TrainValTestSchema = TrainValTestSchema()
+    batch: ModeSchema = ModeSchema()
+    criterion: DataSchema = DataSchema()
+    metrics: DataSchema = DataSchema()
+    logging: DataSchema = DataSchema()
