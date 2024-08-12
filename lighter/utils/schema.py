@@ -23,17 +23,17 @@ class ArgsConfigSchema(BaseModel):
     lr_find: Dict[str, Any] = {}
     scale_batch_size: Dict[str, Any] = {}
 
-    @model_validator(skip_on_failure=True)
-    def check_prohibited_args(cls, fields):  # pylint: disable=no-self-argument
+    @model_validator(mode="after")
+    def check_prohibited_args(self):  # pylint: disable=no-self-argument
         prohibited_keys = ["model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"]
-        for method, args in fields.items():
-            found_keys = [key for key in prohibited_keys if key in args]
+        for field in self.model_fields:
+            found_keys = [key for key in prohibited_keys if key in getattr(self, field)]
             if found_keys:
                 raise ValueError(
-                    f"Found the following prohibited argument(s) in 'args#{method}': "
+                    f"Found the following prohibited argument(s) in 'args#{field}': "
                     f"{found_keys}. Model and datasets should be defined within the 'system'."
                 )
-        return fields
+        return self
 
 
 class ConfigSchema(BaseModel):
@@ -74,12 +74,13 @@ class MetricsSchema(SubscriptableBaseModel):
     val: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     test: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
 
-    @model_validator(pre=True)
-    def setup_metrics(cls, fields):  # pylint: disable=no-self-argument
-        for mode, metric in fields.items():
-            if metric is not None:
-                fields[mode] = MetricCollection(metric)
-        return fields
+    @model_validator(mode="after")
+    def setup_metrics(self):  # pylint: disable=no-self-argument
+        for field in self.model_fields:
+            mode_metrics = getattr(self, field)
+            if field is not None:
+                setattr(self, field, MetricCollection(mode_metrics))
+        return self
 
 
 class ModeSchema(SubscriptableBaseModel):
