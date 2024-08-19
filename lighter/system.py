@@ -13,6 +13,7 @@ from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
 from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
+from lighter.utils.patches import PatchedModuleDict
 from lighter.utils.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
 
 
@@ -98,15 +99,13 @@ class LighterSystem(pl.LightningModule):
         self.pin_memory = pin_memory
         self.drop_last_batch = drop_last_batch
 
-        self.datasets = DatasetSchema(**(datasets or {}))
-        self.samplers = SamplerSchema(**(samplers or {}))
-        self.collate_fns = CollateFnSchema(**(collate_fns or {}))
-        self.postprocessing = PostprocessingSchema(**(postprocessing or {}))
-        self.metrics = MetricsSchema(**(metrics or {}))
+        self.datasets = DatasetSchema(**(datasets or {})).model_dump()
+        self.samplers = SamplerSchema(**(samplers or {})).model_dump()
+        self.collate_fns = CollateFnSchema(**(collate_fns or {})).model_dump()
+        self.postprocessing = PostprocessingSchema(**(postprocessing or {})).model_dump()
+        self.metrics = MetricsSchema(**(metrics or {})).model_dump()
 
-        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
-        self.metrics = {f"_{k}": v for k, v in self.metrics.dict().items()}
-        self.metrics = ModuleDict(self.metrics)
+        self.metrics = PatchedModuleDict(self.metrics)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
@@ -197,8 +196,10 @@ class LighterSystem(pl.LightningModule):
         target = apply_fns(target, self.postprocessing["metrics"]["target"])
         pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-        # Calculate the step metrics. # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
+        # Calculate the step metrics.
+        metrics = None
+        if self.metrics[mode] is not None:
+            metrics = self.metrics[mode](pred, target)
 
         # Postprocessing for logging/writing.
         input = apply_fns(input, self.postprocessing["logging"]["input"])
