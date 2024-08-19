@@ -5,7 +5,7 @@ from functools import partial
 import pytorch_lightning as pl
 from loguru import logger
 from torch import Tensor
-from torch.nn import Module, ModuleDict
+from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset, Sampler
@@ -82,8 +82,6 @@ class LighterSystem(pl.LightningModule):
         inferer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
-        # Bypass LightningModule's check for default methods. We define them in self.setup().
-        self._init_placeholders_for_dataloader_and_step_methods()
 
         # Model setup
         self.model = model
@@ -110,8 +108,9 @@ class LighterSystem(pl.LightningModule):
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Flag that indicates whether the LightningModule methods have been defined. Used in `self.setup()`.
-        self._lightning_module_methods_defined = False
+        # Bypasses LightningModule's check for dataloader and step methods. We define them dynamically in self.setup().
+        self.train_dataloader = self.val_dataloader = self.test_dataloader = self.predict_dataloader = lambda: None
+        self.training_step = self.validation_step = self.test_step = self.predict_step = lambda: None
 
     def forward(self, input: Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
@@ -323,23 +322,6 @@ class LighterSystem(pl.LightningModule):
         Args:
             stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
         """
-        # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
-        # only has methods used in the stage and for which the configuration was provided.
-        if not self._lightning_module_methods_defined:
-            del (
-                self.train_dataloader,
-                self.training_step,
-                self.val_dataloader,
-                self.validation_step,
-                self.test_dataloader,
-                self.test_step,
-                self.predict_dataloader,
-                self.predict_step,
-            )
-            # Prevents the methods from being defined again. This is needed because `Trainer.tune()`
-            # calls the `self.setup()` method whenever it runs for a new parameter.
-            self._lightning_module_methods_defined = True
-
         # Training methods.
         if stage in ["fit", "tune"]:
             self.train_dataloader = partial(self._base_dataloader, mode="train")
@@ -373,17 +355,3 @@ class LighterSystem(pl.LightningModule):
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         self.optimizer.param_groups[0]["lr"] = value
-
-    def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
-        """
-        Initializes placeholders for dataloader and step methods.
-
-        `LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
-        in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
-        at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
-        are initially defined as `lambda: None`, before `self.setup()` is called.
-        """
-        self.train_dataloader = self.training_step = lambda: None
-        self.val_dataloader = self.validation_step = lambda: None
-        self.test_dataloader = self.test_step = lambda: None
-        self.predict_dataloader = self.predict_step = lambda: None
