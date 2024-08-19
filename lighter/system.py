@@ -133,6 +133,89 @@ class LighterSystem(pl.LightningModule):
 
         return self.model(input, **kwargs)
 
+    def configure_optimizers(self) -> Dict:
+        """LightningModule method. Returns optimizers and, if defined, schedulers.
+
+        Returns:
+            Optimizer and, if defined, scheduler.
+        """
+        if self.optimizer is None:
+            raise ValueError("Please specify 'system.optimizer' in the config.")
+        if self.scheduler is None:
+            return {"optimizer": self.optimizer}
+        else:
+            return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
+
+    def setup(self, stage: str) -> None:
+        """Automatically called by the LightningModule after the initialization.
+        `LighterSystem`'s setup checks if the required dataset is provided in the config and
+        sets up LightningModule methods for the stage in which the system is.
+
+        Args:
+            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
+        """
+        # Training methods.
+        if stage in ["fit", "tune"]:
+            self.train_dataloader = partial(self._base_dataloader, mode="train")
+            self.training_step = partial(self._base_step, mode="train")
+
+        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
+        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
+            self.val_dataloader = partial(self._base_dataloader, mode="val")
+            self.validation_step = partial(self._base_step, mode="val")
+
+        # Test methods.
+        if stage == "test":
+            self.test_dataloader = partial(self._base_dataloader, mode="test")
+            self.test_step = partial(self._base_step, mode="test")
+
+        # Predict methods.
+        if stage == "predict":
+            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
+            self.predict_step = partial(self._base_step, mode="predict")
+
+    def _base_dataloader(self, mode: str) -> DataLoader:
+        """Instantiate the dataloader for a mode (train/val/test/predict).
+        Includes a collate function that enables the DataLoader to replace
+        None's (alias for corrupted examples) in the batch with valid examples.
+        To make use of it, write a try-except in your Dataset that handles
+        corrupted data by returning None instead.
+
+        Args:
+            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
+
+        Returns:
+            Instantiated DataLoader.
+        """
+        dataset = self.datasets[mode]
+        sampler = self.samplers[mode]
+        collate_fn = self.collate_fns[mode]
+
+        if dataset is None:
+            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
+
+        # Batch size is 1 when using an inference for two reasons:
+        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
+        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
+        batch_size = self.batch_size
+        if self.inferer is not None and mode in ["val", "test", "predict"]:
+            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
+            batch_size = 1
+
+        # A dataset can return None when a corrupted example occurs. This collate
+        # function replaces None's with valid examples from the dataset.
+        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
+        return DataLoader(
+            dataset,
+            sampler=sampler,
+            shuffle=(mode == "train" and sampler is None),
+            batch_size=batch_size,
+            drop_last=(self.drop_last_batch if mode == "train" else False),
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            collate_fn=collate_fn,
+        )
+
     def _base_step(self, batch: Dict, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes.
 
@@ -258,89 +341,6 @@ class LighterSystem(pl.LightningModule):
         if mode == "train" and batch_idx == 0:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
                 on_epoch_log(f"{mode}/{name}", optimizer_stat)
-
-    def _base_dataloader(self, mode: str) -> DataLoader:
-        """Instantiate the dataloader for a mode (train/val/test/predict).
-        Includes a collate function that enables the DataLoader to replace
-        None's (alias for corrupted examples) in the batch with valid examples.
-        To make use of it, write a try-except in your Dataset that handles
-        corrupted data by returning None instead.
-
-        Args:
-            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
-
-        Returns:
-            Instantiated DataLoader.
-        """
-        dataset = self.datasets[mode]
-        sampler = self.samplers[mode]
-        collate_fn = self.collate_fns[mode]
-
-        if dataset is None:
-            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
-
-        # Batch size is 1 when using an inference for two reasons:
-        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
-        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
-        batch_size = self.batch_size
-        if self.inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
-            batch_size = 1
-
-        # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
-        return DataLoader(
-            dataset,
-            sampler=sampler,
-            shuffle=(mode == "train" and sampler is None),
-            batch_size=batch_size,
-            drop_last=(self.drop_last_batch if mode == "train" else False),
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            collate_fn=collate_fn,
-        )
-
-    def configure_optimizers(self) -> Dict:
-        """LightningModule method. Returns optimizers and, if defined, schedulers.
-
-        Returns:
-            Optimizer and, if defined, scheduler.
-        """
-        if self.optimizer is None:
-            raise ValueError("Please specify 'system.optimizer' in the config.")
-        if self.scheduler is None:
-            return {"optimizer": self.optimizer}
-        else:
-            return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
-
-    def setup(self, stage: str) -> None:
-        """Automatically called by the LightningModule after the initialization.
-        `LighterSystem`'s setup checks if the required dataset is provided in the config and
-        sets up LightningModule methods for the stage in which the system is.
-
-        Args:
-            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
-        """
-        # Training methods.
-        if stage in ["fit", "tune"]:
-            self.train_dataloader = partial(self._base_dataloader, mode="train")
-            self.training_step = partial(self._base_step, mode="train")
-
-        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
-            self.val_dataloader = partial(self._base_dataloader, mode="val")
-            self.validation_step = partial(self._base_step, mode="val")
-
-        # Test methods.
-        if stage == "test":
-            self.test_dataloader = partial(self._base_dataloader, mode="test")
-            self.test_step = partial(self._base_step, mode="test")
-
-        # Predict methods.
-        if stage == "predict":
-            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
-            self.predict_step = partial(self._base_step, mode="predict")
 
     @property
     def learning_rate(self) -> float:
