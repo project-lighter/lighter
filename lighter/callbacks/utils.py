@@ -1,5 +1,6 @@
 import torch
 import torchvision
+from torch import Tensor
 
 
 def get_lighter_mode(lightning_stage: str) -> str:
@@ -15,13 +16,13 @@ def get_lighter_mode(lightning_stage: str) -> str:
     return lightning_to_lighter[lightning_stage]
 
 
-def preprocess_image(image: torch.Tensor) -> torch.Tensor:
+def preprocess_image(image: Tensor) -> Tensor:
     """Preprocess the image before logging it. If it is a batch of multiple images,
     it will create a grid image of them. In case of 3D, a single image is displayed
     with slices stacked vertically, while a batch of 3D images as a grid where each
     column is a different 3D image.
     Args:
-        image (torch.Tensor): A 2D or 3D image tensor.
+        image (Tensor): A 2D or 3D image tensor.
     Returns:
         The image ready for logging.
     """
