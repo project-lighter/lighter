@@ -82,6 +82,7 @@ class ModeSchema(BaseModel):
     train: Optional[Union[Callable, List[Callable]]] = None
     val: Optional[Union[Callable, List[Callable]]] = None
     test: Optional[Union[Callable, List[Callable]]] = None
+    predict: Optional[Union[Callable, List[Callable]]] = None
 
 
 class DataSchema(BaseModel):
