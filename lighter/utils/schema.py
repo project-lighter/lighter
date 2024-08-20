@@ -1,12 +1,15 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import warnings
+
 from pydantic import BaseModel, model_validator
 from torch.utils.data import Dataset, Sampler
 from torchmetrics import MetricCollection
 
+warnings.filterwarnings("ignore", 'Field name "validate" in "ArgsConfigSchema" shadows an attribute in parent "BaseModel"')
+
 BaseModel.model_config["arbitrary_types_allowed"] = True
 BaseModel.model_config["hide_input_in_errors"] = True
-
 
 # ----- Config schema -----
 
