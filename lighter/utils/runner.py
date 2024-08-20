@@ -1,6 +1,5 @@
 from typing import Any
 
-import copy
 from functools import partial
 
 import fire
@@ -10,27 +9,12 @@ from pytorch_lightning.tuner import Tuner
 
 from lighter.system import LighterSystem
 from lighter.utils.dynamic_imports import import_module_from_path
-
-CONFIG_STRUCTURE = {
-    "project": None,
-    "vars": {},
-    "args": {
-        # Keys - names of the methods; values - arguments passed to them.
-        "fit": {},
-        "validate": {},
-        "test": {},
-        "predict": {},
-        "lr_find": {},
-        "scale_batch_size": {},
-    },
-    "system": {},
-    "trainer": {},
-}
+from lighter.utils.schema import ArgsConfigSchema, ConfigSchema
 
 
 def cli() -> None:
     """Defines the command line interface for running lightning trainer's methods."""
-    commands = {method: partial(run, method) for method in CONFIG_STRUCTURE["args"]}
+    commands = {method: partial(run, method) for method in ArgsConfigSchema.model_fields}
     try:
         fire.Fire(commands)
     except TypeError as e:
@@ -51,52 +35,23 @@ def parse_config(**kwargs) -> ConfigParser:
         **kwargs (dict): Keyword arguments containing 'config' and, optionally, config overrides.
     Returns:
         An instance of ConfigParser with configuration and overrides merged and parsed.
-    """
-    config = kwargs.pop("config", None)
-    if config is None:
-        raise ValueError("'--config' not specified. Please provide a valid configuration file.")
-
-    # Create a deep copy to ensure the original structure remains unaltered by ConfigParser.
-    structure = copy.deepcopy(CONFIG_STRUCTURE)
-    # Initialize the parser with the predefined structure.
-    parser = ConfigParser(structure, globals=False)
-    # Update the parser with the configuration file.
-    parser.update(parser.load_config_files(config))
-    # Update the parser with the provided cli arguments.
-    parser.update(kwargs)
-    return parser
-
-
-def validate_config(parser: ConfigParser) -> None:
-    """
-    Validates the configuration parser against predefined structure.
-
-    Args:
-        parser (ConfigParser): The configuration parser instance to validate.
 
     Raises:
-        ValueError: If there are invalid keys in the top-level configuration.
-        ValueError: If there are invalid method names specified in the 'args' section.
+        ValueError: If '--config' is not specified in the keyword arguments.
+        ValueError: If the configuration validation against the schema fails.
     """
-    invalid_root_keys = set(parser.get()) - set(CONFIG_STRUCTURE)
-    if invalid_root_keys:
-        raise ValueError(f"Invalid top-level config keys: {invalid_root_keys}. Allowed keys: {list(CONFIG_STRUCTURE)}.")
+    if "config" not in kwargs:
+        raise ValueError("'--config' not specified. Please provide a valid configuration file.")
 
-    invalid_args_keys = set(parser.get("args")) - set(CONFIG_STRUCTURE["args"])
-    if invalid_args_keys:
-        raise ValueError(f"Invalid key in 'args': {invalid_args_keys}. Allowed keys: {list(CONFIG_STRUCTURE['args'])}.")
-
-    typechecks = {
-        "project": (str, type(None)),
-        "vars": dict,
-        "system": dict,
-        "trainer": dict,
-        "args": dict,
-        **{f"args#{k}": dict for k in CONFIG_STRUCTURE["args"]},
-    }
-    for key, dtype in typechecks.items():
-        if not isinstance(parser.get(key), dtype):
-            raise ValueError(f"Invalid value for key '{key}'. Expected a {dtype}.")
+    # Initialize the parser with the predefined structure.
+    parser = ConfigParser(ConfigSchema().dict(), globals=False)
+    # Update the parser with the configuration file.
+    parser.update(parser.load_config_files(kwargs.pop("config")))
+    # Update the parser with the provided cli arguments.
+    parser.update(kwargs)
+    # Validate the configuration against the schema.
+    ConfigSchema(**parser.config)
+    return parser
 
 
 def run(method: str, **kwargs: Any) -> None:
@@ -110,7 +65,6 @@ def run(method: str, **kwargs: Any) -> None:
 
     # Parse and validate the config.
     parser = parse_config(**kwargs)
-    validate_config(parser)
 
     # Project. If specified, the give path is imported as a module.
     project = parser.get_parsed_content("project")
@@ -127,21 +81,17 @@ def run(method: str, **kwargs: Any) -> None:
     if not isinstance(trainer, Trainer):
         raise ValueError("Expected 'trainer' to be an instance of PyTorch Lightning 'Trainer'")
 
-    # Trainer/Tuner method arguments.
-    method_args = parser.get_parsed_content(f"args#{method}")
-    if any("dataloaders" in key or "datamodule" in key for key in method_args):
-        raise ValueError("Datasets are defined within the 'system', not passed in `args`.")
-
     # Save the config to checkpoints under "hyper_parameters". Log it if a logger is defined.
-    system.save_hyperparameters(parser.get())
+    system.save_hyperparameters(parser.config)
     if trainer.logger is not None:
-        trainer.logger.log_hyperparams(parser.get())
+        trainer.logger.log_hyperparams(parser.config)
 
-    # Run the trainer/tuner method.
+    # Run the Trainer/Tuner method.
+    args = parser.get_parsed_content(f"args#{method}")
     if hasattr(trainer, method):
-        getattr(trainer, method)(system, **method_args)
+        getattr(trainer, method)(system, **args)
     elif hasattr(Tuner, method):
         tuner = Tuner(trainer)
-        getattr(tuner, method)(system, **method_args)
+        getattr(tuner, method)(system, **args)
     else:
-        raise ValueError(f"Method '{method}' is not a valid Trainer or Tuner method [{list(CONFIG_STRUCTURE['args'])}].")
+        raise ValueError(f"Method '{method}' is not a valid Trainer or Tuner method [{list(ArgsConfigSchema.model_fields)}].")
