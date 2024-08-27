@@ -15,23 +15,27 @@ BaseModel.model_config["hide_input_in_errors"] = True
 
 
 class ArgsConfigSchema(BaseModel):
-    fit: Dict[str, Any] = {}
-    validate: Dict[str, Any] = {}
-    predict: Dict[str, Any] = {}
-    test: Dict[str, Any] = {}
-    lr_find: Dict[str, Any] = {}
-    scale_batch_size: Dict[str, Any] = {}
+    fit: Union[Dict[str, Any], str] = {}
+    validate: Union[Dict[str, Any], str] = {}
+    predict: Union[Dict[str, Any], str] = {}
+    test: Union[Dict[str, Any], str] = {}
+    lr_find: Union[Dict[str, Any], str] = {}
+    scale_batch_size: Union[Dict[str, Any], str] = {}
 
     @model_validator(mode="after")
     def check_prohibited_args(self):
         prohibited_keys = ["model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"]
         for field in self.model_fields:
-            found_keys = [key for key in prohibited_keys if key in getattr(self, field)]
-            if found_keys:
-                raise ValueError(
-                    f"Found the following prohibited argument(s) in 'args#{field}': "
-                    f"{found_keys}. Model and datasets should be defined within the 'system'."
-                )
+            field_value = getattr(self, field)
+            if isinstance(field_value, dict):
+                found_keys = [key for key in prohibited_keys if key in field_value]
+                if found_keys:
+                    raise ValueError(
+                        f"Found the following prohibited argument(s) in 'args#{field}': "
+                        f"{found_keys}. Model and datasets should be defined within the 'system'."
+                    )
+            elif isinstance(field_value, str) and not (field_value.startswith("%") or field_value.startswith("@")):
+                raise ValueError(f"Only dict or interpolators starting with '%' or '@' are allowed for 'args#{field}'.")
         return self
 
 

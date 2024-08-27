@@ -87,7 +87,7 @@ def run(method: str, **kwargs: Any) -> None:
         trainer.logger.log_hyperparams(parser.config)
 
     # Run the Trainer/Tuner method.
-    args = parser.get_parsed_content(f"args#{method}")
+    args = parser.get_parsed_content(f"args#{method}", default={})
     if hasattr(trainer, method):
         getattr(trainer, method)(system, **args)
     elif hasattr(Tuner, method):
