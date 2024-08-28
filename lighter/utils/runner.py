@@ -15,15 +15,7 @@ from lighter.utils.schema import ArgsConfigSchema, ConfigSchema
 def cli() -> None:
     """Defines the command line interface for running lightning trainer's methods."""
     commands = {method: partial(run, method) for method in ArgsConfigSchema.model_fields}
-    try:
-        fire.Fire(commands)
-    except TypeError as e:
-        if "run() takes 1 positional argument but" in str(e):
-            raise ValueError(
-                "Ensure that only one command is run at a time (e.g., 'lighter fit') and that "
-                "other command line arguments start with '--' (e.g., '--config', '--system#batch_size=1')."
-            ) from e
-        raise
+    fire.Fire(commands)
 
 
 def parse_config(**kwargs) -> ConfigParser:
@@ -54,13 +46,22 @@ def parse_config(**kwargs) -> ConfigParser:
     return parser
 
 
-def run(method: str, **kwargs: Any) -> None:
-    """Run the trainer method.
+def run(*methods: str, **kwargs: Any) -> None:
+    """
+    Execute specified methods of the Lightning Trainer or Tuner.
 
     Args:
-        method (str): name of the trainer method to run.
-        **kwargs (Any): keyword arguments that include 'config' and specific config overrides passed to `parse_config()`.
+        *methods (str): Method name(s) to be executed.
+        **kwargs (Any): Keyword arguments that include 'config' and specific config overrides passed to `parse_config()`.
     """
+    for method in methods:
+        if method not in ArgsConfigSchema.model_fields:
+            valid_methods = list(ArgsConfigSchema.model_fields)
+            raise ValueError(
+                f"Invalid command '{method}' specified. Available commands: {valid_methods}. "
+                f"If you intended to pass an argument, ensure it is prefixed with '--'."
+            )
+
     seed_everything()
 
     # Parse and validate the config.
@@ -86,12 +87,11 @@ def run(method: str, **kwargs: Any) -> None:
     if trainer.logger is not None:
         trainer.logger.log_hyperparams(parser.config)
 
-    # Run the Trainer/Tuner method.
-    args = parser.get_parsed_content(f"args#{method}", default={})
-    if hasattr(trainer, method):
-        getattr(trainer, method)(system, **args)
-    elif hasattr(Tuner, method):
-        tuner = Tuner(trainer)
-        getattr(tuner, method)(system, **args)
-    else:
-        raise ValueError(f"Method '{method}' is not a valid Trainer or Tuner method [{list(ArgsConfigSchema.model_fields)}].")
+    # Run the Trainer/Tuner method(s).
+    for method in methods:
+        args = parser.get_parsed_content(f"args#{method}", default={})
+        if hasattr(trainer, method):
+            getattr(trainer, method)(system, **args)
+        elif hasattr(Tuner, method):
+            tuner = Tuner(trainer)
+            getattr(tuner, method)(system, **args)

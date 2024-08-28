@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore", 'Field name "validate" in "ArgsConfigSchema" s
 
 BaseModel.model_config["arbitrary_types_allowed"] = True
 BaseModel.model_config["hide_input_in_errors"] = True
-
+BaseModel.model_config["extra"] = "forbid"
 # ----- Config schema -----
 
 
