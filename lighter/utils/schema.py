@@ -40,12 +40,18 @@ class ArgsConfigSchema(BaseModel):
 
 
 class ConfigSchema(BaseModel):
-    _requires_: Optional = None
+    requires: Optional[Any] = None
     project: Optional[str] = None
     vars: Dict[str, Any] = {}
     args: ArgsConfigSchema = ArgsConfigSchema()
     system: Dict[str, Any] = {}
     trainer: Dict[str, Any] = {}
+
+    def __init__(self, **data):
+        # Annoying workardound, Pydantic keeps all underscored keys private
+        requires = data.pop("_requires_") if "_requires_" in data else None
+        super().__init__(**data)
+        self.requires = requires
 
 
 # ----- LighterSystem schema -----
