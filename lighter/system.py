@@ -3,16 +3,18 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from functools import partial
 
 import pytorch_lightning as pl
-import torch
 from loguru import logger
-from torch.nn import Module, ModuleDict
+from torch import Tensor
+from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.collate import collate_replace_corrupted
-from lighter.utils.misc import apply_fns, ensure_dict_schema, get_optimizer_stats, hasarg
+from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
+from lighter.utils.patches import PatchedModuleDict
+from lighter.utils.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
 
 
 class LighterSystem(pl.LightningModule):
@@ -80,8 +82,6 @@ class LighterSystem(pl.LightningModule):
         inferer: Optional[Callable] = None,
     ) -> None:
         super().__init__()
-        # Bypass LightningModule's check for default methods. We define them in self.setup().
-        self._init_placeholders_for_dataloader_and_step_methods()
 
         # Model setup
         self.model = model
@@ -97,28 +97,26 @@ class LighterSystem(pl.LightningModule):
         self.pin_memory = pin_memory
         self.drop_last_batch = drop_last_batch
 
-        # Datasets, samplers, and collate functions
-        self.datasets = self._init_datasets(datasets)
-        self.samplers = self._init_samplers(samplers)
-        self.collate_fns = self._init_collate_fns(collate_fns)
+        self.datasets = DatasetSchema(**(datasets or {})).model_dump()
+        self.samplers = SamplerSchema(**(samplers or {})).model_dump()
+        self.collate_fns = CollateFnSchema(**(collate_fns or {})).model_dump()
+        self.postprocessing = PostprocessingSchema(**(postprocessing or {})).model_dump()
+        self.metrics = MetricsSchema(**(metrics or {})).model_dump()
 
-        # Metrics
-        self.metrics = self._init_metrics(metrics)
-
-        # Postprocessing
-        self.postprocessing = self._init_postprocessing(postprocessing)
+        self.metrics = PatchedModuleDict(self.metrics)
 
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Flag that indicates whether the LightningModule methods have been defined. Used in `self.setup()`.
-        self._lightning_module_methods_defined = False
+        # Bypasses LightningModule's check for dataloader and step methods. We define them dynamically in self.setup().
+        self.train_dataloader = self.val_dataloader = self.test_dataloader = self.predict_dataloader = lambda: None
+        self.training_step = self.validation_step = self.test_step = self.predict_step = lambda: None
 
-    def forward(self, input: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]]) -> Any:
+    def forward(self, input: Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]) -> Any:
         """Forward pass. Multi-input models are supported.
 
         Args:
-            input (torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor], Dict[str, torch.Tensor]): Input to the model.
+            input (Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]): Input to the model.
 
         Returns:
             Output of the model.
@@ -134,6 +132,89 @@ class LighterSystem(pl.LightningModule):
             kwargs["step"] = self.global_step
 
         return self.model(input, **kwargs)
+
+    def configure_optimizers(self) -> Dict:
+        """LightningModule method. Returns optimizers and, if defined, schedulers.
+
+        Returns:
+            Optimizer and, if defined, scheduler.
+        """
+        if self.optimizer is None:
+            raise ValueError("Please specify 'system.optimizer' in the config.")
+        if self.scheduler is None:
+            return {"optimizer": self.optimizer}
+        else:
+            return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
+
+    def setup(self, stage: str) -> None:
+        """Automatically called by the LightningModule after the initialization.
+        `LighterSystem`'s setup checks if the required dataset is provided in the config and
+        sets up LightningModule methods for the stage in which the system is.
+
+        Args:
+            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
+        """
+        # Training methods.
+        if stage in ["fit", "tune"]:
+            self.train_dataloader = partial(self._base_dataloader, mode="train")
+            self.training_step = partial(self._base_step, mode="train")
+
+        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
+        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
+            self.val_dataloader = partial(self._base_dataloader, mode="val")
+            self.validation_step = partial(self._base_step, mode="val")
+
+        # Test methods.
+        if stage == "test":
+            self.test_dataloader = partial(self._base_dataloader, mode="test")
+            self.test_step = partial(self._base_step, mode="test")
+
+        # Predict methods.
+        if stage == "predict":
+            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
+            self.predict_step = partial(self._base_step, mode="predict")
+
+    def _base_dataloader(self, mode: str) -> DataLoader:
+        """Instantiate the dataloader for a mode (train/val/test/predict).
+        Includes a collate function that enables the DataLoader to replace
+        None's (alias for corrupted examples) in the batch with valid examples.
+        To make use of it, write a try-except in your Dataset that handles
+        corrupted data by returning None instead.
+
+        Args:
+            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
+
+        Returns:
+            Instantiated DataLoader.
+        """
+        dataset = self.datasets[mode]
+        sampler = self.samplers[mode]
+        collate_fn = self.collate_fns[mode]
+
+        if dataset is None:
+            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
+
+        # Batch size is 1 when using an inference for two reasons:
+        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
+        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
+        batch_size = self.batch_size
+        if self.inferer is not None and mode in ["val", "test", "predict"]:
+            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
+            batch_size = 1
+
+        # A dataset can return None when a corrupted example occurs. This collate
+        # function replaces None's with valid examples from the dataset.
+        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
+        return DataLoader(
+            dataset,
+            sampler=sampler,
+            shuffle=(mode == "train" and sampler is None),
+            batch_size=batch_size,
+            drop_last=(self.drop_last_batch if mode == "train" else False),
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            collate_fn=collate_fn,
+        )
 
     def _base_step(self, batch: Dict, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
         """Base step for all modes.
@@ -197,8 +278,10 @@ class LighterSystem(pl.LightningModule):
         target = apply_fns(target, self.postprocessing["metrics"]["target"])
         pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
-        # Calculate the step metrics. # TODO: Remove the "_" prefix when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = self.metrics["_" + mode](pred, target) if self.metrics["_" + mode] is not None else None
+        # Calculate the step metrics.
+        metrics = None
+        if self.metrics[mode] is not None:
+            metrics = self.metrics[mode](pred, target)
 
         # Postprocessing for logging/writing.
         input = apply_fns(input, self.postprocessing["logging"]["input"])
@@ -225,13 +308,11 @@ class LighterSystem(pl.LightningModule):
             "id": id,
         }
 
-    def _log_stats(
-        self, loss: Union[torch.Tensor, Dict[str, torch.Tensor]], metrics: MetricCollection, mode: str, batch_idx: int
-    ) -> None:
+    def _log_stats(self, loss: Union[Tensor, Dict[str, Tensor]], metrics: MetricCollection, mode: str, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
         Args:
-            loss (Union[torch.Tensor, Dict[str, torch.Tensor]]): Calculated loss or a dict of sublosses.
+            loss (Union[Tensor, Dict[str, Tensor]]): Calculated loss or a dict of sublosses.
             metrics (MetricCollection): Calculated metrics.
             mode (str): Mode of operation (train/val/test/predict).
             batch_idx (int): Index of current batch.
@@ -261,106 +342,6 @@ class LighterSystem(pl.LightningModule):
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
                 on_epoch_log(f"{mode}/{name}", optimizer_stat)
 
-    def _base_dataloader(self, mode: str) -> DataLoader:
-        """Instantiate the dataloader for a mode (train/val/test/predict).
-        Includes a collate function that enables the DataLoader to replace
-        None's (alias for corrupted examples) in the batch with valid examples.
-        To make use of it, write a try-except in your Dataset that handles
-        corrupted data by returning None instead.
-
-        Args:
-            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
-
-        Returns:
-            Instantiated DataLoader.
-        """
-        dataset = self.datasets[mode]
-        sampler = self.samplers[mode]
-        collate_fn = self.collate_fns[mode]
-
-        if dataset is None:
-            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
-
-        # Batch size is 1 when using an inference for two reasons:
-        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
-        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
-        batch_size = self.batch_size
-        if self.inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
-            batch_size = 1
-
-        # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
-        return DataLoader(
-            dataset,
-            sampler=sampler,
-            shuffle=(mode == "train" and sampler is None),
-            batch_size=batch_size,
-            drop_last=(self.drop_last_batch if mode == "train" else False),
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            collate_fn=collate_fn,
-        )
-
-    def configure_optimizers(self) -> Dict:
-        """LightningModule method. Returns optimizers and, if defined, schedulers.
-
-        Returns:
-            Optimizer and, if defined, scheduler.
-        """
-        if self.optimizer is None:
-            raise ValueError("Please specify 'system.optimizer' in the config.")
-        if self.scheduler is None:
-            return {"optimizer": self.optimizer}
-        else:
-            return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
-
-    def setup(self, stage: str) -> None:
-        """Automatically called by the LightningModule after the initialization.
-        `LighterSystem`'s setup checks if the required dataset is provided in the config and
-        sets up LightningModule methods for the stage in which the system is.
-
-        Args:
-            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
-        """
-        # Stage-specific PyTorch Lightning methods. Defined dynamically so that the system
-        # only has methods used in the stage and for which the configuration was provided.
-        if not self._lightning_module_methods_defined:
-            del (
-                self.train_dataloader,
-                self.training_step,
-                self.val_dataloader,
-                self.validation_step,
-                self.test_dataloader,
-                self.test_step,
-                self.predict_dataloader,
-                self.predict_step,
-            )
-            # Prevents the methods from being defined again. This is needed because `Trainer.tune()`
-            # calls the `self.setup()` method whenever it runs for a new parameter.
-            self._lightning_module_methods_defined = True
-
-        # Training methods.
-        if stage in ["fit", "tune"]:
-            self.train_dataloader = partial(self._base_dataloader, mode="train")
-            self.training_step = partial(self._base_step, mode="train")
-
-        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
-            self.val_dataloader = partial(self._base_dataloader, mode="val")
-            self.validation_step = partial(self._base_step, mode="val")
-
-        # Test methods.
-        if stage == "test":
-            self.test_dataloader = partial(self._base_dataloader, mode="test")
-            self.test_step = partial(self._base_step, mode="test")
-
-        # Predict methods.
-        if stage == "predict":
-            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
-            self.predict_step = partial(self._base_step, mode="predict")
-
     @property
     def learning_rate(self) -> float:
         """Get the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
@@ -374,47 +355,3 @@ class LighterSystem(pl.LightningModule):
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         self.optimizer.param_groups[0]["lr"] = value
-
-    def _init_placeholders_for_dataloader_and_step_methods(self) -> None:
-        """
-        Initializes placeholders for dataloader and step methods.
-
-        `LighterSystem` dynamically defines the `..._dataloader()`and `..._step()` methods
-        in the `self.setup()` method. However, when `LightningModule` excepts them to be defined
-        at init. To prevent it from throwing an error, the `..._dataloader()` and `..._step()`
-        are initially defined as `lambda: None`, before `self.setup()` is called.
-        """
-        self.train_dataloader = self.training_step = lambda: None
-        self.val_dataloader = self.validation_step = lambda: None
-        self.test_dataloader = self.test_step = lambda: None
-        self.predict_dataloader = self.predict_step = lambda: None
-
-    def _init_datasets(self, datasets: Dict[str, Optional[Dataset]]):
-        """Ensures that the datasets have the predefined schema."""
-        return ensure_dict_schema(datasets, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_samplers(self, samplers: Dict[str, Optional[Sampler]]):
-        """Ensures that the samplers have the predefined schema"""
-        return ensure_dict_schema(samplers, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_collate_fns(self, collate_fns: Dict[str, Optional[Callable]]):
-        """Ensures that the collate functions have the predefined schema."""
-        return ensure_dict_schema(collate_fns, {"train": None, "val": None, "test": None, "predict": None})
-
-    def _init_metrics(self, metrics: Dict[str, Optional[Union[Metric, List[Metric], Dict[str, Metric]]]]):
-        """Ensures that the metrics have the predefined schema. Wraps each mode's metrics in
-        a MetricCollection, and finally registers them with PyTorch using a ModuleDict.
-        """
-        metrics = ensure_dict_schema(metrics, {"train": None, "val": None, "test": None})
-        for mode, metric in metrics.items():
-            metrics[mode] = MetricCollection(metric) if metric is not None else None
-        # TODO: Remove the prefix addition line below when fixed https://github.com/pytorch/pytorch/issues/71203
-        metrics = {f"_{k}": v for k, v in metrics.items()}
-        return ModuleDict(metrics)
-
-    def _init_postprocessing(self, postprocessing: Dict[str, Optional[Union[Callable, List[Callable]]]]):
-        """Ensures that the postprocessing functions have the predefined schema."""
-        mode_subschema = {"train": None, "val": None, "test": None, "predict": None}
-        data_subschema = {"input": None, "target": None, "pred": None}
-        schema = {"batch": mode_subschema, "criterion": data_subschema, "metrics": data_subschema, "logging": data_subschema}
-        return ensure_dict_schema(postprocessing, schema)

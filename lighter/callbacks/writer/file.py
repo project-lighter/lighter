@@ -1,12 +1,12 @@
 from typing import Callable, Dict, Union
 
 from functools import partial
-from pathlib import Path
 
 import torch
 import torchvision
 from monai.data import metatensor_to_itk_image
 from monai.transforms import DivisiblePad
+from torch import Tensor
 
 from lighter.callbacks.utils import preprocess_image
 from lighter.callbacks.writer.base import LighterBaseWriter
@@ -27,9 +27,6 @@ class LighterFileWriter(LighterBaseWriter):
             `tensor` is a single tensor without the batch dimension.
     """
 
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
-        super().__init__(path, writer)
-
     @property
     def writers(self) -> Dict[str, Callable]:
         return {
@@ -41,7 +38,7 @@ class LighterFileWriter(LighterBaseWriter):
             "itk_nifti": partial(write_itk_image, suffix=".nii.gz"),
         }
 
-    def write(self, tensor: torch.Tensor, id: Union[int, str]) -> None:
+    def write(self, tensor: Tensor, id: Union[int, str]) -> None:
         """
         Write the tensor using the writer specified at the instatiation.
 
@@ -82,7 +79,7 @@ def write_video(path, tensor):
     torchvision.io.write_video(str(path), tensor, fps=24)
 
 
-def write_itk_image(path: str, tensor: torch.Tensor, suffix) -> None:
+def write_itk_image(path: str, tensor: Tensor, suffix) -> None:
     path = path.with_suffix(suffix)
     itk_image = metatensor_to_itk_image(tensor, channel_dim=0, dtype=tensor.dtype)
     OPTIONAL_IMPORTS["itk"].imwrite(itk_image, str(path), True)
