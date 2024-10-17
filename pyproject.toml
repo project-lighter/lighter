@@ -8,7 +8,7 @@ lighter = "lighter.utils.runner:cli"
 
 [tool.poetry]
 name = "project-lighter"
-version = "0.0.3a4"
+version = "0.0.3a5"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 readme = "README.md"
 authors = ["Ibrahim Hadzic <ibrahimhadzic45@gmail.com>" ,
