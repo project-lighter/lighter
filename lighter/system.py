@@ -109,7 +109,7 @@ class LighterSystem(pl.LightningModule):
         self.inferer = inferer
 
         # Bypasses LightningModule's check for dataloader and step methods. We define them dynamically in self.setup().
-        self.train_dataloader = self.val_dataloader = self.test_dataloader = self.predict_dataloader = lambda: None
+        self.train_dataloader = self.val_dataloader = self.test_dataloader = self.predict_dataloader = lambda: []
         self.training_step = self.validation_step = self.test_step = self.predict_step = lambda: None
 
     def forward(self, input: Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]) -> Any:
