@@ -141,9 +141,10 @@ import pytest
 from lighter.system import LighterSystem
 from torch.nn import Module
 
-class DummyModel(Module):
+class DummyModel(nn.Module):
     def __init__(self):
         super().__init__()
+        self.layer = nn.Linear(10, 10)
 
 def test_system_initialization():
     model = DummyModel()

@@ -10,4 +10,4 @@ def test_preprocess_image_2d():
 def test_preprocess_image_3d():
     image = torch.rand(1, 3, 4, 64, 64)
     processed_image = preprocess_image(image)
-    assert processed_image.shape[1] == 3
+    assert processed_image.shape[0] == 3

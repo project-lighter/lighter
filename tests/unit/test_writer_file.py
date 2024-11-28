@@ -4,7 +4,7 @@ from lighter.callbacks.writer.file import LighterFileWriter
 
 def test_file_writer_initialization():
     writer = LighterFileWriter(path="test_dir", writer="tensor")
-    assert writer.path == "test_dir"
+    assert writer.path == Path("test_dir")
 
 def test_file_writer_write_tensor():
     writer = LighterFileWriter(path="test_dir", writer="tensor")
