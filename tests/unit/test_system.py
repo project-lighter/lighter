@@ -137,3 +137,15 @@ def test_invalid_batch_format(basic_system):
     basic_system.setup("fit")
     invalid_batch = {"wrong_key": torch.randn(1, 3, 32, 32)}
     basic_system._base_step(invalid_batch, batch_idx=0, mode="train")
+import pytest
+from lighter.system import LighterSystem
+from torch.nn import Module
+
+class DummyModel(Module):
+    def __init__(self):
+        super().__init__()
+
+def test_system_initialization():
+    model = DummyModel()
+    system = LighterSystem(model=model, batch_size=32)
+    assert system.batch_size == 32
