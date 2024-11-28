@@ -17,5 +17,6 @@ def test_freezer_freezing():
     model = DummyModel()
     freezer = LighterFreezer(names=["layer1"])
     freezer._set_model_requires_grad(model, requires_grad=False)
+    freezer._frozen_state = True  # Ensure the frozen state is set
     assert not model.layer1.weight.requires_grad
     assert model.layer2.weight.requires_grad
