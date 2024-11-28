@@ -1,4 +1,5 @@
 import pytest
+import torch
 from lighter.callbacks.writer.table import LighterTableWriter
 
 def test_table_writer_initialization():

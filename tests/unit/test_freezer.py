@@ -1,5 +1,6 @@
 import pytest
 from lighter.callbacks.freezer import LighterFreezer
+import torch
 from torch.nn import Module
 
 class DummyModel(Module):

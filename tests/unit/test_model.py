@@ -1,5 +1,6 @@
 import pytest
 from lighter.utils.model import replace_layer_with_identity
+import torch
 from torch.nn import Linear, Module
 
 class DummyModel(Module):
