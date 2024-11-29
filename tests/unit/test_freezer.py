@@ -39,16 +39,20 @@ def test_freezer_initialization():
     assert freezer.names == ["layer1"]
 
 def test_freezer_functionality(dummy_system):
-    freezer = LighterFreezer(names=["layer1"])
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
     assert not dummy_system.model.layer1.weight.requires_grad
+    assert not dummy_system.model.layer1.bias.requires_grad
     assert dummy_system.model.layer2.weight.requires_grad
 
 def test_freezer_with_exceptions(dummy_system):
-    freezer = LighterFreezer(name_starts_with=["layer"], except_names=["layer2"])
+    freezer = LighterFreezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
     assert not dummy_system.model.layer1.weight.requires_grad
+    assert not dummy_system.model.layer1.bias.requires_grad
     assert dummy_system.model.layer2.weight.requires_grad
+    assert dummy_system.model.layer2.bias.requires_grad
     assert not dummy_system.model.layer3.weight.requires_grad
+    assert not dummy_system.model.layer3.bias.requires_grad
