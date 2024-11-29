@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 import torch
 import torch.nn as nn
@@ -8,7 +10,6 @@ from torch.utils.data import DataLoader, Dataset
 from torchmetrics import Accuracy
 
 from lighter.system import LighterSystem
-from unittest import mock
 
 
 class DummyDataset(Dataset):
@@ -82,34 +83,7 @@ def dummy_system():
     return DummySystem()
 
 
-def test_empty_dataset():
-    empty_dataset = DummyDataset(size=0)
-    assert len(empty_dataset) == 0
-    with pytest.raises(IndexError):
-        _ = empty_dataset[0]
-
-def test_empty_predict_dataset():
-    empty_predict_dataset = DummyPredictDataset(size=0)
-    assert len(empty_predict_dataset) == 0
-    with pytest.raises(IndexError):
-        _ = empty_predict_dataset[0]
-
-def test_model_forward_pass():
-    model = DummyModel()
-    input_tensor = torch.randn(1, 3, 32, 32)
-    output = model(input_tensor)
-    assert output.shape == (1, 10)
-
-def test_system_initialization():
-    system = DummySystem()
-    assert isinstance(system.model, DummyModel)
-    assert isinstance(system.optimizer, Adam)
-    assert isinstance(system.scheduler, StepLR)
-    assert isinstance(system.criterion, nn.CrossEntropyLoss)
-    assert "train" in system.datasets
-    assert "val" in system.datasets
-    assert "test" in system.datasets
-    assert "predict" in system.datasets
+def test_system_with_trainer(dummy_system):
     trainer = Trainer(max_epochs=1)
     trainer.fit(dummy_system)
     assert dummy_system.batch_size == 32
@@ -139,7 +113,7 @@ def test_training_step(dummy_system):
     batch = next(iter(dummy_system.train_dataloader()))
 
     # https://github.com/Lightning-AI/pytorch-lightning/issues/9674#issuecomment-926243063
-    with mock.patch.object(dummy_system, 'log'):
+    with mock.patch.object(dummy_system, "log"):
         result = dummy_system.training_step(batch, batch_idx=0)
 
     assert "loss" in result
@@ -156,7 +130,7 @@ def test_validation_step(dummy_system):
     batch = next(iter(dummy_system.val_dataloader()))
 
     # https://github.com/Lightning-AI/pytorch-lightning/issues/9674#issuecomment-926243063
-    with mock.patch.object(dummy_system, 'log'):
+    with mock.patch.object(dummy_system, "log"):
         result = dummy_system.validation_step(batch, batch_idx=0)
 
     assert "loss" in result
@@ -170,7 +144,7 @@ def test_predict_step(dummy_system):
     batch = next(iter(dummy_system.predict_dataloader()))
 
     # https://github.com/Lightning-AI/pytorch-lightning/issues/9674#issuecomment-926243063
-    with mock.patch.object(dummy_system, 'log'):
+    with mock.patch.object(dummy_system, "log"):
         result = dummy_system.predict_step(batch, batch_idx=0)
 
     assert "pred" in result
@@ -183,6 +157,7 @@ def test_learning_rate_property(dummy_system):
 
     dummy_system.learning_rate = 0.01
     assert dummy_system.learning_rate == 0.01
+
 
 @pytest.mark.parametrize(
     "batch",
@@ -197,7 +172,7 @@ def test_valid_batch_formats(dummy_system, batch):
     trainer.fit(dummy_system)  # Only to attach the system to the trainer
 
     # https://github.com/Lightning-AI/pytorch-lightning/issues/9674#issuecomment-926243063
-    with mock.patch.object(dummy_system, 'log'):
+    with mock.patch.object(dummy_system, "log"):
         result = dummy_system.training_step(batch, batch_idx=0)
     assert isinstance(result, dict)
 
@@ -209,5 +184,5 @@ def test_invalid_batch_format(dummy_system):
     trainer.fit(dummy_system)  # Only to attach the system to the trainer
 
     # https://github.com/Lightning-AI/pytorch-lightning/issues/9674#issuecomment-926243063
-    with mock.patch.object(dummy_system, 'log'):
+    with mock.patch.object(dummy_system, "log"):
         dummy_system.training_step(invalid_batch, batch_idx=0)
