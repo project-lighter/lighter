@@ -24,7 +24,17 @@ class DummyDataset(Dataset):
         return {"input": x, "target": y}
 
 
-class DummyModel(nn.Module):
+class DummyPredictDataset(Dataset):
+    def __init__(self, size=20):
+        self.size = size
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        x = torch.randn(3, 32, 32)
+        return {"input": x}
+
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(nn.Flatten(), nn.Linear(3072, 10))
@@ -40,7 +50,12 @@ class DummySystem(LighterSystem):
         scheduler = StepLR(optimizer, step_size=1)
         criterion = nn.CrossEntropyLoss()
 
-        datasets = {"train": DummyDataset(), "val": DummyDataset(50), "test": DummyDataset(20)}
+        datasets = {
+            "train": DummyDataset(),
+            "val": DummyDataset(50),
+            "test": DummyDataset(20),
+            "predict": DummyPredictDataset(20),
+        }
 
         metrics = {
             "train": Accuracy(task="multiclass", num_classes=10),
@@ -116,7 +131,7 @@ def test_validation_step(dummy_system):
 def test_predict_step(dummy_system):
     trainer = Trainer(max_epochs=1)
     trainer.predict(dummy_system)  # Only to attach the system to the trainer
-    batch = {"input": torch.randn(1, 3, 32, 32)}
+    batch = next(iter(dummy_system.predict_dataloader()))
     result = dummy_system._base_step(batch, batch_idx=0, mode="predict")
 
     assert "pred" in result
