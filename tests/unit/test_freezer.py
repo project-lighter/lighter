@@ -57,4 +57,4 @@ def test_freezer_with_exceptions(dummy_system):
     for param_group in dummy_system.optimizer.param_groups:
         for param in param_group['params']:
             if param.requires_grad:
-                assert param.grad is not None
+                assert param.grad_fn is not None
