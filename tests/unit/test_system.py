@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import Trainer
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
@@ -64,7 +64,7 @@ def basic_system():
 
 def test_system_with_trainer(basic_system):
     trainer = Trainer(max_epochs=1)
-    trainer.fit_loop.setup_data(basic_system.train_dataloader())
+    trainer.fit(basic_system)
     trainer.fit_loop.setup_data(basic_system.val_dataloader())
     trainer.fit_loop.setup_data(basic_system.test_dataloader())
     trainer.fit_loop.setup_data(basic_system.predict_dataloader())

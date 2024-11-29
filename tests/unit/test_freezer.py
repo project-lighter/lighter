@@ -26,7 +26,7 @@ def test_freezer_with_trainer():
     model = DummyModel()
     freezer = LighterFreezer(names=["layer1"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
-    trainer.fit_loop.setup_data(DataLoader(DummyDataset()))
+    trainer.fit(DataLoader(DummyDataset()), model)
     freezer.on_train_batch_start(trainer, None, None, 0)
     assert not model.layer1.weight.requires_grad
     assert model.layer2.weight.requires_grad
