@@ -1,0 +1,29 @@
+import pytest
+import torch
+from torch.nn import Linear, Sequential
+from lighter.utils.model import replace_layer_with, replace_layer_with_identity, remove_n_last_layers_sequentially
+
+class SimpleModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = Linear(10, 10)
+        self.layer2 = Linear(10, 10)
+
+    def forward(self, x):
+        return self.layer2(self.layer1(x))
+
+def test_replace_layer_with():
+    model = SimpleModel()
+    new_layer = Linear(10, 10)
+    replace_layer_with(model, "layer1", new_layer)
+    assert model.layer1 == new_layer
+
+def test_replace_layer_with_identity():
+    model = SimpleModel()
+    replace_layer_with_identity(model, "layer1")
+    assert isinstance(model.layer1, torch.nn.Identity)
+
+def test_remove_n_last_layers_sequentially():
+    model = Sequential(Linear(10, 10), Linear(10, 10), Linear(10, 10))
+    new_model = remove_n_last_layers_sequentially(model, num_layers=1)
+    assert len(new_model) == 2

@@ -19,15 +19,12 @@ class DummyDataset(Dataset):
     def __getitem__(self, idx):
         return {"input": torch.randn(10), "target": torch.tensor(0)}
 
-class DummySystem(LighterSystem):
-    def __init__(self):
-        model = DummyModel()
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-        super().__init__(model=model, batch_size=32, optimizer=optimizer, datasets={"train": DummyDataset()})
-
 @pytest.fixture
 def dummy_system():
-    return DummySystem()
+    model = DummyModel()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    dataset = DummyDataset()
+    return LighterSystem(model=model, batch_size=32, optimizer=optimizer, datasets={"train": dataset})
 
 def test_freezer_initialization():
     freezer = LighterFreezer(names=["layer1"])
