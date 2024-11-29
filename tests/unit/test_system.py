@@ -91,6 +91,8 @@ def test_dataloader_creation(dummy_system):
 def test_training_step(dummy_system):
     dummy_system.setup("fit")
     batch = next(iter(dummy_system.train_dataloader()))
+    trainer = Trainer()
+    trainer.fit(dummy_system)
     result = dummy_system._base_step(batch, batch_idx=0, mode="train")
 
     assert "loss" in result
@@ -104,6 +106,8 @@ def test_training_step(dummy_system):
 def test_validation_step(dummy_system):
     dummy_system.setup("validate")
     batch = next(iter(dummy_system.val_dataloader()))
+    trainer = Trainer()
+    trainer.validate(dummy_system)
     result = dummy_system._base_step(batch, batch_idx=0, mode="val")
 
     assert "loss" in result
@@ -131,9 +135,9 @@ def test_learning_rate_property(dummy_system):
 @pytest.mark.parametrize(
     "batch",
     [
-        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=()).long()},
-        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=()).long()},
-        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=()).long(), "id": "test_id"},
+        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long()},
+        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long()},
+        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long(), "id": "test_id"},
     ],
 )
 

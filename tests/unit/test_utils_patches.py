@@ -8,8 +8,8 @@ def test_patched_module_dict_handles_reserved_names():
     reserved_names = {
         'type': None,
         'to': None,
-        'forward': 1,
-        'training': "123",
+        'forward': Linear(10, 10),
+        'training': Linear(10, 10),
         'modules': [Linear(10, 10)]
     }
     
