@@ -88,7 +88,6 @@ def test_dataloader_creation(dummy_system):
     assert train_loader.batch_size == 32
 
 
-@pytest.mark.skip(reason="Requires trainer attachment")
 def test_training_step(dummy_system):
     dummy_system.setup("fit")
     batch = next(iter(dummy_system.train_dataloader()))
@@ -102,7 +101,6 @@ def test_training_step(dummy_system):
     assert torch.is_tensor(result["loss"])
 
 
-@pytest.mark.skip(reason="Requires trainer attachment")
 def test_validation_step(dummy_system):
     dummy_system.setup("validate")
     batch = next(iter(dummy_system.val_dataloader()))
@@ -138,7 +136,7 @@ def test_learning_rate_property(dummy_system):
         {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=()).long(), "id": "test_id"},
     ],
 )
-@pytest.mark.skip(reason="Requires trainer attachment")
+
 def test_valid_batch_formats(dummy_system, batch):
     dummy_system.setup("fit")
     result = dummy_system._base_step(batch, batch_idx=0, mode="train")
