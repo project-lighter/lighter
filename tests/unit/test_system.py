@@ -89,12 +89,9 @@ def test_dataloader_creation(dummy_system):
 
 
 def test_training_step(dummy_system):
-    dummy_system.setup("fit")
-    batch = next(iter(dummy_system.train_dataloader()))
-    trainer = Trainer()
-    trainer.fit(dummy_system)
     trainer = Trainer(max_epochs=1)
-    trainer.fit(dummy_system)
+    trainer.fit(dummy_system)  # Only to attach the system to the trainer
+    batch = next(iter(dummy_system.train_dataloader()))
     result = dummy_system._base_step(batch, batch_idx=0, mode="train")
 
     assert "loss" in result
@@ -106,10 +103,9 @@ def test_training_step(dummy_system):
 
 
 def test_validation_step(dummy_system):
-    dummy_system.setup("validate")
+    trainer = Trainer(max_epochs=1)
+    trainer.validate(dummy_system)  # Only to attach the system to the trainer
     batch = next(iter(dummy_system.val_dataloader()))
-    trainer = Trainer()
-    trainer.validate(dummy_system)
     result = dummy_system._base_step(batch, batch_idx=0, mode="val")
 
     assert "loss" in result
@@ -118,7 +114,8 @@ def test_validation_step(dummy_system):
 
 
 def test_predict_step(dummy_system):
-    dummy_system.setup("predict")
+    trainer = Trainer(max_epochs=1)
+    trainer.predict(dummy_system)  # Only to attach the system to the trainer
     batch = {"input": torch.randn(1, 3, 32, 32)}
     result = dummy_system._base_step(batch, batch_idx=0, mode="predict")
 
@@ -133,24 +130,24 @@ def test_learning_rate_property(dummy_system):
     dummy_system.learning_rate = 0.01
     assert dummy_system.learning_rate == 0.01
 
-
 @pytest.mark.parametrize(
     "batch",
     [
         {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long()},
-        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long()},
-        {"input": torch.randn(1, 3, 32, 32), "target": torch.randint(0, 10, size=(1,)).long(), "id": "test_id"},
+        {"input": torch.randn(2, 3, 32, 32), "target": torch.randint(0, 10, size=(2,)).long()},
+        {"input": torch.randn(4, 3, 32, 32), "target": torch.randint(0, 10, size=(4,)).long(), "id": "test_id"},
     ],
 )
-
 def test_valid_batch_formats(dummy_system, batch):
-    dummy_system.setup("fit")
+    trainer = Trainer(max_epochs=1)
+    trainer.fit(dummy_system)  # Only to attach the system to the trainer
     result = dummy_system._base_step(batch, batch_idx=0, mode="train")
     assert isinstance(result, dict)
 
 
 @pytest.mark.xfail(raises=ValueError)
 def test_invalid_batch_format(dummy_system):
-    dummy_system.setup("fit")
     invalid_batch = {"wrong_key": torch.randn(1, 3, 32, 32)}
+    trainer = Trainer(max_epochs=1)
+    trainer.fit(dummy_system)  # Only to attach the system to the trainer
     dummy_system._base_step(invalid_batch, batch_idx=0, mode="train")
