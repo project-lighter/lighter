@@ -82,7 +82,34 @@ def dummy_system():
     return DummySystem()
 
 
-def test_system_with_trainer(dummy_system):
+def test_empty_dataset():
+    empty_dataset = DummyDataset(size=0)
+    assert len(empty_dataset) == 0
+    with pytest.raises(IndexError):
+        _ = empty_dataset[0]
+
+def test_empty_predict_dataset():
+    empty_predict_dataset = DummyPredictDataset(size=0)
+    assert len(empty_predict_dataset) == 0
+    with pytest.raises(IndexError):
+        _ = empty_predict_dataset[0]
+
+def test_model_forward_pass():
+    model = DummyModel()
+    input_tensor = torch.randn(1, 3, 32, 32)
+    output = model(input_tensor)
+    assert output.shape == (1, 10)
+
+def test_system_initialization():
+    system = DummySystem()
+    assert isinstance(system.model, DummyModel)
+    assert isinstance(system.optimizer, Adam)
+    assert isinstance(system.scheduler, StepLR)
+    assert isinstance(system.criterion, nn.CrossEntropyLoss)
+    assert "train" in system.datasets
+    assert "val" in system.datasets
+    assert "test" in system.datasets
+    assert "predict" in system.datasets
     trainer = Trainer(max_epochs=1)
     trainer.fit(dummy_system)
     assert dummy_system.batch_size == 32
