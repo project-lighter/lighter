@@ -10,6 +10,6 @@ class DummySystem(LighterSystem):
         self.fc = Linear(10, 10)
 
 def test_replace_layer_with_identity():
-    model = DummyModel()
-    replace_layer_with_identity(model, "fc")
-    assert isinstance(model.fc, torch.nn.Identity)
+    system = DummySystem()
+    replace_layer_with_identity(system.model, "fc")
+    assert isinstance(system.model.fc, torch.nn.Identity)
