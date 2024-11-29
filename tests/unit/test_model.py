@@ -1,9 +1,10 @@
 import pytest
 from lighter.utils.model import replace_layer_with_identity
 import torch
-from torch.nn import Linear, Module
+from torch.nn import Linear
+from lighter.system import LighterSystem
 
-class DummyModel(Module):
+class DummySystem(LighterSystem):
     def __init__(self):
         super().__init__()
         self.fc = Linear(10, 10)

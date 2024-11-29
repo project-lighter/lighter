@@ -33,34 +33,38 @@ class DummyModel(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+class DummySystem(LighterSystem):
+    def __init__(self):
+        model = DummyModel()
+        optimizer = Adam(model.parameters(), lr=0.001)
+        scheduler = StepLR(optimizer, step_size=1)
+        criterion = nn.CrossEntropyLoss()
+        
+        datasets = {
+            "train": DummyDataset(),
+            "val": DummyDataset(50),
+            "test": DummyDataset(20)
+        }
+        
+        metrics = {
+            "train": Accuracy(task="multiclass", num_classes=10),
+            "val": Accuracy(task="multiclass", num_classes=10),
+            "test": Accuracy(task="multiclass", num_classes=10)
+        }
+        
+        super().__init__(
+            model=model,
+            batch_size=32,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            criterion=criterion,
+            datasets=datasets,
+            metrics=metrics
+        )
+
 @pytest.fixture
 def basic_system():
-    model = DummyModel()
-    optimizer = Adam(model.parameters(), lr=0.001)
-    scheduler = StepLR(optimizer, step_size=1)
-    criterion = nn.CrossEntropyLoss()
-    
-    datasets = {
-        "train": DummyDataset(),
-        "val": DummyDataset(50),
-        "test": DummyDataset(20)
-    }
-    
-    metrics = {
-        "train": Accuracy(task="multiclass", num_classes=10),
-        "val": Accuracy(task="multiclass", num_classes=10),
-        "test": Accuracy(task="multiclass", num_classes=10)
-    }
-    
-    return LighterSystem(
-        model=model,
-        batch_size=32,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        criterion=criterion,
-        datasets=datasets,
-        metrics=metrics
-    )
+    return DummySystem()
 
 def test_system_with_trainer(basic_system):
     trainer = Trainer(max_epochs=1)
@@ -146,7 +150,7 @@ def test_invalid_batch_format(basic_system):
     basic_system._base_step(invalid_batch, batch_idx=0, mode="train")
 import pytest
 from lighter.system import LighterSystem
-from torch.nn import Module
+from lighter.system import LighterSystem
 
 class DummyModel(nn.Module):
     def __init__(self):
