@@ -3,7 +3,7 @@ from lighter.callbacks.freezer import LighterFreezer
 import torch
 from torch.nn import Module
 from lighter.system import LighterSystem
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from pytorch_lightning import Trainer
 
 class DummyModel(Module):
@@ -17,7 +17,7 @@ class DummyDataset(Dataset):
         return 10
 
     def __getitem__(self, idx):
-        return torch.randn(10), torch.tensor(0)
+        return {"input": torch.randn(10), "target": torch.tensor(0)}
 
 class DummySystem(LighterSystem):
     def __init__(self):
