@@ -1,6 +1,7 @@
 import pytest
 from lighter.callbacks.freezer import LighterFreezer
 import torch
+from torch.nn import Module
 from lighter.system import LighterSystem
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import Trainer
