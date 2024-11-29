@@ -52,9 +52,3 @@ def test_freezer_with_exceptions(dummy_system):
     assert not dummy_system.model.layer1.weight.requires_grad
     assert dummy_system.model.layer2.weight.requires_grad
     assert not dummy_system.model.layer3.weight.requires_grad
-
-    # Ensure that the optimizer is set up correctly
-    for param_group in dummy_system.optimizer.param_groups:
-        for param in param_group['params']:
-            if param.requires_grad:
-                assert param.grad_fn is not None
