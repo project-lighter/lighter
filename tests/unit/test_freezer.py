@@ -3,7 +3,7 @@ from lighter.callbacks.freezer import LighterFreezer
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import Callback
-from torch.utils.data import DataLoader, Dataset
+from torch.nn import Module
 
 class DummyModel(Module):
     def __init__(self):
