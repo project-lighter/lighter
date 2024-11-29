@@ -1,11 +1,14 @@
-import pytest
-import torch
 from pathlib import Path
+
+import torch
+
 from lighter.callbacks.writer.table import LighterTableWriter
+
 
 def test_table_writer_initialization():
     writer = LighterTableWriter(path="test.csv", writer="tensor")
     assert writer.path == Path("test.csv")
+
 
 def test_table_writer_write():
     writer = LighterTableWriter(path="test.csv", writer="tensor")

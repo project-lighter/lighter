@@ -1,5 +1,5 @@
-import pytest
 from lighter.utils.collate import collate_replace_corrupted
+
 
 def test_collate_replace_corrupted():
     batch = [1, None, 2, None, 3]

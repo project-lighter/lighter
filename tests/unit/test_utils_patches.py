@@ -1,6 +1,7 @@
-import pytest
-from lighter.utils.patches import PatchedModuleDict
 from torch.nn import Linear
+
+from lighter.utils.patches import PatchedModuleDict
+
 
 def test_patched_module_dict():
     modules = {"layer1": Linear(10, 10)}

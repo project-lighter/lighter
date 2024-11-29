@@ -1,10 +1,12 @@
 import pytest
-from lighter.callbacks.freezer import LighterFreezer
 import torch
-from torch.nn import Module
-from lighter.system import LighterSystem
-from torch.utils.data import Dataset
 from pytorch_lightning import Trainer
+from torch.nn import Module
+from torch.utils.data import Dataset
+
+from lighter.callbacks.freezer import LighterFreezer
+from lighter.system import LighterSystem
+
 
 class DummyModel(Module):
     def __init__(self):
@@ -19,12 +21,14 @@ class DummyModel(Module):
         x = self.layer3(x)
         return x
 
+
 class DummyDataset(Dataset):
     def __len__(self):
         return 10
 
     def __getitem__(self, idx):
         return {"input": torch.randn(10), "target": torch.tensor(0)}
+
 
 @pytest.fixture
 def dummy_system():
@@ -34,9 +38,11 @@ def dummy_system():
     criterion = torch.nn.CrossEntropyLoss()
     return LighterSystem(model=model, batch_size=32, criterion=criterion, optimizer=optimizer, datasets={"train": dataset})
 
+
 def test_freezer_initialization():
     freezer = LighterFreezer(names=["layer1"])
     assert freezer.names == ["layer1"]
+
 
 def test_freezer_functionality(dummy_system):
     freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"])
@@ -45,6 +51,7 @@ def test_freezer_functionality(dummy_system):
     assert not dummy_system.model.layer1.weight.requires_grad
     assert not dummy_system.model.layer1.bias.requires_grad
     assert dummy_system.model.layer2.weight.requires_grad
+
 
 def test_freezer_with_exceptions(dummy_system):
     freezer = LighterFreezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])

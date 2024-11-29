@@ -1,5 +1,7 @@
 import pytest
+
 from lighter.utils.dynamic_imports import import_module_from_path
+
 
 def test_import_module_from_path():
     with pytest.raises(FileNotFoundError):
