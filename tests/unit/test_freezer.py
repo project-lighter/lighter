@@ -1,9 +1,9 @@
 import pytest
 from lighter.callbacks.freezer import LighterFreezer
 import torch
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import Callback
+from torch.nn import Module
 from torch.utils.data import Dataset, DataLoader
+from pytorch_lightning import Trainer
 
 class DummyModel(Module):
     def __init__(self):

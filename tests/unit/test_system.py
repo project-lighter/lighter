@@ -1,6 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset
 from pytorch_lightning import Trainer
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
