@@ -93,6 +93,8 @@ def test_training_step(dummy_system):
     batch = next(iter(dummy_system.train_dataloader()))
     trainer = Trainer()
     trainer.fit(dummy_system)
+    trainer = Trainer(max_epochs=1)
+    trainer.fit(dummy_system)
     result = dummy_system._base_step(batch, batch_idx=0, mode="train")
 
     assert "loss" in result
