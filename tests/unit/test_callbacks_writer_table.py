@@ -1,5 +1,6 @@
 from unittest import mock
 from pathlib import Path
+import pandas as pd
 import pytest
 import torch
 from pytorch_lightning import Trainer
@@ -59,9 +60,17 @@ def test_table_writer_write():
 
     # Verify file creation and content
     assert test_file.exists()
-    with open(test_file) as f:
-        content = f.read()
-        assert "1,2,3" in content  # verify first tensor
+    df = pd.read_csv(test_file)
+    expected_records = [
+        {"id": 1, "pred": [1, 2, 3]},
+        {"id": 2, "pred": []},
+        {"id": 3, "pred": test_tensor.tolist()},
+        {"id": 4, "pred": [1.5, 2.5]},
+    ]
+    for record in expected_records:
+        row = df[df['id'] == record['id']]
+        assert not row.empty
+        assert row['pred'].tolist() == record['pred']
     
     # Cleanup
     test_file.unlink()
