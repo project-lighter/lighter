@@ -19,11 +19,19 @@ def test_table_writer_custom_writer():
     writer.write(tensor=test_tensor, id=1)
     assert writer.csv_records[0]["pred"] == {"custom": 6}
 
-def test_table_writer_distributed_gather(tmp_path):
+def test_table_writer_distributed_gather(tmp_path, monkeypatch):
     writer = LighterTableWriter(path=tmp_path / "test.csv", writer="tensor")
-    trainer = mock.Mock()
-    trainer.world_size = 2
-    trainer.is_global_zero = True
+    # Create a real Trainer instance
+    trainer = Trainer(
+        max_epochs=1,
+        strategy="ddp_spawn",  # Use a distributed strategy
+        devices=2,  # Simulate a distributed environment with 2 devices
+        accelerator="cpu"  # Use CPU for testing
+    )
+    
+    # Mock the distributed environment methods
+    monkeypatch.setattr(trainer, "world_size", 2)
+    monkeypatch.setattr(trainer, "is_global_zero", True)
     writer.csv_records = [{"id": 1, "pred": [1, 2, 3]}]
     writer.on_predict_epoch_end(trainer, mock.Mock())
     assert (tmp_path / "test.csv").exists()
