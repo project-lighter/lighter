@@ -47,7 +47,7 @@ def test_file_writer_write_tensor_errors():
     
     try:
         # Test invalid tensor
-        with pytest.raises((TypeError, AttributeError)):
+        with pytest.raises(ValueError):
             writer.write("not a tensor", id=1)
         
         # Test invalid ID
