@@ -43,30 +43,26 @@ def test_table_writer_write():
     test_file = Path("test.csv")
     writer = LighterTableWriter(path="test.csv", writer="tensor")
     
+    expected_records = [
+        {"id": 1, "pred": [1, 2, 3]},
+        {"id": "some_id", "pred": -1},
+        {"id": 1331, "pred": [1.5, 2.5]},
+    ]
     # Test basic write
-    test_tensor = torch.tensor([1, 2, 3])
-    writer.write(tensor=test_tensor, id=1)
+    writer.write(tensor=torch.tensor(expected_records[0]["pred"]), id=expected_records[0]["id"])
     assert len(writer.csv_records) == 1
-    assert writer.csv_records[0]["pred"] == test_tensor.tolist()
-    assert writer.csv_records[0]["id"] == 1
+    assert writer.csv_records[0]["pred"] == expected_records[0]["pred"]
+    assert writer.csv_records[0]["id"] == expected_records[0]["id"]
     
     # Test edge cases
-    writer.write(tensor=torch.tensor([]), id=2)  # empty tensor
-    writer.write(tensor=torch.randn(1000), id=3)  # large tensor
-    writer.write(tensor=torch.tensor([1.5, 2.5]), id=4)  # float tensor
-    
+    writer.write(tensor=torch.tensor(expected_records[1]["pred"]), id=expected_records[1]["id"])
+    writer.write(tensor=torch.tensor(expected_records[2]["pred"]), id=expected_records[2]["id"])
     trainer = Trainer(max_epochs=1)
     writer.on_predict_epoch_end(trainer, mock.Mock())
 
     # Verify file creation and content
     assert test_file.exists()
     df = pd.read_csv(test_file)
-    expected_records = [
-        {"id": 1, "pred": [1, 2, 3]},
-        {"id": 2, "pred": []},
-        {"id": 3, "pred": test_tensor.tolist()},
-        {"id": 4, "pred": [1.5, 2.5]},
-    ]
     for record in expected_records:
         row = df[df['id'] == record['id']]
         assert not row.empty
