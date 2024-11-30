@@ -5,12 +5,18 @@ import torch
 from lighter.callbacks.writer.file import LighterFileWriter
 
 
+import shutil
+
 def test_file_writer_initialization():
+    """Test LighterFileWriter initialization with proper attributes."""
     path = Path("test_dir")
     path.mkdir(exist_ok=True)  # Ensure the directory exists
-    writer = LighterFileWriter(path=path, writer="tensor")
-    assert writer.path == Path("test_dir")
-
+    try:
+        writer = LighterFileWriter(path=path, writer="tensor")
+        assert writer.path == Path("test_dir")
+        assert writer.writer == "tensor"  # Verify writer type
+    finally:
+        shutil.rmtree(path)  # Clean up after test
 
 import pytest
 
