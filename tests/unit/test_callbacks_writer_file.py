@@ -22,7 +22,7 @@ import pytest
 
 def test_file_writer_write_tensor():
     """Test LighterFileWriter's ability to write and persist tensors correctly."""
-    test_dir = Path("test_dir_tensor")
+    test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
         writer = LighterFileWriter(path=test_dir, writer="tensor")
@@ -41,12 +41,17 @@ def test_file_writer_write_tensor():
 
 def test_file_writer_write_tensor_errors():
     """Test error handling in LighterFileWriter."""
-    writer = LighterFileWriter(path="test_dir_errors", writer="tensor")
+    test_dir = Path("test_dir")
+    test_dir.mkdir(exist_ok=True)
+    writer = LighterFileWriter(path=test_dir, writer="tensor")
     
-    # Test invalid tensor
-    with pytest.raises(TypeError):
-        writer.write("not a tensor", id=1)
-    
-    # Test invalid ID
-    with pytest.raises(ValueError):
-        writer.write(torch.tensor([1]), id=-1)
+    try:
+        # Test invalid tensor
+        with pytest.raises(TypeError):
+            writer.write("not a tensor", id=1)
+        
+        # Test invalid ID
+        with pytest.raises(ValueError):
+            writer.write(torch.tensor([1]), id=-1)
+    finally:
+        shutil.rmtree(test_dir)
