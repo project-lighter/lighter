@@ -21,13 +21,7 @@ def test_table_writer_custom_writer():
 
 def test_table_writer_distributed_gather(tmp_path, monkeypatch):
     writer = LighterTableWriter(path=tmp_path / "test.csv", writer="tensor")
-    # Create a real Trainer instance
-    trainer = Trainer(
-        max_epochs=1,
-        strategy="ddp_spawn",  # Use a distributed strategy
-        devices=2,  # Simulate a distributed environment with 2 devices
-        accelerator="cpu"  # Use CPU for testing
-    )
+    trainer = Trainer(max_epochs=1)
     
     # Mock the distributed environment methods
     monkeypatch.setattr(trainer, "world_size", 2)
@@ -60,6 +54,9 @@ def test_table_writer_write():
     writer.write(tensor=torch.randn(1000), id=3)  # large tensor
     writer.write(tensor=torch.tensor([1.5, 2.5]), id=4)  # float tensor
     
+    trainer = Trainer(max_epochs=1)
+    writer.on_predict_epoch_end(trainer, mock.Mock())
+
     # Verify file creation and content
     assert test_file.exists()
     with open(test_file) as f:
