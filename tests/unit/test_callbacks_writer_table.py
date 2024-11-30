@@ -25,8 +25,8 @@ def test_table_writer_distributed_gather(tmp_path, monkeypatch):
     trainer = Trainer(max_epochs=1)
     
     # Mock the distributed environment methods
-    monkeypatch.setattr(trainer, "world_size", 2)
-    monkeypatch.setattr(trainer, "is_global_zero", True)
+    monkeypatch.setattr(trainer, "world_size", lambda: 2)
+    monkeypatch.setattr(trainer, "is_global_zero", lambda: True)
     writer.csv_records = [{"id": 1, "pred": [1, 2, 3]}]
     writer.on_predict_epoch_end(trainer, mock.Mock())
     assert (tmp_path / "test.csv").exists()
