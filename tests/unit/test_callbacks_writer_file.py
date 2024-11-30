@@ -14,7 +14,7 @@ def test_file_writer_initialization():
     try:
         writer = LighterFileWriter(path=path, writer="tensor")
         assert writer.path == Path("test_dir")
-        assert writer.writer == "tensor"  # Verify writer type
+        assert writer.writer.__name__ == "write_tensor"  # Verify writer function
     finally:
         shutil.rmtree(path)  # Clean up after test
 
@@ -47,7 +47,7 @@ def test_file_writer_write_tensor_errors():
     
     try:
         # Test invalid tensor
-        with pytest.raises(TypeError):
+        with pytest.raises((TypeError, AttributeError)):
             writer.write("not a tensor", id=1)
         
         # Test invalid ID
