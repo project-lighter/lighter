@@ -152,3 +152,5 @@ projects/*
 **/predictions/
 */.DS_Store
 .DS_Store
+.aider*
+test_dir/

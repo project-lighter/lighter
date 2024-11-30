@@ -36,7 +36,7 @@ def parse_config(**kwargs) -> ConfigParser:
         raise ValueError("'--config' not specified. Please provide a valid configuration file.")
 
     # Initialize the parser with the predefined structure.
-    parser = ConfigParser(ConfigSchema().dict(), globals=False)
+    parser = ConfigParser(ConfigSchema().model_dump(), globals=False)
     # Update the parser with the configuration file.
     parser.update(parser.load_config_files(kwargs.pop("config")))
     # Update the parser with the provided cli arguments.
