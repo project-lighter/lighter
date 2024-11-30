@@ -11,7 +11,7 @@ def custom_writer(tensor):
     return {"custom": tensor.sum().item()}
 
 def test_table_writer_initialization():
-    writer = LighterTableWriter(path=test_file, writer="tensor")
+    writer = LighterTableWriter(path="test.csv", writer="tensor")
     assert writer.path == Path("test.csv")
 
 def test_table_writer_custom_writer():
@@ -22,13 +22,13 @@ def test_table_writer_custom_writer():
 
 def test_table_writer_distributed_gather(tmp_path, monkeypatch):
     writer = LighterTableWriter(path=tmp_path / "test.csv", writer="tensor")
-    trainer = Trainer(max_epochs=1, devices=1, accelerator="cpu")
+    trainer = Trainer(max_epochs=1)
     
     # Mock the distributed environment methods
     monkeypatch.setattr(trainer, "world_size", 2)
     monkeypatch.setattr(trainer, "is_global_zero", True)
     writer.csv_records = [{"id": 1, "pred": [1, 2, 3]}]
-    writer.on_predict_epoch_end(trainer, LighterSystem())
+    writer.on_predict_epoch_end(trainer, mock.Mock())
     assert (tmp_path / "test.csv").exists()
 
 def test_table_writer_edge_cases():
@@ -60,13 +60,17 @@ def test_table_writer_write():
     trainer = Trainer(max_epochs=1)
     writer.on_predict_epoch_end(trainer, mock.Mock())
 
-    # Verify file creation and content
-    assert test_file.exists()
-    df = pd.read_csv(test_file)
-    for record in expected_records:
-        row = df[df['id'] == str(record['id'])]
-        assert not row.empty
-        assert row['pred'].tolist() == record['pred']
-    
+  # Verify file creation and content     
+    assert test_file.exists()     
+    df = pd.read_csv(test_file)     
+    df['id'] = df['id'].astype(str)     
+    df['pred'] = df['pred'].apply(eval)     
+
+    for record in expected_records:         
+        row = df[df['id'] == str(record['id'])]         
+        assert not row.empty         
+        pred_value = row['pred'].iloc[0]  # get the value from the Series
+        assert pred_value == record['pred']
+
     # Cleanup
     test_file.unlink()
