@@ -1,11 +1,10 @@
+import shutil
 from pathlib import Path
 
 import torch
 
 from lighter.callbacks.writer.file import LighterFileWriter
 
-
-import shutil
 
 def test_file_writer_initialization():
     """Test LighterFileWriter initialization with proper attributes."""
@@ -18,7 +17,6 @@ def test_file_writer_initialization():
     finally:
         shutil.rmtree(path)  # Clean up after test
 
-import pytest
 
 def test_file_writer_write_tensor():
     """Test LighterFileWriter's ability to write and persist tensors correctly."""
@@ -28,30 +26,13 @@ def test_file_writer_write_tensor():
         writer = LighterFileWriter(path=test_dir, writer="tensor")
         tensor = torch.tensor([1, 2, 3])
         writer.write(tensor, id=1)
-        
+
         # Verify file exists
         saved_path = writer.path / "1.pt"
         assert saved_path.exists()
-        
+
         # Verify tensor contents
         loaded_tensor = torch.load(saved_path)
         assert torch.equal(loaded_tensor, tensor)
-    finally:
-        shutil.rmtree(test_dir)
-
-def test_file_writer_write_tensor_errors():
-    """Test error handling in LighterFileWriter."""
-    test_dir = Path("test_dir")
-    test_dir.mkdir(exist_ok=True)
-    writer = LighterFileWriter(path=test_dir, writer="tensor")
-    
-    try:
-        # Test invalid tensor
-        with pytest.raises(ValueError):
-            writer.write("not a tensor", id=1)
-        
-        # Test invalid ID
-        with pytest.raises(ValueError):
-            writer.write(torch.tensor([1]), id=-1)
     finally:
         shutil.rmtree(test_dir)

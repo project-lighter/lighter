@@ -60,7 +60,11 @@ class LighterTableWriter(LighterBaseWriter):
         # Save the records to a CSV file
         if trainer.is_global_zero:
             df = pd.DataFrame(self.csv_records)
-            df = df.sort_values("id").set_index("id")
+            try:
+                df = df.sort_values("id")
+            except TypeError:
+                pass
+            df = df.set_index("id")
             df.to_csv(self.path)
 
         # Clear the records after saving
