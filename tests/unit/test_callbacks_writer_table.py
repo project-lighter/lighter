@@ -19,7 +19,7 @@ def test_table_writer_write():
     test_tensor = torch.tensor([1, 2, 3])
     writer.write(tensor=test_tensor, id=1)
     assert len(writer.csv_records) == 1
-    assert writer.csv_records[0]["tensor"] == test_tensor.tolist()
+    assert writer.csv_records[0]["pred"] == test_tensor.tolist()
     assert writer.csv_records[0]["id"] == 1
     
     # Test edge cases
