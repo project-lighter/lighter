@@ -7,7 +7,7 @@ With Lighter, you can be as hands-on as you wish when using it in your project. 
 - [x] Train on your data + Add a custom model architecture + Add a complex loss function
 - [x] Customization per your imagination! 
 
-Lets start by looking at each of these one by one. At the end of this, you will hopefully have a better idea of how best you can leverage lighter
+Let's start by looking at each of these one by one. At the end of this, you will hopefully have a better idea of how best you can leverage Lighter.
 
 ### Training on your own dataset
 
@@ -90,7 +90,7 @@ class MyXRayDataset(Dataset):
 ```
 
 !!! note
-    Lighter works with the default torchvision format of (image, target) and also with `dict` with `input` and `target` keys. The input/target key or tuple can contain complex input/target organization, e.g. multiple images for input and multiple labels for target
+    Lighter works with the default torchvision format of (image, target) and also with `dict` with `input` and `target` keys. The input/target key or tuple can contain complex input/target organization, e.g., multiple images for input and multiple labels for target.
 
 
 Now that you have built your dataset, all you need to do is add it to the lighter config! But wait, how will Lighter know where your code is? All lighter configs contain a `project` key that takes the full path to where your python code is located. Once you set this up, call `project.my_xray_dataset.` and Lighter will pick up the dataset. 

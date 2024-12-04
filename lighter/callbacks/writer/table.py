@@ -1,3 +1,7 @@
+"""
+This module provides the LighterTableWriter class, which saves predictions in a table format, such as CSV.
+"""
+
 from typing import Any, Callable, Dict, Union
 
 import itertools
@@ -13,13 +17,11 @@ from lighter.callbacks.writer.base import LighterBaseWriter
 
 class LighterTableWriter(LighterBaseWriter):
     """
-    Writer for saving predictions in a table format.
+    Writer for saving predictions in a table format, such as CSV.
 
     Args:
-        path (Path): CSV filepath.
-        writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
-            Available writers: "tensor". A custom writer function must take a single argument: `tensor`, and return the record
-            to be saved in the CSV file under 'pred' column. The tensor will be a single tensor without the batch dimension.
+        path (Union[str, Path]): CSV filepath.
+        writer (Union[str, Callable]): Writer function or name of a registered writer.
     """
 
     def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
@@ -34,21 +36,21 @@ class LighterTableWriter(LighterBaseWriter):
 
     def write(self, tensor: Any, id: Union[int, str]) -> None:
         """
-        Write the tensor as a table record using the specified writer.
+        Writes the tensor as a table record using the specified writer.
 
         Args:
-            tensor (Any): Tensor, without the batch dimension, to be recorded.
-            id (Union[int, str]): Identifier, used as the key for the record.
+            tensor (Any): The tensor to record. Should not have a batch dimension.
+            id (Union[int, str]): Identifier for the record.
         """
         self.csv_records.append({"id": id, "pred": self.writer(tensor)})
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         """
-        Callback invoked at the end of the prediction epoch to save predictions to a CSV file.
+        Called at the end of the prediction epoch to save predictions to a CSV file.
 
-        This method is responsible for organizing prediction records and saving them as a CSV file.
-        If training was done in a distributed setting, it gathers predictions from all processes
-        and then saves them from the rank 0 process.
+        Args:
+            trainer (Trainer): The trainer instance.
+            pl_module (LighterSystem): The LighterSystem instance.
         """
         # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:

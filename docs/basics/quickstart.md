@@ -16,10 +16,10 @@ pip install project-lighter --pre
 ## Building a config
 Key to the Lighter ecosystem is a YAML file that serves as the central point of control for your experiments. It allows you to define, manage, and modify all aspects of your experiment without diving deep into the code. 
 
-A Lighter config contains two main components: 
+A Lighter config contains two main components:
 
-- Trainer
-- LighterSystem
+- **Trainer**: Manages the training loop and related settings.
+- **LighterSystem**: Defines the model, datasets, optimizer, and other components.
 
 ### Trainer
 Trainer contains all the information about running a training/evaluation/inference process and is a crucial component of training automation in Pytorch Lightning. Please refer to the [Pytorch Lightning's Trainer documentation](https://lightning.ai/docs/pytorch/stable/common/trainer.html) for more information.
@@ -76,10 +76,11 @@ system:
       # takes a dictionary as input. 
       batch:
           train: '$lambda x: {"input": x[0], "target": x[1]}'
-             
 ```
 
-For more information about each of the LighterSystem components and how to override them, see [here](./config.md)
+5.  Postprocessing functions can be defined for different stages like batch, criterion, metrics, and logging. These functions allow you to modify data at various points in the workflow.
+
+For more information about each of the LighterSystem components and how to override them, see [here](./config.md).
 
 ## Running this experiment with Lighter
 We just combine the Trainer and LighterSystem into a single YAML and run the command in the terminal as shown,

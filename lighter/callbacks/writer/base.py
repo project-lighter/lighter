@@ -1,3 +1,7 @@
+"""
+This module provides the base class for defining custom writers in Lighter, allowing predictions to be saved in various formats.
+"""
+
 from typing import Any, Callable, Dict, Union
 
 import gc
@@ -21,8 +25,8 @@ class LighterBaseWriter(ABC, Callback):
         2) `self.write()` method to specify the saving strategy for a prediction.
 
     Args:
-        path (Union[str, Path]): Path for saving. It can be a directory or a specific file.
-        writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
+        path (Union[str, Path]): Path for saving predictions.
+        writer (Union[str, Callable]): Writer function or name of a registered writer.
     """
 
     def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
@@ -63,11 +67,12 @@ class LighterBaseWriter(ABC, Callback):
 
     def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
         """
-        Callback function to set up necessary prerequisites: prediction count and prediction file or directory.
-        When executing in a distributed environment, it ensures that:
-        1. Each distributed node initializes a prediction count based on its rank.
-        2. All distributed nodes write predictions to the same path.
-        3. The path is accessible to all nodes, i.e., all nodes share the same storage.
+        Sets up the writer, ensuring the path is ready for saving predictions.
+
+        Args:
+            trainer (Trainer): The trainer instance.
+            pl_module (LighterSystem): The LighterSystem instance.
+            stage (str): The current stage of training.
         """
         if stage != "predict":
             return
@@ -99,9 +104,15 @@ class LighterBaseWriter(ABC, Callback):
         self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         """
-        Callback method executed at the end of each prediction batch/step.
-        If the IDs are not provided, it generates global unique IDs based on the prediction count.
-        Finally, it writes the predictions using the specified writer.
+        Callback method executed at the end of each prediction batch to write predictions with unique IDs.
+
+        Args:
+            trainer (Trainer): The trainer instance.
+            pl_module (LighterSystem): The LighterSystem instance.
+            outputs (Any): The outputs from the prediction step.
+            batch (Any): The current batch.
+            batch_idx (int): The index of the batch.
+            dataloader_idx (int): The index of the dataloader.
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
         if outputs["id"] is None:

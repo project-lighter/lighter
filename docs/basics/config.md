@@ -2,7 +2,11 @@
 
 Lighter is a configuration-centric framework where the config. is used for setting up the machine learning workflow from model architecture selection, loss function, optimizer, dataset preparation and running the training/evaluation/inference process.
 
-Our configuration system is heavily based on MONAI bundle parser but with a standardized structure. For every configuration, we expect several items to be mandatorily defined. 
+Our configuration system is heavily based on the MONAI bundle parser but with a standardized structure. For every configuration, we expect several items to be mandatorily defined.
+
+The configuration is divided into two main components:
+- **Trainer**: Handles the training process, including epochs, devices, etc.
+- **LighterSystem**: Encapsulates the model, optimizer, datasets, and other components.
 
 Let us take a simple example config to dig deeper into the configuration system of Lighter. You can go through the config and click on the + for more information about specific concepts.
 
@@ -49,7 +53,9 @@ system:
 1.  `_target_` is a special reserved keyword that initializes a python object from the provided text. In this case, a `Trainer` object from the `pytorch_lightning` library is initialized
 2.  `max_epochs` is an argument of the `Trainer` class which is passed through this format. Any argument for the class can be passed similarly.
 3.  `$@` is a combination of `$` which evaluates a python expression and `@` which references a python object. In this case we first reference the model with `@model` which is the `torchvision.models.resnet18` defined earlier and then access its parameters using `$@model.parameters()`
-4.  YAML allows passing a list in the format below where each `_target_` specifices a transform that is added to the list of transforms in `Compose`. The `torchvision.datasets.CIFAR10` accepts these with a `transform` argument and applies them to each item. 
+4.  YAML allows passing a list in the format below where each `_target_` specifies a transform that is added to the list of transforms in `Compose`. The `torchvision.datasets.CIFAR10` accepts these with a `transform` argument and applies them to each item.
+
+5.  Datasets are defined for different modes: train, val, test, and predict. Each dataset can have its own transforms and configurations.
 
 ## Configuration Concepts
 As seen in the [Quickstart](./quickstart.md), Lighter has two main components:

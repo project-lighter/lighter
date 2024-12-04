@@ -1,3 +1,7 @@
+"""
+This module provides utility functions for manipulating PyTorch models, such as replacing layers or loading state_dicts.
+"""
+
 from typing import Dict, List
 
 import torch
@@ -8,45 +12,47 @@ from lighter.utils.misc import setattr_dot_notation
 
 
 def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Module:
-    """Replaces the specified layer of the network with another layer.
+    """
+    Replaces a specified layer in a PyTorch model with a new layer.
 
     Args:
-        model (Module): PyTorch model to be edited
-        layer_name (string): Name of the layer which will be replaced.
-            Dot-notation supported, e.g. "layer10.fc".
+        model (Module): The model to modify.
+        layer_name (str): The name of the layer to replace,
+            using dot notation if necessary (e.g. "layer10.fc.weights").
+        new_layer (Module): The new layer to insert.
 
     Returns:
-        PyTorch model with the new layer set at the specified location.
+        Module: The modified model with the new layer.
     """
     setattr_dot_notation(model, layer_name, new_layer)
     return model
 
 
 def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
-    """Replaces any layer of the network with an Identity layer.
-    Useful for removing layers of a network to be used as a backbone.
+    """
+    Replaces a specified layer in a PyTorch model with an Identity layer.
 
     Args:
-        model (Module): PyTorch model to be edited
-        layer_name (string): Name of the layer which will be replaced with an
-            Identity function. Dot-notation supported, e.g. "layer10.fc".
+        model (Module): The model to modify.
+        layer_name (str): The name of the layer to replace with an Identity layer,
+            using dot notation if necessary (e.g. "layer10.fc.weights").
 
     Returns:
-        PyTorch model with Identity layer at the specified location.
+        Module: The modified model with the Identity layer.
     """
     return replace_layer_with(model, layer_name, Identity())
 
 
 def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequential:
-    """Remove a number of last layers of a network and return it as an nn.Sequential model.
-    Useful when a network is used as a backbone of an SSL model.
+    """
+    Removes a specified number of layers from the end of a model and returns it as a Sequential model.
 
     Args:
-        model (Module): PyTorch model object.
-        num_layers (int, optional): Number of last layers to be removed. Defaults to 1.
+        model (Module): The model to modify.
+        num_layers (int): The number of layers to remove from the end.
 
     Returns:
-        PyTorch Sequential model with the last layer removed.
+        Sequential: The modified model as a Sequential container.
     """
     return Sequential(*list(model.children())[:-num_layers])
 
@@ -54,25 +60,28 @@ def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequenti
 def adjust_prefix_and_load_state_dict(
     model: Module, ckpt_path: str, ckpt_to_model_prefix: Dict[str, str] = None, layers_to_ignore: List[str] = None
 ) -> Module:
-    """Load state_dict from a checkpoint into a model using `torch.load(strict=False`).
-    `ckpt_to_model_prefix` mapping allows to rename the prefix of the checkpoint's state_dict keys
-    so that they match those of the model's state_dict. This is often needed when a model was trained
-    as a backbone of another model, so its state_dict keys won't be the same to those of a standalone
-    version of that model. Prior to defining the `ckpt_to_model_prefix`, it is advised to manually check
-    for mismatch between the names and specify them accordingly.
+    """
+    This function loads a state dictionary from a checkpoint file into a model using `torch.load(strict=False)`.
+    It supports remapping layer names between the checkpoint and model through the `ckpt_to_model_prefix` parameter.
+
+    This is useful when loading weights from a model that was trained as part of a larger architecture,
+    where the layer names may not match the standalone version of the model.
+
+    Before using `ckpt_to_model_prefix`, it's recommended to:
+    1. Check the layer names in both the checkpoint and target model
+    2. Map the mismatched prefixes accordingly
 
     Args:
-        model (Module): PyTorch model instance to load the state_dict into.
-        ckpt_path (str): Path to the checkpoint.
-        ckpt_to_model_prefix (Dict[str, str], optional): A dictionary that maps keys in the checkpoint's
-            state_dict to keys in the model's state_dict. If None, no key mapping is performed. Defaults to None.
-        layers_to_ignore (List[str], optional): A list of layer names that won't be loaded into the model.
-            Specify the names as they are after `ckpt_to_model_prefix` is applied. Defaults to None.
+        model (Module): The model to load the state_dict into.
+        ckpt_path (str): The path to the checkpoint file.
+        ckpt_to_model_prefix (Dict[str, str]): Mapping of checkpoint prefixes to model prefixes.
+        layers_to_ignore (List[str]): Layers to ignore when loading the state_dict.
+
     Returns:
-        The model instance with the state_dict loaded.
+        Module: The model with the loaded state_dict.
 
     Raises:
-        ValueError: If there is no overlap between checkpoint's and model's state_dict.
+        ValueError: If there is no overlap between the checkpoint's and model's state_dict.
     """
 
     # Load checkpoint

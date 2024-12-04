@@ -1,3 +1,7 @@
+"""
+This module provides the command line interface and functions for running Lighter experiments using PyTorch Lightning.
+"""
+
 from typing import Any
 
 from functools import partial
@@ -13,24 +17,25 @@ from lighter.utils.schema import ArgsConfigSchema, ConfigSchema
 
 
 def cli() -> None:
-    """Defines the command line interface for running lightning trainer's methods."""
+    """
+    Defines the command line interface for running Lighter experiments, mapping methods to commands.
+    """
     commands = {method: partial(run, method) for method in ArgsConfigSchema.model_fields}
     fire.Fire(commands)
 
 
 def parse_config(**kwargs) -> ConfigParser:
     """
-    Parses configuration files and updates the provided parser
-    with given keyword arguments. Returns an updated parser object.
+    Parses and validates configuration files, updating with provided keyword arguments.
 
     Args:
-        **kwargs (dict): Keyword arguments containing 'config' and, optionally, config overrides.
+        **kwargs (dict): Keyword arguments containing 'config' and optional overrides.
+
     Returns:
-        An instance of ConfigParser with configuration and overrides merged and parsed.
+        ConfigParser: The updated configuration parser.
 
     Raises:
-        ValueError: If '--config' is not specified in the keyword arguments.
-        ValueError: If the configuration validation against the schema fails.
+        ValueError: If '--config' is not specified or validation fails.
     """
     if "config" not in kwargs:
         raise ValueError("'--config' not specified. Please provide a valid configuration file.")
@@ -48,11 +53,11 @@ def parse_config(**kwargs) -> ConfigParser:
 
 def run(*methods: str, **kwargs: Any) -> None:
     """
-    Execute specified methods of the Lightning Trainer or Tuner.
+    Executes specified methods of the Lightning Trainer or Tuner.
 
     Args:
-        *methods (str): Method name(s) to be executed.
-        **kwargs (Any): Keyword arguments that include 'config' and specific config overrides passed to `parse_config()`.
+        *methods (str): Method name or names to execute.
+        **kwargs (Any): Keyword arguments for configuration and overrides.
     """
     for method in methods:
         if method not in ArgsConfigSchema.model_fields:

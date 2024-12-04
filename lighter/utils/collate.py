@@ -1,3 +1,8 @@
+"""
+This module provides custom collate functions for handling batches in PyTorch DataLoaders.
+It includes a function to replace corrupted examples in a batch with valid ones.
+"""
+
 from typing import Any, Callable
 
 import random
@@ -11,24 +16,16 @@ default_collate_fn_map.update({type(None): collate_str_fn})
 
 
 def collate_replace_corrupted(batch: Any, dataset: DataLoader, default_collate_fn: Callable = None) -> Any:
-    """Collate function that allows to replace corrupted examples in the batch.
-    The dataloader should return `None` when that occurs.
-    The `None`s in the batch are replaced with other, randomly-selected, examples.
+    """
+    Collate function to handle corrupted examples in a batch by replacing them with valid ones.
 
     Args:
-        batch (Any): Batch from the DataLoader.
-        dataset (Dataset): Dataset that the DataLoader is passing through. Needs to be fixed
-            in place with functools.partial before passing it to DataLoader's 'collate_fn' option
-            as 'collate_fn' should only have a single argument - batch. Example:
-                ```
-                collate_fn = functools.partial(collate_replace_corrupted, dataset=dataset)`
-                loader = DataLoader(dataset, ..., collate_fn=collate_fn).
-                ```
-        default_collate_fn (Callable): Collate function to call once the batch has no corrupted examples.
-            If `None`, `torch.utils.data.dataloader.default_collate` is called. Defaults to None.
+        batch (Any): The batch of data from the DataLoader.
+        dataset (Dataset): The dataset being used, which should return `None` for corrupted examples.
+        default_collate_fn (Callable): The default collate function to use once the batch is clean.
 
     Returns:
-        Batch with the new examples instead of the corrupted ones.
+        A batch with corrupted examples replaced by valid ones.
     """
     # Use `torch.utils.data.dataloader.default_collate` if no other default collate function is specified.
     default_collate_fn = default_collate_fn if default_collate_fn is not None else default_collate

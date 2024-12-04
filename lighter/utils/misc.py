@@ -1,3 +1,7 @@
+"""
+This module contains miscellaneous utility functions for handling lists, attributes, and function arguments.
+"""
+
 from typing import Any, Callable, Dict, List, Union
 
 import inspect
@@ -6,13 +10,14 @@ from torch.optim.optimizer import Optimizer
 
 
 def ensure_list(input: Any) -> List:
-    """Wrap the input into a list if it is not a list. If it is a None, return an empty list.
+    """
+    Ensures that the input is wrapped in a list. If the input is None, returns an empty list.
 
     Args:
-        input (Any): Input to wrap into a list.
+        input (Any): The input to wrap in a list.
 
     Returns:
-        Output list.
+        List: The input wrapped in a list, or an empty list if input is None.
     """
     if isinstance(input, list):
         return input
@@ -24,12 +29,13 @@ def ensure_list(input: Any) -> List:
 
 
 def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
-    """Set object's attribute. Supports dot notation.
+    """
+    Sets an attribute on an object using dot notation.
 
     Args:
-        obj (Callable): Object.
-        attr (str): Attribute name of the object.
-        value (Any): Value to set the attribute to.
+        obj (Callable): The object on which to set the attribute.
+        attr (str): The attribute name, which can use dot notation for nested attributes.
+        value (Any): The value to set the attribute to.
     """
     if "." not in attr:
         if not hasattr(obj, attr):
@@ -42,30 +48,30 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
 
 
 def hasarg(_callable: Callable, arg_name: str) -> bool:
-    """Check if a function, class, or method has an argument with the specified name.
+    """
+    Checks if a callable (function, method, or class) has a specific argument.
 
     Args:
-        _callable (Callable): Function, class, or method to inspect.
-        arg_name (str): Argument name to check for.
+        _callable (Callable): The callable to inspect.
+        arg_name (str): The name of the argument to check for.
 
     Returns:
-        bool: `True` if the argument if the specified name exists.
+        bool: True if the argument exists, False otherwise.
     """
-
     args = inspect.signature(_callable).parameters.keys()
     return arg_name in args
 
 
 def get_name(_callable: Callable, include_module_name: bool = False) -> str:
-    """Get the name of an object, class or function.
+    """
+    Retrieves the name of a callable, optionally including the module name.
 
     Args:
-        _callable (Callable): Object, class or function.
-        include_module_name (bool, optional): Whether to include the name of the module from
-            which it comes. Defaults to False.
+        _callable (Callable): The callable whose name to retrieve.
+        include_module_name (bool): Whether to include the module name in the result.
 
     Returns:
-        Name of the given object, class or function.
+        str: The name of the callable, optionally prefixed with the module name.
     """
     name = type(_callable).__name__ if isinstance(_callable, object) else _callable.__name__
     if include_module_name:
@@ -75,14 +81,15 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
 
 
 def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
-    """Apply a function or a list of functions on the input.
+    """
+    Applies a function or a list of functions to the input data.
 
     Args:
-        data (Any): Input to apply the function(s) on.
-        fns (Union[Callable, List[Callable]]): Function or list of functions to apply on the input.
+        data (Any): The data to process.
+        fns (Union[Callable, List[Callable]]): A function or list of functions to apply.
 
     Returns:
-        Output after applying the function(s).
+        Any: The processed data after applying the function(s).
     """
     for fn in ensure_list(fns):
         data = fn(data)
@@ -91,23 +98,21 @@ def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
 
 def get_optimizer_stats(optimizer: Optimizer) -> Dict[str, float]:
     """
-    Extract learning rates and momentum values from an optimizer into a dictionary.
+    Extract learning rates and momentum values from a PyTorch optimizer.
 
-    This function iterates over the parameter groups of the given optimizer and collects
-    the learning rate and momentum (or beta values) for each group. The collected values
-    are stored in a dictionary with keys formatted to indicate the optimizer type and
-    parameter group index (if multiple groups are present).
+    Collects learning rate and momentum/beta values from each parameter group
+    in the optimizer and returns them in a dictionary. Keys are formatted to show
+    the optimizer type and group number (if multiple groups exist).
 
     Args:
-        optimizer (Optimizer): A PyTorch optimizer instance.
+        optimizer (Optimizer): The PyTorch optimizer to extract values from.
 
     Returns:
-        Dict[str, float]: A dictionary containing the learning rates and momentum values
-        for each parameter group in the optimizer. The keys are formatted as:
-        - "optimizer/{optimizer_class_name}/lr" for learning rates
-        - "optimizer/{optimizer_class_name}/momentum" for momentum values
-        If there are multiple parameter groups, the keys will include the group index, e.g.,
-        "optimizer/{optimizer_class_name}/lr/group1".
+        Dict[str, float]: Dictionary containing:
+            - Learning rates: "optimizer/{name}/lr[/group{N}]"
+            - Momentum values: "optimizer/{name}/momentum[/group{N}]"
+
+            Where [/group{N}] is only added for optimizers with multiple groups.
     """
     stats_dict = {}
     for group_idx, group in enumerate(optimizer.param_groups):

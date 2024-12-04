@@ -1,3 +1,7 @@
+"""
+This module defines schemas for configuration validation using Pydantic, ensuring correct structure and types.
+"""
+
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import warnings
@@ -15,6 +19,10 @@ BaseModel.model_config["extra"] = "forbid"
 
 
 class ArgsConfigSchema(BaseModel):
+    """
+    Schema for validating arguments configuration, ensuring correct types and prohibiting certain keys.
+    """
+
     fit: Union[Dict[str, Any], str] = {}
     validate: Union[Dict[str, Any], str] = {}
     predict: Union[Dict[str, Any], str] = {}
@@ -24,6 +32,12 @@ class ArgsConfigSchema(BaseModel):
 
     @model_validator(mode="after")
     def check_prohibited_args(self):
+        """
+        Validates that prohibited arguments are not present in the configuration.
+
+        Raises:
+            ValueError: If prohibited arguments are found.
+        """
         prohibited_keys = ["model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"]
         for field in self.model_fields:
             field_value = getattr(self, field)
@@ -40,6 +54,10 @@ class ArgsConfigSchema(BaseModel):
 
 
 class ConfigSchema(BaseModel):
+    """
+    Schema for validating the overall configuration, including system and trainer settings.
+    """
+
     requires: Optional[Any] = None
     project: Optional[str] = None
     vars: Dict[str, Any] = {}
@@ -58,6 +76,10 @@ class ConfigSchema(BaseModel):
 
 
 class DatasetSchema(BaseModel):
+    """
+    Schema for validating dataset configurations for different stages (train, val, test, predict).
+    """
+
     train: Optional[Dataset] = None
     val: Optional[Dataset] = None
     test: Optional[Dataset] = None
@@ -65,6 +87,10 @@ class DatasetSchema(BaseModel):
 
 
 class SamplerSchema(BaseModel):
+    """
+    Schema for validating sampler configurations for different stages (train, val, test, predict).
+    """
+
     train: Optional[Sampler] = None
     val: Optional[Sampler] = None
     test: Optional[Sampler] = None
@@ -72,6 +98,10 @@ class SamplerSchema(BaseModel):
 
 
 class CollateFnSchema(BaseModel):
+    """
+    Schema for validating collate function configurations for different stages (train, val, test, predict).
+    """
+
     train: Optional[Callable] = None
     val: Optional[Callable] = None
     test: Optional[Callable] = None
@@ -79,12 +109,22 @@ class CollateFnSchema(BaseModel):
 
 
 class MetricsSchema(BaseModel):
+    """
+    Schema for validating metrics configurations, supporting single or multiple metrics.
+    """
+
     train: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     val: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
     test: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
 
     @model_validator(mode="after")
     def setup_metrics(self):
+        """
+        Converts metrics into a MetricCollection for consistent handling.
+
+        Returns:
+            MetricsSchema: The updated schema with MetricCollections.
+        """
         for field in self.model_fields:
             if getattr(self, field) is not None:
                 setattr(self, field, MetricCollection(getattr(self, field)))
@@ -92,6 +132,10 @@ class MetricsSchema(BaseModel):
 
 
 class ModeSchema(BaseModel):
+    """
+    Schema for validating mode-specific configurations, such as postprocessing functions.
+    """
+
     train: Optional[Union[Callable, List[Callable]]] = None
     val: Optional[Union[Callable, List[Callable]]] = None
     test: Optional[Union[Callable, List[Callable]]] = None
@@ -99,12 +143,20 @@ class ModeSchema(BaseModel):
 
 
 class DataSchema(BaseModel):
+    """
+    Schema for validating data-specific configurations, such as input, target, and prediction processing.
+    """
+
     input: Optional[Union[Callable, List[Callable]]] = None
     target: Optional[Union[Callable, List[Callable]]] = None
     pred: Optional[Union[Callable, List[Callable]]] = None
 
 
 class PostprocessingSchema(BaseModel):
+    """
+    Schema for validating postprocessing configurations, ensuring correct structure for batch, criterion, metrics, and logging.
+    """
+
     batch: ModeSchema = ModeSchema()
     criterion: DataSchema = DataSchema()
     metrics: DataSchema = DataSchema()

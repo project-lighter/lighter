@@ -36,7 +36,7 @@ def dummy_system():
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     dataset = DummyDataset()
     criterion = torch.nn.CrossEntropyLoss()
-    return LighterSystem(model=model, batch_size=32, criterion=criterion, optimizer=optimizer, datasets={"train": dataset})
+    return LighterSystem(model=model, batch_size=8, criterion=criterion, optimizer=optimizer, datasets={"train": dataset})
 
 
 def test_freezer_initialization():

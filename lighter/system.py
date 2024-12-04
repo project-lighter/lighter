@@ -1,3 +1,8 @@
+"""
+This module defines the LighterSystem class, which encapsulates the components of a deep learning system,
+including the model, optimizer, datasets, and more. It extends PyTorch Lightning's LightningModule.
+"""
+
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from functools import partial
@@ -18,7 +23,8 @@ from lighter.utils.schema import CollateFnSchema, DatasetSchema, MetricsSchema, 
 
 
 class LighterSystem(pl.LightningModule):
-    """_summary_
+    """
+    LighterSystem encapsulates the components of a deep learning system, extending PyTorch Lightning's LightningModule.
 
     Args:
         model (Module): Model.
@@ -26,16 +32,16 @@ class LighterSystem(pl.LightningModule):
         drop_last_batch (bool, optional): Whether the last batch in the dataloader should be dropped. Defaults to False.
         num_workers (int, optional): Number of dataloader workers. Defaults to 0.
         pin_memory (bool, optional): Whether to pin the dataloaders memory. Defaults to True.
-        optimizer (Optimizer, optional): Optimizers. Defaults to None.
-        scheduler (LRScheduler, optional): Learning rate scheduler. Defaults to None.
-        criterion (Callable, optional): Criterion/loss function. Defaults to None.
-        datasets (Dict[str, Dataset], optional): Datasets for train, val, test, and predict. Defaults to None.
-        samplers (Dict[str, Sampler], optional): Samplers for train, val, test, and predict. Defaults to None.
+        optimizer (Optimizer, optional): Optimizers.
+        scheduler (LRScheduler, optional): Learning rate scheduler.
+        criterion (Callable, optional): Criterion/loss function.
+        datasets (Dict[str, Dataset], optional): Datasets for train, val, test, and predict.
+        samplers (Dict[str, Sampler], optional): Samplers for train, val, test, and predict.
         collate_fns (Dict[str, Union[Callable, List[Callable]]], optional):
-            Collate functions for train, val, test, and predict. Defaults to None.
+            Collate functions for train, val, test, and predict.
         metrics (Dict[str, Union[Metric, List[Metric], Dict[str, Metric]]], optional):
             Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
-            Defaults to None.
+
         postprocessing (Dict[str, Union[Callable, List[Callable]]], optional):
             Functions to apply to:
                 1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
@@ -55,13 +61,13 @@ class LighterSystem(pl.LightningModule):
             ```
             Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
             the logging postprocessing will be done on the data that has been postprocessed for the criterion
-            and metrics earlier. Defaults to None.
+            and metrics earlier.
         inferer (Callable, optional): Inferer must be a class with a `__call__` method that accepts two
             arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
             mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
             that will infer over the smaller parts of the input, combine them, and return a single output.
             The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
-            Defaults to None.
+
     """
 
     def __init__(
@@ -113,13 +119,14 @@ class LighterSystem(pl.LightningModule):
         self.training_step = self.validation_step = self.test_step = self.predict_step = lambda: None
 
     def forward(self, input: Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]) -> Any:
-        """Forward pass. Multi-input models are supported.
+        """
+        Forward pass through the model. Supports multi-input models.
 
         Args:
-            input (Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]): Input to the model.
+            input (Union[Tensor, List[Tensor], Tuple[Tensor], Dict[str, Tensor]]): The input data.
 
         Returns:
-            Output of the model.
+            Any: The model's output.
         """
 
         # Keyword arguments to pass to the forward method
@@ -134,10 +141,11 @@ class LighterSystem(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def configure_optimizers(self) -> Dict:
-        """LightningModule method. Returns optimizers and, if defined, schedulers.
+        """
+        Configures the optimizers and learning rate schedulers.
 
         Returns:
-            Optimizer and, if defined, scheduler.
+            Dict: A dictionary containing the optimizer and scheduler.
         """
         if self.optimizer is None:
             raise ValueError("Please specify 'system.optimizer' in the config.")
@@ -147,12 +155,11 @@ class LighterSystem(pl.LightningModule):
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
     def setup(self, stage: str) -> None:
-        """Automatically called by the LightningModule after the initialization.
-        `LighterSystem`'s setup checks if the required dataset is provided in the config and
-        sets up LightningModule methods for the stage in which the system is.
+        """
+        Sets up the dataloaders and step methods for the specified stage.
 
         Args:
-            stage (str): Passed automatically by PyTorch Lightning. ["fit", "validate", "test"].
+            stage (str): The stage of training (fit, validate, test, predict).
         """
         # Training methods.
         if stage in ["fit", "tune"]:
@@ -175,17 +182,15 @@ class LighterSystem(pl.LightningModule):
             self.predict_step = partial(self._base_step, mode="predict")
 
     def _base_dataloader(self, mode: str) -> DataLoader:
-        """Instantiate the dataloader for a mode (train/val/test/predict).
-        Includes a collate function that enables the DataLoader to replace
-        None's (alias for corrupted examples) in the batch with valid examples.
-        To make use of it, write a try-except in your Dataset that handles
-        corrupted data by returning None instead.
+        """
+        Creates a DataLoader for the specified mode. Replaces None values (corrupted examples) in batches
+        with valid examples using a custom collate function. Dataset should return None for corrupted data.
 
         Args:
-            mode (str): Mode of operation for which to create the dataloader ["train", "val", "test", "predict"].
+            mode (str): The mode of operation (train, val, test, predict).
 
         Returns:
-            Instantiated DataLoader.
+            DataLoader: The configured DataLoader.
         """
         dataset = self.datasets[mode]
         sampler = self.samplers[mode]
@@ -217,18 +222,17 @@ class LighterSystem(pl.LightningModule):
         )
 
     def _base_step(self, batch: Dict, batch_idx: int, mode: str) -> Union[Dict[str, Any], Any]:
-        """Base step for all modes.
+        """
+        Performs a step in the specified mode, processing the batch and calculating loss and metrics.
 
         Args:
-            batch (Dict): Batch data as a containing "input", and optionally "target" and "id".
-            batch_idx (int): Batch index. PyTorch Lightning requires it, even though it is not used here.
-            mode (str): Operating mode. (train/val/test/predict)
-
+            batch (Dict): The batch of data.
+            batch_idx (int): The index of the batch.
+            mode (str): The mode of operation (train, val, test, predict).
         Returns:
-            For the predict step, it returns pred only.
-            For the training, validation, and test steps, it returns a dictionary
-            containing loss, metrics, input, target, pred, and id. Loss is `None`
-            for the test step. Metrics is `None` if no metrics are specified.
+            Dict or Any: For predict step, returns prediction only. For other steps,
+            returns dict with loss, metrics, input, target, pred, and id. Loss is None
+            for test step, metrics is None if unspecified.
         """
         # Allow postprocessing on batch data. Can be used to restructure the batch data into the required format.
         batch = apply_fns(batch, self.postprocessing["batch"][mode])
@@ -311,11 +315,12 @@ class LighterSystem(pl.LightningModule):
     def _log_stats(self, loss: Union[Tensor, Dict[str, Tensor]], metrics: MetricCollection, mode: str, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
+
         Args:
-            loss (Union[Tensor, Dict[str, Tensor]]): Calculated loss or a dict of sublosses.
-            metrics (MetricCollection): Calculated metrics.
-            mode (str): Mode of operation (train/val/test/predict).
-            batch_idx (int): Index of current batch.
+            loss (Union[Tensor, Dict[str, Tensor]]): The calculated loss.
+            metrics (MetricCollection): The calculated metrics.
+            mode (str): The mode of operation (train, val, test, predict).
+            batch_idx (int): The index of the batch.
         """
         if self.trainer.logger is None:
             return
@@ -344,14 +349,24 @@ class LighterSystem(pl.LightningModule):
 
     @property
     def learning_rate(self) -> float:
-        """Get the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
+        """
+        Gets the learning rate of the optimizer.
+
+        Returns:
+            float: The learning rate.
+        """
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         return self.optimizer.param_groups[0]["lr"]
 
     @learning_rate.setter
     def learning_rate(self, value) -> None:
-        """Set the learning rate of the optimizer. Ensures compatibility with the Tuner's 'lr_find()' method."""
+        """
+        Sets the learning rate of the optimizer.
+
+        Args:
+            value (float): The new learning rate.
+        """
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         self.optimizer.param_groups[0]["lr"] = value
