@@ -69,7 +69,7 @@ class DummySystem(LighterSystem):
 
         super().__init__(
             model=model,
-            batch_size=32,
+            batch_size=8,
             optimizer=optimizer,
             scheduler=scheduler,
             criterion=criterion,
@@ -86,7 +86,7 @@ def dummy_system():
 def test_system_with_trainer(dummy_system):
     trainer = Trainer(max_epochs=1)
     trainer.fit(dummy_system)
-    assert dummy_system.batch_size == 32
+    assert dummy_system.batch_size == 8
     assert isinstance(dummy_system.model, DummyModel)
     assert isinstance(dummy_system.optimizer, Adam)
     assert isinstance(dummy_system.scheduler, StepLR)
@@ -104,7 +104,7 @@ def test_dataloader_creation(dummy_system):
     dummy_system.setup("fit")
     train_loader = dummy_system.train_dataloader()
     assert isinstance(train_loader, DataLoader)
-    assert train_loader.batch_size == 32
+    assert train_loader.batch_size == 8
 
 
 def test_training_step(dummy_system):

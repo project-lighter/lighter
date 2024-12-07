@@ -1,4 +1,7 @@
-from typing import Dict
+"""
+This module provides utilities for dynamic imports, allowing optional imports and importing modules from paths.
+"""
+
 
 import importlib
 import sys
@@ -11,28 +14,38 @@ from monai.utils.module import optional_import
 
 @dataclass
 class OptionalImports:
-    """Dataclass for handling optional imports.
-
-    This class provides a way to handle optional imports in a convenient manner.
-    It allows importing modules that may or may not be available, and raises an ImportError if the module is not available.
-
-    Example:
-
-        from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
-
-        writer = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter()
+    """
+    Handles optional imports, allowing modules to be imported only if they are available.
 
     Attributes:
-        imports (Dict[str, object]): A dictionary to store the imported modules.
+        imports: A dictionary to store the imported modules.
+
+    Example:
+        ```
+        from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+        writer = OPTIONAL_IMPORTS["tensorboard"].SummaryWriter()
+        ```
     """
 
-    imports: Dict[str, object] = field(default_factory=dict)
+    imports: dict[str, object] = field(default_factory=dict)
 
-    def __getitem__(self, module_name: str) -> "module":
+    def __getitem__(self, module_name: str) -> object:
+        """
+        Get the imported module by name, importing it if necessary.
+
+        Args:
+            module_name: Name of the module to import.
+
+        Raises:
+            ImportError: If the module is not available.
+
+        Returns:
+            object: The imported module.
+        """
         """Get the imported module by name.
 
         Args:
-            module_name (str): Name of the module to import.
+            module_name: Name of the module to import.
 
         Raises:
             ImportError: If the module is not available.
@@ -51,13 +64,12 @@ OPTIONAL_IMPORTS = OptionalImports()
 
 
 def import_module_from_path(module_name: str, module_path: str) -> None:
-    """Import a module from a given path and assign it a specified name.
-
-    This function imports a module from the specified path and assigns it the specified name.
+    """
+    Import a module from a given path and assign it a specified name.
 
     Args:
-        module_name (str): Name to assign to the imported module.
-        module_path (str): Path to the module being imported.
+        module_name: Name to assign to the imported module.
+        module_path: Path to the module being imported.
 
     Raises:
         ValueError: If the module has already been imported.

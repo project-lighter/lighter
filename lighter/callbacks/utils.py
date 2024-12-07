@@ -1,30 +1,37 @@
+"""
+This module provides utility functions for callbacks, including mode conversion and image preprocessing.
+"""
+
 import torch
 import torchvision
 from torch import Tensor
 
 
 def get_lighter_mode(lightning_stage: str) -> str:
-    """Converts the name of a PyTorch Lightnig stage to the name of its corresponding Lighter mode.
+    """
+    Converts a PyTorch Lightning stage name to the corresponding Lighter mode name.
 
     Args:
-        lightning_stage (str): Stage in which the Trainer is. Can be accessed using `trainer.state.stage`.
+        lightning_stage: The Lightning stage in which the Trainer is operating.
 
     Returns:
-        Lighter mode name.
+        str: The corresponding Lighter mode name.
     """
     lightning_to_lighter = {"train": "train", "validate": "val", "test": "test"}
     return lightning_to_lighter[lightning_stage]
 
 
 def preprocess_image(image: Tensor) -> Tensor:
-    """Preprocess the image before logging it. If it is a batch of multiple images,
-    it will create a grid image of them. In case of 3D, a single image is displayed
-    with slices stacked vertically, while a batch of 3D images as a grid where each
-    column is a different 3D image.
+    """
+    Preprocess image for logging. For multiple 2D images, creates a grid.
+    For 3D images, stacks slices vertically. For multiple 3D images, creates a grid
+    with each column showing a different 3D image stacked vertically.
+
     Args:
-        image (Tensor): A 2D or 3D image tensor.
+        image: A 2D or 3D image tensor.
+
     Returns:
-        The image ready for logging.
+        Tensor: The preprocessed image ready for logging.
     """
     # If 3D (BCDHW), concat the images vertically and horizontally.
     if image.ndim == 5:

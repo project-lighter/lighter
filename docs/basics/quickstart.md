@@ -1,5 +1,5 @@
 # Quickstart 
-Get up and running in under 5 mins! 
+Get started with Lighter in just a few minutes! This guide will walk you through the installation and setup process, enabling you to quickly configure and run your experiments.
 
 ## Installation
 
@@ -14,17 +14,17 @@ pip install project-lighter --pre
 
 
 ## Building a config
-Key to the Lighter ecosystem is a YAML file that serves as the central point of control for your experiments. It allows you to define, manage, and modify all aspects of your experiment without diving deep into the code. 
+At the heart of the Lighter ecosystem is a YAML configuration file. This file acts as the central hub for managing your experiments, allowing you to define, adjust, and control every aspect without delving into the underlying code.
 
-A Lighter config contains two main components: 
+A Lighter config contains two main components:
 
-- Trainer
-- LighterSystem
+- **Trainer**: Manages the training loop and related settings.
+- **LighterSystem**: Defines the model, datasets, optimizer, and other components.
 
 ### Trainer
-Trainer contains all the information about running a training/evaluation/inference process and is a crucial component of training automation in Pytorch Lightning. Please refer to the [Pytorch Lightning's Trainer documentation](https://lightning.ai/docs/pytorch/stable/common/trainer.html) for more information.
+The Trainer section encapsulates all the details necessary for running training, evaluation, or inference processes. It is a vital component of training automation in PyTorch Lightning. For more details, refer to the [PyTorch Lightning Trainer documentation](https://lightning.ai/docs/pytorch/stable/common/trainer.html).
 
-Simply put, you can set several things here such as the number of epochs, the number of gpus, the number of nodes, etc. All the parameters that can be set in the `pytorch_lightning.Trainer` class can also go here. Please refer to the [API](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api) for more information.
+In this section, you can configure various parameters such as the number of epochs, GPUs, nodes, and more. Any parameter available in the `pytorch_lightning.Trainer` class can be specified here. For a comprehensive list, see the [API documentation](https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api).
 
 Defining this in our config looks something like this
 ```yaml
@@ -36,9 +36,9 @@ trainer:
 For more information see [here](./config.md)
 
 ### LighterSystem
-LighterSystem encapsulates all parts of a deep learning setup, such as the model, optimizer, criterion, datasets, metrics, etc. This is where the "science" of building deep learning models is developed. The LighterSystem is highly flexible and contain logic suitable for any task - classification, segmentation, object detection, self-supervised learning, etc. Think of this as writing your code but with predefined structure on where to define each compoenent (such as model, criterion, etc.)
+The LighterSystem component encompasses all elements of a deep learning setup, including the model, optimizer, criterion, datasets, and metrics. This is where the core logic of building deep learning models is defined. LighterSystem is highly adaptable, supporting tasks like classification, segmentation, object detection, and self-supervised learning. It provides a structured approach to defining each component, akin to writing your code with a clear framework.
 
-This provides powerful extensibility as training experiments for classification and self-supervised learning can follow a similar template. An example of a LighterSystem for training a supervised classification model on CIFAR10 dataset is shown below,
+This structure offers powerful extensibility, allowing training experiments for classification and self-supervised learning to follow a consistent template. Below is an example of a LighterSystem configuration for training a supervised classification model on the CIFAR10 dataset:
 
 ```yaml
 system:
@@ -70,19 +70,18 @@ system:
           - _target_: torchvision.transforms.Normalize
             mean: [0.5, 0.5, 0.5]
             std: [0.5, 0.5, 0.5]
+      # Format the batch as required by Lighter.
+          - _target_: torchvision.transforms.Lambda
+            lambd: $lambda x: {"input": x[0], "target": x[1]}'
 
-  postprocessing:
-      # Format the batch as required by Lighter as lighter 
-      # takes a dictionary as input. 
-      batch:
-          train: '$lambda x: {"input": x[0], "target": x[1]}'
-             
 ```
 
-For more information about each of the LighterSystem components and how to override them, see [here](./config.md)
+5.  Postprocessing functions can be defined for various stages, such as batch processing, criterion evaluation, metrics calculation, and logging. These functions enable data modification at different points in the workflow, enhancing flexibility and control.
+
+For more information about each of the LighterSystem components and how to override them, see [here](./config.md).
 
 ## Running this experiment with Lighter
-We just combine the Trainer and LighterSystem into a single YAML and run the command in the terminal as shown,
+To run an experiment with Lighter, combine the Trainer and LighterSystem configurations into a single YAML file and execute the following command in your terminal:
 
 === "cifar10.yaml"
     ```yaml
@@ -121,10 +120,9 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
                 std: [0.5, 0.5, 0.5]
 
       postprocessing:
-          # Format the batch as required by Lighter as lighter 
-          # takes a dictionary as input. 
+          # Ensure the batch is formatted as a dictionary with 'input' and 'target' keys.
           batch:
-              train: '$lambda x: {"input": x[0], "target": x[1]}'
+              train: '$lambda x: x'
 
     ```
 === "Terminal"
@@ -133,4 +131,4 @@ We just combine the Trainer and LighterSystem into a single YAML and run the com
     ```
 
 
-Congratulations!! You have run your first training example with Lighter.
+Congratulations! You've successfully run your first training example using Lighter.

@@ -1,21 +1,23 @@
-"""Contains code that patches certain issues from other libraries that we expect will be resolved in the future."""
+"""
+Contains code that patches certain issues from other libraries that we expect will be resolved in the future.
+"""
 
 from torch.nn import ModuleDict
 
 
 class PatchedModuleDict(ModuleDict):
     """
-    A patched version of PyTorch's ModuleDict to address key conflicts.
-
-    This class provides a workaround for the issue described in
-    https://github.com/pytorch/pytorch/issues/71203 by ensuring that
-    keys are uniquely mapped internally to avoid conflicts.
-
-    Args:
-        modules (dict, optional): A dictionary of modules to initialize the ModuleDict.
+    This class provides a workaround for key conflicts in PyTorch's ModuleDict by ensuring unique internal keys.
     """
 
+    # https://github.com/pytorch/pytorch/issues/71203
     def __init__(self, modules=None):
+        """
+        Initializes the PatchedModuleDict with optional modules.
+
+        Args:
+            modules (dict, optional): A dictionary of modules to initialize the ModuleDict.
+        """
         self._key_map = {}
         super().__init__(modules)
 
