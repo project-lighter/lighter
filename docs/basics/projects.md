@@ -1,6 +1,6 @@
 # Using Lighter in your own projects
 
-With Lighter, you can be as hands-on as you wish when using it in your project. For example, you can use a pre-defined Lighter configuration and,
+Lighter offers a flexible framework for integrating deep learning workflows into your projects. Whether you're starting with a pre-defined configuration or building a custom setup, Lighter adapts to your needs. Here’s how you can leverage Lighter:
 
 - [x] Train on your own dataset
 - [x] Train on your data + Add a custom model architecture
@@ -11,7 +11,7 @@ Let's start by looking at each of these one by one. At the end of this, you will
 
 ### Training on your own dataset
 
-If you are reproducing another study you often start with a pre-defined configuration. Let us take the case of `cifar10.yaml` shown in [Quickstart](./quickstart.md). You have a dataset of Chest X-rays that you want to use to reproduce the same training that was done on CIFAR10. With lighter, all you need to change is the highlighted sections.
+When reproducing a study or adapting a model to new data, you often start with a pre-defined configuration. For instance, consider the `cifar10.yaml` example from our [Quickstart](./quickstart.md). Suppose you have a dataset of Chest X-rays and wish to replicate the training process used for CIFAR10. With Lighter, you only need to modify specific sections of the configuration.
 
 ```yaml title="cifar10.yaml"  hl_lines="18-29"
 system:
@@ -45,7 +45,7 @@ system:
             std: [0.5, 0.5, 0.5]
 ```
 
-To replace this with your own dataset, you can create a Pytorch dataset that produces images and targets in the same format as torchvision datasets, i.e (image, target) tuple.
+To integrate your dataset, create a PyTorch dataset class that outputs a dictionary with `input`, `target`, and optionally `id` keys. This ensures compatibility with Lighter's configuration system.
 
 ```py title="/home/user/project/my_xray_dataset.py"
 class MyXRayDataset(Dataset):
@@ -80,20 +80,19 @@ class MyXRayDataset(Dataset):
         img_name = os.path.join(self.root_dir, self.annotations.iloc[idx, 0])
         image = Image.open(img_name)
         target = self.annotations.iloc[idx, 1]
-        sample = {'image': image, 'target': target}
+        sample = {'input': image, 'target': target}
 
         if self.transform:
-            sample['image'] = self.transform(sample['image'])
+            sample['input'] = self.transform(sample['input'])
 
-        return sample['image'], sample['target']
+        return sample
 
 ```
 
-!!! note
-    Lighter works with the default torchvision format of (image, target) and also with `dict` with `input` and `target` keys. The input/target key or tuple can contain complex input/target organization, e.g., multiple images for input and multiple labels for target.
+> **Note:** Lighter requires the dataset to return a dictionary with `input`, `target`, and optionally `id` keys. This format allows for complex input/target structures, such as multiple images or labels.
 
 
-Now that you have built your dataset, all you need to do is add it to the lighter config! But wait, how will Lighter know where your code is? All lighter configs contain a `project` key that takes the full path to where your python code is located. Once you set this up, call `project.my_xray_dataset.` and Lighter will pick up the dataset. 
+Once your dataset is ready, integrate it into the Lighter configuration. The `project` key in the config specifies the path to your Python code, allowing Lighter to locate and utilize your dataset. Simply reference your dataset class, and Lighter will handle the rest.
 
 In the above example, the path of the dataset is `/home/user/project/my_xray_dataset.py`. Copy the config shown above, make the following changes and run on the terminal
 

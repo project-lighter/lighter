@@ -29,7 +29,7 @@ def parse_config(**kwargs) -> ConfigParser:
     Parses and validates configuration files, updating with provided keyword arguments.
 
     Args:
-        **kwargs (dict): Keyword arguments containing 'config' and optional overrides.
+        **kwargs: Keyword arguments containing 'config' and optional overrides.
 
     Returns:
         ConfigParser: The updated configuration parser.
@@ -56,8 +56,8 @@ def run(*methods: str, **kwargs: Any) -> None:
     Executes specified methods of the Lightning Trainer or Tuner.
 
     Args:
-        *methods (str): Method name or names to execute.
-        **kwargs (Any): Keyword arguments for configuration and overrides.
+        methods: Method name or names to execute.
+        **kwargs: Keyword arguments for configuration and overrides.
     """
     for method in methods:
         if method not in ArgsConfigSchema.model_fields:

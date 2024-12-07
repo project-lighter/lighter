@@ -15,14 +15,14 @@ from torch.utils.data.dataloader import default_collate
 default_collate_fn_map.update({type(None): collate_str_fn})
 
 
-def collate_replace_corrupted(batch: Any, dataset: DataLoader, default_collate_fn: Callable = None) -> Any:
+def collate_replace_corrupted(batch: Any, dataset: DataLoader, default_collate_fn: Callable | None = None) -> Any:
     """
     Collate function to handle corrupted examples in a batch by replacing them with valid ones.
 
     Args:
-        batch (Any): The batch of data from the DataLoader.
-        dataset (Dataset): The dataset being used, which should return `None` for corrupted examples.
-        default_collate_fn (Callable): The default collate function to use once the batch is clean.
+        batch: The batch of data from the DataLoader.
+        dataset: The dataset being used, which should return `None` for corrupted examples.
+        default_collate_fn: The default collate function to use once the batch is clean.
 
     Returns:
         A batch with corrupted examples replaced by valid ones.

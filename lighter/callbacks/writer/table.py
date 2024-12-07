@@ -2,7 +2,7 @@
 This module provides the LighterTableWriter class, which saves predictions in a table format, such as CSV.
 """
 
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable
 
 import itertools
 from pathlib import Path
@@ -20,27 +20,27 @@ class LighterTableWriter(LighterBaseWriter):
     Writer for saving predictions in a table format, such as CSV.
 
     Args:
-        path (Union[str, Path]): CSV filepath.
-        writer (Union[str, Callable]): Writer function or name of a registered writer.
+        path: CSV filepath.
+        writer: Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable) -> None:
         super().__init__(path, writer)
         self.csv_records = []
 
     @property
-    def writers(self) -> Dict[str, Callable]:
+    def writers(self) -> dict[str, Callable]:
         return {
             "tensor": lambda tensor: tensor.item() if tensor.numel() == 1 else tensor.tolist(),
         }
 
-    def write(self, tensor: Any, id: Union[int, str]) -> None:
+    def write(self, tensor: Any, id: int | str) -> None:
         """
         Writes the tensor as a table record using the specified writer.
 
         Args:
-            tensor (Any): The tensor to record. Should not have a batch dimension.
-            id (Union[int, str]): Identifier for the record.
+            tensor: The tensor to record. Should not have a batch dimension.
+            id: Identifier for the record.
         """
         self.csv_records.append({"id": id, "pred": self.writer(tensor)})
 
@@ -49,8 +49,8 @@ class LighterTableWriter(LighterBaseWriter):
         Called at the end of the prediction epoch to save predictions to a CSV file.
 
         Args:
-            trainer (Trainer): The trainer instance.
-            pl_module (LighterSystem): The LighterSystem instance.
+            trainer: The trainer instance.
+            pl_module: The LighterSystem instance.
         """
         # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:

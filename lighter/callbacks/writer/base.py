@@ -2,7 +2,7 @@
 This module provides the base class for defining custom writers in Lighter, allowing predictions to be saved in various formats.
 """
 
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable
 
 import gc
 from abc import ABC, abstractmethod
@@ -25,11 +25,11 @@ class LighterBaseWriter(ABC, Callback):
         2) `self.write()` method to specify the saving strategy for a prediction.
 
     Args:
-        path (Union[str, Path]): Path for saving predictions.
-        writer (Union[str, Callable]): Writer function or name of a registered writer.
+        path (str | Path): Path for saving predictions.
+        writer (str | Callable): Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable) -> None:
         self.path = Path(path)
 
         # Check if the writer is a string and if it exists in the writers dictionary
@@ -46,7 +46,7 @@ class LighterBaseWriter(ABC, Callback):
 
     @property
     @abstractmethod
-    def writers(self) -> Dict[str, Callable]:
+    def writers(self) -> dict[str, Callable]:
         """
         Property to define the default writer functions.
         """

@@ -2,7 +2,7 @@
 This module provides utility functions for manipulating PyTorch models, such as replacing layers or loading state_dicts.
 """
 
-from typing import Dict, List
+from typing import List
 
 import torch
 from loguru import logger
@@ -16,10 +16,10 @@ def replace_layer_with(model: Module, layer_name: str, new_layer: Module) -> Mod
     Replaces a specified layer in a PyTorch model with a new layer.
 
     Args:
-        model (Module): The model to modify.
-        layer_name (str): The name of the layer to replace,
+        model: The model to modify.
+        layer_name: The name of the layer to replace,
             using dot notation if necessary (e.g. "layer10.fc.weights").
-        new_layer (Module): The new layer to insert.
+        new_layer: The new layer to insert.
 
     Returns:
         Module: The modified model with the new layer.
@@ -33,8 +33,8 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     Replaces a specified layer in a PyTorch model with an Identity layer.
 
     Args:
-        model (Module): The model to modify.
-        layer_name (str): The name of the layer to replace with an Identity layer,
+        model: The model to modify.
+        layer_name: The name of the layer to replace with an Identity layer,
             using dot notation if necessary (e.g. "layer10.fc.weights").
 
     Returns:
@@ -48,8 +48,8 @@ def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequenti
     Removes a specified number of layers from the end of a model and returns it as a Sequential model.
 
     Args:
-        model (Module): The model to modify.
-        num_layers (int): The number of layers to remove from the end.
+        model: The model to modify.
+        num_layers: The number of layers to remove from the end.
 
     Returns:
         Sequential: The modified model as a Sequential container.
@@ -58,7 +58,10 @@ def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequenti
 
 
 def adjust_prefix_and_load_state_dict(
-    model: Module, ckpt_path: str, ckpt_to_model_prefix: Dict[str, str] = None, layers_to_ignore: List[str] = None
+    model: Module,
+    ckpt_path: str,
+    ckpt_to_model_prefix: dict[str, str] | None = None,
+    layers_to_ignore: List[str] | None = None,
 ) -> Module:
     """
     This function loads a state dictionary from a checkpoint file into a model using `torch.load(strict=False)`.
@@ -72,10 +75,10 @@ def adjust_prefix_and_load_state_dict(
     2. Map the mismatched prefixes accordingly
 
     Args:
-        model (Module): The model to load the state_dict into.
-        ckpt_path (str): The path to the checkpoint file.
-        ckpt_to_model_prefix (Dict[str, str]): Mapping of checkpoint prefixes to model prefixes.
-        layers_to_ignore (List[str]): Layers to ignore when loading the state_dict.
+        model: The model to load the state_dict into.
+        ckpt_path: The path to the checkpoint file.
+        ckpt_to_model_prefix: Mapping of checkpoint prefixes to model prefixes.
+        layers_to_ignore: Layers to ignore when loading the state_dict.
 
     Returns:
         Module: The model with the loaded state_dict.

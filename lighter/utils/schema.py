@@ -2,7 +2,7 @@
 This module defines schemas for configuration validation using Pydantic, ensuring correct structure and types.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, List
 
 import warnings
 
@@ -23,12 +23,12 @@ class ArgsConfigSchema(BaseModel):
     Schema for validating arguments configuration, ensuring correct types and prohibiting certain keys.
     """
 
-    fit: Union[Dict[str, Any], str] = {}
-    validate: Union[Dict[str, Any], str] = {}
-    predict: Union[Dict[str, Any], str] = {}
-    test: Union[Dict[str, Any], str] = {}
-    lr_find: Union[Dict[str, Any], str] = {}
-    scale_batch_size: Union[Dict[str, Any], str] = {}
+    fit: dict[str, Any] | str = {}
+    validate: dict[str, Any] | str = {}
+    predict: dict[str, Any] | str = {}
+    test: dict[str, Any] | str = {}
+    lr_find: dict[str, Any] | str = {}
+    scale_batch_size: dict[str, Any] | str = {}
 
     @model_validator(mode="after")
     def check_prohibited_args(self):
@@ -58,12 +58,12 @@ class ConfigSchema(BaseModel):
     Schema for validating the overall configuration, including system and trainer settings.
     """
 
-    requires: Optional[Any] = None
-    project: Optional[str] = None
-    vars: Dict[str, Any] = {}
+    requires: Any | None = None
+    project: str | None = None
+    vars: dict[str, Any] = {}
     args: ArgsConfigSchema = ArgsConfigSchema()
-    system: Dict[str, Any] = {}
-    trainer: Dict[str, Any] = {}
+    system: dict[str, Any] = {}
+    trainer: dict[str, Any] = {}
 
     def __init__(self, **data):
         # Annoying workardound, Pydantic keeps all underscored keys private
@@ -80,10 +80,10 @@ class DatasetSchema(BaseModel):
     Schema for validating dataset configurations for different stages (train, val, test, predict).
     """
 
-    train: Optional[Dataset] = None
-    val: Optional[Dataset] = None
-    test: Optional[Dataset] = None
-    predict: Optional[Dataset] = None
+    train: Dataset | None = None
+    val: Dataset | None = None
+    test: Dataset | None = None
+    predict: Dataset | None = None
 
 
 class SamplerSchema(BaseModel):
@@ -91,10 +91,10 @@ class SamplerSchema(BaseModel):
     Schema for validating sampler configurations for different stages (train, val, test, predict).
     """
 
-    train: Optional[Sampler] = None
-    val: Optional[Sampler] = None
-    test: Optional[Sampler] = None
-    predict: Optional[Sampler] = None
+    train: Sampler | None = None
+    val: Sampler | None = None
+    test: Sampler | None = None
+    predict: Sampler | None = None
 
 
 class CollateFnSchema(BaseModel):
@@ -102,10 +102,10 @@ class CollateFnSchema(BaseModel):
     Schema for validating collate function configurations for different stages (train, val, test, predict).
     """
 
-    train: Optional[Callable] = None
-    val: Optional[Callable] = None
-    test: Optional[Callable] = None
-    predict: Optional[Callable] = None
+    train: Callable | None = None
+    val: Callable | None = None
+    test: Callable | None = None
+    predict: Callable | None = None
 
 
 class MetricsSchema(BaseModel):
@@ -113,9 +113,9 @@ class MetricsSchema(BaseModel):
     Schema for validating metrics configurations, supporting single or multiple metrics.
     """
 
-    train: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
-    val: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
-    test: Optional[Union[Any, List[Any], Dict[str, Any]]] = None
+    train: Any | List[Any] | dict[str, Any] | None = None
+    val: Any | List[Any] | dict[str, Any] | None = None
+    test: Any | List[Any] | dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def setup_metrics(self):
@@ -123,7 +123,7 @@ class MetricsSchema(BaseModel):
         Converts metrics into a MetricCollection for consistent handling.
 
         Returns:
-            MetricsSchema: The updated schema with MetricCollections.
+            self: The updated schema with MetricCollections.
         """
         for field in self.model_fields:
             if getattr(self, field) is not None:
@@ -136,10 +136,10 @@ class ModeSchema(BaseModel):
     Schema for validating mode-specific configurations, such as postprocessing functions.
     """
 
-    train: Optional[Union[Callable, List[Callable]]] = None
-    val: Optional[Union[Callable, List[Callable]]] = None
-    test: Optional[Union[Callable, List[Callable]]] = None
-    predict: Optional[Union[Callable, List[Callable]]] = None
+    train: Callable | List[Callable] | None = None
+    val: Callable | List[Callable] | None = None
+    test: Callable | List[Callable] | None = None
+    predict: Callable | List[Callable] | None = None
 
 
 class DataSchema(BaseModel):
@@ -147,9 +147,9 @@ class DataSchema(BaseModel):
     Schema for validating data-specific configurations, such as input, target, and prediction processing.
     """
 
-    input: Optional[Union[Callable, List[Callable]]] = None
-    target: Optional[Union[Callable, List[Callable]]] = None
-    pred: Optional[Union[Callable, List[Callable]]] = None
+    input: Callable | List[Callable] | None = None
+    target: Callable | List[Callable] | None = None
+    pred: Callable | List[Callable] | None = None
 
 
 class PostprocessingSchema(BaseModel):

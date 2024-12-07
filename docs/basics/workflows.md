@@ -1,6 +1,6 @@
 # Running Workflows
 
-Once the configuration is established, Lighter can run different deep learning workflows. The following workflows are supported:
+With your configuration in place, Lighter can execute various deep learning workflows. The supported workflows include:
 
 1. fit
 2. validate
@@ -9,25 +9,16 @@ Once the configuration is established, Lighter can run different deep learning w
 
 These workflows are inherited from the PyTorch Lightning trainer and can be found in the [PL docs](https://lightning.ai/docs/pytorch/stable/common/trainer.html#methods).
 
-Below, we show how you can run these workflows and what are some "required" definitions in the config while running these workflows.
+Below, we outline how to run these workflows and highlight the essential configuration elements required for each.
 
 ## Fit workflow
-The fit workflow is used for training the model. It requires the `trainer` and `system` configurations to be defined in the YAML file.
+The fit workflow is designed for training models. Ensure that both the `trainer` and `system` configurations are specified in your YAML file.
 
 ## Validate workflow
-The validate workflow is used to evaluate the model on a validation dataset. Ensure that the `val` dataset is defined in the `system` configuration.
+The validate workflow evaluates models on a validation dataset. Make sure the `val` dataset is defined within the `system` configuration.
 
 ## Test workflow
-The test workflow is used to evaluate the model on a test dataset. Ensure that the `test` dataset is defined in the `system` configuration.
+The test workflow assesses models using a test dataset. Confirm that the `test` dataset is included in the `system` configuration.
 
 ## Predict workflow
-The predict workflow is used to make predictions on new data. Ensure that the `predict` dataset is defined in the `system` configuration.
-
-## Fit workflow
-
-
-## Validate workflow
-
-## Test workflow
-
-## Predict workflow
+The predict workflow generates predictions on new data. Verify that the `predict` dataset is specified in the `system` configuration.

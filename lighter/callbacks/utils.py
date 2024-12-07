@@ -12,7 +12,7 @@ def get_lighter_mode(lightning_stage: str) -> str:
     Converts a PyTorch Lightning stage name to the corresponding Lighter mode name.
 
     Args:
-        lightning_stage (str): The Lightning stage in which the Trainer is operating.
+        lightning_stage: The Lightning stage in which the Trainer is operating.
 
     Returns:
         str: The corresponding Lighter mode name.
@@ -28,7 +28,7 @@ def preprocess_image(image: Tensor) -> Tensor:
     with each column showing a different 3D image stacked vertically.
 
     Args:
-        image (Tensor): A 2D or 3D image tensor.
+        image: A 2D or 3D image tensor.
 
     Returns:
         Tensor: The preprocessed image ready for logging.

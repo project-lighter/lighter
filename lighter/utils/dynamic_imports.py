@@ -2,7 +2,6 @@
 This module provides utilities for dynamic imports, allowing optional imports and importing modules from paths.
 """
 
-from typing import Dict
 
 import importlib
 import sys
@@ -19,7 +18,7 @@ class OptionalImports:
     Handles optional imports, allowing modules to be imported only if they are available.
 
     Attributes:
-        imports (Dict[str, object]): A dictionary to store the imported modules.
+        imports: A dictionary to store the imported modules.
 
     Example:
         ```
@@ -28,25 +27,25 @@ class OptionalImports:
         ```
     """
 
-    imports: Dict[str, object] = field(default_factory=dict)
+    imports: dict[str, object] = field(default_factory=dict)
 
-    def __getitem__(self, module_name: str) -> "module":
+    def __getitem__(self, module_name: str) -> object:
         """
         Get the imported module by name, importing it if necessary.
 
         Args:
-            module_name (str): Name of the module to import.
+            module_name: Name of the module to import.
 
         Raises:
             ImportError: If the module is not available.
 
         Returns:
-            The imported module.
+            object: The imported module.
         """
         """Get the imported module by name.
 
         Args:
-            module_name (str): Name of the module to import.
+            module_name: Name of the module to import.
 
         Raises:
             ImportError: If the module is not available.
@@ -69,8 +68,8 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     Import a module from a given path and assign it a specified name.
 
     Args:
-        module_name (str): Name to assign to the imported module.
-        module_path (str): Path to the module being imported.
+        module_name: Name to assign to the imported module.
+        module_path: Path to the module being imported.
 
     Raises:
         ValueError: If the module has already been imported.

@@ -2,7 +2,7 @@
 This module provides the LighterFileWriter class, which writes predictions to files in various formats.
 """
 
-from typing import Callable, Dict, Union
+from typing import Callable
 
 from functools import partial
 
@@ -22,8 +22,8 @@ class LighterFileWriter(LighterBaseWriter):
     Writer for saving predictions to files in various formats including tensors, images, videos, and ITK images.
     Custom writer functions can be provided to extend supported formats.
     Args:
-        path (Union[str, Path]): Directory path where output files will be saved.
-        writer (Union[str, Callable]): Either a string specifying a built-in writer or a custom writer function.
+        path: Directory path where output files will be saved.
+        writer: Either a string specifying a built-in writer or a custom writer function.
             Built-in writers:
                 - "tensor": Saves raw tensor data (.pt)
                 - "image": Saves as image file (.png)
@@ -38,7 +38,7 @@ class LighterFileWriter(LighterBaseWriter):
     """
 
     @property
-    def writers(self) -> Dict[str, Callable]:
+    def writers(self) -> dict[str, Callable]:
         return {
             "tensor": write_tensor,
             "image": write_image,
@@ -48,13 +48,13 @@ class LighterFileWriter(LighterBaseWriter):
             "itk_nifti": partial(write_itk_image, suffix=".nii.gz"),
         }
 
-    def write(self, tensor: Tensor, id: Union[int, str]) -> None:
+    def write(self, tensor: Tensor, id: int | str) -> None:
         """
         Writes the tensor to a file using the specified writer.
 
         Args:
-            tensor (Tensor): The tensor to write.
-            id (Union[int, str]): Identifier for naming the file.
+            tensor: The tensor to write.
+            id: Identifier for naming the file.
         """
         if not self.path.is_dir():
             raise RuntimeError(f"LighterFileWriter expects a directory path, got {self.path}")
@@ -70,8 +70,8 @@ def write_tensor(path, tensor):
     Writes a tensor to a file in .pt format.
 
     Args:
-        path (Path): The path to save the tensor.
-        tensor (Tensor): The tensor to save.
+        path: The path to save the tensor.
+        tensor: The tensor to save.
     """
     torch.save(tensor, path.with_suffix(".pt"))
 
@@ -81,8 +81,8 @@ def write_image(path, tensor):
     Writes a tensor as an image file in .png format.
 
     Args:
-        path (Path): The path to save the image.
-        tensor (Tensor): The tensor representing the image.
+        path: The path to save the image.
+        tensor: The tensor representing the image.
     """
     path = path.with_suffix(".png")
     tensor = preprocess_image(tensor)
@@ -94,8 +94,8 @@ def write_video(path, tensor):
     Writes a tensor as a video file in .mp4 format.
 
     Args:
-        path (Path): The path to save the video.
-        tensor (Tensor): The tensor representing the video.
+        path: The path to save the video.
+        tensor: The tensor representing the video.
     """
     path = path.with_suffix(".mp4")
     # Video tensor must be divisible by 2. Pad the height and width.
@@ -115,9 +115,9 @@ def write_itk_image(path: str, tensor: Tensor, suffix) -> None:
     Writes a tensor as an ITK image file.
 
     Args:
-        path (str): The path to save the ITK image.
-        tensor (Tensor): The tensor representing the image.
-        suffix (str): The file suffix indicating the format.
+        path: The path to save the ITK image.
+        tensor: The tensor representing the image.
+        suffix: The file suffix indicating the format.
     """
     path = path.with_suffix(suffix)
     itk_image = metatensor_to_itk_image(tensor, channel_dim=0, dtype=tensor.dtype)

@@ -2,7 +2,7 @@
 This module contains miscellaneous utility functions for handling lists, attributes, and function arguments.
 """
 
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, List
 
 import inspect
 
@@ -14,7 +14,7 @@ def ensure_list(input: Any) -> List:
     Ensures that the input is wrapped in a list. If the input is None, returns an empty list.
 
     Args:
-        input (Any): The input to wrap in a list.
+        input: The input to wrap in a list.
 
     Returns:
         List: The input wrapped in a list, or an empty list if input is None.
@@ -33,9 +33,9 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
     Sets an attribute on an object using dot notation.
 
     Args:
-        obj (Callable): The object on which to set the attribute.
-        attr (str): The attribute name, which can use dot notation for nested attributes.
-        value (Any): The value to set the attribute to.
+        obj: The object on which to set the attribute.
+        attr: The attribute name, which can use dot notation for nested attributes.
+        value: The value to set the attribute to.
     """
     if "." not in attr:
         if not hasattr(obj, attr):
@@ -52,8 +52,8 @@ def hasarg(_callable: Callable, arg_name: str) -> bool:
     Checks if a callable (function, method, or class) has a specific argument.
 
     Args:
-        _callable (Callable): The callable to inspect.
-        arg_name (str): The name of the argument to check for.
+        _callable: The callable to inspect.
+        arg_name: The name of the argument to check for.
 
     Returns:
         bool: True if the argument exists, False otherwise.
@@ -67,8 +67,8 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     Retrieves the name of a callable, optionally including the module name.
 
     Args:
-        _callable (Callable): The callable whose name to retrieve.
-        include_module_name (bool): Whether to include the module name in the result.
+        _callable: The callable whose name to retrieve.
+        include_module_name: Whether to include the module name in the result.
 
     Returns:
         str: The name of the callable, optionally prefixed with the module name.
@@ -80,13 +80,13 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     return name
 
 
-def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
+def apply_fns(data: Any, fns: Callable | List[Callable]) -> Any:
     """
     Applies a function or a list of functions to the input data.
 
     Args:
-        data (Any): The data to process.
-        fns (Union[Callable, List[Callable]]): A function or list of functions to apply.
+        data: The data to process.
+        fns: A function or list of functions to apply.
 
     Returns:
         Any: The processed data after applying the function(s).
@@ -96,7 +96,7 @@ def apply_fns(data: Any, fns: Union[Callable, List[Callable]]) -> Any:
     return data
 
 
-def get_optimizer_stats(optimizer: Optimizer) -> Dict[str, float]:
+def get_optimizer_stats(optimizer: Optimizer) -> dict[str, float]:
     """
     Extract learning rates and momentum values from a PyTorch optimizer.
 
@@ -105,10 +105,10 @@ def get_optimizer_stats(optimizer: Optimizer) -> Dict[str, float]:
     the optimizer type and group number (if multiple groups exist).
 
     Args:
-        optimizer (Optimizer): The PyTorch optimizer to extract values from.
+        optimizer: The PyTorch optimizer to extract values from.
 
     Returns:
-        Dict[str, float]: Dictionary containing:
+        dict[str, float]: dictionary containing:
             - Learning rates: "optimizer/{name}/lr[/group{N}]"
             - Momentum values: "optimizer/{name}/momentum[/group{N}]"
 
