@@ -1,5 +1,6 @@
 """
-This module provides the base class for defining custom writers in Lighter, allowing predictions to be saved in various formats.
+This module provides the base class for defining custom writers in Lighter,
+allowing predictions to be saved in various formats.
 """
 
 from typing import Any, Callable

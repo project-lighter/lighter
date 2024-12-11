@@ -86,7 +86,7 @@ def write_image(path, tensor):
     """
     path = path.with_suffix(".png")
     tensor = preprocess_image(tensor)
-    torchvision.io.write_png(tensor, path)
+    torchvision.io.write_png(tensor, str(path))
 
 
 def write_video(path, tensor):

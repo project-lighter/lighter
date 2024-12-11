@@ -16,10 +16,10 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torchmetrics import Metric, MetricCollection
 
+from lighter.engine.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
 from lighter.utils.collate import collate_replace_corrupted
 from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
 from lighter.utils.patches import PatchedModuleDict
-from lighter.utils.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
 
 
 class LighterSystem(pl.LightningModule):

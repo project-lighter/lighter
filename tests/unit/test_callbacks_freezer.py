@@ -40,6 +40,11 @@ def dummy_system():
 
 
 def test_freezer_initialization():
+    with pytest.raises(ValueError, match="At least one of `names` or `name_starts_with` must be specified."):
+        LighterFreezer()
+
+    with pytest.raises(ValueError, match="Only one of `until_step` or `until_epoch` can be specified."):
+        LighterFreezer(names=["layer1"], until_step=10, until_epoch=1)
     freezer = LighterFreezer(names=["layer1"])
     assert freezer.names == ["layer1"]
 
@@ -53,7 +58,80 @@ def test_freezer_functionality(dummy_system):
     assert dummy_system.model.layer2.weight.requires_grad
 
 
+def test_freezer_exceed_until_step(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"], until_step=0)
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+
+
+def test_freezer_exceed_until_epoch(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"], until_epoch=0)
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+
+
+def test_freezer_set_model_requires_grad(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"])
+    freezer._set_model_requires_grad(dummy_system.model, requires_grad=False)
+    assert not dummy_system.model.layer1.weight.requires_grad
+    assert not dummy_system.model.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.model, requires_grad=True)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+
+
+def test_freezer_until_step(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"], until_step=0)
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+
+
+def test_freezer_until_epoch(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"], until_epoch=0)
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+
+
 def test_freezer_with_exceptions(dummy_system):
+    freezer = LighterFreezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert not dummy_system.model.layer1.weight.requires_grad
+    assert not dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.model.layer2.weight.requires_grad
+    assert dummy_system.model.layer2.bias.requires_grad
+    assert not dummy_system.model.layer3.weight.requires_grad
+    assert not dummy_system.model.layer3.bias.requires_grad
+
+
+def test_freezer_except_name_starts_with(dummy_system):
+    freezer = LighterFreezer(name_starts_with=["layer"], except_name_starts_with=["layer2"])
+    trainer = Trainer(callbacks=[freezer], max_epochs=1)
+    trainer.fit(dummy_system)
+    assert not dummy_system.model.layer1.weight.requires_grad
+    assert not dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.model.layer2.weight.requires_grad
+    assert dummy_system.model.layer2.bias.requires_grad
+    assert not dummy_system.model.layer3.weight.requires_grad
+    assert not dummy_system.model.layer3.bias.requires_grad
+
+
+def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
+    freezer = LighterFreezer(names=["layer1.weight", "layer1.bias"], except_names=["layer1.bias"])
+    freezer._set_model_requires_grad(dummy_system.model, requires_grad=False)
+    assert not dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.model, requires_grad=True)
+    assert dummy_system.model.layer1.weight.requires_grad
+    assert dummy_system.model.layer1.bias.requires_grad
     freezer = LighterFreezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)

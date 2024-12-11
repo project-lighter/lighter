@@ -73,10 +73,14 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     Returns:
         str: The name of the callable, optionally prefixed with the module name.
     """
-    name = type(_callable).__name__ if isinstance(_callable, object) else _callable.__name__
+    # Get the name directly from the callable's __name__ attribute
+    name = getattr(_callable, "__name__", type(_callable).__name__)
+
     if include_module_name:
-        module = type(_callable).__module__ if isinstance(_callable, object) else _callable.__module__
+        # Get the module name directly from the callable's __module__ attribute
+        module = getattr(_callable, "__module__", type(_callable).__module__)
         name = f"{module}.{name}"
+
     return name
 
 

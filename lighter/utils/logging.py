@@ -3,7 +3,7 @@ SUPPRESSED_MODULES = [
     "fire",
     "pydantic",
     "monai.bundle",
-    "lighter.utils.runner",
+    "lighter.engine.runner",
     "pytorch_lightning.trainer",
     "lightning_utilities",
     "torch.utils.data.dataloader",

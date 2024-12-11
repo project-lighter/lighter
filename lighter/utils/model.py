@@ -86,50 +86,48 @@ def adjust_prefix_and_load_state_dict(
     Raises:
         ValueError: If there is no overlap between the checkpoint's and model's state_dict.
     """
-
-    # Load checkpoint
+    # Load checkpoint and handle if state_dict is nested.
     ckpt = torch.load(ckpt_path)
-
-    # Check if the checkpoint is a model's state_dict or a LighterSystem checkpoint.
-    # A LighterSystem checkpoint contains the model’s entire internal state, we only need its state_dict.
     if "state_dict" in ckpt:
-        ckpt = ckpt["state_dict"]
-        # Remove the "model." prefix from the checkpoint's state_dict keys. This is characteristic to LighterSystem.
-        ckpt = {key.replace("model.", ""): value for key, value in ckpt.items()}
+        # LighterSystem has a model attribute that contains the actual model, remove the "model." prefix
+        ckpt = {key.replace("model.", ""): value for key, value in ckpt["state_dict"].items()}
 
-    # Adjust the keys in the checkpoint's state_dict to match the the model's state_dict's keys.
-    if ckpt_to_model_prefix is not None:
+    # Adjust checkpoint keys based on prefix mapping
+    adjusted_ckpt = {}
+    if ckpt_to_model_prefix:
         for ckpt_prefix, model_prefix in ckpt_to_model_prefix.items():
-            # Add a dot at the end of the prefix if necessary.
-            ckpt_prefix = ckpt_prefix if ckpt_prefix == "" or ckpt_prefix.endswith(".") else f"{ckpt_prefix}."
-            model_prefix = model_prefix if model_prefix == "" or model_prefix.endswith(".") else f"{model_prefix}."
-            if ckpt_prefix != "":
-                # Replace ckpt_prefix with model_prefix in the checkpoint state_dict
-                ckpt = {key.replace(ckpt_prefix, model_prefix): value for key, value in ckpt.items() if ckpt_prefix in key}
-            else:
-                # Add the model_prefix before the current key name if there's no specific ckpt_prefix
-                ckpt = {f"{model_prefix}{key}": value for key, value in ckpt.items() if ckpt_prefix in key}
+            ckpt_prefix = f"{ckpt_prefix}." if ckpt_prefix and not ckpt_prefix.endswith(".") else ckpt_prefix
+            model_prefix = f"{model_prefix}." if model_prefix and not model_prefix.endswith(".") else model_prefix
 
-    # Check if the checkpoint's and model's state_dicts have no overlap.
+            if ckpt_prefix:
+                adjusted_ckpt.update(
+                    {key.replace(ckpt_prefix, model_prefix): value for key, value in ckpt.items() if ckpt_prefix in key}
+                )
+            else:
+                adjusted_ckpt.update({f"{model_prefix}{key}": value for key, value in ckpt.items()})
+
+        if not adjusted_ckpt:
+            adjusted_ckpt = ckpt
+    else:
+        adjusted_ckpt = ckpt
+
+    # Remove ignored layers if specified
+    if layers_to_ignore:
+        for layer in layers_to_ignore:
+            adjusted_ckpt.pop(layer)
+
+    # Verify overlap between model and checkpoint keys
     model_keys = list(model.state_dict().keys())
-    ckpt_keys = list(ckpt.keys())
-    if not set(ckpt_keys) & set(model_keys):
+    ckpt_keys = list(adjusted_ckpt.keys())
+    if not set(model_keys) & set(ckpt_keys):
         raise ValueError(
             "There is no overlap between checkpoint's and model's state_dict."
-            f"\nModel keys: '{model_keys[0]}', ..., '{model_keys[-1]}', "
-            f"\nCheckpoint keys: '{ckpt_keys[0]}', ..., '{ckpt_keys[-1]}'"
+            f"\nModel keys: {model_keys[0] + ', ..., ' + model_keys[-1] if model_keys else '[]'}"
+            f"\nCheckpoint keys: {ckpt_keys[0] + ', ..., ' + ckpt_keys[-1] if ckpt_keys else '[]'}"
         )
-
-    # Remove the layers that are not to be loaded.
-    if layers_to_ignore is not None:
-        for layer in layers_to_ignore:
-            ckpt.pop(layer)
-
-    # Load the adjusted state_dict into the model instance.
-    incompatible_keys = model.load_state_dict(ckpt, strict=False)
-
-    # Log the incompatible keys during checkpoint loading.
-    if len(incompatible_keys.missing_keys) > 0 or len(incompatible_keys.unexpected_keys) > 0:
+    # Load state dict and handle incompatible keys
+    incompatible_keys = model.load_state_dict(adjusted_ckpt, strict=False)
+    if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
         logger.info(f"Encountered incompatible keys during checkpoint loading. If intended, ignore.\n{incompatible_keys}")
     else:
         logger.info("Checkpoint loaded successfully.")

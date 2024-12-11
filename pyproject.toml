@@ -4,7 +4,7 @@ requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-lighter = "lighter.utils.runner:cli"
+lighter = "lighter.engine.runner:cli"
 
 [tool.poetry]
 name = "project-lighter"
@@ -83,6 +83,7 @@ pytest-html = "^3.2.0"
 pytest-cov = "^4.0.0"
 coverage = "^7.0.5"
 coverage-badge = "^1.1.0"
+av = "12.0.0"  # required to test video writing with torchvision
 
 [tool.poetry.group.dev.dependencies]
 typing-extensions = "^4.4.0"
@@ -179,6 +180,7 @@ source = "lighter"
 
 [coverage.run]
 branch = true
+cov-report = "term-missing"
 
 [coverage.report]
 fail_under = 50

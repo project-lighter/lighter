@@ -11,9 +11,9 @@ from monai.bundle.config_parser import ConfigParser
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.tuner import Tuner
 
+from lighter.engine.schema import ArgsConfigSchema, ConfigSchema
 from lighter.system import LighterSystem
 from lighter.utils.dynamic_imports import import_module_from_path
-from lighter.utils.schema import ArgsConfigSchema, ConfigSchema
 
 
 def cli() -> None:
