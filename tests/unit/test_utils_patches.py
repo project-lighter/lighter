@@ -1,10 +1,14 @@
 import pytest
-from torch.nn import Linear, Module
+from torch.nn import Linear
 
 from lighter.utils.patches import PatchedModuleDict
 
 
 def test_patched_module_dict_basic_operations():
+    """
+    Test basic operations of PatchedModuleDict including initialization,
+    containment checks, and deletion.
+    """
     # Test initialization with modules and basic operations
     modules = {"layer1": Linear(10, 10), "layer2": Linear(10, 10)}
     patched_dict = PatchedModuleDict(modules)
@@ -22,12 +26,19 @@ def test_patched_module_dict_basic_operations():
 
 
 def test_patched_module_dict_non_existent_key():
+    """
+    Test that accessing a non-existent key in PatchedModuleDict raises KeyError.
+    """
     patched_dict = PatchedModuleDict()
     with pytest.raises(KeyError):
         _ = patched_dict["non_existent"]
 
 
 def test_patched_module_dict_collection_methods():
+    """
+    Test collection methods of PatchedModuleDict including keys(), values(),
+    and items().
+    """
     modules = {"key1": Linear(10, 10), "key2": Linear(10, 10)}
     patched_dict = PatchedModuleDict(modules)
 
@@ -49,12 +60,15 @@ def test_patched_module_dict_collection_methods():
 
 
 def test_patched_module_dict_key_conflicts():
+    """
+    Test handling of key assignments and potential conflicts in PatchedModuleDict.
+    """
     patched_dict = PatchedModuleDict()
 
-    # Test multiple internal key iterations
+    # Test multiple key assignments
     module1 = Linear(10, 10)
-    patched_dict._modules["_key"] = module1
-    patched_dict._modules["__key"] = Linear(20, 20)
+    patched_dict["_key"] = module1
+    patched_dict["__key"] = Linear(20, 20)
 
     module3 = Linear(30, 30)
     patched_dict["key"] = module3

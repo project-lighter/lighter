@@ -8,7 +8,7 @@ from functools import partial
 
 import torch
 import torchvision
-from monai.data import metatensor_to_itk_image
+from monai.data import MetaTensor, metatensor_to_itk_image
 from monai.transforms import DivisiblePad
 from torch import Tensor
 
@@ -110,15 +110,17 @@ def write_video(path, tensor):
     torchvision.io.write_video(str(path), tensor, fps=24)
 
 
-def write_itk_image(path: str, tensor: Tensor, suffix) -> None:
+def write_itk_image(path: str, tensor: MetaTensor, suffix) -> None:
     """
     Writes a tensor as an ITK image file.
 
     Args:
         path: The path to save the ITK image.
-        tensor: The tensor representing the image.
+        tensor: The tensor representing the image. Must be in MONAI MetaTensor format.
         suffix: The file suffix indicating the format.
     """
     path = path.with_suffix(suffix)
+    if not isinstance(tensor, MetaTensor):
+        raise TypeError("Tensor must be in MONAI MetaTensor format.")
     itk_image = metatensor_to_itk_image(tensor, channel_dim=0, dtype=tensor.dtype)
     OPTIONAL_IMPORTS["itk"].imwrite(itk_image, str(path), True)

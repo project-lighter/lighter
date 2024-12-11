@@ -8,12 +8,31 @@ from lighter.utils.misc import apply_fns, ensure_list, get_name, get_optimizer_s
 
 
 def test_ensure_list():
+    """
+    Test the ensure_list function which converts various input types to a list.
+
+    Tests:
+        - Converting a single value to a single-item list
+        - Preserving an existing list
+        - Converting a tuple to a list
+    """
     assert ensure_list(1) == [1]
     assert ensure_list([1, 2]) == [1, 2]
     assert ensure_list((1, 2)) == [1, 2]  # Test with tuple input
 
 
 def test_setattr_dot_notation():
+    """
+    Test the setattr_dot_notation function which sets attributes using dot notation.
+
+    Tests:
+        - Setting a direct attribute on an object
+        - Setting a nested attribute using dot notation
+        - Verifying that attempting to set a non-existent attribute raises AttributeError
+
+    The function uses dummy classes to simulate nested object structures.
+    """
+
     class Dummy:
         def __init__(self):
             self.attr = MagicMock()
@@ -36,6 +55,16 @@ def test_setattr_dot_notation():
 
 
 def test_hasarg():
+    """
+    Test the hasarg function which checks if a function has a specific argument.
+
+    Tests:
+        - Verifying that an existing argument is correctly identified
+        - Verifying that a non-existent argument returns False
+
+    Uses a simple test function with two arguments to verify the functionality.
+    """
+
     def func_with_args(a, b):
         pass
 
@@ -44,6 +73,17 @@ def test_hasarg():
 
 
 def test_get_name():
+    """
+    Test the get_name function which retrieves the name of a function or class.
+
+    Tests:
+        - Getting the name of a function
+        - Getting the name of a class
+        - Getting the fully qualified name (including module) of a function
+
+    Verifies both simple name retrieval and module-included name retrieval.
+    """
+
     def sample_function():
         pass
 
@@ -56,6 +96,18 @@ def test_get_name():
 
 
 def test_apply_fns():
+    """
+    Test the apply_fns function which applies one or more functions sequentially to an input.
+
+    Tests:
+        - Applying a single function
+        - Applying the same function twice
+        - Applying different functions in different orders
+
+    Uses simple arithmetic functions (increment and double) to verify the correct
+    order of function application and handling of both single and multiple functions.
+    """
+
     def increment(x):
         return x + 1
 
@@ -69,6 +121,21 @@ def test_apply_fns():
 
 
 def test_get_optimizer_stats():
+    """
+    Test the get_optimizer_stats function which extracts statistics from PyTorch optimizers.
+
+    Tests:
+        - Basic optimizer configuration with single parameter group
+        - Complex optimizer configuration with multiple parameter groups
+
+    Verifies:
+        - Correct extraction of learning rate and momentum values
+        - Proper handling of multiple parameter groups with distinct settings
+        - Correct formatting of stat names including group numbers
+
+    Uses SGD optimizer with both single and multiple parameter group configurations
+    to ensure comprehensive coverage of optimizer statistics extraction.
+    """
     model = torch.nn.Linear(10, 1)
     optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
     stats = get_optimizer_stats(optimizer)
