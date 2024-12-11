@@ -1,4 +1,8 @@
-from typing import Any, List, Optional, Union
+"""
+This module provides the LighterFreezer callback, which allows freezing model parameters during training.
+"""
+
+from typing import Any, List
 
 from loguru import logger
 from pytorch_lightning import Callback, Trainer
@@ -10,18 +14,16 @@ from lighter.utils.misc import ensure_list
 
 class LighterFreezer(Callback):
     """
-    Callback to freeze the parameters/layers of a model. Can be run indefinitely or until a specified step or epoch.
-    `names` and`name_starts_with` can be used to specify which parameters to freeze.
-    If both are specified, the parameters that match any of the two will be frozen.
+    Callback to freeze model parameters during training. Parameters can be frozen by exact name or prefix.
+    Freezing can be applied indefinitely or until a specified step/epoch.
 
     Args:
-        names (str, List[str], optional): Names of the parameters to be frozen. Defaults to None.
-        name_starts_with (str, List[str], optional): Prefixes of the parameter names to be frozen. Defaults to None.
-        except_names (str, List[str], optional): Names of the parameters to be excluded from freezing. Defaults to None.
-        except_name_starts_with (str, List[str], optional): Prefixes of the parameter names to be excluded from freezing.
-            Defaults to None.
-        until_step (int, optional): Maximum step to freeze parameters until. Defaults to None.
-        until_epoch (int, optional): Maximum epoch to freeze parameters until. Defaults to None.
+        names: Full names of parameters to freeze.
+        name_starts_with: Prefixes of parameter names to freeze.
+        except_names: Names of parameters to exclude from freezing.
+        except_name_starts_with: Prefixes of parameter names to exclude from freezing.
+        until_step: Maximum step to freeze parameters until.
+        until_epoch: Maximum epoch to freeze parameters until.
 
     Raises:
         ValueError: If neither `names` nor `name_starts_with` are specified.
@@ -31,12 +33,12 @@ class LighterFreezer(Callback):
 
     def __init__(
         self,
-        names: Optional[Union[str, List[str]]] = None,
-        name_starts_with: Optional[Union[str, List[str]]] = None,
-        except_names: Optional[Union[str, List[str]]] = None,
-        except_name_starts_with: Optional[Union[str, List[str]]] = None,
-        until_step: int = None,
-        until_epoch: int = None,
+        names: str | List[str] | None = None,
+        name_starts_with: str | List[str] | None = None,
+        except_names: str | List[str] | None = None,
+        except_name_starts_with: str | List[str] | None = None,
+        until_step: int | None = None,
+        until_epoch: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -56,6 +58,15 @@ class LighterFreezer(Callback):
         self._frozen_state = False
 
     def on_train_batch_start(self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int) -> None:
+        """
+        Called at the start of each training batch to potentially freeze parameters.
+
+        Args:
+            trainer: The trainer instance.
+            pl_module: The LighterSystem instance.
+            batch: The current batch.
+            batch_idx: The index of the batch.
+        """
         self._on_batch_start(trainer, pl_module)
 
     def on_validation_batch_start(
@@ -75,11 +86,11 @@ class LighterFreezer(Callback):
 
     def _on_batch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
         """
-        Freezes the parameters of the model at the start of each training batch.
+        Freezes or unfreezes model parameters based on the current step or epoch.
 
         Args:
-            trainer (Trainer): Trainer instance.
-            pl_module (LighterSystem): LighterSystem instance.
+            trainer: The trainer instance.
+            pl_module: The LighterSystem instance.
         """
         current_step = trainer.global_step
         current_epoch = trainer.current_epoch
@@ -99,14 +110,13 @@ class LighterFreezer(Callback):
         if not self._frozen_state:
             self._set_model_requires_grad(pl_module, False)
 
-    def _set_model_requires_grad(self, model: Union[Module, LighterSystem], requires_grad: bool) -> None:
+    def _set_model_requires_grad(self, model: Module | LighterSystem, requires_grad: bool) -> None:
         """
-        Sets the requires_grad attribute of the model's parameters.
+        Sets the requires_grad attribute for model parameters, effectively freezing or unfreezing them.
 
         Args:
-            model (Module): PyTorch model whose parameters need to be frozen.
-            requires_grad (bool): Whether to freeze the parameters or not.
-
+            model: The model whose parameters to modify.
+            requires_grad: Whether to allow gradients (unfreeze) or not (freeze).
         """
         # If the model is a `LighterSystem`, get the underlying PyTorch model.
         if isinstance(model, LighterSystem):

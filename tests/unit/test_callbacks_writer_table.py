@@ -11,15 +11,39 @@ from lighter.system import LighterSystem
 
 
 def custom_writer(tensor):
+    """
+    Custom writer function that sums a tensor and returns it in a dictionary.
+
+    Args:
+        tensor (torch.Tensor): Input tensor to be processed
+
+    Returns:
+        dict: Dictionary with key 'custom' and value as the sum of the input tensor
+    """
     return {"custom": tensor.sum().item()}
 
 
 def test_table_writer_initialization():
+    """
+    Test proper initialization of LighterTableWriter.
+
+    Verifies that:
+    - The writer is correctly instantiated with the given path
+    - The path attribute is properly converted to a Path object
+    """
     writer = LighterTableWriter(path="test.csv", writer="tensor")
     assert writer.path == Path("test.csv")
 
 
 def test_table_writer_custom_writer():
+    """
+    Test LighterTableWriter with a custom writer function.
+
+    Verifies that:
+    - Custom writer function is properly integrated
+    - Writer correctly processes tensor input using custom function
+    - Resulting CSV records contain expected values
+    """
     writer = LighterTableWriter(path="test.csv", writer=custom_writer)
     test_tensor = torch.tensor([1, 2, 3])
     writer.write(tensor=test_tensor, id=1)
@@ -27,7 +51,22 @@ def test_table_writer_custom_writer():
 
 
 def test_table_writer_write():
-    """Test LighterTableWriter write functionality with various inputs."""
+    """
+    Test LighterTableWriter write functionality with various inputs.
+
+    Tests:
+    - Basic tensor writing with integer ID
+    - Writing with string ID
+    - Writing floating point tensors
+    - CSV file creation and content verification
+    - Proper handling of different tensor shapes and types
+
+    File Operations:
+    - Creates a temporary CSV file
+    - Writes multiple records with different formats
+    - Verifies file content matches expected records
+    - Cleans up by removing the test file
+    """
     test_file = Path("test.csv")
     writer = LighterTableWriter(path="test.csv", writer="tensor")
 
@@ -65,6 +104,28 @@ def test_table_writer_write():
 
 
 def test_table_writer_write_multi_process(tmp_path, monkeypatch):
+    """
+    Test LighterTableWriter in a multi-process environment.
+
+    Tests:
+    - Writing records from multiple processes
+    - Proper gathering of records across processes
+    - Correct file creation and content verification in distributed setting
+
+    Args:
+        tmp_path (Path): Pytest fixture providing temporary directory path
+        monkeypatch (MonkeyPatch): Pytest fixture for mocking
+
+    Mocked Behaviors:
+    - Simulates 2-process distributed environment
+    - Mocks torch.distributed functions for testing
+    - Simulates gathering of records from multiple ranks
+
+    Verifies:
+    - All records from different processes are properly gathered
+    - CSV file contains correct combined records
+    - Record order and content integrity is maintained
+    """
     test_file = tmp_path / "test.csv"
     writer = LighterTableWriter(path=test_file, writer="tensor")
     trainer = Trainer(max_epochs=1)
