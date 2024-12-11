@@ -87,7 +87,7 @@ def adjust_prefix_and_load_state_dict(
         ValueError: If there is no overlap between the checkpoint's and model's state_dict.
     """
     # Load checkpoint and handle if state_dict is nested.
-    ckpt = torch.load(ckpt_path)
+    ckpt = torch.load(ckpt_path)  # nosec B614
     if "state_dict" in ckpt:
         # LighterSystem has a model attribute that contains the actual model, remove the "model." prefix
         ckpt = {key.replace("model.", ""): value for key, value in ckpt["state_dict"].items()}

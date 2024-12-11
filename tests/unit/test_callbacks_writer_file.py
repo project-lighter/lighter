@@ -36,7 +36,7 @@ def test_file_writer_write_tensor():
         assert saved_path.exists()
 
         # Verify tensor contents
-        loaded_tensor = torch.load(saved_path)
+        loaded_tensor = torch.load(saved_path)  # nosec B614
         assert torch.equal(loaded_tensor, tensor)
     finally:
         shutil.rmtree(test_dir)

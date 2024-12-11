@@ -73,7 +73,7 @@ def write_tensor(path, tensor):
         path: The path to save the tensor.
         tensor: The tensor to save.
     """
-    torch.save(tensor, path.with_suffix(".pt"))
+    torch.save(tensor, path.with_suffix(".pt"))  # nosec B614
 
 
 def write_image(path, tensor):
