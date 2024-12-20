@@ -86,28 +86,6 @@ class DatasetSchema(BaseModel):
     predict: Dataset | None = None
 
 
-class SamplerSchema(BaseModel):
-    """
-    Schema for validating sampler configurations for different stages (train, val, test, predict).
-    """
-
-    train: Sampler | None = None
-    val: Sampler | None = None
-    test: Sampler | None = None
-    predict: Sampler | None = None
-
-
-class CollateFnSchema(BaseModel):
-    """
-    Schema for validating collate function configurations for different stages (train, val, test, predict).
-    """
-
-    train: Callable | None = None
-    val: Callable | None = None
-    test: Callable | None = None
-    predict: Callable | None = None
-
-
 class MetricsSchema(BaseModel):
     """
     Schema for validating metrics configurations, supporting single or multiple metrics.
