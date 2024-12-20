@@ -1,6 +1,5 @@
 ---
-title: Title
-template: index.html
+title: Lighter
 ---
 
 <!-- Fake title -->
@@ -21,21 +20,10 @@ pip install project-lighter
 
 <!-- Body -->
 
-**Lighter** is a PyTorch/Pytorch Lightning framework for **streamlining deep learning experiments though configuration files**.
-
-Say goodbye to messy scripts and notebooks. Lighter is here to help you organize your experiments and make them reproducible.
-
-## Features
-
-1. **Structured** - the pre-defined structure ensures that your experiments are standardized, organized, and reproducible.
-2. **Boilerplate-free** - forget about writing training logic over and over. `LighterSystem` handles it for you and is compatible with any task, from classification to self-supervised learning.
-3. **Readable** - wondering what learning rate or architecture was used? Just glance at the config.
-4. **Easily modifiable** - override parameters from CLI or using another config. Leave `argparse` and hardcoding in the past.
-
-## Comparison
+**Lighter** organizes your experiments through a **configuration file**, with all the **boilerplate code implemented under the hood**. Focus on the core aspects of your research, such as model architecture, datasets, and hyperparameters, **without writing repetitive code** for each experiment:
 
 <div style="display: flex; justify-content: space-between">
-    <div style="width: 49%;">
+    <div style="width: 47%;">
         <h3 style="text-align: center">PyTorch Lightning</h3>
         ```bash title="Terminal"
         python cifar10.py
@@ -96,7 +84,7 @@ Say goodbye to messy scripts and notebooks. Lighter is here to help you organize
         ```
     </div>
 
-    <div style="width: 49%;">
+    <div style="width: 52%;">
         <h3 style="text-align: center">Lighter</h3>
         ```bash title="Terminal"
         lighter fit --config cifar10.yaml
@@ -110,30 +98,31 @@ Say goodbye to messy scripts and notebooks. Lighter is here to help you organize
             _target_: lighter.LighterSystem
             batch_size: 512
 
-            model: torchvision.models.resnet18
-            num_classes: 10
+            model: 
+                _target_: torchvision.models.resnet18
+                num_classes: 10
 
             criterion:
-            _target_: torch.nn.CrossEntropyLoss
+                _target_: torch.nn.CrossEntropyLoss
 
             optimizer:
-            _target_: torch.optim.Adam
-            params: "$@system#model.parameters()"
-            lr: 0.001
+                _target_: torch.optim.Adam
+                params: "$@system#model.parameters()"
+                lr: 0.001
             
             datasets:
                 train:
-                _target_: torchvision.datasets.CIFAR10
-                download: True
-                root: .datasets
-                train: True
-                transform:
-                    _target_: torchvision.transforms.Compose
-                    transforms:
-                    - _target_: torchvision.transforms.ToTensor
-                    - _target_: torchvision.transforms.Normalize
-                    mean: [0.5, 0.5, 0.5]
-                    std: [0.5, 0.5, 0.5]
+                    _target_: torchvision.datasets.CIFAR10
+                    download: True
+                    root: .datasets
+                    train: True
+                    transform:
+                        _target_: torchvision.transforms.Compose
+                        transforms:
+                            - _target_: torchvision.transforms.ToTensor
+                            - _target_: torchvision.transforms.Normalize
+                              mean: [0.5, 0.5, 0.5]
+                              std: [0.5, 0.5, 0.5]
         ```
     </div>
 </div>

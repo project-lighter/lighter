@@ -127,7 +127,6 @@ def test_writer_setup_predict(target_path, caplog):
     writer = MockWriter(path=target_path, writer="tensor")
     writer.setup(trainer, pl_module, stage="predict")
     assert writer._pred_counter == 0
-    assert writer._pred_counter == 0
 
 
 def test_writer_setup_non_predict(target_path):

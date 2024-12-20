@@ -153,4 +153,4 @@ projects/*
 */.DS_Store
 .DS_Store
 .aider*
-test_dir/
+*.txt
