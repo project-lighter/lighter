@@ -8,16 +8,15 @@ from typing import Any, Callable, List, Tuple
 from functools import partial
 
 import pytorch_lightning as pl
-from loguru import logger
 from torch import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import Dataset
 from torchmetrics import Metric, MetricCollection
 
-from lighter.engine.schema import CollateFnSchema, DatasetSchema, MetricsSchema, PostprocessingSchema, SamplerSchema
-from lighter.utils.collate import collate_replace_corrupted
+from lighter.engine.schema import DatasetSchema, MetricsSchema, PostprocessingSchema
+from lighter.utils.data import DataLoader
 from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
 from lighter.utils.patches import PatchedModuleDict
 
@@ -28,18 +27,12 @@ class LighterSystem(pl.LightningModule):
 
     Args:
         model: Model.
-        batch_size: Batch size.
-        drop_last_batch: Whether the last batch in the dataloader should be dropped.
-        num_workers: Number of dataloader workers.
-        pin_memory: Whether to pin the dataloaders memory.
         optimizer: Optimizers.
         scheduler: Learning rate scheduler.
         criterion: Criterion/loss function.
         datasets: Datasets for train, val, test, and predict.
-        samplers: Samplers for train, val, test, and predict.
-        collate_fns: Collate functions for train, val, test, and predict.
+        dataloader: Dataloader factory that creates PyTorch DataLoaders with mode-specific configurations.
         metrics: Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
-
         postprocessing:
             Functions to apply to:
                 1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
@@ -71,16 +64,11 @@ class LighterSystem(pl.LightningModule):
     def __init__(
         self,
         model: Module,
-        batch_size: int,
-        drop_last_batch: bool = False,
-        num_workers: int = 0,
-        pin_memory: bool = True,
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         criterion: Callable | None = None,
         datasets: dict[str, Dataset] | None = None,
-        samplers: dict[str, Sampler] | None = None,
-        collate_fns: dict[str, Callable | List[Callable]] | None = None,
+        dataloader: DataLoader | None = None,
         metrics: dict[str, Metric | List[Metric] | dict[str, Metric]] | None = None,
         postprocessing: dict[str, Callable | List[Callable]] | None = None,
         inferer: Callable | None = None,
@@ -89,21 +77,15 @@ class LighterSystem(pl.LightningModule):
 
         # Model setup
         self.model = model
-        self.batch_size = batch_size
 
         # Criterion, optimizer, and scheduler
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-        # DataLoader specifics
-        self.num_workers = num_workers
-        self.pin_memory = pin_memory
-        self.drop_last_batch = drop_last_batch
-
         self.datasets = DatasetSchema(**(datasets or {})).model_dump()
-        self.samplers = SamplerSchema(**(samplers or {})).model_dump()
-        self.collate_fns = CollateFnSchema(**(collate_fns or {})).model_dump()
+        self.dataloader = dataloader
+
         self.postprocessing = PostprocessingSchema(**(postprocessing or {})).model_dump()
         self.metrics = MetricsSchema(**(metrics or {})).model_dump()
 
@@ -161,63 +143,23 @@ class LighterSystem(pl.LightningModule):
         """
         # Training methods.
         if stage in ["fit", "tune"]:
-            self.train_dataloader = partial(self._base_dataloader, mode="train")
-            self.training_step = partial(self._base_step, mode="train")
+            self.train_dataloader = lambda: self.dataloader(dataset=self.datasets["train"], mode="train")
+            self.training_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="train")
 
         # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
         if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
-            self.val_dataloader = partial(self._base_dataloader, mode="val")
-            self.validation_step = partial(self._base_step, mode="val")
+            self.val_dataloader = lambda: self.dataloader(self.datasets["val"], mode="val", inferer=self.inferer)
+            self.validation_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="val")
 
         # Test methods.
         if stage == "test":
-            self.test_dataloader = partial(self._base_dataloader, mode="test")
-            self.test_step = partial(self._base_step, mode="test")
+            self.test_dataloader = lambda: self.dataloader(self.datasets["test"], mode="test", inferer=self.inferer)
+            self.test_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="test")
 
         # Predict methods.
         if stage == "predict":
-            self.predict_dataloader = partial(self._base_dataloader, mode="predict")
-            self.predict_step = partial(self._base_step, mode="predict")
-
-    def _base_dataloader(self, mode: str) -> DataLoader:
-        """
-        Creates a DataLoader for the specified mode. Replaces None values (corrupted examples) in batches
-        with valid examples using a custom collate function. Dataset should return None for corrupted data.
-
-        Args:
-            mode: The mode of operation (train, val, test, predict).
-
-        Returns:
-            DataLoader: The configured DataLoader.
-        """
-        dataset = self.datasets[mode]
-        sampler = self.samplers[mode]
-        collate_fn = self.collate_fns[mode]
-
-        if dataset is None:
-            raise ValueError(f"Please specify '{mode}' dataset in the 'datasets' key of the config.")
-
-        # Batch size is 1 when using an inference for two reasons:
-        # 1) Inferer separates an input into multiple parts, forming a batch of its own.
-        # 2) The val/test/pred data usually differ in their shape, so they cannot be stacked into a batch.
-        batch_size = self.batch_size
-        if self.inferer is not None and mode in ["val", "test", "predict"]:
-            logger.info(f"Setting the '{mode}' mode dataloader to batch size of 1 because an inferer is provided.")
-            batch_size = 1
-
-        # A dataset can return None when a corrupted example occurs. This collate
-        # function replaces None's with valid examples from the dataset.
-        collate_fn = partial(collate_replace_corrupted, dataset=dataset, default_collate_fn=collate_fn)
-        return DataLoader(
-            dataset,
-            sampler=sampler,
-            shuffle=(mode == "train" and sampler is None),
-            batch_size=batch_size,
-            drop_last=(self.drop_last_batch if mode == "train" else False),
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            collate_fn=collate_fn,
-        )
+            self.predict_dataloader = lambda: self.dataloader(self.datasets["predict"], mode="predict", inferer=self.inferer)
+            self.predict_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="predict")
 
     def _base_step(self, batch: dict, batch_idx: int, mode: str) -> dict[str, Any] | Any:
         """
