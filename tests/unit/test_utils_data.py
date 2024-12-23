@@ -1,4 +1,4 @@
-from lighter.utils.collate import collate_replace_corrupted
+from lighter.utils.data import collate_replace_corrupted
 
 
 def test_collate_replace_corrupted_basic():

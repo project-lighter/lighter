@@ -15,8 +15,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Dataset
 from torchmetrics import Metric, MetricCollection
 
-from lighter.engine.schema import DatasetSchema, MetricsSchema, PostprocessingSchema
-from lighter.utils.data import DataLoader
+from lighter.utils.enums import Mode
 from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
 from lighter.utils.patches import PatchedModuleDict
 
@@ -30,9 +29,13 @@ class LighterSystem(pl.LightningModule):
         optimizer: Optimizers.
         scheduler: Learning rate scheduler.
         criterion: Criterion/loss function.
-        datasets: Datasets for train, val, test, and predict.
-        dataloader: Dataloader factory that creates PyTorch DataLoaders with mode-specific configurations.
-        metrics: Metrics for train, val, and test. Supports a single metric or a list/dict of `torchmetrics` metrics.
+        inferer: Inferer must be a class with a `__call__` method that accepts two
+            arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
+            mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
+            that will infer over the smaller parts of the input, combine them, and return a single output.
+            The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
+        metrics: Metrics for train, val, and test. Supports a single or a list/dict of `torchmetrics` metrics.
+        dataloaders: Dataloaders for train, val, test, and predict.
         postprocessing:
             Functions to apply to:
                 1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
@@ -53,11 +56,6 @@ class LighterSystem(pl.LightningModule):
             Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
             the logging postprocessing will be done on the data that has been postprocessed for the criterion
             and metrics earlier.
-        inferer: Inferer must be a class with a `__call__` method that accepts two
-            arguments - the input to infer over, and the model itself. Used in 'val', 'test', and 'predict'
-            mode, but not in 'train'. Typically, an inferer is a sliding window or a patch-based inferer
-            that will infer over the smaller parts of the input, combine them, and return a single output.
-            The inferers provided by MONAI cover most of such cases (https://docs.monai.io/en/stable/inferers.html).
 
     """
 
@@ -67,11 +65,10 @@ class LighterSystem(pl.LightningModule):
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         criterion: Callable | None = None,
-        datasets: dict[str, Dataset] | None = None,
-        dataloader: DataLoader | None = None,
-        metrics: dict[str, Metric | List[Metric] | dict[str, Metric]] | None = None,
-        postprocessing: dict[str, Callable | List[Callable]] | None = None,
         inferer: Callable | None = None,
+        metrics: dict[str, Metric | List[Metric] | dict[str, Metric]] | None = None,
+        dataloaders: dict[str, Dataset] | None = None,
+        postprocessing: dict[str, Callable | List[Callable]] | None = None,
     ) -> None:
         super().__init__()
 
@@ -83,20 +80,30 @@ class LighterSystem(pl.LightningModule):
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-        self.datasets = DatasetSchema(**(datasets or {})).model_dump()
-        self.dataloader = dataloader
-
-        self.postprocessing = PostprocessingSchema(**(postprocessing or {})).model_dump()
-        self.metrics = MetricsSchema(**(metrics or {})).model_dump()
-
-        self.metrics = PatchedModuleDict(self.metrics)
-
         # Inferer for val, test, and predict
         self.inferer = inferer
 
-        # Bypasses LightningModule's check for dataloader and step methods. We define them dynamically in self.setup().
-        self.train_dataloader = self.val_dataloader = self.test_dataloader = self.predict_dataloader = lambda: []
-        self.training_step = self.validation_step = self.test_step = self.predict_step = lambda: None
+        # Mode-specific metrics
+        for mode, metric in metrics.items():
+            metrics[mode] = MetricCollection(metric) if isinstance(metric, (list, dict)) else metric
+        self.metrics = PatchedModuleDict(metrics)
+
+        # Mode-specific dataloader and step methods
+        if Mode.TRAIN in dataloaders:
+            self.train_dataloader = lambda: dataloaders[Mode.TRAIN]
+            self.train_step = partial(self._step, mode=Mode.TRAIN)
+        if Mode.VAL in dataloaders:
+            self.val_dataloader = lambda: dataloaders[Mode.VAL]
+            self.validation_step = partial(self._step, mode=Mode.VAL)
+        if Mode.TEST in dataloaders:
+            self.test_dataloader = lambda: dataloaders[Mode.TEST]
+            self.test_step = partial(self._step, mode=Mode.TEST)
+        if Mode.PREDICT in dataloaders:
+            self.predict_dataloader = lambda: dataloaders[Mode.PREDICT]
+            self.predict_step = partial(self._step, mode=Mode.PREDICT)
+
+        # Postprocessing
+        self.postprocessing = postprocessing
 
     def forward(self, input: Tensor | List[Tensor] | Tuple[Tensor] | dict[str, Tensor]) -> Any:
         """
@@ -134,34 +141,7 @@ class LighterSystem(pl.LightningModule):
         else:
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
-    def setup(self, stage: str) -> None:
-        """
-        Sets up the dataloaders and step methods for the specified stage.
-
-        Args:
-            stage: The stage of training (fit, validate, test, predict).
-        """
-        # Training methods.
-        if stage in ["fit", "tune"]:
-            self.train_dataloader = lambda: self.dataloader(dataset=self.datasets["train"], mode="train")
-            self.training_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="train")
-
-        # Validation methods. Required in 'validate' stage and optionally in 'fit' or 'tune' stage.
-        if stage == "validate" or (stage in ["fit", "tune"] and self.datasets["val"] is not None):
-            self.val_dataloader = lambda: self.dataloader(self.datasets["val"], mode="val", inferer=self.inferer)
-            self.validation_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="val")
-
-        # Test methods.
-        if stage == "test":
-            self.test_dataloader = lambda: self.dataloader(self.datasets["test"], mode="test", inferer=self.inferer)
-            self.test_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="test")
-
-        # Predict methods.
-        if stage == "predict":
-            self.predict_dataloader = lambda: self.dataloader(self.datasets["predict"], mode="predict", inferer=self.inferer)
-            self.predict_step = lambda batch, batch_idx: self._base_step(batch, batch_idx, mode="predict")
-
-    def _base_step(self, batch: dict, batch_idx: int, mode: str) -> dict[str, Any] | Any:
+    def _step(self, batch: dict, batch_idx: int, mode: str) -> dict[str, Any] | Any:
         """
         Performs a step in the specified mode, processing the batch and calculating loss and metrics.
 
@@ -195,32 +175,32 @@ class LighterSystem(pl.LightningModule):
         id = batch.get("id", None)
 
         # Forward
-        if self.inferer and mode in ["val", "test", "predict"]:
+        if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
             pred = self.inferer(input, self)
         else:
             pred = self(input)
 
         # Postprocessing for loss calculation.
-        input = apply_fns(input, self.postprocessing["criterion"]["input"])
-        target = apply_fns(target, self.postprocessing["criterion"]["target"])
-        pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
+        # input = apply_fns(input, self.postprocessing["criterion"]["input"])
+        # target = apply_fns(target, self.postprocessing["criterion"]["target"])
+        # pred = apply_fns(pred, self.postprocessing["criterion"]["pred"])
 
         # Predict mode stops here.
-        if mode == "predict":
+        if mode == Mode.PREDICT:
             # Postprocessing for logging/writing.
-            pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+            # pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
             return {"pred": pred, "id": id}
 
         # Calculate the loss.
         loss = None
-        if mode in ["train", "val"]:
+        if mode in [Mode.TRAIN, Mode.VAL]:
             # When target is not provided, pass only the predictions to the criterion.
             loss = self.criterion(pred) if target is None else self.criterion(pred, target)
 
         # Postprocessing for metrics.
-        input = apply_fns(input, self.postprocessing["metrics"]["input"])
-        target = apply_fns(target, self.postprocessing["metrics"]["target"])
-        pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
+        # input = apply_fns(input, self.postprocessing["metrics"]["input"])
+        # target = apply_fns(target, self.postprocessing["metrics"]["target"])
+        # pred = apply_fns(pred, self.postprocessing["metrics"]["pred"])
 
         # Calculate the step metrics.
         metrics = None
@@ -228,9 +208,9 @@ class LighterSystem(pl.LightningModule):
             metrics = self.metrics[mode](pred, target)
 
         # Postprocessing for logging/writing.
-        input = apply_fns(input, self.postprocessing["logging"]["input"])
-        target = apply_fns(target, self.postprocessing["logging"]["target"])
-        pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
+        # input = apply_fns(input, self.postprocessing["logging"]["input"])
+        # target = apply_fns(target, self.postprocessing["logging"]["target"])
+        # pred = apply_fns(pred, self.postprocessing["logging"]["pred"])
 
         # Ensure that a dict of losses has a 'total' key.
         if isinstance(loss, dict) and "total" not in loss:
@@ -242,7 +222,7 @@ class LighterSystem(pl.LightningModule):
         # Logging
         self._log_stats(loss, metrics, mode, batch_idx)
 
-        # Return the loss as required by Lightning as well as other data that can be used in hooks or callbacks.
+        # Return the loss as required by Lightning and the other data to use in hooks or callbacks.
         return {
             "loss": loss["total"] if isinstance(loss, dict) else loss,
             "metrics": metrics,
@@ -282,8 +262,9 @@ class LighterSystem(pl.LightningModule):
             for name, metric in metrics.items():
                 on_step_log(f"{mode}/metrics/{name}/step", metric)
                 on_epoch_log(f"{mode}/metrics/{name}/epoch", metric)
+
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
-        if mode == "train" and batch_idx == 0:
+        if mode == Mode.TRAIN and batch_idx == 0:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
                 on_epoch_log(f"{mode}/{name}", optimizer_stat)
 

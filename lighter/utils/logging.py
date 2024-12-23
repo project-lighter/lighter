@@ -1,7 +1,6 @@
 # List of modules to suppress in Rich traceback for cleaner output
 SUPPRESSED_MODULES = [
     "fire",
-    "pydantic",
     "monai.bundle",
     "lighter.engine.runner",
     "pytorch_lightning.trainer",

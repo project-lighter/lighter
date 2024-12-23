@@ -15,20 +15,9 @@ trainer:
 
 system:
     _target_: lighter.LighterSystem
-    batch_size: 512
-    pin_memory: True
-    num_workers: 2
 
     model:
         _target_: "project.models.net.Net"
-
-    # model:
-    #     _target_: monai.networks.nets.EfficientNetBN
-    #     model_name: efficientnet-b0
-    #     pretrained: False
-    #     spatial_dims: 2
-    #     in_channels: 3
-    #     num_classes: 10
 
     criterion:
         _target_: torch.nn.CrossEntropyLoss
@@ -60,50 +49,50 @@ system:
         val: "%#train"
         test: "%#train"
 
-    datasets:
+    dataloaders:
         train:
-            _target_: torchvision.datasets.CIFAR10
-            download: True
-            root: ./.datasets/
-            train: True
-            transform:
-                _target_: torchvision.transforms.Compose
-                transforms:
-                    - _target_: torchvision.transforms.ToTensor
-                    - _target_: torchvision.transforms.Normalize
-                      mean: [0.5, 0.5, 0.5]
-                      std: [0.5, 0.5, 0.5]
-            target_transform: null
+            _target_: torch.utils.data.DataLoader
+            batch_size: 512
+            num_workers: 2
+            pin_memory: True
+            dataset:
+                _target_: torchvision.datasets.CIFAR10
+                download: True
+                root: ./.datasets/
+                train: True
+                transform:
+                    _target_: torchvision.transforms.Compose
+                    transforms:
+                        - _target_: torchvision.transforms.ToTensor
+                        - _target_: torchvision.transforms.Normalize
+                          mean: [0.5, 0.5, 0.5]
+                          std: [0.5, 0.5, 0.5]
+                target_transform: null
   
+        # val: "%#train"
+        # val#dataset#train: False
+
         val:
-          _target_: torchvision.datasets.CIFAR10
-          download: True
-          root: ./.datasets/
-          train:  False  # Same as test, for prototyping purposes only
-          transform:
-              _target_: torchvision.transforms.Compose
-              transforms:
-                  - _target_: torchvision.transforms.ToTensor
-                  - _target_: torchvision.transforms.Normalize
-                    mean: [0.5, 0.5, 0.5]
-                    std: [0.5, 0.5, 0.5]
-          target_transform: null
+            _target_: torch.utils.data.DataLoader
+            batch_size: 512
+            num_workers: 2
+            pin_memory: True
+            dataset:
+                _target_: torchvision.datasets.CIFAR10
+                download: True
+                root: ./.datasets/
+                train: False
+                transform:
+                    _target_: torchvision.transforms.Compose
+                    transforms:
+                        - _target_: torchvision.transforms.ToTensor
+                        - _target_: torchvision.transforms.Normalize
+                          mean: [0.5, 0.5, 0.5]
+                          std: [0.5, 0.5, 0.5]
+                target_transform: null
 
-        test:
-          _target_: torchvision.datasets.CIFAR10
-          download: True
-          root: ./.datasets/
-          train: False
-          transform:
-              _target_: torchvision.transforms.Compose
-              transforms:
-                  - _target_: torchvision.transforms.ToTensor
-                  - _target_: torchvision.transforms.Normalize
-                    mean: [0.5, 0.5, 0.5]
-                    std: [0.5, 0.5, 0.5]
-          target_transform: null
-
-        predict: "%#test"
+        test: "%#val"
+        predict: "%#val"
     
     postprocessing:
         # Format the batch as required by Lighter

@@ -7,20 +7,6 @@ import torchvision
 from torch import Tensor
 
 
-def get_lighter_mode(lightning_stage: str) -> str:
-    """
-    Converts a PyTorch Lightning stage name to the corresponding Lighter mode name.
-
-    Args:
-        lightning_stage: The Lightning stage in which the Trainer is operating.
-
-    Returns:
-        str: The corresponding Lighter mode name.
-    """
-    lightning_to_lighter = {"train": "train", "validate": "val", "test": "test"}
-    return lightning_to_lighter[lightning_stage]
-
-
 def preprocess_image(image: Tensor) -> Tensor:
     """
     Preprocess image for logging. For multiple 2D images, creates a grid.
