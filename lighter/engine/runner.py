@@ -17,7 +17,7 @@ class LighterConfig:
 
     REQUIRED_SECTIONS = {"system", "trainer"}
     OPTIONAL_SECTIONS = {"_meta_", "_requires_", "args", "vars", "project"}
-    ALLOWED_SECTIONS: set[str] = REQUIRED_SECTIONS | OPTIONAL_SECTIONS
+    ALLOWED_SECTIONS = REQUIRED_SECTIONS | OPTIONAL_SECTIONS
     PROHIBITED_STAGE_ARGS = {"model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"}
     DATALOADER_SECTIONS = {Mode.TRAIN, Mode.VAL, Mode.TEST, Mode.PREDICT}
     METRICS_SECTIONS = {Mode.TRAIN, Mode.VAL, Mode.TEST}
@@ -30,13 +30,13 @@ class LighterConfig:
             config_path: Path to the YAML configuration file
             config_overrides: Keyword arguments to override values in the configuration file
         """
-        self.config_parser = ConfigParser()
-        self.config_parser.read_config(config_path)
-        self.config_parser.parse()
-        self.config_parser.update(config_overrides)
-        self.validate_config()
+        self._config_parser = ConfigParser()
+        self._config_parser.read_config(config_path)
+        self._config_parser.parse()
+        self._config_parser.update(config_overrides)
+        self._validate_config()
 
-    def validate_config(self) -> None:
+    def _validate_config(self) -> None:
         """Validate the configuration sections and arguments."""
         config_keys = self.get().keys()
 
@@ -85,13 +85,13 @@ class LighterConfig:
 
     def get(self, key: str | None = None, default: Any = None) -> Any:
         """Get raw content for the given key. If key is None, get the entire config."""
-        return self.config_parser.config if key is None else self.config_parser.config.get(key, default)
+        return self._config_parser.config if key is None else self._config_parser.config.get(key, default)
 
     def get_parsed_content(self, key: str | None = None, default: Any = None) -> Any:
         """
         Get the parsed content for the given key. If key is None, get the entire parsed config.
         """
-        return self.config_parser.get_parsed_content(key, default=default)
+        return self._config_parser.get_parsed_content(key, default=default)
 
 
 class LighterRunner:
@@ -190,7 +190,6 @@ class LighterRunner:
         stage_method(self.system, **self.arguments)
 
     def run(self, stage: str, config: str | None = None, **config_overrides: Any) -> None:
-
         seed_everything()
         self.config = LighterConfig(config, **config_overrides)
         self._setup_stage(stage)
