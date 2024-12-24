@@ -88,4 +88,4 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules[module_name] = module
-    logger.info(f"{module_path.parent} imported as '{module_name}' module.")
+    logger.info(f"Imported {module_path.parent} as module '{module_name}'.")

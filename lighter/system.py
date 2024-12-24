@@ -62,12 +62,12 @@ class LighterSystem(pl.LightningModule):
     def __init__(
         self,
         model: Module,
+        dataloaders: dict[str, Dataset],
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         criterion: Callable | None = None,
         inferer: Callable | None = None,
         metrics: dict[str, Metric | List[Metric] | dict[str, Metric]] | None = None,
-        dataloaders: dict[str, Dataset] | None = None,
         postprocessing: dict[str, Callable | List[Callable]] | None = None,
     ) -> None:
         super().__init__()
@@ -84,14 +84,16 @@ class LighterSystem(pl.LightningModule):
         self.inferer = inferer
 
         # Mode-specific metrics
+        metrics = metrics or {}
         for mode, metric in metrics.items():
             metrics[mode] = MetricCollection(metric) if isinstance(metric, (list, dict)) else metric
         self.metrics = PatchedModuleDict(metrics)
 
         # Mode-specific dataloader and step methods
+        dataloaders = dataloaders or {}
         if Mode.TRAIN in dataloaders:
             self.train_dataloader = lambda: dataloaders[Mode.TRAIN]
-            self.train_step = partial(self._step, mode=Mode.TRAIN)
+            self.training_step = partial(self._step, mode=Mode.TRAIN)
         if Mode.VAL in dataloaders:
             self.val_dataloader = lambda: dataloaders[Mode.VAL]
             self.validation_step = partial(self._step, mode=Mode.VAL)
@@ -103,7 +105,7 @@ class LighterSystem(pl.LightningModule):
             self.predict_step = partial(self._step, mode=Mode.PREDICT)
 
         # Postprocessing
-        self.postprocessing = postprocessing
+        self.postprocessing = postprocessing or {}
 
     def forward(self, input: Tensor | List[Tensor] | Tuple[Tensor] | dict[str, Tensor]) -> Any:
         """
@@ -204,7 +206,7 @@ class LighterSystem(pl.LightningModule):
 
         # Calculate the step metrics.
         metrics = None
-        if self.metrics[mode] is not None:
+        if mode in self.metrics and self.metrics[mode] is not None:
             metrics = self.metrics[mode](pred, target)
 
         # Postprocessing for logging/writing.
