@@ -15,6 +15,7 @@ from pytorch_lightning import Callback, Trainer
 from torch import Tensor
 
 from lighter import LighterSystem
+from lighter.utils.types import Data, Stage
 
 
 class LighterBaseWriter(ABC, Callback):
@@ -75,7 +76,7 @@ class LighterBaseWriter(ABC, Callback):
             pl_module (LighterSystem): The LighterSystem instance.
             stage (str): The current stage of training.
         """
-        if stage != "predict":
+        if stage != Stage.PREDICT:
             return
 
         # Initialize the prediction count with the rank of the current process
@@ -116,13 +117,13 @@ class LighterBaseWriter(ABC, Callback):
             dataloader_idx (int): The index of the dataloader.
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
-        if outputs["id"] is None:
-            batch_size = len(outputs["pred"])
+        if outputs[Data.ID] is None:
+            batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
-            outputs["id"] = list(range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size))
+            outputs[Data.ID] = list(range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size))
             self._pred_counter += batch_size * world_size
 
-        for id, pred in zip(outputs["id"], outputs["pred"]):
+        for id, pred in zip(outputs[Data.ID], outputs[Data.PRED]):
             self.write(tensor=pred, id=id)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398

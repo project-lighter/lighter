@@ -9,7 +9,7 @@ from pytorch_lightning.tuner import Tuner
 
 from lighter.system import LighterSystem
 from lighter.utils.dynamic_imports import import_module_from_path
-from lighter.utils.enums import Mode, Stage
+from lighter.utils.types import Mode, Stage
 
 
 class LighterConfig:
@@ -51,10 +51,10 @@ class LighterConfig:
         if errors:
             raise ValueError("\n".join(errors))
 
-        self._validate_stage_args()
-        self._validate_system_sections()
+        self._validate_args_config()
+        self._validate_system_config()
 
-    def _validate_stage_args(self) -> None:
+    def _validate_args_config(self) -> None:
         # TODO: Verify this method
         """Validate stage-specific arguments in the configuration."""
         args_config = self.get("args", {})
@@ -74,7 +74,7 @@ class LighterConfig:
             elif not isinstance(value, (dict, str)):
                 raise ValueError(f"Invalid type for 'args#{stage}'. Expected dict or str, got {type(value)}")
 
-    def _validate_system_sections(self) -> None:
+    def _validate_system_config(self) -> None:
         # TODO: Verify this method
         """Validate system-specific sections in the configuration."""
         system_config = self.get("system", {})
@@ -114,7 +114,7 @@ class LighterRunner:
         self.config = None
         self.system = None
         self.trainer = None
-        self.arguments = None
+        self.args = None
 
     def _get_stage_config(self, config: dict[str, Any], stage: str) -> dict[str, Any]:
         """Get stage-specific configuration by filtering unused components."""
@@ -138,7 +138,7 @@ class LighterRunner:
             system_config.pop("optimizer", None)
             system_config.pop("scheduler", None)
 
-        # Remove 'args' components that are not relevant to the current stage
+        # Remove args not relevant to the current stage
         if "args" in stage_config:
             stage_config["args"] = {stage: stage_config["args"][stage]} if stage in stage_config["args"] else {}
 
@@ -177,7 +177,7 @@ class LighterRunner:
             raise ValueError("'trainer' must be an instance of Trainer")
 
         # Set up arguments for the stage
-        self.arguments = stage_parser.get_parsed_content(f"args#{stage}", default={})
+        self.args = stage_parser.get_parsed_content(f"args#{stage}", default={})
 
         # Save config to system checkpoint and trainer logger
         self._save_config()
@@ -187,7 +187,7 @@ class LighterRunner:
             stage_method = getattr(self.trainer, stage)
         else:
             stage_method = getattr(Tuner(self.trainer), stage)
-        stage_method(self.system, **self.arguments)
+        stage_method(self.system, **self.args)
 
     def run(self, stage: str, config: str | None = None, **config_overrides: Any) -> None:
         seed_everything()

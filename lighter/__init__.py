@@ -8,9 +8,8 @@ from .utils.logging import _setup_logging
 
 _setup_logging()
 
-# Expose Trainer and Tuner from PyTorch Lightning
+# Expose Trainer from PyTorch Lightning for convenience
 from pytorch_lightning import Trainer
-from pytorch_lightning.tuner import Tuner
 
-# Expose the System
+from .engine import LighterConfig, LighterRunner
 from .system import LighterSystem
