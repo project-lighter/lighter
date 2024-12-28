@@ -6,8 +6,8 @@ import pytest
 import torch
 from pytorch_lightning import Trainer
 
-from lighter.callbacks.writer.table import LighterTableWriter
-from lighter.system import LighterSystem
+from lighter.callbacks.writer.table import TableWriter
+from lighter.system import System
 
 
 def custom_writer(tensor):
@@ -25,26 +25,26 @@ def custom_writer(tensor):
 
 def test_table_writer_initialization():
     """
-    Test proper initialization of LighterTableWriter.
+    Test proper initialization of TableWriter.
 
     Verifies that:
     - The writer is correctly instantiated with the given path
     - The path attribute is properly converted to a Path object
     """
-    writer = LighterTableWriter(path="test.csv", writer="tensor")
+    writer = TableWriter(path="test.csv", writer="tensor")
     assert writer.path == Path("test.csv")
 
 
 def test_table_writer_custom_writer():
     """
-    Test LighterTableWriter with a custom writer function.
+    Test TableWriter with a custom writer function.
 
     Verifies that:
     - Custom writer function is properly integrated
     - Writer correctly processes tensor input using custom function
     - Resulting CSV records contain expected values
     """
-    writer = LighterTableWriter(path="test.csv", writer=custom_writer)
+    writer = TableWriter(path="test.csv", writer=custom_writer)
     test_tensor = torch.tensor([1, 2, 3])
     writer.write(tensor=test_tensor, id=1)
     assert writer.csv_records[0]["pred"] == {"custom": 6}
@@ -52,7 +52,7 @@ def test_table_writer_custom_writer():
 
 def test_table_writer_write():
     """
-    Test LighterTableWriter write functionality with various inputs.
+    Test TableWriter write functionality with various inputs.
 
     Tests:
     - Basic tensor writing with integer ID
@@ -68,7 +68,7 @@ def test_table_writer_write():
     - Cleans up by removing the test file
     """
     test_file = Path("test.csv")
-    writer = LighterTableWriter(path="test.csv", writer="tensor")
+    writer = TableWriter(path="test.csv", writer="tensor")
 
     expected_records = [
         {"id": 1, "pred": [1, 2, 3]},
@@ -105,7 +105,7 @@ def test_table_writer_write():
 
 def test_table_writer_write_multi_process(tmp_path, monkeypatch):
     """
-    Test LighterTableWriter in a multi-process environment.
+    Test TableWriter in a multi-process environment.
 
     Tests:
     - Writing records from multiple processes
@@ -127,7 +127,7 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
     - Record order and content integrity is maintained
     """
     test_file = tmp_path / "test.csv"
-    writer = LighterTableWriter(path=test_file, writer="tensor")
+    writer = TableWriter(path=test_file, writer="tensor")
     trainer = Trainer(max_epochs=1)
 
     # Expected records after gathering from all processes

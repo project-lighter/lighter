@@ -14,11 +14,11 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 from torch import Tensor
 
-from lighter import LighterSystem
+from lighter import System
 from lighter.utils.types import Data, Stage
 
 
-class LighterBaseWriter(ABC, Callback):
+class BaseWriter(ABC, Callback):
     """
     Base class for defining custom Writer. It provides the structure to save predictions in various formats.
 
@@ -67,13 +67,13 @@ class LighterBaseWriter(ABC, Callback):
             id (int): Identifier for the tensor, can be used for naming files or adding table records.
         """
 
-    def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
+    def setup(self, trainer: Trainer, pl_module: System, stage: str) -> None:
         """
         Sets up the writer, ensuring the path is ready for saving predictions.
 
         Args:
             trainer (Trainer): The trainer instance.
-            pl_module (LighterSystem): The LighterSystem instance.
+            pl_module (System): The System instance.
             stage (str): The current stage of training.
         """
         if stage != Stage.PREDICT:
@@ -103,14 +103,14 @@ class LighterBaseWriter(ABC, Callback):
             )
 
     def on_predict_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
+        self, trainer: Trainer, pl_module: System, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         """
         Callback method executed at the end of each prediction batch to write predictions with unique IDs.
 
         Args:
             trainer (Trainer): The trainer instance.
-            pl_module (LighterSystem): The LighterSystem instance.
+            pl_module (System): The System instance.
             outputs (Any): The outputs from the prediction step.
             batch (Any): The current batch.
             batch_idx (int): The index of the batch.

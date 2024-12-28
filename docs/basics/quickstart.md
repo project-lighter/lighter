@@ -19,7 +19,7 @@ At the heart of the Lighter ecosystem is a YAML configuration file. This file ac
 A Lighter config contains two main components:
 
 - **Trainer**: Manages the training loop and related settings.
-- **LighterSystem**: Defines the model, datasets, optimizer, and other components.
+- **System**: Defines the model, datasets, optimizer, and other components.
 
 ### Trainer
 The Trainer section encapsulates all the details necessary for running training, evaluation, or inference processes. It is a vital component of training automation in PyTorch Lightning. For more details, refer to the [PyTorch Lightning Trainer documentation](https://lightning.ai/docs/pytorch/stable/common/trainer.html).
@@ -35,14 +35,14 @@ trainer:
 
 For more information see [here](./config.md)
 
-### LighterSystem
-The LighterSystem component encompasses all elements of a deep learning setup, including the model, optimizer, criterion, datasets, and metrics. This is where the core logic of building deep learning models is defined. LighterSystem is highly adaptable, supporting tasks like classification, segmentation, object detection, and self-supervised learning. It provides a structured approach to defining each component, akin to writing your code with a clear framework.
+### System
+The System component encompasses all elements of a deep learning setup, including the model, optimizer, criterion, datasets, and metrics. This is where the core logic of building deep learning models is defined. System is highly adaptable, supporting tasks like classification, segmentation, object detection, and self-supervised learning. It provides a structured approach to defining each component, akin to writing your code with a clear framework.
 
-This structure offers powerful extensibility, allowing training experiments for classification and self-supervised learning to follow a consistent template. Below is an example of a LighterSystem configuration for training a supervised classification model on the CIFAR10 dataset:
+This structure offers powerful extensibility, allowing training experiments for classification and self-supervised learning to follow a consistent template. Below is an example of a System configuration for training a supervised classification model on the CIFAR10 dataset:
 
 ```yaml
 system:
-  _target_: lighter.LighterSystem
+  _target_: lighter.System
   batch_size: 512
 
   model:
@@ -78,10 +78,10 @@ system:
 
 5.  Postprocessing functions can be defined for various stages, such as batch processing, criterion evaluation, metrics calculation, and logging. These functions enable data modification at different points in the workflow, enhancing flexibility and control.
 
-For more information about each of the LighterSystem components and how to override them, see [here](./config.md).
+For more information about each of the System components and how to override them, see [here](./config.md).
 
 ## Running this experiment with Lighter
-To run an experiment with Lighter, combine the Trainer and LighterSystem configurations into a single YAML file and execute the following command in your terminal:
+To run an experiment with Lighter, combine the Trainer and System configurations into a single YAML file and execute the following command in your terminal:
 
 === "cifar10.yaml"
     ```yaml
@@ -90,7 +90,7 @@ To run an experiment with Lighter, combine the Trainer and LighterSystem configu
       max_epochs: 100
       
     system:
-      _target_: lighter.LighterSystem
+      _target_: lighter.System
       batch_size: 512
 
       model:

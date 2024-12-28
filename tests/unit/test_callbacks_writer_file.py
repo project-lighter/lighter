@@ -7,14 +7,14 @@ import pytest
 import torch
 from PIL import Image
 
-from lighter.callbacks.writer.file import LighterFileWriter
+from lighter.callbacks.writer.file import FileWriter
 
 
 def test_file_writer_initialization():
-    """Test the initialization of LighterFileWriter class.
+    """Test the initialization of FileWriter class.
 
     This test verifies that:
-    1. The LighterFileWriter is initialized with the correct path
+    1. The FileWriter is initialized with the correct path
     2. The writer function is properly assigned based on the writer type
     3. The directory is created and cleaned up properly
 
@@ -24,7 +24,7 @@ def test_file_writer_initialization():
     path = Path("test_dir")
     path.mkdir(exist_ok=True)  # Ensure the directory exists
     try:
-        writer = LighterFileWriter(path=path, writer="tensor")
+        writer = FileWriter(path=path, writer="tensor")
         assert writer.path == Path("test_dir")
         assert writer.writer.__name__ == "write_tensor"  # Verify writer function
     finally:
@@ -32,7 +32,7 @@ def test_file_writer_initialization():
 
 
 def test_file_writer_write_tensor():
-    """Test tensor writing functionality of LighterFileWriter.
+    """Test tensor writing functionality of FileWriter.
 
     This test verifies that:
     1. A tensor can be successfully written to disk
@@ -45,7 +45,7 @@ def test_file_writer_write_tensor():
     test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
-        writer = LighterFileWriter(path=test_dir, writer="tensor")
+        writer = FileWriter(path=test_dir, writer="tensor")
         tensor = torch.tensor([1, 2, 3])
         writer.write(tensor, id=1)
 
@@ -61,7 +61,7 @@ def test_file_writer_write_tensor():
 
 
 def test_file_writer_write_image():
-    """Test image writing functionality of LighterFileWriter.
+    """Test image writing functionality of FileWriter.
 
     This test verifies that:
     1. A tensor representing an image can be successfully written to disk as PNG
@@ -74,7 +74,7 @@ def test_file_writer_write_image():
     test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
-        writer = LighterFileWriter(path=test_dir, writer="image")
+        writer = FileWriter(path=test_dir, writer="image")
         tensor = torch.randint(0, 256, (3, 64, 64), dtype=torch.uint8)
         writer.write(tensor, id="image_test")
 
@@ -91,7 +91,7 @@ def test_file_writer_write_image():
 
 
 def test_file_writer_write_video():
-    """Test video writing functionality of LighterFileWriter.
+    """Test video writing functionality of FileWriter.
 
     This test verifies that:
     1. A tensor representing a video can be successfully written to disk as MP4
@@ -103,7 +103,7 @@ def test_file_writer_write_video():
     test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
-        writer = LighterFileWriter(path=test_dir, writer="video")
+        writer = FileWriter(path=test_dir, writer="video")
         tensor = torch.randint(0, 256, (3, 10, 64, 64), dtype=torch.uint8)
         writer.write(tensor, id="video_test")
 
@@ -115,7 +115,7 @@ def test_file_writer_write_video():
 
 
 def test_file_writer_write_grayscale_video():
-    """Test grayscale video writing functionality of LighterFileWriter.
+    """Test grayscale video writing functionality of FileWriter.
 
     This test verifies that:
     1. A single-channel (grayscale) video tensor can be successfully written to disk
@@ -128,7 +128,7 @@ def test_file_writer_write_grayscale_video():
     test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
-        writer = LighterFileWriter(path=test_dir, writer="video")
+        writer = FileWriter(path=test_dir, writer="video")
         # Create a grayscale video tensor with 1 channel
         tensor = torch.randint(0, 256, (1, 10, 64, 64), dtype=torch.uint8)
         writer.write(tensor, id="grayscale_video_test")
@@ -141,7 +141,7 @@ def test_file_writer_write_grayscale_video():
 
 
 def test_file_writer_write_itk_image():
-    """Test ITK image writing functionality of LighterFileWriter.
+    """Test ITK image writing functionality of FileWriter.
 
     This test verifies that:
     1. The writer correctly handles MONAI MetaTensor format
@@ -154,7 +154,7 @@ def test_file_writer_write_itk_image():
     test_dir = Path("test_dir")
     test_dir.mkdir(exist_ok=True)
     try:
-        writer = LighterFileWriter(path=test_dir, writer="itk_nrrd")
+        writer = FileWriter(path=test_dir, writer="itk_nrrd")
         tensor = torch.rand(1, 1, 64, 64, 64)  # Example 3D tensor
 
         # Test with regular tensor
@@ -173,7 +173,7 @@ def test_file_writer_write_itk_image():
 
 
 def test_file_writer_invalid_directory():
-    """Test error handling for invalid directory paths in LighterFileWriter.
+    """Test error handling for invalid directory paths in FileWriter.
 
     This test verifies that:
     1. Using a file path instead of a directory path raises appropriate errors
@@ -186,12 +186,12 @@ def test_file_writer_invalid_directory():
     test_file = Path("test_file.txt")
     test_file.touch()  # Create a file instead of a directory
     try:
-        with pytest.raises(RuntimeError, match="LighterFileWriter expects a directory path"):
-            writer = LighterFileWriter(path=test_file, writer="tensor")
+        with pytest.raises(RuntimeError, match="FileWriter expects a directory path"):
+            writer = FileWriter(path=test_file, writer="tensor")
             writer.write(torch.tensor([1, 2, 3]), id=1)
     finally:
         test_file.unlink()  # Clean up the file after test
 
     with pytest.raises(RuntimeError):
-        writer = LighterFileWriter(path=Path("invalid_dir"), writer="tensor")
+        writer = FileWriter(path=Path("invalid_dir"), writer="tensor")
         writer.write(torch.tensor([1, 2, 3]), id=1)

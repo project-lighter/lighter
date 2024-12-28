@@ -1,5 +1,5 @@
 """
-This module defines the LighterSystem class, which encapsulates the components of a deep learning system,
+This module defines the System class, which encapsulates the components of a deep learning system,
 including the model, optimizer, datasets, and more. It extends PyTorch Lightning's LightningModule.
 """
 
@@ -20,9 +20,9 @@ from lighter.utils.patches import PatchedModuleDict
 from lighter.utils.types import Batch, Data, Mode
 
 
-class LighterSystem(pl.LightningModule):
+class System(pl.LightningModule):
     """
-    LighterSystem encapsulates the components of a deep learning system, extending PyTorch Lightning's LightningModule.
+    System encapsulates the components of a deep learning system, extending PyTorch Lightning's LightningModule.
 
     Args:
         model: Model.

@@ -1,5 +1,5 @@
 """
-This module provides the LighterTableWriter class, which saves predictions in a table format, such as CSV.
+This module provides the TableWriter class, which saves predictions in a table format, such as CSV.
 """
 
 from typing import Any, Callable
@@ -11,11 +11,11 @@ import pandas as pd
 import torch
 from pytorch_lightning import Trainer
 
-from lighter import LighterSystem
-from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter import System
+from lighter.callbacks.writer.base import BaseWriter
 
 
-class LighterTableWriter(LighterBaseWriter):
+class TableWriter(BaseWriter):
     """
     Writer for saving predictions in a table format, such as CSV.
 
@@ -44,13 +44,13 @@ class LighterTableWriter(LighterBaseWriter):
         """
         self.csv_records.append({"id": id, "pred": self.writer(tensor)})
 
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
+    def on_predict_epoch_end(self, trainer: Trainer, pl_module: System) -> None:
         """
         Called at the end of the prediction epoch to save predictions to a CSV file.
 
         Args:
             trainer: The trainer instance.
-            pl_module: The LighterSystem instance.
+            pl_module: The System instance.
         """
         # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:

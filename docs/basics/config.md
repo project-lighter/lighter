@@ -6,7 +6,7 @@ Our configuration system is inspired by the MONAI bundle parser, offering a stan
 
 The configuration is divided into two main components:
 - **Trainer**: Handles the training process, including epochs, devices, etc.
-- **LighterSystem**: Encapsulates the model, optimizer, datasets, and other components.
+- **System**: Encapsulates the model, optimizer, datasets, and other components.
 
 Let's explore a simple example configuration to understand Lighter's configuration system better. You can expand each section for more details on specific concepts.
 
@@ -19,7 +19,7 @@ trainer:
   max_epochs (2): 100
 
 system:
-  _target_: lighter.LighterSystem
+  _target_: lighter.System
   batch_size: 512
 
   model:
@@ -71,10 +71,10 @@ The trainer object (`pytorch_lightning.Trainer`) is initialized using the `_targ
 
 The `max_epochs` parameter is passed to the `pytorch_lightning.Trainer` object during instantiation. You can provide any argument accepted by the class in this manner.
 
-### LighterSystem Configuration
-While Lighter utilizes the Trainer from PyTorch Lightning, LighterSystem is a unique component that incorporates concepts from PL, such as LightningModule, to encapsulate all essential elements of a deep learning system in a straightforward manner.
+### System Configuration
+While Lighter utilizes the Trainer from PyTorch Lightning, System is a unique component that incorporates concepts from PL, such as LightningModule, to encapsulate all essential elements of a deep learning system in a straightforward manner.
 
-Concepts encapsulated by LighterSystem include,
+Concepts encapsulated by System include,
 
 #### Model definition
 The `torchvision` library is included by default in Lighter, allowing you to select various torchvision models. Additionally, Lighter includes `monai`, enabling you to easily switch to a ResNet model by adjusting your configuration as follows:
@@ -82,7 +82,7 @@ The `torchvision` library is included by default in Lighter, allowing you to sel
 === "Torchvision ResNet18"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: torchvision.models.resnet18
@@ -93,7 +93,7 @@ The `torchvision` library is included by default in Lighter, allowing you to sel
 === "MONAI ResNet50"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: monai.networks.nets.resnet50
@@ -105,7 +105,7 @@ The `torchvision` library is included by default in Lighter, allowing you to sel
 === "MONAI 3DResNet50"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: monai.networks.nets.resnet50
@@ -121,7 +121,7 @@ Just as you can override models, Lighter allows you to switch between various lo
 
 === "CrossEntropyLoss"
     ```yaml
-    LighterSystem:
+    System:
       ...
       criterion:
         _target_: torch.nn.CrossEntropyLoss
@@ -130,7 +130,7 @@ Just as you can override models, Lighter allows you to switch between various lo
 
 === "MONAI's Dice Loss"
     ```yaml
-    LighterSystem:
+    System:
       ...
       criterion:
         _target_: monai.losses.DiceLoss
@@ -142,7 +142,7 @@ Just as you can override models, Lighter allows you to switch between various lo
 
 Similarly, you can experiment with different optimizer parameters. Model parameters are passed directly to the optimizer via the `params` argument.
 ```yaml hl_lines="5" 
-LighterSystem:
+System:
   ...
   optimizer:
     _target_: torch.optim.Adam
@@ -153,7 +153,7 @@ LighterSystem:
 
 You can also define a scheduler for the optimizer as shown below:
 ```yaml hl_lines="10"
-LighterSystem:
+System:
   ...
   optimizer:
     _target_: torch.optim.Adam
@@ -178,7 +178,7 @@ Datasets are often the most frequently modified part of the configuration, as wo
 <div class="annotate" markdown>
 
 ```yaml
-LighterSystem:
+System:
   ...
   datasets:
     train:

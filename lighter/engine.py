@@ -7,12 +7,12 @@ from monai.bundle.config_parser import ConfigParser
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.tuner import Tuner
 
-from lighter.system import LighterSystem
+from lighter.system import System
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types import Mode, Stage
 
 
-class LighterConfig:
+class Config:
     """Configuration manager for ML experiments using YAML files."""
 
     REQUIRED_SECTIONS = {"system", "trainer"}
@@ -94,7 +94,7 @@ class LighterConfig:
         return self._config_parser.get_parsed_content(key, default=default)
 
 
-class LighterRunner:
+class Runner:
 
     TRAINER_STAGE_MODES = {
         Stage.FIT: [Mode.TRAIN, Mode.VAL],
@@ -168,8 +168,8 @@ class LighterRunner:
 
         # Initialize system
         self.system = stage_parser.get_parsed_content("system")
-        if not isinstance(self.system, LighterSystem):
-            raise ValueError("'system' must be an instance of LighterSystem")
+        if not isinstance(self.system, System):
+            raise ValueError("'system' must be an instance of System")
 
         # Initialize trainer
         self.trainer = stage_parser.get_parsed_content("trainer")
@@ -191,13 +191,13 @@ class LighterRunner:
 
     def run(self, stage: str, config: str | None = None, **config_overrides: Any) -> None:
         seed_everything()
-        self.config = LighterConfig(config, **config_overrides)
+        self.config = Config(config, **config_overrides)
         self._setup_stage(stage)
         self._run_stage(stage)
 
 
 def cli():
-    runner = LighterRunner()
+    runner = Runner()
 
     class Commands:
         def __init__(self):

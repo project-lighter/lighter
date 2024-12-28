@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter.callbacks.writer.base import BaseWriter
 
 
 @pytest.fixture
@@ -19,9 +19,9 @@ def target_path():
     return Path("test")
 
 
-class MockWriter(LighterBaseWriter):
+class MockWriter(BaseWriter):
     """
-    Mock implementation of LighterBaseWriter for testing purposes.
+    Mock implementation of BaseWriter for testing purposes.
 
     This class provides a minimal implementation of the abstract base class
     with a simple tensor writer function.
@@ -66,7 +66,7 @@ def test_writer_initialization(target_path):
     writer = MockWriter(path=target_path, writer="tensor")
     assert callable(writer.writer)
     with pytest.raises(TypeError):
-        LighterBaseWriter(path=target_path, writer="tensor")
+        BaseWriter(path=target_path, writer="tensor")
 
 
 def test_on_predict_batch_end(target_path):

@@ -150,7 +150,7 @@ projects/*
 !projects/README.md
 !projects/cifar10
 **/predictions/
-*/.DS_Store
-.DS_Store
+**/.DS_Store
 .aider*
 test_dir/
+*.code-workspace
