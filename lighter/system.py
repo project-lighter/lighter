@@ -13,11 +13,15 @@ from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import Dataset
+from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
 from lighter.utils.patches import PatchedModuleDict
 from lighter.utils.types import Batch, Data, Mode
+
+# Patch the original collate function to allow None values in the batch. Done within the function to avoid global changes.
+default_collate_fn_map.update({type(None): collate_str_fn})
 
 
 class System(pl.LightningModule):
@@ -258,8 +262,8 @@ class System(pl.LightningModule):
         Args:
             name (str): key to log.
             value (Any): value to log.
-            on_step (bool, optional): if ``True`` logs at this step.
-            on_epoch (bool, optional): if `True` logs epoch accumulated metrics.
+            on_step (bool, optional): if True, logs on step.
+            on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
         """
         self.log(name, value, logger=True, batch_size=self.batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
 

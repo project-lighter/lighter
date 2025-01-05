@@ -193,6 +193,8 @@ disable = """
     too-many-arguments,
     no-else-return,
 """
+allowed-redefined-builtins = [ 'id', 'input' ]
+
 generated-members = "torch.*"
 
 [tool.pylint.master]

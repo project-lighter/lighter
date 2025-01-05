@@ -95,7 +95,6 @@ class Config:
 
 
 class Runner:
-
     TRAINER_STAGE_MODES = {
         Stage.FIT: [Mode.TRAIN, Mode.VAL],
         Stage.VALIDATE: [Mode.VAL],
@@ -151,7 +150,6 @@ class Runner:
             self.trainer.logger.log_hyperparams(self.config.get())
 
     def _setup_stage(self, stage: str) -> None:
-
         if stage not in self.STAGE_MODES:
             raise ValueError(f"Invalid stage: {stage}. Must be one of {list(self.STAGE_MODES.keys())}")
 

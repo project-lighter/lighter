@@ -9,12 +9,12 @@ trainer:
     log_every_n_steps: 10
     logger: False
     callbacks:
-        - _target_: lighter.callbacks.LighterFileWriter
+        - _target_: lighter.callbacks.FileWriter
           path: '$f"{@project}/predictions"'
           writer: tensor
 
 system:
-    _target_: lighter.LighterSystem
+    _target_: lighter.System
 
     model:
         _target_: "project.models.net.Net"
