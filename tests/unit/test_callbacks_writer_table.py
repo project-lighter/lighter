@@ -46,7 +46,7 @@ def test_table_writer_custom_writer():
     """
     writer = TableWriter(path="test.csv", writer=custom_writer)
     test_tensor = torch.tensor([1, 2, 3])
-    writer.write(tensor=test_tensor, id=1)
+    writer.write(tensor=test_tensor, identifier=1)
     assert writer.csv_records[0]["pred"] == {"custom": 6}
 
 
@@ -55,8 +55,8 @@ def test_table_writer_write():
     Test TableWriter write functionality with various inputs.
 
     Tests:
-    - Basic tensor writing with integer ID
-    - Writing with string ID
+    - Basic tensor writing with integer IDENTIFIER
+    - Writing with string IDENTIFIER
     - Writing floating point tensors
     - CSV file creation and content verification
     - Proper handling of different tensor shapes and types
@@ -71,30 +71,30 @@ def test_table_writer_write():
     writer = TableWriter(path="test.csv", writer="tensor")
 
     expected_records = [
-        {"id": 1, "pred": [1, 2, 3]},
-        {"id": "some_id", "pred": -1},
-        {"id": 1331, "pred": [1.5, 2.5]},
+        {"identifier": 1, "pred": [1, 2, 3]},
+        {"identifier": "some_id", "pred": -1},
+        {"identifier": 1331, "pred": [1.5, 2.5]},
     ]
     # Test basic write
-    writer.write(tensor=torch.tensor(expected_records[0]["pred"]), id=expected_records[0]["id"])
+    writer.write(tensor=torch.tensor(expected_records[0]["pred"]), identifier=expected_records[0]["identifier"])
     assert len(writer.csv_records) == 1
     assert writer.csv_records[0]["pred"] == expected_records[0]["pred"]
-    assert writer.csv_records[0]["id"] == expected_records[0]["id"]
+    assert writer.csv_records[0]["identifier"] == expected_records[0]["identifier"]
 
     # Test edge cases
-    writer.write(tensor=torch.tensor(expected_records[1]["pred"]), id=expected_records[1]["id"])
-    writer.write(tensor=torch.tensor(expected_records[2]["pred"]), id=expected_records[2]["id"])
+    writer.write(tensor=torch.tensor(expected_records[1]["pred"]), identifier=expected_records[1]["identifier"])
+    writer.write(tensor=torch.tensor(expected_records[2]["pred"]), identifier=expected_records[2]["identifier"])
     trainer = Trainer(max_epochs=1)
     writer.on_predict_epoch_end(trainer, mock.Mock())
 
     # Verify file creation and content
     assert test_file.exists()
     df = pd.read_csv(test_file)
-    df["id"] = df["id"].astype(str)
+    df["identifier"] = df["identifier"].astype(str)
     df["pred"] = df["pred"].apply(eval)
 
     for record in expected_records:
-        row = df[df["id"] == str(record["id"])]
+        row = df[df["identifier"] == str(record["identifier"])]
         assert not row.empty
         pred_value = row["pred"].iloc[0]  # get the value from the Series
         assert pred_value == record["pred"]
@@ -131,8 +131,8 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
     trainer = Trainer(max_epochs=1)
 
     # Expected records after gathering from all processes
-    rank0_records = [{"id": 1, "pred": [1, 2, 3]}]  # records from rank 0
-    rank1_records = [{"id": 2, "pred": [4, 5, 6]}]  # records from rank 1
+    rank0_records = [{"identifier": 1, "pred": [1, 2, 3]}]  # records from rank 0
+    rank1_records = [{"identifier": 2, "pred": [4, 5, 6]}]  # records from rank 1
     expected_records = rank0_records + rank1_records
 
     # Mock distributed functions for multi-process simulation
@@ -156,12 +156,12 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
 
     # Verify file content
     df = pd.read_csv(test_file)
-    df["id"] = df["id"].astype(str)
+    df["identifier"] = df["identifier"].astype(str)
     df["pred"] = df["pred"].apply(eval)
 
     # Check that all expected records are in the CSV
     for record in expected_records:
-        row = df[df["id"] == str(record["id"])]
+        row = df[df["identifier"] == str(record["identifier"])]
         assert not row.empty
         pred_value = row["pred"].iloc[0]
         assert pred_value == record["pred"]

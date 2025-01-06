@@ -15,7 +15,7 @@ from pytorch_lightning import Callback, Trainer
 from torch import Tensor
 
 from lighter import System
-from lighter.utils.types import Data, Stage
+from lighter.utils.types.enums import Data, Stage
 
 
 class BaseWriter(ABC, Callback):
@@ -54,7 +54,7 @@ class BaseWriter(ABC, Callback):
         """
 
     @abstractmethod
-    def write(self, tensor: Tensor, id: int) -> None:
+    def write(self, tensor: Tensor, identifier: int) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
         the batch dimension.
@@ -64,7 +64,7 @@ class BaseWriter(ABC, Callback):
 
         Args:
             tensor (Tensor): Tensor, without the batch dimension, to be saved.
-            id (int): Identifier for the tensor, can be used for naming files or adding table records.
+            identifier (int): Identifier for the tensor, can be used for naming files or adding table records.
         """
 
     def setup(self, trainer: Trainer, pl_module: System, stage: str) -> None:
@@ -117,14 +117,16 @@ class BaseWriter(ABC, Callback):
             dataloader_idx (int): The index of the dataloader.
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
-        if outputs[Data.ID] is None:
+        if outputs[Data.IDENTIFIER] is None:
             batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
-            outputs[Data.ID] = list(range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size))
+            outputs[Data.IDENTIFIER] = list(
+                range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size)
+            )
             self._pred_counter += batch_size * world_size
 
-        for id, pred in zip(outputs[Data.ID], outputs[Data.PRED]):
-            self.write(tensor=pred, id=id)
+        for identifier, pred in zip(outputs[Data.IDENTIFIER], outputs[Data.PRED]):
+            self.write(tensor=pred, identifier=identifier)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]

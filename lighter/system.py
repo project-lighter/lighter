@@ -16,9 +16,9 @@ from torch.utils.data import Dataset
 from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.misc import apply_fns, get_optimizer_stats, hasarg
-from lighter.utils.patches import PatchedModuleDict
-from lighter.utils.types import Batch, Data, Mode
+from lighter.utils.misc import get_optimizer_stats, hasarg
+from lighter.utils.types.containers import Adapters, DataLoaders, Metrics
+from lighter.utils.types.enums import Data, Mode
 
 # Patch the original collate function to allow None values in the batch. Done within the function to avoid global changes.
 default_collate_fn_map.update({type(None): collate_str_fn})
@@ -35,26 +35,7 @@ class System(pl.LightningModule):
         criterion: Criterion (loss) function.
         metrics: Metrics for train, val, and test. Supports a single or a list/dict of `torchmetrics` metrics.
         dataloaders: Dataloaders for train, val, test, and predict.
-        postprocessing:
-            Functions to apply to:
-                1) The batch returned from the train/val/test/predict Dataset. Defined separately for each.
-                2) The input, target, or pred data prior to criterion/metrics/logging. Defined separately for each.
-
-            Follow this structure (all keys are optional):
-            ```
-                batch:
-                    train:
-                    val:
-                    test:
-                    predict:
-                criterion / metrics / logging:
-                    input:
-                    target:
-                    pred:
-            ```
-            Note that the postprocessing of a latter stage stacks on top of the prior ones - for example,
-            the logging postprocessing will be done on the data that has been postprocessed for the criterion
-            and metrics earlier.
+        adapters: TODO
         inferer: Inferer to use in val/test/predict modes.
             See MONAI inferers for more details: (https://docs.monai.io/en/stable/inferers.html).
 
@@ -68,7 +49,7 @@ class System(pl.LightningModule):
         scheduler: LRScheduler | None = None,
         criterion: Callable | None = None,
         metrics: dict[str, Metric | List[Metric] | dict[str, Metric]] | None = None,
-        postprocessing: dict[str, Callable | List[Callable]] | None = None,
+        adapters: dict[str, Callable] | None = None,
         inferer: Callable | None = None,
     ) -> None:
         super().__init__()
@@ -81,28 +62,25 @@ class System(pl.LightningModule):
         self.inferer = inferer
 
         # Metrics
-        metrics = metrics or {}
-        for mode, metric in metrics.items():
-            metrics[mode] = MetricCollection(metric) if isinstance(metric, (list, dict)) else metric
-        self.metrics = PatchedModuleDict(metrics)
+        self.metrics = Metrics(**(metrics or {}))
 
-        # Dataloader and step methods
-        dataloaders = dataloaders or {}
-        if Mode.TRAIN in dataloaders:
-            self.train_dataloader = lambda: dataloaders[Mode.TRAIN]
+        # Adapters
+        self.adapters = Adapters(**(adapters or {}))
+
+        # Set up methods for dataloaders and steps
+        dataloaders = DataLoaders(**(dataloaders or {}))
+        if dataloaders.train is not None:
+            self.train_dataloader = lambda: dataloaders.train
             self.training_step = partial(self._step, mode=Mode.TRAIN)
-        if Mode.VAL in dataloaders:
-            self.val_dataloader = lambda: dataloaders[Mode.VAL]
+        if dataloaders.val is not None:
+            self.val_dataloader = lambda: dataloaders.val
             self.validation_step = partial(self._step, mode=Mode.VAL)
-        if Mode.TEST in dataloaders:
-            self.test_dataloader = lambda: dataloaders[Mode.TEST]
+        if dataloaders.test is not None:
+            self.test_dataloader = lambda: dataloaders.test
             self.test_step = partial(self._step, mode=Mode.TEST)
-        if Mode.PREDICT in dataloaders:
-            self.predict_dataloader = lambda: dataloaders[Mode.PREDICT]
+        if dataloaders.predict is not None:
+            self.predict_dataloader = lambda: dataloaders.predict
             self.predict_step = partial(self._step, mode=Mode.PREDICT)
-
-        # Postprocessing
-        self.postprocessing = postprocessing or {}
 
     def forward(self, input: Tensor | List[Tensor] | Tuple[Tensor] | dict[str, Tensor]) -> Any:
         """
@@ -150,20 +128,15 @@ class System(pl.LightningModule):
             mode: The mode of operation (train, val, test, predict).
         Returns:
             dict or Any: For predict step, returns prediction only. For other steps,
-            returns dict with loss, metrics, input, target, pred, and id. Loss is None
+            returns dict with loss, metrics, input, target, pred, and identifier. Loss is None
             for test step, metrics is None if unspecified.
         """
-        # Postprocessing for the batch. Useful for reformatting the batch data into the required format.
-        batch = apply_fns(batch, self.postprocessing["batch"][mode])
+        adapters = getattr(self.adapters, mode)
 
-        # Validate the batch structure.
-        try:
-            batch = Batch(**batch)
-        except (TypeError, ValueError) as e:
-            raise type(e)(f"Batch must be a dict with keys: 'input', 'target' (optional), 'id' (optional).\nError: {e}")
-
-        # Unpack the batch. The target and id are None if not provided by the dataloader.
-        id, input, target = batch.id, batch.input, batch.target
+        # Batch adapter formats the batch into the required format
+        input = adapters.batch.input(batch)
+        target = adapters.batch.target(batch)
+        identifier = adapters.batch.identifier(batch)
 
         # Forward
         if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
@@ -171,56 +144,36 @@ class System(pl.LightningModule):
         else:
             pred = self(input)
 
-        # Postprocessing for loss calculation.
-        # input = apply_fns(input, self.postprocessing["criterion"][Data.INPUT])
-        # target = apply_fns(target, self.postprocessing["criterion"][Data.TARGET])
-        # pred = apply_fns(pred, self.postprocessing["criterion"][Data.PRED])
-
         # Predict mode stops here.
         if mode == Mode.PREDICT:
-            # Postprocessing for logging/writing.
-            # pred = apply_fns(pred, self.postprocessing["logging"][Data.PRED])
-            return {Data.PRED: pred, Data.ID: id}
+            # Logging adapter applies any specied transforms to for pred data
+            return {Data.IDENTIFIER: identifier, Data.PRED: adapters.logging.pred(pred)}
 
         # Calculate the loss.
         loss = None
         if mode in [Mode.TRAIN, Mode.VAL]:
-            # When target is not provided, pass only the predictions to the criterion.
-            loss = self.criterion(pred) if target is None else self.criterion(pred, target)
+            loss = adapters.criterion(self.criterion, input=input, target=target, pred=pred)
+            if isinstance(loss, dict) and "total" not in loss:
+                raise ValueError(
+                    "The loss dictionary must include a 'total' key that combines all sublosses. "
+                    "Example: {'total': combined_loss, 'subloss1': loss1, ...}"
+                )
 
-        # Postprocessing for metrics.
-        # input = apply_fns(input, self.postprocessing["metrics"][Data.INPUT])
-        # target = apply_fns(target, self.postprocessing["metrics"][Data.TARGET])
-        # pred = apply_fns(pred, self.postprocessing["metrics"][Data.PRED])
+        # Calculate the metrics. If no metrics are specified, the returned metrics value is None.
+        metrics = getattr(self.metrics, mode)
+        if metrics is not None:
+            metrics = adapters.metrics(metrics, input=input, target=target, pred=pred)
 
-        # Calculate the step metrics.
-        metrics = None
-        if mode in self.metrics and self.metrics[mode] is not None:
-            metrics = self.metrics[mode](pred, target)
+        self._log_stats(loss=loss, metrics=metrics, mode=mode, batch_idx=batch_idx)
 
-        # Postprocessing for logging/writing.
-        # input = apply_fns(input, self.postprocessing["logging"][Data.INPUT])
-        # target = apply_fns(target, self.postprocessing["logging"][Data.TARGET])
-        # pred = apply_fns(pred, self.postprocessing["logging"][Data.PRED])
-
-        # Ensure that a dict of losses has a 'total' key.
-        if isinstance(loss, dict) and "total" not in loss:
-            raise ValueError(
-                "The loss dictionary must include a 'total' key that combines all sublosses. "
-                "Example: {'total': combined_loss, 'subloss1': loss1, ...}"
-            )
-
-        # Logging
-        self._log_stats(loss, metrics, mode, batch_idx)
-
-        # Return the loss as required by Lightning and the other data to use in hooks or callbacks.
+        # Return Lightning-required loss and additional data for callbacks like logging
         return {
             "loss": loss["total"] if isinstance(loss, dict) else loss,
             "metrics": metrics,
-            Data.INPUT: input,
-            Data.TARGET: target,
-            Data.PRED: pred,
-            Data.ID: id,
+            Data.IDENTIFIER: identifier,
+            Data.INPUT: adapters.logging.input(input),
+            Data.TARGET: adapters.logging.target(target),
+            Data.PRED: adapters.logging.pred(pred),
         }
 
     def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, mode: str, batch_idx: int) -> None:

@@ -37,13 +37,13 @@ class MockWriter(BaseWriter):
         """
         return {"tensor": lambda x: None}
 
-    def write(self, tensor, id):
+    def write(self, tensor, identifier):
         """
         Mock implementation of the write method.
 
         Args:
             tensor: The tensor to write
-            id: Identifier for the tensor
+            identifier: Identifier for the tensor
         """
         pass
 
@@ -92,13 +92,13 @@ def test_on_predict_batch_end(target_path):
     writer = MockWriter(path=target_path, writer="tensor")
     writer._pred_counter = 0
 
-    outputs = {"pred": [torch.tensor([1, 2, 3])], "id": None}
+    outputs = {"pred": [torch.tensor([1, 2, 3])], "identifier": None}
     batch = MagicMock()
     batch_idx = 0
 
     writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
 
-    assert outputs["id"] == [0]
+    assert outputs["identifier"] == [0]
     assert trainer.predict_loop._predictions == [[]]
     assert writer._pred_counter == 1
 

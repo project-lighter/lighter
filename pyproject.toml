@@ -193,7 +193,7 @@ disable = """
     too-many-arguments,
     no-else-return,
 """
-allowed-redefined-builtins = [ 'id', 'input' ]
+allowed-redefined-builtins = [ 'input' ]
 
 generated-members = "torch.*"
 

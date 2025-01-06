@@ -26,7 +26,7 @@ class DummyDataset(Dataset):
 
         data = {"input": x, "target": y}
         if self.return_id:
-            data["id"] = f"id_{idx}"
+            data["identifier"] = f"id_{idx}"
         return data
 
 
@@ -102,8 +102,8 @@ def test_invalid_batch_values(base_system):
     with pytest.raises(ValueError, match="Batch's 'target' value cannot be None"):
         base_system._base_step(invalid_batch, 0, "train")
 
-    invalid_batch = {"input": torch.randn(1, 3, 32, 32), "id": None}
-    with pytest.raises(ValueError, match="Batch's 'id' value cannot be None"):
+    invalid_batch = {"input": torch.randn(1, 3, 32, 32), "identifier": None}
+    with pytest.raises(ValueError, match="Batch's 'identifier' value cannot be None"):
         base_system._base_step(invalid_batch, 0, "train")
 
 

@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch.optim import SGD
 
-from lighter.utils.misc import apply_fns, ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
+from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
 
 
 def test_ensure_list():
@@ -93,31 +93,6 @@ def test_get_name():
     assert get_name(sample_function) == "sample_function"
     assert get_name(Dummy) == "Dummy"
     assert "test_utils_misc" in get_name(sample_function, include_module_name=True)
-
-
-def test_apply_fns():
-    """
-    Test the apply_fns function which applies one or more functions sequentially to an input.
-
-    Tests:
-        - Applying a single function
-        - Applying the same function twice
-        - Applying different functions in different orders
-
-    Uses simple arithmetic functions (increment and double) to verify the correct
-    order of function application and handling of both single and multiple functions.
-    """
-
-    def increment(x):
-        return x + 1
-
-    def double(x):
-        return x * 2
-
-    assert apply_fns(1, increment) == 2
-    assert apply_fns(1, [increment, increment]) == 3
-    assert apply_fns(2, [increment, double]) == 6
-    assert apply_fns(2, [double, increment]) == 5
 
 
 def test_get_optimizer_stats():

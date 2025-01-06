@@ -9,18 +9,22 @@ from pytorch_lightning.tuner import Tuner
 
 from lighter.system import System
 from lighter.utils.dynamic_imports import import_module_from_path
-from lighter.utils.types import Mode, Stage
+from lighter.utils.types.enums import Mode, Stage
 
 
 class Config:
-    """Configuration manager for ML experiments using YAML files."""
-
     REQUIRED_SECTIONS = {"system", "trainer"}
     OPTIONAL_SECTIONS = {"_meta_", "_requires_", "args", "vars", "project"}
     ALLOWED_SECTIONS = REQUIRED_SECTIONS | OPTIONAL_SECTIONS
     PROHIBITED_STAGE_ARGS = {"model", "train_loaders", "validation_loaders", "dataloaders", "datamodule"}
     DATALOADER_SECTIONS = {Mode.TRAIN, Mode.VAL, Mode.TEST, Mode.PREDICT}
     METRICS_SECTIONS = {Mode.TRAIN, Mode.VAL, Mode.TEST}
+    ADAPTERS_SECTIONS = {
+        Mode.TRAIN: {"batch", "model", "criterion", "metrics", "logging"},
+        Mode.VAL: {"batch", "model", "criterion", "metrics", "logging"},
+        Mode.TEST: {"batch", "model", "metrics", "logging"},
+        Mode.PREDICT: {"batch", "model", "logging"},
+    }
 
     def __init__(self, config_path: str | None = None, **config_overrides: Any):
         """
@@ -75,13 +79,51 @@ class Config:
                 raise ValueError(f"Invalid type for 'args#{stage}'. Expected dict or str, got {type(value)}")
 
     def _validate_system_config(self) -> None:
-        # TODO: Verify this method
         """Validate system-specific sections in the configuration."""
         system_config = self.get("system", {})
-        for key, valid in [("dataloaders", self.DATALOADER_SECTIONS), ("metrics", self.METRICS_SECTIONS)]:
-            if key in system_config:
-                if invalid := set(system_config[key].keys()) - valid:
-                    raise ValueError(f"Invalid section(s) in 'system.{key}': {invalid}. Allowed sections are: {valid}")
+
+        # Handle dataloaders and metrics (which use simple sets)
+        if "dataloaders" in system_config:
+            if invalid := set(system_config["dataloaders"].keys()) - self.DATALOADER_SECTIONS:
+                raise ValueError(
+                    f"Invalid section(s) in 'system.dataloaders': {invalid}. Allowed sections are: {self.DATALOADER_SECTIONS}"
+                )
+
+        if "metrics" in system_config:
+            if invalid := set(system_config["metrics"].keys()) - self.METRICS_SECTIONS:
+                raise ValueError(
+                    f"Invalid section(s) in 'system.metrics': {invalid}. Allowed sections are: {self.METRICS_SECTIONS}"
+                )
+
+        # Handle adapters (which uses a dict of sets)
+        if "adapters" in system_config:
+            adapters_config = system_config["adapters"]
+            if invalid_modes := set(adapters_config.keys()) - set(self.ADAPTERS_SECTIONS.keys()):
+                raise ValueError(
+                    f"Invalid mode(s) in 'system.adapters': {invalid_modes}. Allowed modes are: {set(self.ADAPTERS_SECTIONS.keys())}"
+                )
+
+            # Validate the structure of each adapter
+            self._validate_adapters_structure(adapters_config)
+
+    def _validate_adapters_structure(self, adapters_config: dict) -> None:
+        """Validate the structure of adapters configuration."""
+        for mode, adapter in adapters_config.items():
+            if not isinstance(adapter, dict):
+                raise ValueError(f"Adapter configuration for mode '{mode}' must be a dictionary")
+
+            allowed_keys = self.ADAPTERS_SECTIONS[mode]
+
+            # Check each key in the adapter
+            for key, value in adapter.items():
+                # Skip validation for interpolated values (starting with '%' or '@')
+                if isinstance(value, str) and value.startswith(("%", "@")):
+                    continue
+
+                if key not in allowed_keys:
+                    raise ValueError(
+                        f"Invalid key '{key}' found in adapter '{mode}'. " f"Allowed keys for {mode} mode are: {allowed_keys}"
+                    )
 
     def get(self, key: str | None = None, default: Any = None) -> Any:
         """Get raw content for the given key. If key is None, get the entire config."""

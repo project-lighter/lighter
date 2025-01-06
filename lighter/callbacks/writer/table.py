@@ -34,15 +34,15 @@ class TableWriter(BaseWriter):
             "tensor": lambda tensor: tensor.item() if tensor.numel() == 1 else tensor.tolist(),
         }
 
-    def write(self, tensor: Any, id: int | str) -> None:
+    def write(self, tensor: Any, identifier: int | str) -> None:
         """
         Writes the tensor as a table record using the specified writer.
 
         Args:
             tensor: The tensor to record. Should not have a batch dimension.
-            id: Identifier for the record.
+            identifier: Identifier for the record.
         """
-        self.csv_records.append({"id": id, "pred": self.writer(tensor)})
+        self.csv_records.append({"identifier": identifier, "pred": self.writer(tensor)})
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: System) -> None:
         """
@@ -63,10 +63,10 @@ class TableWriter(BaseWriter):
         if trainer.is_global_zero:
             df = pd.DataFrame(self.csv_records)
             try:
-                df = df.sort_values("id")
+                df = df.sort_values("identifier")
             except TypeError:
                 pass
-            df = df.set_index("id")
+            df = df.set_index("identifier")
             df.to_csv(self.path)
 
         # Clear the records after saving

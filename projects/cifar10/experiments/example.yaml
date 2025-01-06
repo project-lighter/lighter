@@ -68,9 +68,6 @@ system:
                           mean: [0.5, 0.5, 0.5]
                           std: [0.5, 0.5, 0.5]
                 target_transform: null
-  
-        # val: "%#train"
-        # val#dataset#train: False
 
         val:
             _target_: torch.utils.data.DataLoader
@@ -93,11 +90,13 @@ system:
 
         test: "%#val"
         predict: "%#val"
-    
-    postprocessing:
-        # Format the batch as required by Lighter
-        batch:
-            train: '$lambda x: {"input": x[0], "target": x[1]}'
-            val: "%#train"
-            test: "%#train"
-            predict: "%#train"
+
+    adapters:
+        train:
+            batch:
+                _target_: lighter.adapters.BatchAdapter
+                input_accessor: 0
+                target_accessor: 1
+        val: "%#train"
+        test: "%#train"
+        predict: "%#train"
