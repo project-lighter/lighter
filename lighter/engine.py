@@ -121,9 +121,7 @@ class Config:
                     continue
 
                 if key not in allowed_keys:
-                    raise ValueError(
-                        f"Invalid key '{key}' found in adapter '{mode}'. " f"Allowed keys for {mode} mode are: {allowed_keys}"
-                    )
+                    raise ValueError(f"Invalid key '{key}' in adapter '{mode}'. Allowed keys for '{mode}' are: {allowed_keys}")
 
     def get(self, key: str | None = None, default: Any = None) -> Any:
         """Get raw content for the given key. If key is None, get the entire config."""

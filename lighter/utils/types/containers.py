@@ -1,19 +1,50 @@
-from typing import Any, Callable
+from typing import Any
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 
-from torch import nn
 from torchmetrics import Metric, MetricCollection
 
 from lighter.adapters import BatchAdapter, CriterionAdapter, LoggingAdapter, MetricsAdapter
 
 
-class Metrics(nn.Module):
-    def __init__(self, train=None, val=None, test=None):
-        super().__init__()
-        self.train = MetricCollection(train) if train is not None else {}
-        self.val = MetricCollection(val) if val is not None else {}
-        self.test = MetricCollection(test) if test is not None else {}
+def nested(cls):
+    """
+    Decorator to handle nested dataclass creation.
+    Example:
+        ```
+        @nested
+        @dataclass
+        class Example:
+            ...
+        ```
+    """
+    original_init = cls.__init__
+
+    def __init__(self, *args, **kwargs):
+        for f in fields(cls):
+            if is_dataclass(f.type) and f.name in kwargs:
+                kwargs[f.name] = f.type(**kwargs[f.name])
+        original_init(self, *args, **kwargs)
+
+    cls.__init__ = __init__
+    return cls
+
+
+@dataclass
+class Metrics:
+    train: Metric | MetricCollection | None = None
+    val: Metric | MetricCollection | None = None
+    test: Metric | MetricCollection | None = None
+
+    def __post_init__(self):
+        self.train = self._convert_to_collection(self.train)
+        self.val = self._convert_to_collection(self.val)
+        self.test = self._convert_to_collection(self.test)
+
+    def _convert_to_collection(self, x):
+        if x and not isinstance(x, MetricCollection):
+            return MetricCollection(x)
+        return {}
 
 
 @dataclass
@@ -61,6 +92,7 @@ class Predict:
     logging: LoggingAdapter = field(default_factory=LoggingAdapter)
 
 
+@nested
 @dataclass
 class Adapters:
     """Root configuration class for all adapters across different modes."""
@@ -69,14 +101,3 @@ class Adapters:
     val: Val = field(default_factory=Val)
     test: Test = field(default_factory=Test)
     predict: Predict = field(default_factory=Predict)
-
-    def __post_init__(self):
-        """Ensure nested dataclasses are properly initialized."""
-        if isinstance(self.train, dict):
-            self.train = Train(**self.train)
-        if isinstance(self.val, dict):
-            self.val = Val(**self.val)
-        if isinstance(self.test, dict):
-            self.test = Test(**self.test)
-        if isinstance(self.predict, dict):
-            self.predict = Predict(**self.predict)

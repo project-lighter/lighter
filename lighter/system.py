@@ -5,6 +5,7 @@ including the model, optimizer, datasets, and more. It extends PyTorch Lightning
 
 from typing import Any, Callable, List, Tuple
 
+from dataclasses import asdict
 from functools import partial
 
 import pytorch_lightning as pl
@@ -59,15 +60,16 @@ class System(pl.LightningModule):
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.metrics = Metrics(**(metrics or {}))
+        self.adapters = Adapters(**(adapters or {}))
         self.inferer = inferer
 
-        # Metrics
-        self.metrics = Metrics(**(metrics or {}))
+        # Register metrics to move them to the appropriate device. ModuleDict not used because 'train' is a reserved key.
+        for mode, metric in asdict(self.metrics).items():
+            if isinstance(metric, Module):
+                self.add_module(f"metrics_{mode}", metric)
 
-        # Adapters
-        self.adapters = Adapters(**(adapters or {}))
-
-        # Set up methods for dataloaders and steps
+        # Dataloader and step LightningModule methods
         dataloaders = DataLoaders(**(dataloaders or {}))
         if dataloaders.train is not None:
             self.train_dataloader = lambda: dataloaders.train
