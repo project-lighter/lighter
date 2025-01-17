@@ -27,13 +27,13 @@ formatting: codestyle
 #* Linting
 .PHONY: test
 test:
-	PYTHONPATH=$(PYTHONPATH) uv run pytest -c pyproject.toml
+	uv run pytest -c pyproject.toml --cov=lighter --cov-report=term-missing
 
 .PHONY: check-codestyle
 check-codestyle:
 	uvx isort --diff --check-only --settings-path pyproject.toml ./
 	uvx black --diff --check --config pyproject.toml ./
-	uvx pylint lighter
+	uv run pylint lighter
 
 .PHONY: mypy
 mypy:

@@ -216,6 +216,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/3e/38/7859ff46355f76f8d19459005ca000b6e7012f2f1ca597746cbcd1fbfe5e/antlr4-python3-runtime-4.9.3.tar.gz", hash = "sha256:f224469b4168294902bb1efa80a8bf7855f24c99aef99cbefc1bcd3cce77881b", size = 117034 }
 
 [[package]]
+name = "astroid"
+version = "3.3.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/c5/5c83c48bbf547f3dd8b587529db7cf5a265a3368b33e85e76af8ff6061d3/astroid-3.3.8.tar.gz", hash = "sha256:a88c7994f914a4ea8572fac479459f4955eeccc877be3f2d959a33273b0cf40b", size = 398196 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/28/0bc8a17d6cd4cc3c79ae41b7105a2b9a327c110e5ddd37a8a27b29a5c8a2/astroid-3.3.8-py3-none-any.whl", hash = "sha256:187ccc0c248bfbba564826c26f070494f7bc964fd286b6d9fff4420e55de828c", size = 275153 },
+]
+
+[[package]]
 name = "async-timeout"
 version = "4.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -405,6 +417,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/be/8f/e92b0a010c76b0da82709838b3f3ae9aec638d0c44dbfb1186a5751f5d2e/coverage_badge-1.1.2.tar.gz", hash = "sha256:fe7ed58a3b72dad85a553b64a99e963dea3847dcd0b8ddd2b38a00333618642c", size = 6335 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/90/3d/5642a1a06191b2e1e0f87a2e824e6d3eb7c32c589a68ed4d1dcbd3324d63/coverage_badge-1.1.2-py2.py3-none-any.whl", hash = "sha256:d8413ce51c91043a1692b943616b450868cbeeb0ea6a0c54a32f8318c9c96ff7", size = 6493 },
+]
+
+[[package]]
+name = "dill"
+version = "0.3.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/43/86fe3f9e130c4137b0f1b50784dd70a5087b911fe07fa81e53e0c4c47fea/dill-0.3.9.tar.gz", hash = "sha256:81aa267dddf68cbfe8029c42ca9ec6a4ab3b22371d1c450abc54422577b4512c", size = 187000 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/d1/e73b6ad76f0b1fb7f23c35c6d95dbc506a9c8804f43dda8cb5b0fa6331fd/dill-0.3.9-py3-none-any.whl", hash = "sha256:468dff3b89520b474c0397703366b7b95eebe6303f108adf9b19da1f702be87a", size = 119418 },
 ]
 
 [[package]]
@@ -607,6 +628,15 @@ wheels = [
 ]
 
 [[package]]
+name = "isort"
+version = "5.13.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/f9/c1eb8635a24e87ade2efce21e3ce8cd6b8630bb685ddc9cdaca1349b2eb5/isort-5.13.2.tar.gz", hash = "sha256:48fdfcb9face5d58a4f6dde2e72a1fb8dcaf8ab26f95ab49fab84c2ddefb0109", size = 175303 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/b3/8def84f539e7d2289a02f0524b944b15d7c75dab7628bedf1c4f0992029c/isort-5.13.2-py3-none-any.whl", hash = "sha256:8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6", size = 92310 },
+]
+
+[[package]]
 name = "jinja2"
 version = "3.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -753,6 +783,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/02/8c/ab9a463301a50dab04d5472e998acbd4080597abc048166ded5c7aa768c8/MarkupSafe-2.1.5-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:5049256f536511ee3f7e1b3f87d1d1209d327e818e6ae1365e8653d7e3abb6a6", size = 29823 },
     { url = "https://files.pythonhosted.org/packages/bc/29/9bc18da763496b055d8e98ce476c8e718dcfd78157e17f555ce6dd7d0895/MarkupSafe-2.1.5-cp39-cp39-win32.whl", hash = "sha256:00e046b6dd71aa03a41079792f8473dc494d564611a8f89bbbd7cb93295ebdcf", size = 16658 },
     { url = "https://files.pythonhosted.org/packages/f6/f8/4da07de16f10551ca1f640c92b5f316f9394088b183c6a57183df6de5ae4/MarkupSafe-2.1.5-cp39-cp39-win_amd64.whl", hash = "sha256:fa173ec60341d6bb97a89f5ea19c85c5643c1e7dedebc22f5181eb73573142c5", size = 17211 },
+]
+
+[[package]]
+name = "mccabe"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/ff/0ffefdcac38932a54d2b5eed4e0ba8a408f215002cd178ad1df0f2806ff8/mccabe-0.7.0.tar.gz", hash = "sha256:348e0240c33b60bbdf4e523192ef919f28cb2c3d7d5c7794f74009290f236325", size = 9658 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl", hash = "sha256:6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e", size = 7350 },
 ]
 
 [[package]]
@@ -1158,6 +1197,15 @@ wheels = [
 ]
 
 [[package]]
+name = "platformdirs"
+version = "4.3.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/13/fc/128cc9cb8f03208bdbf93d3aa862e16d376844a14f9a0ce5cf4507372de4/platformdirs-4.3.6.tar.gz", hash = "sha256:357fb2acbc885b0419afd3ce3ed34564c13c9b95c89360cd9563f73aa5e2b907", size = 21302 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/a6/bc1012356d8ece4d66dd75c4b9fc6c1f6650ddd5991e421177d9f8f671be/platformdirs-4.3.6-py3-none-any.whl", hash = "sha256:73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb", size = 18439 },
+]
+
+[[package]]
 name = "pluggy"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1168,7 +1216,7 @@ wheels = [
 
 [[package]]
 name = "project-lighter"
-version = "0.0.3a6"
+version = "0.0.3a11"
 source = { editable = "." }
 dependencies = [
     { name = "fire" },
@@ -1190,14 +1238,13 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "aiohttp" },
-    { name = "typing-extensions" },
-]
-tests = [
     { name = "coverage" },
     { name = "coverage-badge" },
+    { name = "pylint" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-html" },
+    { name = "typing-extensions" },
 ]
 
 [package.metadata]
@@ -1221,14 +1268,13 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aiohttp", specifier = ">=3.8.3,<4" },
-    { name = "typing-extensions", specifier = ">=4.4.0,<5" },
-]
-tests = [
     { name = "coverage", specifier = ">=7.0.5,<8" },
     { name = "coverage-badge", specifier = ">=1.1.0,<2" },
+    { name = "pylint", specifier = ">=3.3.3" },
     { name = "pytest", specifier = ">=7.4.0,<8" },
     { name = "pytest-cov", specifier = ">=4.0.0,<5" },
     { name = "pytest-html", specifier = ">=3.2.0,<4" },
+    { name = "typing-extensions", specifier = ">=4.4.0,<5" },
 ]
 
 [[package]]
@@ -1364,6 +1410,26 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8e/62/8336eff65bcbc8e4cb5d05b55faf041285951b6e80f33e2bff2024788f31/pygments-2.18.0.tar.gz", hash = "sha256:786ff802f32e91311bff3889f6e9a86e81505fe99f2735bb6d60ae0c5004f199", size = 4891905 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/3f/01c8b82017c199075f8f788d0d906b9ffbbc5a47dc9918a945e13d5a2bda/pygments-2.18.0-py3-none-any.whl", hash = "sha256:b8e6aca0523f3ab76fee51799c488e38782ac06eafcf95e7ba832985c8e7b13a", size = 1205513 },
+]
+
+[[package]]
+name = "pylint"
+version = "3.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "astroid" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "dill" },
+    { name = "isort" },
+    { name = "mccabe" },
+    { name = "platformdirs" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
+    { name = "tomlkit" },
+    { name = "typing-extensions", marker = "python_full_version < '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/fd/e9a739afac274a39596bbe562e9d966db6f3917fdb2bd7322ffc56da0ba2/pylint-3.3.3.tar.gz", hash = "sha256:07c607523b17e6d16e2ae0d7ef59602e332caa762af64203c24b41c27139f36a", size = 1516550 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/e1/26d55acea92b1ea4d33672e48f09ceeb274e84d7d542a4fb9a32a556db46/pylint-3.3.3-py3-none-any.whl", hash = "sha256:26e271a2bc8bce0fc23833805a9076dd9b4d5194e2a02164942cb3cdc37b4183", size = 521918 },
 ]
 
 [[package]]
@@ -1649,6 +1715,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5b/b9/1ed31d167be802da0fc95020d04cd27b7d7065cc6fbefdd2f9186f60d7bd/tomli-2.2.1-cp313-cp313-win32.whl", hash = "sha256:d3f5614314d758649ab2ab3a62d4f2004c825922f9e370b29416484086b264ec", size = 98724 },
     { url = "https://files.pythonhosted.org/packages/c7/32/b0963458706accd9afcfeb867c0f9175a741bf7b19cd424230714d722198/tomli-2.2.1-cp313-cp313-win_amd64.whl", hash = "sha256:a38aa0308e754b0e3c67e344754dff64999ff9b513e691d0e786265c93583c69", size = 109383 },
     { url = "https://files.pythonhosted.org/packages/6e/c2/61d3e0f47e2b74ef40a68b9e6ad5984f6241a942f7cd3bbfbdbd03861ea9/tomli-2.2.1-py3-none-any.whl", hash = "sha256:cb55c73c5f4408779d0cf3eef9f762b9c9f147a77de7b258bef0a5628adc85cc", size = 14257 },
+]
+
+[[package]]
+name = "tomlkit"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/09/a439bec5888f00a54b8b9f05fa94d7f901d6735ef4e55dcec9bc37b5d8fa/tomlkit-0.13.2.tar.gz", hash = "sha256:fff5fe59a87295b278abd31bec92c15d9bc4a06885ab12bcea52c71119392e79", size = 192885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/b6/a447b5e4ec71e13871be01ba81f5dfc9d0af7e473da256ff46bc0e24026f/tomlkit-0.13.2-py3-none-any.whl", hash = "sha256:7a974427f6e119197f670fbbbeae7bef749a6c14e793db934baefc1b5f03efde", size = 37955 },
 ]
 
 [[package]]

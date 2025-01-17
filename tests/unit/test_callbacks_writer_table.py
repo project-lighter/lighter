@@ -2,12 +2,10 @@ from pathlib import Path
 from unittest import mock
 
 import pandas as pd
-import pytest
 import torch
 from pytorch_lightning import Trainer
 
 from lighter.callbacks.writer.table import LighterTableWriter
-from lighter.system import LighterSystem
 
 
 def custom_writer(tensor):
