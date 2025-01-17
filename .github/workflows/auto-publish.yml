@@ -14,15 +14,12 @@ jobs:
           with:
             python-version: 3.9
 
-        - name: Install poetry
+        - name: Install uv
           run: make setup
-          
-        - name: Install poeblix for version freezing
-          run: poetry self add poeblix@latest
           
         - name: Bump version
           run: |
-            poetry version prerelease
+            uvx poetry version prerelease
 
         - name: Commit changes
           run: |
@@ -35,7 +32,7 @@ jobs:
           run: git push
 
         - name: Build with lockfile versions
-          run: poetry blixbuild --only-lock
+          run: uv build
           
         - name: Publish distribution 📦 to PyPI
           uses: pypa/gh-action-pypi-publish@release/v1
