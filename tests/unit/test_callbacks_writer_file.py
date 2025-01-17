@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 
 import monai
@@ -6,7 +5,6 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
-import tempfile
 
 from lighter.callbacks.writer.file import LighterFileWriter
 
