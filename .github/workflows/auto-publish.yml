@@ -12,14 +12,14 @@ jobs:
         - name: Set up Python
           uses: actions/setup-python@v2.2.2
           with:
-            python-version: 3.9
+            python-version: 3.11
 
         - name: Install uv
           run: make setup
           
         - name: Bump version
           run: |
-            uvx poetry version prerelease
+            make bump-prerelease
 
         - name: Commit changes
           run: |

@@ -35,6 +35,22 @@ check-codestyle:
 	uvx black --diff --check --config pyproject.toml ./
 	uv run pylint lighter
 
+.PHONY: bump-prerelease
+bump-prerelease:
+	uvx --with poetry-bumpversion poetry version prerelease
+
+.PHONY: bump-patch
+bump-patch:
+	uvx --with poetry-bumpversion poetry version patch
+
+.PHONY: bump-minor
+bump-minor:
+	uvx --with poetry-bumpversion poetry version minor
+
+.PHONY: bump-major
+bump-major:
+	uvx --with poetry-bumpversion poetry version major
+
 .PHONY: mypy
 mypy:
 	uvx mypy --config-file pyproject.toml ./
