@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-lighter"
-version = "0.0.3a6"
+version = "0.0.3a11"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 authors = [
     { name = "Ibrahim Hadzic", email = "ibrahimhadzic45@gmail.com" },
@@ -78,7 +78,7 @@ include = ["lighter"]
 
 [tool.black]
 # https://github.com/psf/black
-target-version = ["py38"]
+target-version = ["py310"]
 line-length = 127
 
 exclude = '''
@@ -99,7 +99,7 @@ exclude = '''
 
 [tool.isort]
 # https://github.com/timothycrosley/isort/
-py_version = 38
+py_version = 39
 line_length = 127
 
 known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
@@ -111,7 +111,7 @@ indent = 4
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = 3.8
+python_version = 3.10
 pretty = true
 show_traceback = true
 
@@ -161,6 +161,7 @@ source = "lighter"
 
 [coverage.run]
 branch = true
+cov-report = "term-missing"
 
 [coverage.report]
 fail_under = 50

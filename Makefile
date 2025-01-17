@@ -1,10 +1,8 @@
-#* Variables
+### Variables
+# Define shell and Python environment variables
 SHELL := /usr/bin/env bash
 PYTHON := python
 PYTHONPATH := `pwd`
-#* Docker variables
-IMAGE := lighter
-VERSION := latest
 
 # Install
 .PHONY: setup

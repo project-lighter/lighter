@@ -1,6 +1,6 @@
 import pytest
 
-from lighter.utils.runner import parse_config
+from lighter.engine.runner import parse_config
 
 
 @pytest.mark.parametrize(

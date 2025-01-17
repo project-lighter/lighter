@@ -2,7 +2,7 @@
 
 import pytest
 
-from lighter.utils.runner import run
+from lighter.engine.runner import run
 
 test_overrides = "./tests/integration/test_overrides.yaml"
 
