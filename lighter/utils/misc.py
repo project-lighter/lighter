@@ -47,18 +47,18 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
         setattr_dot_notation(getattr(obj, obj_name), attr, value)
 
 
-def hasarg(_callable: Callable, arg_name: str) -> bool:
+def hasarg(fn: Callable, arg_name: str) -> bool:
     """
     Checks if a callable (function, method, or class) has a specific argument.
 
     Args:
-        _callable: The callable to inspect.
+        fn: The callable to inspect.
         arg_name: The name of the argument to check for.
 
     Returns:
         bool: True if the argument exists, False otherwise.
     """
-    args = inspect.signature(_callable).parameters.keys()
+    args = inspect.signature(fn).parameters.keys()
     return arg_name in args
 
 

@@ -136,9 +136,7 @@ class System(pl.LightningModule):
         adapters = getattr(self.adapters, mode)
 
         # Batch adapter formats the batch into the required format
-        input = adapters.batch.input(batch)
-        target = adapters.batch.target(batch)
-        identifier = adapters.batch.identifier(batch)
+        input, target, identifier = adapters.batch(batch)
 
         # Forward
         if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
@@ -148,8 +146,10 @@ class System(pl.LightningModule):
 
         # Predict mode stops here.
         if mode == Mode.PREDICT:
-            # Logging adapter applies any specied transforms to for pred data
-            return {Data.IDENTIFIER: identifier, Data.PRED: adapters.logging.pred(pred)}
+            # Logging adapter formats data for logging.
+            input, target, pred = adapters.logging(input, target, pred)
+            # Return data for callbacks (e.g. logging or writing).
+            return {Data.IDENTIFIER: identifier, Data.INPUT: input, Data.TARGET: target, Data.PRED: pred}
 
         # Calculate the loss.
         loss = None
@@ -161,21 +161,23 @@ class System(pl.LightningModule):
                     "Example: {'total': combined_loss, 'subloss1': loss1, ...}"
                 )
 
-        # Calculate the metrics. If no metrics are specified, the returned metrics value is None.
+        # Calculate the metrics. None if not specified.
         metrics = getattr(self.metrics, mode)
         if metrics is not None:
             metrics = adapters.metrics(metrics, input=input, target=target, pred=pred)
 
         self._log_stats(loss=loss, metrics=metrics, mode=mode, batch_idx=batch_idx)
 
-        # Return Lightning-required loss and additional data for callbacks like logging
+        # Logging adapter formats data for logging.
+        input, target, pred = adapters.logging(input, target, pred)
+        # Return loss for backprop and data for callbacks (e.g. logging or writing).
         return {
             "loss": loss["total"] if isinstance(loss, dict) else loss,
-            "metrics": metrics,
             Data.IDENTIFIER: identifier,
-            Data.INPUT: adapters.logging.input(input),
-            Data.TARGET: adapters.logging.target(target),
-            Data.PRED: adapters.logging.pred(pred),
+            Data.INPUT: input,
+            Data.TARGET: target,
+            Data.PRED: pred,
+            "metrics": metrics,
         }
 
     def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, mode: str, batch_idx: int) -> None:

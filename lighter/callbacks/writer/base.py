@@ -121,11 +121,15 @@ class BaseWriter(ABC, Callback):
             batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
             outputs[Data.IDENTIFIER] = list(
-                range(start=self._pred_counter, stop=self._pred_counter + batch_size * world_size, step=world_size)
+                range(
+                    self._pred_counter,  # Start: counted globally, initialized with the rank of the current process
+                    self._pred_counter + batch_size * world_size,  # Stop: count the total batch size across all processes
+                    world_size,  # Step: each process writes predictions for every Nth sample
+                )
             )
             self._pred_counter += batch_size * world_size
 
-        for identifier, pred in zip(outputs[Data.IDENTIFIER], outputs[Data.PRED]):
+        for pred, identifier in zip(outputs[Data.PRED], outputs[Data.IDENTIFIER]):
             self.write(tensor=pred, identifier=identifier)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
