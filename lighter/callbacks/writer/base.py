@@ -121,7 +121,7 @@ class BaseWriter(ABC, Callback):
             batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
             outputs[Data.IDENTIFIER] = list(
-                range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size)
+                range(start=self._pred_counter, stop=self._pred_counter + batch_size * world_size, step=world_size)
             )
             self._pred_counter += batch_size * world_size
 
