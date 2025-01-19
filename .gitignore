@@ -154,3 +154,4 @@ projects/*
 .aider*
 test_dir/
 *.code-workspace
+.scale_batch_size*

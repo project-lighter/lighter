@@ -1,14 +1,18 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class Data(str, Enum):
+class Data(StrEnum):
     IDENTIFIER = "identifier"
     INPUT = "input"
     TARGET = "target"
     PRED = "pred"
+    LOSS = "loss"
+    METRICS = "metrics"
+    STEP = "step"
+    EPOCH = "epoch"
 
 
-class Stage(str, Enum):
+class Stage(StrEnum):
     FIT = "fit"
     VALIDATE = "validate"
     TEST = "test"
@@ -17,7 +21,7 @@ class Stage(str, Enum):
     SCALE_BATCH_SIZE = "scale_batch_size"
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"

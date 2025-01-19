@@ -296,14 +296,14 @@ def cli():
     class Commands:
         def __init__(self):
             for stage in Stage:
-                setattr(self, stage.value, self._make_command(stage))
+                setattr(self, stage, self._make_command(stage))
 
         def _make_command(self, stage: Stage):
             def command(config: str, **config_overrides: Any):
-                return runner.run(stage=stage.value, config=config, **config_overrides)
+                return runner.run(stage=stage, config=config, **config_overrides)
 
-            command.__name__ = stage.value
-            command.__doc__ = f"Run the '{stage.value}' stage."
+            command.__name__ = stage
+            command.__doc__ = f"Run the '{stage}' stage."
             return command
 
     fire.Fire(Commands())
