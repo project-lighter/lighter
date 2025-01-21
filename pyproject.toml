@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-lighter"
-version = "0.0.3a11"
+version = "0.0.3a12"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 authors = [
     { name = "Ibrahim Hadzic", email = "ibrahimhadzic45@gmail.com" },
