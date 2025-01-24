@@ -200,12 +200,12 @@ wheels = [
 ]
 
 [[package]]
-name = "cerebrus"
-version = "0.2"
+name = "cerberus"
+version = "1.3.7"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/14/f9/f9474da24dfacc878a6b836d18b55ae6d3639a21a90fbdafb54adb31e36c/cerebrus-0.2.tar.gz", hash = "sha256:d8cfb40590a1a478a54e96d65832fffef1f872430a9e525df0bf59c356fc1706", size = 8173 }
+sdist = { url = "https://files.pythonhosted.org/packages/08/92/6d861524d97a2c4913816309ca12afe313b32c8efc3ec641de98b890834b/cerberus-1.3.7.tar.gz", hash = "sha256:ecf249665400a0b7a9d5e4ee1ffc234fd5d003186d3e1904f70bc14038642c13", size = 29651 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/e2/6c45e5aa90a322f2b5dc6930746e0722f7f571f3d29c5aff2f8d38b427ea/cerebrus-0.2-py3-none-any.whl", hash = "sha256:4d7a295399f16bce38ff7cf859aae70bbd932cee0ab38c9375334fc17086ae07", size = 8726 },
+    { url = "https://files.pythonhosted.org/packages/15/ce/e3abf3fd04da28978eefb06ea906549f20f23f2ec6df8873ede6b62c8a8c/Cerberus-1.3.7-py3-none-any.whl", hash = "sha256:180e7d1fa1a5765cbff7b5c716e52fddddfab859dc8f625b0d563ace4b7a7ab3", size = 30508 },
 ]
 
 [[package]]
@@ -1220,7 +1220,7 @@ name = "project-lighter"
 version = "0.0.3a12"
 source = { editable = "." }
 dependencies = [
-    { name = "cerebrus" },
+    { name = "cerberus" },
     { name = "fire" },
     { name = "lightly" },
     { name = "loguru" },
@@ -1254,7 +1254,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cerebrus", specifier = ">=0.2" },
+    { name = "cerberus", specifier = ">=1.3.7" },
     { name = "fire", specifier = ">=0.5.0,<0.6" },
     { name = "lightly", specifier = ">=1.5.13,<2" },
     { name = "loguru", specifier = ">=0.6.0,<0.7" },
