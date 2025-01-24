@@ -5,7 +5,6 @@ from dataclasses import dataclass, field, fields, is_dataclass
 from torchmetrics import Metric, MetricCollection
 
 from lighter.adapters import BatchAdapter, CriterionAdapter, LoggingAdapter, MetricsAdapter
-from lighter.utils.data import DataLoader
 
 
 def nested(cls):
@@ -54,12 +53,6 @@ class DataLoaders:
     val: Any | None = None
     test: Any | None = None
     predict: Any | None = None
-
-    # ensure that are all lighter.utils.data.DataLoader instances
-    def __post_init__(self):
-        for attr in fields(self):
-            if getattr(self, attr.name) is not None and not isinstance(getattr(self, attr.name), DataLoader):
-                raise ValueError(f"{attr.name} must be an instance of lighter.utils.data.DataLoader.")
 
 
 @dataclass

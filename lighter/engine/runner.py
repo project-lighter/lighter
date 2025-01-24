@@ -81,17 +81,31 @@ class Runner:
 def cli():
     runner = Runner()
 
-    class Commands:
-        def __init__(self):
-            for stage in Stage:
-                setattr(self, stage, self._make_command(stage))
+    def fit(config: str, **config_overrides: Any):
+        runner.run(Stage.FIT, config, **config_overrides)
 
-        def _make_command(self, stage: Stage):
-            def command(config: str, **config_overrides: Any):
-                return runner.run(stage=stage, config=config, **config_overrides)
+    def validate(config: str, **config_overrides: Any):
+        runner.run(Stage.VALIDATE, config, **config_overrides)
 
-            command.__name__ = stage
-            command.__doc__ = f"Run the '{stage}' stage."
-            return command
+    def test(config: str, **config_overrides: Any):
+        runner.run(Stage.TEST, config, **config_overrides)
 
-    fire.Fire(Commands())
+    def predict(config: str, **config_overrides: Any):
+        runner.run(Stage.PREDICT, config, **config_overrides)
+
+    def lr_find(config: str, **config_overrides: Any):
+        runner.run(Stage.LR_FIND, config, **config_overrides)
+
+    def scale_batch_size(config: str, **config_overrides: Any):
+        runner.run(Stage.SCALE_BATCH_SIZE, config, **config_overrides)
+
+    fire.Fire(
+        {
+            "fit": fit,
+            "validate": validate,
+            "test": test,
+            "predict": predict,
+            "lr_find": lr_find,
+            "scale_batch_size": scale_batch_size,
+        }
+    )

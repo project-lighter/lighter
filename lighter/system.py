@@ -6,22 +6,21 @@ including the model, optimizer, datasets, and more. It extends PyTorch Lightning
 from typing import Any, Callable
 
 from dataclasses import asdict
-from functools import partial
 
 import pytorch_lightning as pl
 from torch import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.data import DataLoader
 from lighter.utils.misc import get_optimizer_stats, hasarg
 from lighter.utils.types.containers import Adapters, DataLoaders, Metrics
 from lighter.utils.types.enums import Data, Mode
 
-# Patch the original collate function to allow None values in the batch. Done within the function to avoid global changes.
+# Patch the original collate function to allow None values in the batch.
 default_collate_fn_map.update({type(None): collate_str_fn})
 
 
@@ -65,44 +64,43 @@ class System(pl.LightningModule):
         self.adapters = Adapters(**(adapters or {}))
         self.inferer = inferer
 
+        self.mode = None
+        self._setup_mode_hooks()
         self._register_metrics()
-        self._setup_steps_and_dataloaders()
 
-    def _step(self, batch: dict, batch_idx: int, mode: str) -> dict[str, Any] | Any:
+    def _step(self, batch: dict, batch_idx: int) -> dict[str, Any] | Any:
         """
         Performs a step in the specified mode, processing the batch and calculating loss and metrics.
 
         Args:
             batch: The batch of data.
             batch_idx: The index of the batch.
-            mode: The mode of the step (train, val, test, predict).
         Returns:
             dict or Any: For predict step, returns prediction only. For other steps,
             returns dict with loss, metrics, input, target, pred, and identifier. Loss is None
             for test step, metrics is None if unspecified.
         """
-        input, target, identifier = self._prepare_batch(batch, mode)
-        pred = self.forward(input, mode)
+        input, target, identifier = self._prepare_batch(batch)
+        pred = self.forward(input)
 
-        loss = self._calculate_loss(input, target, pred, mode)
-        metrics = self._calculate_metrics(input, target, pred, mode)
+        loss = self._calculate_loss(input, target, pred)
+        metrics = self._calculate_metrics(input, target, pred)
 
-        self._log_stats(loss, metrics, batch_idx, mode)
-        output = self._prepare_output(identifier, input, target, pred, loss, metrics, mode)
+        self._log_stats(loss, metrics, batch_idx)
+        output = self._prepare_output(identifier, input, target, pred, loss, metrics)
         return output
 
-    def _prepare_batch(self, batch: dict, mode: str) -> tuple[Any, Any, Any]:
-        adapters = getattr(self.adapters, mode)
+    def _prepare_batch(self, batch: dict) -> tuple[Any, Any, Any]:
+        adapters = getattr(self.adapters, self.mode)
         input, target, identifier = adapters.batch(batch)
         return input, target, identifier
 
-    def forward(self, input: Any, mode: str) -> Any:  # pylint: disable=arguments-differ
+    def forward(self, input: Any) -> Any:  # pylint: disable=arguments-differ
         """
         Forward pass through the model. Supports multi-input models.
 
         Args:
             input: The input data.
-            mode: The mode of the forward pass (train, val, test, predict).
 
         Returns:
             Any: The model's output.
@@ -116,14 +114,14 @@ class System(pl.LightningModule):
             kwargs[Data.STEP] = self.global_step
 
         # Predict. Use inferer if available in val, test, and predict modes.
-        if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
+        if self.inferer and self.mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
             return self.inferer(input, self.model, **kwargs)
         return self.model(input, **kwargs)
 
-    def _calculate_loss(self, input: Any, target: Any, pred: Any, mode: str) -> Tensor | dict[str, Tensor] | None:
-        adapters = getattr(self.adapters, mode)
+    def _calculate_loss(self, input: Any, target: Any, pred: Any) -> Tensor | dict[str, Tensor] | None:
+        adapters = getattr(self.adapters, self.mode)
         loss = None
-        if mode in [Mode.TRAIN, Mode.VAL]:
+        if self.mode in [Mode.TRAIN, Mode.VAL]:
             loss = adapters.criterion(self.criterion, input, target, pred)
             if isinstance(loss, dict) and "total" not in loss:
                 raise ValueError(
@@ -132,14 +130,14 @@ class System(pl.LightningModule):
                 )
         return loss
 
-    def _calculate_metrics(self, input: Any, target: Any, pred: Any, mode: str) -> Any | None:
-        adapters = getattr(self.adapters, mode)
-        metrics = getattr(self.metrics, mode)
+    def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
+        adapters = getattr(self.adapters, self.mode)
+        metrics = getattr(self.metrics, self.mode)
         if metrics is not None:
             metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
 
-    def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int, mode: str) -> None:
+    def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
 
@@ -147,34 +145,31 @@ class System(pl.LightningModule):
             loss: The calculated loss.
             metrics: The calculated metrics.
             batch_idx: The index of the batch.
-            mode: The mode of the step (train, val, test, predict).
         """
         if self.trainer.logger is None:
             return
 
-        batch_size = getattr(self.dataloaders, mode).batch_size
-
         # Loss
         if loss is not None:
             if not isinstance(loss, dict):
-                self._log(f"{mode}/{Data.LOSS}/{Data.STEP}", loss, batch_size, on_step=True)
-                self._log(f"{mode}/{Data.LOSS}/{Data.EPOCH}", loss, batch_size, on_epoch=True)
+                self._log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
+                self._log(f"{self.mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
             else:
                 for name, subloss in loss.items():
-                    self._log(f"{mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, batch_size, on_step=True)
-                    self._log(f"{mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, batch_size, on_epoch=True)
+                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
+                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
         # Metrics
         if metrics is not None:
             for name, metric in metrics.items():
-                self._log(f"{mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, batch_size, on_step=True)
-                self._log(f"{mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, batch_size, on_epoch=True)
+                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
+                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
 
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
-        if mode == Mode.TRAIN and batch_idx == 0:
+        if self.mode == Mode.TRAIN and batch_idx == 0:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
-                self._log(f"{mode}/{name}", optimizer_stat, batch_size, on_epoch=True)
+                self._log(f"{self.mode}/{name}", optimizer_stat, on_epoch=True)
 
-    def _log(self, name: str, value: Any, batch_size, on_step: bool = False, on_epoch: bool = False) -> None:
+    def _log(self, name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
         """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
 
         Args:
@@ -184,6 +179,7 @@ class System(pl.LightningModule):
             on_step (bool, optional): if True, logs on step.
             on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
         """
+        batch_size = getattr(self.dataloaders, self.mode).batch_size
         self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
 
     def _prepare_output(
@@ -194,9 +190,8 @@ class System(pl.LightningModule):
         pred: Any,
         loss: Tensor | dict[str, Tensor] | None,
         metrics: Any | None,
-        mode: str,
     ) -> dict[str, Any]:
-        adapters = getattr(self.adapters, mode)
+        adapters = getattr(self.adapters, self.mode)
         input, target, pred = adapters.logging(input, target, pred)
         return {
             Data.IDENTIFIER: identifier,
@@ -229,20 +224,33 @@ class System(pl.LightningModule):
             if isinstance(metric, Module):
                 self.add_module(f"{Data.METRICS}_{mode}", metric)
 
-    def _setup_steps_and_dataloaders(self):
-        # Dataloader and step methods. Defined only if the corresponding dataloader is provided.
+    def _setup_mode_hooks(self):
         if self.dataloaders.train is not None:
-            self.train_dataloader = lambda: self.dataloaders.train(Mode.TRAIN)
-            self.training_step = partial(self._step, mode=Mode.TRAIN)
+            self.training_step = self._step
+            self.train_dataloader = lambda: self.dataloaders.train
+            self.on_train_start = lambda: self._on_mode_start(Mode.TRAIN)
+            self.on_train_end = self._on_mode_end
         if self.dataloaders.val is not None:
-            self.val_dataloader = lambda: self.dataloaders.val(Mode.VAL)
-            self.validation_step = partial(self._step, mode=Mode.VAL)
+            self.validation_step = self._step
+            self.val_dataloader = lambda: self.dataloaders.val
+            self.on_validation_start = lambda: self._on_mode_start(Mode.VAL)
+            self.on_validation_end = self._on_mode_end
         if self.dataloaders.test is not None:
-            self.test_dataloader = lambda: self.dataloaders.test(Mode.TEST)
-            self.test_step = partial(self._step, mode=Mode.TEST)
+            self.test_step = self._step
+            self.test_dataloader = lambda: self.dataloaders.test
+            self.on_test_start = lambda: self._on_mode_start(Mode.TEST)
+            self.on_test_end = self._on_mode_end
         if self.dataloaders.predict is not None:
-            self.predict_dataloader = lambda: self.dataloaders.predict(Mode.PREDICT)
-            self.predict_step = partial(self._step, mode=Mode.PREDICT)
+            self.predict_step = self._step
+            self.predict_dataloader = lambda: self.dataloaders.predict
+            self.on_predict_start = lambda: self._on_mode_start(Mode.PREDICT)
+            self.on_predict_end = self._on_mode_end
+
+    def _on_mode_start(self, mode: str | None) -> None:
+        self.mode = mode
+
+    def _on_mode_end(self) -> None:
+        self.mode = None
 
     @property
     def learning_rate(self) -> float:

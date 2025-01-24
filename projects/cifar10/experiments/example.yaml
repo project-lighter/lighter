@@ -51,10 +51,11 @@ system:
 
     dataloaders:
         train:
-            _target_: lighter.utils.data.DataLoader
+            _target_: torch.utils.data.DataLoader
             batch_size: 512
             num_workers: 2
             pin_memory: True
+            shuffle: True
             dataset:
                 _target_: torchvision.datasets.CIFAR10
                 download: True
@@ -70,10 +71,11 @@ system:
                 target_transform: null
 
         val:
-            _target_: lighter.utils.data.DataLoader
+            _target_: torch.utils.data.DataLoader
             batch_size: 512
             num_workers: 2
             pin_memory: True
+            shuffle: False
             dataset:
                 _target_: torchvision.datasets.CIFAR10
                 download: True
