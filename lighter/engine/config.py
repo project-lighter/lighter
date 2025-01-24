@@ -32,22 +32,21 @@ class Config:
             schema: A Cerberus schema for validation.
             config_overrides: Keyword arguments to override values in the configuration file
         """
+        if not isinstance(config, (dict, str, type(None))):
+            raise ValueError("Invalid type for 'config'. Must be a dictionary or (comma-separated) path(s) to YAML file(s).")
+
         self._config_parser = ConfigParser(globals=False)
-        if isinstance(config, dict):
-            self._config_parser.update(config)
-        elif isinstance(config, str):
-            # Read one or more config files separated by commas
-            config = self._config_parser.load_config_files(config)
-            self._config_parser.read_config(config)
-        else:
-            raise ValueError("Invalid type for 'config'. Must be a dictionary or path(s) to YAML file(s).")
+        self._config_parser.read_config(config)
         self._config_parser.parse()
 
-        if schema:
-            self._validator = cerberus.Validator(schema)
-            self.validate()
+        # TODO: verify that switching from .update(config_overrides) to .set(value, name) is a valid approach. The latter allows creation of currently non-existent keys.
+        for name, value in config_overrides.items():
+            self._config_parser.set(value, name)
 
-        self._config_parser.update(config_overrides)
+        if schema:
+            validator = cerberus.Validator(schema)
+            if not validator.validate(self.get()):
+                raise ConfigurationException(format_validation_errors(validator.errors))
 
     def get(self, key: str | None = None, default: Any = None) -> Any:
         """Get raw content for the given key. If key is None, get the entire config."""
@@ -59,34 +58,29 @@ class Config:
         """
         return self._config_parser.get_parsed_content(key, default=default)
 
-    def validate(self) -> None:  # Add normalize argument
-        """Validate the configuration against the Cerberus schema."""
-        if not self._validator.validate(self.get()):
-            error_messages = self._format_validation_errors(self._validator.errors)
-            raise ConfigurationException(error_messages)
 
-    def _format_validation_errors(self, errors: dict) -> str:
-        """
-        Recursively format Cerberus validation errors into a readable string.
-        """
-        messages = []
+def format_validation_errors(errors: dict) -> str:
+    """
+    Recursively format validation errors into a readable string.
+    """
+    messages = []
 
-        def process_error(key, value, base_path=""):
-            full_key = f"{base_path}.{key}" if base_path else key
+    def process_error(key, value, base_path=""):
+        full_key = f"{base_path}.{key}" if base_path else key
 
-            if isinstance(value, dict):
-                for sub_key, sub_value in value.items():
-                    process_error(sub_key, sub_value, full_key)
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, str):
-                        messages.append(f"{full_key}: {item}")
-                    elif isinstance(item, dict):
-                        process_error(key, item, base_path)
-                    else:
-                        messages.append(f"{full_key}: {item}")
-            else:
-                messages.append(f"{full_key}: {value}")
+        if isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                process_error(sub_key, sub_value, full_key)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    messages.append(f"{full_key}: {item}")
+                elif isinstance(item, dict):
+                    process_error(key, item, base_path)
+                else:
+                    messages.append(f"{full_key}: {item}")
+        else:
+            messages.append(f"{full_key}: {value}")
 
-        process_error("", errors)
-        return "\n".join(messages)
+    process_error("", errors)
+    return "\n".join(messages)

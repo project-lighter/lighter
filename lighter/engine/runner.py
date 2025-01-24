@@ -1,7 +1,5 @@
 from typing import Any
 
-from pathlib import Path
-
 import fire
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.tuner import Tuner
@@ -48,14 +46,13 @@ class Runner:
         stage_method(self.system, **self.args)
 
     def _setup_stage(self, stage: str) -> None:
-        """Set up the system and trainer based on the stage-specific configuration."""
-        # Get and parse stage-specific configuration
+        # Prune the configuration to the stage-specific components
         stage_config = self.resolver.get_stage_config(stage)
 
-        # Import project module if specified
+        # Import project module
         project_path = stage_config.get("project")
         if project_path:
-            import_module_from_path("project", Path(project_path))
+            import_module_from_path("project", project_path)
 
         # Initialize system
         self.system = stage_config.get_parsed_content("system")
