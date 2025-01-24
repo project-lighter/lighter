@@ -8,10 +8,14 @@ Key components:
 
 from typing import Any, Callable
 
+import inspect
 import random
 
 import torch
+from loguru import logger
 from torch.utils.data.dataloader import default_collate
+
+from lighter.utils.types.enums import Mode
 
 
 def collate_replace_corrupted(
@@ -44,3 +48,64 @@ def collate_replace_corrupted(
         return collate_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, apply the default collate function.
     return default_collate_fn(batch)
+
+
+class DataLoader:
+    """A factory class for delayed PyTorch DataLoader instantiation."""
+
+    def __init__(self, cls=torch.utils.data.DataLoader, *args, **kwargs):
+        """
+        Initialize the DataLoader factory with arguments for delayed instantiation.
+
+        Args:
+            cls: The DataLoader class to instantiate (default: torch.utils.data.DataLoader)
+            *args: Positional arguments for the DataLoader.
+            **kwargs: Keyword arguments for the DataLoader.
+        """
+        signature = inspect.signature(cls)
+        # Assign args and kwargs to the parameters. This way, we essentially turn the args into kwargs.
+        try:
+            kwargs = signature.bind_partial(*args, **kwargs).arguments
+        # Throws a TypeError if the arguments do not match the signature
+        except TypeError as e:
+            raise TypeError(f"{cls} {e}") from e
+        # Use a separate attribute to store parameters to avoid conflicts
+        object.__setattr__(self, "_kwargs", kwargs)
+        object.__setattr__(self, "cls", cls)
+
+    def __call__(self, mode) -> torch.utils.data.DataLoader:
+        """
+        Create a PyTorch DataLoader with mode-specific configurations.
+
+        Args:
+            mode: The mode to operate in (train, val, test, predict)
+
+        Returns:
+            A configured PyTorch DataLoader
+        """
+        # Handle shuffling when not specified if the DataLoader class has a `shuffle` parameter
+        if "shuffle" not in self._kwargs and "shuffle" in inspect.signature(self.cls).parameters:
+            shuffle = mode == Mode.TRAIN
+            self._kwargs["shuffle"] = shuffle
+            logger.warning(f"Setting 'shuffle={shuffle}' for DataLoader in '{mode}' mode since it was not specified.")
+
+        # Disable `drop_last` if set to True in val/test/predict modes
+        if mode != Mode.TRAIN and self._kwargs.get("drop_last", False):
+            self._kwargs["drop_last"] = False
+            logger.warning(f"Setting 'drop_last=False' for DataLoader in '{mode}' mode to avoid dropping data.")
+
+        return self.cls(**self._kwargs)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Protect internal attributes from being overwritten
+        if "_kwargs" in self.__dict__ and name in self._kwargs:
+            self._kwargs[name] = value
+        else:
+            object.__setattr__(self, name, value)
+
+    def __getattr__(self, name: str) -> Any:
+        # Expose attributes from the internal kwargs. For example, self.batch_size instead of self._kwargs["batch_size"].
+        if "_kwargs" in self.__dict__ and name in self._kwargs:
+            return self._kwargs[name]
+        else:
+            return object.__getattribute__(self, name)

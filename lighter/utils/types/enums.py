@@ -1,4 +1,14 @@
-from enum import StrEnum
+from enum import Enum
+
+
+class StrEnum(str, Enum):
+    """
+    Enum class that inherits from str. This allows for the enum values to be accessed as strings.
+    """
+
+    # Remove this class when Python 3.10 support is dropped, as Python >=3.11 has StrEnum built-in.
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 class Data(StrEnum):

@@ -11,5 +11,6 @@ _setup_logging()
 # Expose Trainer from PyTorch Lightning for convenience
 from pytorch_lightning import Trainer
 
-from .engine import Config, Runner
+from .engine.config import Config
+from .engine.runner import Runner
 from .system import System
