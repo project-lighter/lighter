@@ -1,84 +1,45 @@
-name: CI
+name: Lighter CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
-
-permissions:
-  contents: write
-  id-token: write  # Required for trusted publishing
-
+    branches:
+      - main
+      
 jobs:
-  test-and-publish:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v2.2.2
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install poetry
+    - name: Install uv
       run: make setup
 
     - name: Set up cache
-      uses: actions/cache@v3
+      uses: actions/cache@v2.1.6
       with:
         path: .venv
-        key: venv-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-
-    - name: Install dependencies
-      run: |
-        poetry config virtualenvs.in-project true
-        poetry install
+        key: venv-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('poetry.lock') }}
 
     - name: Run safety checks
       run: |
-        poetry install --with safety
         make check-safety
 
     - name: Run style checks
-      continue-on-error: true
       run: |
-        poetry install --with style
         make check-codestyle
 
     - name: Run tests
       run: |
-        poetry install --with tests
         make test
-  
-    - name: Run coverage
-      run: |
-        poetry install --with tests
-        make coverage
 
-    # Only run publishing steps on main branch and Python 3.11
-    - name: Version
-      if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
-      run: |
-        # Increment version before building
-        poetry version prerelease
-        VERSION=$(poetry version -s)
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add .
-        git commit -m "Bump version to ${VERSION}" || echo "No changes to commit"
-        git push
-
-    - name: Build distribution
-      if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
-      run: poetry build
-  
-    - name: Publish distribution 📦 to PyPI
-      if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_TOKEN }}

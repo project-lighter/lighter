@@ -2,7 +2,9 @@
 Lighter is a framework for streamlining deep learning experiments with configuration files.
 """
 
-__version__ = "0.0.3a11"
+from .system import LighterSystem
+
+__version__ = "0.0.3a12"
 
 from .utils.logging import _setup_logging
 
