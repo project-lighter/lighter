@@ -200,6 +200,15 @@ wheels = [
 ]
 
 [[package]]
+name = "cerebrus"
+version = "0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/f9/f9474da24dfacc878a6b836d18b55ae6d3639a21a90fbdafb54adb31e36c/cerebrus-0.2.tar.gz", hash = "sha256:d8cfb40590a1a478a54e96d65832fffef1f872430a9e525df0bf59c356fc1706", size = 8173 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/e2/6c45e5aa90a322f2b5dc6930746e0722f7f571f3d29c5aff2f8d38b427ea/cerebrus-0.2-py3-none-any.whl", hash = "sha256:4d7a295399f16bce38ff7cf859aae70bbd932cee0ab38c9375334fc17086ae07", size = 8726 },
+]
+
+[[package]]
 name = "certifi"
 version = "2024.7.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1208,9 +1217,10 @@ wheels = [
 
 [[package]]
 name = "project-lighter"
-version = "0.0.3a11"
+version = "0.0.3a12"
 source = { editable = "." }
 dependencies = [
+    { name = "cerebrus" },
     { name = "fire" },
     { name = "lightly" },
     { name = "loguru" },
@@ -1244,6 +1254,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cerebrus", specifier = ">=0.2" },
     { name = "fire", specifier = ">=0.5.0,<0.6" },
     { name = "lightly", specifier = ">=1.5.13,<2" },
     { name = "loguru", specifier = ">=0.6.0,<0.7" },
