@@ -1,5 +1,5 @@
 """
-This module provides the LighterFileWriter class, which writes predictions to files in various formats.
+This module provides the FileWriter class, which writes predictions to files in various formats.
 """
 
 from typing import Callable
@@ -13,11 +13,11 @@ from monai.transforms import DivisiblePad
 from torch import Tensor
 
 from lighter.callbacks.utils import preprocess_image
-from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter.callbacks.writer.base import BaseWriter
 from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
 
 
-class LighterFileWriter(LighterBaseWriter):
+class FileWriter(BaseWriter):
     """
     Writer for saving predictions to files in various formats including tensors, images, videos, and ITK images.
     Custom writer functions can be provided to extend supported formats.
@@ -48,19 +48,19 @@ class LighterFileWriter(LighterBaseWriter):
             "itk_nifti": partial(write_itk_image, suffix=".nii.gz"),
         }
 
-    def write(self, tensor: Tensor, id: int | str) -> None:
+    def write(self, tensor: Tensor, identifier: int | str) -> None:
         """
         Writes the tensor to a file using the specified writer.
 
         Args:
             tensor: The tensor to write.
-            id: Identifier for naming the file.
+            identifier: Identifier for naming the file.
         """
         if not self.path.is_dir():
-            raise RuntimeError(f"LighterFileWriter expects a directory path, got {self.path}")
+            raise RuntimeError(f"FileWriter expects a directory path, got {self.path}")
 
         # Determine the path for the file based on prediction count. The suffix must be added by the writer function.
-        path = self.path / str(id)
+        path = self.path / str(identifier)
         # Write the tensor to the file.
         self.writer(path, tensor)
 

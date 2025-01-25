@@ -1,5 +1,5 @@
 """
-This module provides the LighterFreezer callback, which allows freezing model parameters during training.
+This module provides the Freezer callback, which allows freezing model parameters during training.
 """
 
 from typing import Any, List
@@ -8,11 +8,11 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 from torch.nn import Module
 
-from lighter import LighterSystem
+from lighter import System
 from lighter.utils.misc import ensure_list
 
 
-class LighterFreezer(Callback):
+class Freezer(Callback):
     """
     Callback to freeze model parameters during training. Parameters can be frozen by exact name or prefix.
     Freezing can be applied indefinitely or until a specified step/epoch.
@@ -57,40 +57,40 @@ class LighterFreezer(Callback):
 
         self._frozen_state = False
 
-    def on_train_batch_start(self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int) -> None:
+    def on_train_batch_start(self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int) -> None:
         """
         Called at the start of each training batch to potentially freeze parameters.
 
         Args:
             trainer: The trainer instance.
-            pl_module: The LighterSystem instance.
+            pl_module: The System instance.
             batch: The current batch.
             batch_idx: The index of the batch.
         """
         self._on_batch_start(trainer, pl_module)
 
     def on_validation_batch_start(
-        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int = 0
+        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_start(trainer, pl_module)
 
     def on_test_batch_start(
-        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int = 0
+        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_start(trainer, pl_module)
 
     def on_predict_batch_start(
-        self, trainer: Trainer, pl_module: LighterSystem, batch: Any, batch_idx: int, dataloader_idx: int = 0
+        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         self._on_batch_start(trainer, pl_module)
 
-    def _on_batch_start(self, trainer: Trainer, pl_module: LighterSystem) -> None:
+    def _on_batch_start(self, trainer: Trainer, pl_module: System) -> None:
         """
         Freezes or unfreezes model parameters based on the current step or epoch.
 
         Args:
             trainer: The trainer instance.
-            pl_module: The LighterSystem instance.
+            pl_module: The System instance.
         """
         current_step = trainer.global_step
         current_epoch = trainer.current_epoch
@@ -110,7 +110,7 @@ class LighterFreezer(Callback):
         if not self._frozen_state:
             self._set_model_requires_grad(pl_module, False)
 
-    def _set_model_requires_grad(self, model: Module | LighterSystem, requires_grad: bool) -> None:
+    def _set_model_requires_grad(self, model: Module | System, requires_grad: bool) -> None:
         """
         Sets the requires_grad attribute for model parameters, effectively freezing or unfreezing them.
 
@@ -118,8 +118,8 @@ class LighterFreezer(Callback):
             model: The model whose parameters to modify.
             requires_grad: Whether to allow gradients (unfreeze) or not (freeze).
         """
-        # If the model is a `LighterSystem`, get the underlying PyTorch model.
-        if isinstance(model, LighterSystem):
+        # If the model is a `System`, get the underlying PyTorch model.
+        if isinstance(model, System):
             model = model.model
 
         frozen_layers = []

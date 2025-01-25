@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Dataset
 from torchmetrics import Accuracy
 
-from lighter.system import LighterSystem
+from lighter.system import System
 
 
 class DummyDataset(Dataset):
@@ -26,7 +26,7 @@ class DummyDataset(Dataset):
 
         data = {"input": x, "target": y}
         if self.return_id:
-            data["id"] = f"id_{idx}"
+            data["identifier"] = f"id_{idx}"
         return data
 
 
@@ -53,7 +53,7 @@ class InvalidDictCriterion(nn.Module):
 def base_system():
     model = DummyModel()
     optimizer = Adam(model.parameters(), lr=0.001)
-    system = LighterSystem(
+    system = System(
         model=model, batch_size=8, optimizer=optimizer, criterion=nn.CrossEntropyLoss(), datasets={"train": DummyDataset()}
     )
     # Set up minimal trainer
@@ -65,7 +65,7 @@ def base_system():
 def test_step_with_dict_loss():
     model = DummyModel()
     criterion = DictCriterion()
-    system = LighterSystem(
+    system = System(
         model=model, batch_size=8, optimizer=Adam(model.parameters()), criterion=criterion, datasets={"train": DummyDataset()}
     )
 
@@ -82,7 +82,7 @@ def test_step_with_dict_loss():
 def test_step_with_invalid_dict_loss():
     model = DummyModel()
     criterion = InvalidDictCriterion()
-    system = LighterSystem(
+    system = System(
         model=model, batch_size=8, optimizer=Adam(model.parameters()), criterion=criterion, datasets={"train": DummyDataset()}
     )
 
@@ -102,8 +102,8 @@ def test_invalid_batch_values(base_system):
     with pytest.raises(ValueError, match="Batch's 'target' value cannot be None"):
         base_system._base_step(invalid_batch, 0, "train")
 
-    invalid_batch = {"input": torch.randn(1, 3, 32, 32), "id": None}
-    with pytest.raises(ValueError, match="Batch's 'id' value cannot be None"):
+    invalid_batch = {"input": torch.randn(1, 3, 32, 32), "identifier": None}
+    with pytest.raises(ValueError, match="Batch's 'identifier' value cannot be None"):
         base_system._base_step(invalid_batch, 0, "train")
 
 
@@ -178,7 +178,7 @@ def test_forward_with_step_and_epoch():
 
     # Set up model and system
     model = ModelWithStepEpoch()
-    system = LighterSystem(
+    system = System(
         model=model,
         batch_size=8,
         optimizer=Adam(model.parameters()),
@@ -201,7 +201,7 @@ def test_setup_without_datasets_with_error():
     model = DummyModel()
 
     # Create system without any datasets
-    system = LighterSystem(
+    system = System(
         model=model,
         batch_size=8,
         optimizer=Adam(model.parameters()),
@@ -218,7 +218,7 @@ def test_setup_without_datasets_with_error():
 
 def test_batch_without_target_with_error():
     model = DummyModel()
-    system = LighterSystem(
+    system = System(
         model=model,
         batch_size=8,
         optimizer=Adam(model.parameters()),
@@ -234,7 +234,7 @@ def test_batch_without_target_with_error():
 
 def test_batch_type_validation():
     model = DummyModel()
-    system = LighterSystem(model=model, batch_size=8, optimizer=Adam(model.parameters()), datasets={"train": DummyDataset()})
+    system = System(model=model, batch_size=8, optimizer=Adam(model.parameters()), datasets={"train": DummyDataset()})
 
     system.trainer = Mock()
 
@@ -255,7 +255,7 @@ def test_batch_processing_stages():
     count_calls.calls = 0
 
     model = DummyModel()
-    system = LighterSystem(
+    system = System(
         model=model,
         batch_size=8,
         optimizer=Adam(model.parameters()),
@@ -284,7 +284,7 @@ def test_multiple_param_groups():
     model = DummyModel()
     optimizer = Adam([{"params": model.net[0].parameters(), "lr": 0.001}, {"params": model.net[1].parameters(), "lr": 0.002}])
 
-    system = LighterSystem(model=model, batch_size=8, optimizer=optimizer, datasets={"train": DummyDataset()})
+    system = System(model=model, batch_size=8, optimizer=optimizer, datasets={"train": DummyDataset()})
 
     with pytest.raises(ValueError, match="multiple optimizer parameter groups"):
         _ = system.learning_rate
@@ -295,13 +295,13 @@ def test_multiple_param_groups():
 
 def test_configure_optimizers_no_optimizer():
     model = DummyModel()
-    system = LighterSystem(model=model, batch_size=8, criterion=nn.CrossEntropyLoss(), datasets={"train": DummyDataset()})
+    system = System(model=model, batch_size=8, criterion=nn.CrossEntropyLoss(), datasets={"train": DummyDataset()})
 
     with pytest.raises(ValueError, match="Please specify 'system.optimizer' in the config."):
         system.configure_optimizers()
 
     model = DummyModel()
-    system = LighterSystem(
+    system = System(
         model=model,
         batch_size=8,
         optimizer=Adam(model.parameters()),

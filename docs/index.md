@@ -95,7 +95,7 @@ pip install project-lighter
             max_epochs: 100
         
         system:
-            _target_: lighter.LighterSystem
+            _target_: lighter.System
             batch_size: 512
 
             model: 

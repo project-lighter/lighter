@@ -1,102 +1,111 @@
-"""
-This module provides the command line interface and functions for running Lighter experiments using PyTorch Lightning.
-"""
-
 from typing import Any
 
-from functools import partial
-
 import fire
-from monai.bundle.config_parser import ConfigParser
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.tuner import Tuner
 
-from lighter.engine.schema import ArgsConfigSchema, ConfigSchema
-from lighter.system import LighterSystem
+from lighter.engine.config import Config
+from lighter.engine.resolver import Resolver
+from lighter.system import System
 from lighter.utils.dynamic_imports import import_module_from_path
+from lighter.utils.types.enums import Stage
 
 
-def cli() -> None:
+class Runner:
     """
-    Defines the command line interface for running Lighter experiments, mapping methods to commands.
+    Executes the specified stage using the validated and resolved configurations.
     """
-    commands = {method: partial(run, method) for method in ArgsConfigSchema.model_fields}
-    fire.Fire(commands)
+
+    def __init__(self):
+        self.config = None
+        self.resolver = None
+        self.system = None
+        self.trainer = None
+        self.args = None
+
+    def run(self, stage: str, config: str | dict | None = None, **config_overrides: Any) -> None:
+        """Run the specified stage with the given configuration."""
+        seed_everything()
+        self.config = Config(config, **config_overrides, validate=True)
+
+        # Resolves stage-specific configuration
+        self.resolver = Resolver(self.config)
+
+        # Setup stage
+        self._setup_stage(stage)
+
+        # Run stage
+        self._run_stage(stage)
+
+    def _run_stage(self, stage: str) -> None:
+        """Execute the specified stage (method) of the trainer."""
+        if stage in [Stage.LR_FIND, Stage.SCALE_BATCH_SIZE]:
+            stage_method = getattr(Tuner(self.trainer), stage)
+        else:
+            stage_method = getattr(self.trainer, stage)
+        stage_method(self.system, **self.args)
+
+    def _setup_stage(self, stage: str) -> None:
+        # Prune the configuration to the stage-specific components
+        stage_config = self.resolver.get_stage_config(stage)
+
+        # Import project module
+        project_path = stage_config.get("project")
+        if project_path:
+            import_module_from_path("project", project_path)
+
+        # Initialize system
+        self.system = stage_config.get_parsed_content("system")
+        if not isinstance(self.system, System):
+            raise ValueError("'system' must be an instance of System")
+
+        # Initialize trainer
+        self.trainer = stage_config.get_parsed_content("trainer")
+        if not isinstance(self.trainer, Trainer):
+            raise ValueError("'trainer' must be an instance of Trainer")
+
+        # Set up arguments for the stage
+        self.args = stage_config.get_parsed_content(f"args#{stage}", default={})
+
+        # Save config to system checkpoint and trainer logger
+        self._save_config()
+
+    def _save_config(self) -> None:
+        """Save config to system checkpoint and trainer logger."""
+        if self.system:
+            self.system.save_hyperparameters(self.config.get())
+        if self.trainer and self.trainer.logger:
+            self.trainer.logger.log_hyperparams(self.config.get())
 
 
-def parse_config(**kwargs) -> ConfigParser:
-    """
-    Parses and validates configuration files, updating with provided keyword arguments.
+def cli():
+    runner = Runner()
 
-    Args:
-        **kwargs: Keyword arguments containing 'config' and optional overrides.
+    def fit(config: str, **config_overrides: Any):
+        runner.run(Stage.FIT, config, **config_overrides)
 
-    Returns:
-        ConfigParser: The updated configuration parser.
+    def validate(config: str, **config_overrides: Any):
+        runner.run(Stage.VALIDATE, config, **config_overrides)
 
-    Raises:
-        ValueError: If '--config' is not specified or validation fails.
-    """
-    if "config" not in kwargs:
-        raise ValueError("'--config' not specified. Please provide a valid configuration file.")
+    def test(config: str, **config_overrides: Any):
+        runner.run(Stage.TEST, config, **config_overrides)
 
-    # Initialize the parser with the predefined structure.
-    parser = ConfigParser(ConfigSchema().model_dump(), globals=False)
-    # Update the parser with the configuration file.
-    parser.update(parser.load_config_files(kwargs.pop("config")))
-    # Update the parser with the provided cli arguments.
-    parser.update(kwargs)
-    # Validate the configuration against the schema.
-    ConfigSchema(**parser.config)
-    return parser
+    def predict(config: str, **config_overrides: Any):
+        runner.run(Stage.PREDICT, config, **config_overrides)
 
+    def lr_find(config: str, **config_overrides: Any):
+        runner.run(Stage.LR_FIND, config, **config_overrides)
 
-def run(*methods: str, **kwargs: Any) -> None:
-    """
-    Executes specified methods of the Lightning Trainer or Tuner.
+    def scale_batch_size(config: str, **config_overrides: Any):
+        runner.run(Stage.SCALE_BATCH_SIZE, config, **config_overrides)
 
-    Args:
-        methods: Method name or names to execute.
-        **kwargs: Keyword arguments for configuration and overrides.
-    """
-    for method in methods:
-        if method not in ArgsConfigSchema.model_fields:
-            valid_methods = list(ArgsConfigSchema.model_fields)
-            raise ValueError(
-                f"Invalid command '{method}' specified. Available commands: {valid_methods}. "
-                f"If you intended to pass an argument, ensure it is prefixed with '--'."
-            )
-
-    seed_everything()
-
-    # Parse and validate the config.
-    parser = parse_config(**kwargs)
-
-    # Project. If specified, the give path is imported as a module.
-    project = parser.get_parsed_content("project")
-    if project is not None:
-        import_module_from_path("project", project)
-
-    # System
-    system = parser.get_parsed_content("system")
-    if not isinstance(system, LighterSystem):
-        raise ValueError("Expected 'system' to be an instance of 'LighterSystem'")
-
-    # Trainer
-    trainer = parser.get_parsed_content("trainer")
-    if not isinstance(trainer, Trainer):
-        raise ValueError("Expected 'trainer' to be an instance of PyTorch Lightning 'Trainer'")
-
-    # Save the config to checkpoints under "hyper_parameters". Log it if a logger is defined.
-    system.save_hyperparameters(parser.config)
-    if trainer.logger is not None:
-        trainer.logger.log_hyperparams(parser.config)
-
-    # Run the Trainer/Tuner method(s).
-    for method in methods:
-        args = parser.get_parsed_content(f"args#{method}", default={})
-        if hasattr(trainer, method):
-            getattr(trainer, method)(system, **args)
-        elif hasattr(Tuner, method):
-            tuner = Tuner(trainer)
-            getattr(tuner, method)(system, **args)
+    fire.Fire(
+        {
+            "fit": fit,
+            "validate": validate,
+            "test": test,
+            "predict": predict,
+            "lr_find": lr_find,
+            "scale_batch_size": scale_batch_size,
+        }
+    )

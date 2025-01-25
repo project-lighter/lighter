@@ -13,17 +13,17 @@ test_overrides = "./tests/integration/test_overrides.yaml"
         (  # Method name
             "fit",
             # Config fiile
-            "./projects/cifar10/experiments/monai_bundle_prototype.yaml",
+            "./projects/cifar10/experiments/example.yaml",
         ),
         (  # Method name
             "test",
             # Config fiile
-            "./projects/cifar10/experiments/monai_bundle_prototype.yaml",
+            "./projects/cifar10/experiments/example.yaml",
         ),
         (  # Method name
             "predict",
             # Config fiile
-            "./projects/cifar10/experiments/monai_bundle_prototype.yaml",
+            "./projects/cifar10/experiments/example.yaml",
         ),
     ],
 )

@@ -4,18 +4,18 @@ import pytest
 from pytorch_lightning import Trainer
 
 from lighter.engine.runner import cli, parse_config, run
-from lighter.system import LighterSystem
+from lighter.system import System
 
 
 @pytest.fixture
 def mock_system():
     """
-    Creates a mock LighterSystem instance for testing.
+    Creates a mock System instance for testing.
 
     Returns:
-        MagicMock: A mock object that simulates a LighterSystem instance.
+        MagicMock: A mock object that simulates a System instance.
     """
-    return MagicMock(spec=LighterSystem)
+    return MagicMock(spec=System)
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ def base_config(mock_system, mock_trainer):
     Creates a basic configuration function for testing.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_trainer: Mock Trainer instance
 
     Returns:
@@ -120,7 +120,7 @@ def test_run_with_tuner_method(mock_system, mock_trainer, mock_parse_config, moc
     Tests that a Tuner method is correctly called with appropriate arguments.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_trainer: Mock Trainer instance
         mock_parse_config: Mock parse_config function
         mock_seed_everything: Mock seed_everything function
@@ -148,7 +148,7 @@ def test_run_with_project_import(mock_system, mock_trainer, mock_parse_config, m
     Tests that the project module is correctly imported when a project path is specified.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_trainer: Mock Trainer instance
         mock_parse_config: Mock parse_config function
         mock_seed_everything: Mock seed_everything function
@@ -181,7 +181,7 @@ def test_run_with_invalid_system(mock_trainer, mock_parse_config, mock_seed_ever
         mock_trainer_class: Mock Trainer class
 
     Raises:
-        ValueError: Expected to be raised when system is not a LighterSystem instance.
+        ValueError: Expected to be raised when system is not a System instance.
     """
     mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
         "project": None,
@@ -191,7 +191,7 @@ def test_run_with_invalid_system(mock_trainer, mock_parse_config, mock_seed_ever
 
     mock_trainer_class.return_value = mock_trainer
 
-    with pytest.raises(ValueError, match="Expected 'system' to be an instance of 'LighterSystem'"):
+    with pytest.raises(ValueError, match="Expected 'system' to be an instance of 'System'"):
         run("fit")
 
 
@@ -200,7 +200,7 @@ def test_run_with_invalid_trainer(mock_system, mock_parse_config, mock_seed_ever
     Tests that run raises ValueError when an invalid trainer instance is provided.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_parse_config: Mock parse_config function
         mock_seed_everything: Mock seed_everything function
 
@@ -222,7 +222,7 @@ def test_run_with_trainer_logger(mock_system, mock_trainer, mock_parse_config, m
     Tests that the trainer logger correctly logs hyperparameters.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_trainer: Mock Trainer instance
         mock_parse_config: Mock parse_config function
         mock_seed_everything: Mock seed_everything function
@@ -250,7 +250,7 @@ def test_run_trainer_fit_called(mock_system, mock_trainer, mock_parse_config, mo
     Tests that the trainer's fit method is called with correct arguments.
 
     Args:
-        mock_system: Mock LighterSystem instance
+        mock_system: Mock System instance
         mock_trainer: Mock Trainer instance
         mock_parse_config: Mock parse_config function
         mock_seed_everything: Mock seed_everything function

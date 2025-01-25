@@ -4,68 +4,61 @@ SHELL := /usr/bin/env bash
 PYTHON := python
 PYTHONPATH := `pwd`
 
-### Poetry Setup
-# Install Poetry and configure environment
+# Install
 .PHONY: setup
-setup:
-	curl -sSL https://install.python-poetry.org | $(PYTHON) -
-	@echo "export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring" >> ~/.bashrc 
-	@echo "export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring" >> ~/.profile
-	poetry self add poetry-bumpversion@latest poetry-plugin-export@latest
-
-### Installation
-# Install project dependencies
+setup: 
+	pip install uv
+	
+#* Installation
 .PHONY: install
 install:
-	poetry install -n
+	uv pip install -e .
 
-# Install pre-commit hooks
-.PHONY: pre-commit-install
-pre-commit-install:
-	poetry run pre-commit install
+#* Formatters
+.PHONY: codestyle
+codestyle:
+	uvx pyupgrade --exit-zero-even-if-changed --py37-plus **/*.py
+	uvx isort --settings-path pyproject.toml ./
+	uvx black --config pyproject.toml ./
 
-### Linting & Testing
-# Check code formatting and style
-.PHONY: check-codestyle
-check-codestyle:
-	poetry run isort --diff --check-only --settings-path pyproject.toml ./
-	poetry run black --diff --check --config pyproject.toml ./
-	poetry run pylint lighter
+.PHONY: formatting
+formatting: codestyle
 
-# Run security checks
-.PHONY: check-safety
-check-safety:
-	poetry check
-	poetry export | poetry run safety check --stdin
-	poetry run bandit -ll --recursive lighter tests
-
-# Run tests with coverage report
+#* Linting
 .PHONY: test
 test:
-	PYTHONPATH=$(PYTHONPATH) poetry run pytest -c pyproject.toml --cov-report=html --cov=lighter tests/
+	uv run pytest -c pyproject.toml --cov=lighter --cov-report=term-missing
 
-# Generate coverage badge
-.PHONY: coverage
-coverage:
-	poetry run coverage-badge -o assets/images/coverage.svg -f
+.PHONY: check-codestyle
+check-codestyle:
+	uvx isort --diff --check-only --settings-path pyproject.toml ./
+	uvx black --diff --check --config pyproject.toml ./
+	uv run pylint lighter
 
-### Dependency Management
-# Update development dependencies
-.PHONY: update-dev-deps
-update-dev-deps:
-	poetry add -G dev bandit@latest "isort[colors]@latest" mypy@latest pre-commit@latest pydocstyle@latest \
-		pylint@latest pytest@latest pyupgrade@latest safety@latest coverage@latest coverage-badge@latest \
-		pytest-html@latest pytest-cov@latest
-	poetry add -G dev --allow-prereleases black@latest
+.PHONY: bump-prerelease
+bump-prerelease:
+	uvx --with poetry-bumpversion poetry version prerelease
 
-# Update main project dependencies
-.PHONY: update-deps
-update-deps:
-	poetry add torch@latest torchvision@latest pytorch_lightning@latest torchmetrics@latest monai@latest
+.PHONY: bump-patch
+bump-patch:
+	uvx --with poetry-bumpversion poetry version patch
 
-### Cleaning
-# Remove temporary files and build artifacts
-.PHONY: clean
-clean:
-	find . | grep -E "(__pycache__|\.pyc|\.pyo$|.DS_Store|.mypy_cache|.pytest_cache|.ipynb_checkpoints)" | xargs rm -rf
-	rm -rf build/
+.PHONY: bump-minor
+bump-minor:
+	uvx --with poetry-bumpversion poetry version minor
+
+.PHONY: bump-major
+bump-major:
+	uvx --with poetry-bumpversion poetry version major
+
+.PHONY: mypy
+mypy:
+	uvx mypy --config-file pyproject.toml ./
+
+.PHONY: check-safety
+check-safety:
+	uvx safety check
+	uvx bandit -ll --recursive lighter tests
+
+.PHONY: lint
+lint: test check-codestyle mypy check-safety
