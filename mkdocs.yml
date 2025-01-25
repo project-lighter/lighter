@@ -1,6 +1,5 @@
 site_name: Lighter
 theme:
-  custom_dir: docs/overrides
   icon:
     repo: fontawesome/brands/github
   font:
