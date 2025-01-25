@@ -119,10 +119,14 @@ class System(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def _calculate_loss(self, input: Any, target: Any, pred: Any) -> Tensor | dict[str, Tensor] | None:
-        adapters = getattr(self.adapters, self.mode)
         loss = None
         if self.mode in [Mode.TRAIN, Mode.VAL]:
+            if self.criterion is None:
+                raise ValueError("Please specify 'system.criterion' in the config.")
+
+            adapters = getattr(self.adapters, self.mode)
             loss = adapters.criterion(self.criterion, input, target, pred)
+
             if isinstance(loss, dict) and "total" not in loss:
                 raise ValueError(
                     "The loss dictionary must include a 'total' key that combines all sublosses. "
@@ -131,9 +135,9 @@ class System(pl.LightningModule):
         return loss
 
     def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
-        adapters = getattr(self.adapters, self.mode)
         metrics = getattr(self.metrics, self.mode)
-        if metrics is not None:
+        if metrics:
+            adapters = getattr(self.adapters, self.mode)
             metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
 
