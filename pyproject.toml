@@ -163,15 +163,14 @@ cov-report= "term-missing"
 fail_under = 50
 show_missing = true
 
-[tool.pylint.'MESSAGES CONTROL']
+[tool.pylint."MESSAGES CONTROL"]
 max-line-length = 127
-disable = """
-generated-members = "torch.*"
-    too-many-arguments,
-    no-else-return,
-"""
-allowed-redefined-builtins = [ 'input' ]
-generated-members = "torch.*"
+disable = [
+    "too-many-arguments",
+    "no-else-return",
+]
+
+allowed-redefined-builtins = ["input"]
 
 [tool.pylint.master]
 fail-under=8

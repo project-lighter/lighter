@@ -48,4 +48,4 @@ class Resolver:
         if "args" in stage_config:
             stage_config["args"] = {stage: stage_config["args"].get(stage, {})}
 
-        return Config(stage_config)
+        return Config(stage_config, validate=False)

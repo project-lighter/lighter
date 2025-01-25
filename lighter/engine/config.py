@@ -3,8 +3,6 @@ from typing import Any
 import cerberus
 from monai.bundle.config_parser import ConfigParser
 
-from lighter.engine.schema import SCHEMA
-
 
 class ConfigurationException(Exception):
     """Custom exception for validation errors."""
@@ -20,8 +18,8 @@ class Config:
 
     def __init__(
         self,
-        config: str | dict | None = None,
-        schema: dict | None = SCHEMA,
+        config: str | dict,
+        validate: bool,
         **config_overrides: Any,
     ):
         """
@@ -29,7 +27,7 @@ class Config:
 
         Args:
             config: Path to a YAML configuration file or a dictionary containing the configuration.
-            schema: A Cerberus schema for validation.
+            validate: Whether to validate the configuration.
             config_overrides: Keyword arguments to override values in the configuration file
         """
         if not isinstance(config, (dict, str, type(None))):
@@ -43,10 +41,13 @@ class Config:
         for name, value in config_overrides.items():
             self._config_parser.set(value, name)
 
-        if schema:
-            validator = cerberus.Validator(schema)
-            if not validator.validate(self.get()):
-                raise ConfigurationException(format_validation_errors(validator.errors))
+        # Validate the configuration
+        if validate:
+            validator = cerberus.Validator(SCHEMA)
+            valid = validator.validate(self.get())
+            if not valid:
+                errors = format_validation_errors(validator.errors)
+                raise ConfigurationException(errors)
 
     def get(self, key: str | None = None, default: Any = None) -> Any:
         """Get raw content for the given key. If key is None, get the entire config."""
@@ -84,3 +85,60 @@ def format_validation_errors(errors: dict) -> str:
 
     process_error("", errors)
     return "\n".join(messages)
+
+
+SCHEMA = {
+    "_meta_": {"type": "dict"},
+    "_requires_": {"type": ["string", "list", "dict"]},
+    "project": {"type": "string"},
+    "vars": {"type": "dict"},
+    "args": {
+        "type": "dict",
+        "schema": {
+            "fit": {"type": "dict"},
+            "validate": {"type": "dict"},
+            "test": {"type": "dict"},
+            "predict": {"type": "dict"},
+            "lr_find": {"type": "dict"},
+            "scale_batch_size": {"type": "dict"},
+        },
+    },
+    "trainer": {"type": "dict"},
+    "system": {
+        "type": "dict",
+        "schema": {
+            "_target_": {"type": "string", "required": True},
+            "model": {"type": "dict"},
+            "criterion": {"type": "dict"},
+            "optimizer": {"type": "dict"},
+            "scheduler": {"type": "dict"},
+            "inferer": {"type": "dict"},
+            "metrics": {
+                "type": "dict",
+                "schema": {
+                    "train": {"type": ["list", "dict"]},
+                    "val": {"type": ["list", "dict"]},
+                    "test": {"type": ["list", "dict"]},
+                },
+            },
+            "dataloaders": {
+                "type": "dict",
+                "schema": {
+                    "train": {"type": "dict"},
+                    "val": {"type": "dict"},
+                    "test": {"type": "dict"},
+                    "predict": {"type": "dict"},
+                },
+            },
+            "adapters": {
+                "type": "dict",
+                "schema": {
+                    "train": {"type": "dict"},
+                    "val": {"type": "dict"},
+                    "test": {"type": "dict"},
+                    "predict": {"type": "dict"},
+                },
+            },
+        },
+    },
+}

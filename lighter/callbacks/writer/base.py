@@ -133,5 +133,6 @@ class BaseWriter(ABC, Callback):
             self.write(tensor=pred, identifier=identifier)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
+        # pylint: disable=protected-access
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
         gc.collect()

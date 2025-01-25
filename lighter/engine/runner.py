@@ -26,7 +26,7 @@ class Runner:
     def run(self, stage: str, config: str | dict | None = None, **config_overrides: Any) -> None:
         """Run the specified stage with the given configuration."""
         seed_everything()
-        self.config = Config(config, **config_overrides)
+        self.config = Config(config, **config_overrides, validate=True)
 
         # Resolves stage-specific configuration
         self.resolver = Resolver(self.config)
