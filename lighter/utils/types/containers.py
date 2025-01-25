@@ -59,7 +59,7 @@ class DataLoaders:
 class Train:
     """Train mode sub-dataclass for Adapters."""
 
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor="input", target_accessor="target"))
+    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
     criterion: CriterionAdapter = field(default_factory=lambda: CriterionAdapter(pred_argument=0, target_argument=1))
     metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
     logging: LoggingAdapter = field(default_factory=LoggingAdapter)
@@ -69,7 +69,7 @@ class Train:
 class Val:
     """Val mode sub-dataclass for Adapters."""
 
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor="input", target_accessor="target"))
+    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
     criterion: CriterionAdapter = field(default_factory=lambda: CriterionAdapter(pred_argument=0, target_argument=1))
     metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
     logging: LoggingAdapter = field(default_factory=LoggingAdapter)
@@ -79,7 +79,7 @@ class Val:
 class Test:
     """Test mode sub-dataclass for Adapters."""
 
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor="input", target_accessor="target"))
+    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
     metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
     logging: LoggingAdapter = field(default_factory=LoggingAdapter)
 
@@ -88,7 +88,7 @@ class Test:
 class Predict:
     """Predict mode sub-dataclass for Adapters."""
 
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor="input"))
+    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=lambda batch: batch))
     logging: LoggingAdapter = field(default_factory=LoggingAdapter)
 
 
