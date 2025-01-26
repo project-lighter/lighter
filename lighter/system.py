@@ -136,7 +136,7 @@ class System(pl.LightningModule):
 
     def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
         metrics = getattr(self.metrics, self.mode)
-        if metrics:
+        if metrics is not None:
             adapters = getattr(self.adapters, self.mode)
             metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
@@ -162,6 +162,7 @@ class System(pl.LightningModule):
                 for name, subloss in loss.items():
                     self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
                     self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
+
         # Metrics
         if metrics is not None:
             for name, metric in metrics.items():
