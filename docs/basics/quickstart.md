@@ -3,13 +3,14 @@ Get started with Lighter in just a few minutes! This guide will walk you through
 
 ## Installation
 
+Latest release (recommended):
 ```python
-pip install project-lighter
+pip install lighter
 ```
 
-For bleeding edge version, run
+Up-to-date with the main branch (may contain experimental features):
 ```python
-pip install project-lighter --pre
+pip install lighter --pre
 ```
 
 

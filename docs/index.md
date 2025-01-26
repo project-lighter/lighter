@@ -13,7 +13,7 @@ title: Lighter
 </br>
 
 ```bash
-pip install project-lighter
+pip install lighter
 ```
 </div>
 </br>
@@ -23,7 +23,7 @@ pip install project-lighter
 **Lighter** organizes your experiments through a **configuration file**, with all the **boilerplate code implemented under the hood**. Focus on the core aspects of your research, such as model architecture, datasets, and hyperparameters, **without writing repetitive code** for each experiment:
 
 <div style="display: flex; justify-content: space-between">
-    <div style="width: 47%;">
+    <div style="width: 49%;">
         <h3 style="text-align: center">PyTorch Lightning</h3>
         ```bash title="Terminal"
         python cifar10.py
@@ -35,9 +35,7 @@ pip install project-lighter
         from torch.utils.data import DataLoader
         from torchvision.models import resnet18
         from torchvision.datasets import CIFAR10
-        from torchvision.transforms import (ToTensor
-                                            Normalize,
-                                            Compose)
+        from torchvision.transforms import ToTensor, Normalize, Compose
 
         class Model(LightningModule):
             def __init__(self):
@@ -84,7 +82,7 @@ pip install project-lighter
         ```
     </div>
 
-    <div style="width: 52%;">
+    <div style="width: 49%;">
         <h3 style="text-align: center">Lighter</h3>
         ```bash title="Terminal"
         lighter fit --config cifar10.yaml
@@ -93,14 +91,12 @@ pip install project-lighter
         trainer:
             _target_: pytorch_lightning.Trainer
             max_epochs: 100
-        
+
         system:
             _target_: lighter.System
-            batch_size: 512
 
-            model: 
+            model:
                 _target_: torchvision.models.resnet18
-                num_classes: 10
 
             criterion:
                 _target_: torch.nn.CrossEntropyLoss
@@ -109,20 +105,24 @@ pip install project-lighter
                 _target_: torch.optim.Adam
                 params: "$@system#model.parameters()"
                 lr: 0.001
-            
-            datasets:
+
+            dataloaders:
                 train:
-                    _target_: torchvision.datasets.CIFAR10
-                    download: True
-                    root: .datasets
-                    train: True
-                    transform:
-                        _target_: torchvision.transforms.Compose
-                        transforms:
-                            - _target_: torchvision.transforms.ToTensor
-                            - _target_: torchvision.transforms.Normalize
-                              mean: [0.5, 0.5, 0.5]
-                              std: [0.5, 0.5, 0.5]
+                    _target_: torch.utils.data.DataLoader
+                    batch_size: 256
+                    shuffle: True
+                    dataset:
+                        _target_: torchvision.datasets.CIFAR10
+                        download: True
+                        root: .datasets/
+                        train: True
+                        transform:
+                            _target_: torchvision.transforms.Compose
+                            transforms:
+                                - _target_: torchvision.transforms.ToTensor
+                                - _target_: torchvision.transforms.Normalize
+                                mean: [0.5, 0.5, 0.5]
+                                std: [0.5, 0.5, 0.5]
         ```
     </div>
 </div>
