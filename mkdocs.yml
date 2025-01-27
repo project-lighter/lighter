@@ -62,17 +62,26 @@ plugins:
 
 nav:
   - Home: index.md
-  - Basics:
-    - Quickstart: basics/quickstart.md
-    - Configuration System: basics/config.md
-    - Running workflows: basics/workflows.md
-    - Integrating your projects: basics/projects.md
+  - Tutorials:
+      - Configuration Basics: tutorials/01_configuration_basics.md
+      - Image Classification: tutorials/02_image_classification.md
+      - Semantic Segmentation: tutorials/03_semantic_segmentation.md
+      - Transfer Learning: tutorials/04_transfer_learning.md
+      - Multi-task Learning: tutorials/05_multi_task_learning.md
+  - How-To:
+      - Custom Project Modules: how-to/custom_project_modules.md
+      - Debugging Config Errors: how-to/debugging_config_errors.md
+      - Creating a Custom Metric: how-to/creating_a_custom_metric.md
+      - Using Adapters: how-to/using_adapters.md
+      - Using and Extending Writers: how-to/using_and_extending_writers.md
+      - Using Freezer: how-to/using_freezer.md
+      - Implementing a Custom Inferer: how-to/implementing_a_custom_inferer.md
+  - Explanation:
+      - Overview: explanation/overview.md
+      - Configuration System: explanation/configuration_system.md
+      - Adapter System: explanation/adapter_system.md
+      - Dynamic Module Loading: explanation/dynamic_module_loading.md
 
-  - Advanced:
-    - Postprocessing: advanced/postprocessing.md
-    - Inferer: advanced/inferer.md
-    - Callbacks: advanced/callbacks.md
-  - API Reference: reference/
   
 markdown_extensions:
   - pymdownx.highlight:
