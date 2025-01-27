@@ -80,6 +80,19 @@
     color:                   #fff;
 }
 
+[data-md-color-scheme="default"] table,
+[data-md-color-scheme="default"] th,
+[data-md-color-scheme="default"] td,
+[data-md-color-scheme="default"] code,
+[data-md-color-scheme="slate"] table,
+[data-md-color-scheme="slate"] th,
+[data-md-color-scheme="slate"] td,
+[data-md-color-scheme="slate"] code {
+    font-size: 14px; /* paragraph 16px, rest 14px */
+}
+
+
+
 @media only screen and (min-width: 75.25em) {
   .md-main__inner {
     max-width: 1000em;
