@@ -81,7 +81,7 @@ nav:
       - Configuration System: explanation/configuration_system.md
       - Adapter System: explanation/adapter_system.md
       - Dynamic Module Loading: explanation/dynamic_module_loading.md
-
+  - API Reference: reference/
   
 markdown_extensions:
   - pymdownx.highlight:
