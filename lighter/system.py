@@ -135,11 +135,14 @@ class System(pl.LightningModule):
         return loss
 
     def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
-        metrics = getattr(self.metrics, self.mode)
-        if metrics is not None:
-            adapters = getattr(self.adapters, self.mode)
-            metrics = adapters.metrics(metrics, input, target, pred)
+        metrics = None
+        if self.mode != Mode.PREDICT:
+            metrics = getattr(self.metrics, self.mode)
+            if metrics is not None:
+                adapters = getattr(self.adapters, self.mode)
+                metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
+
 
     def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
         """
