@@ -2,7 +2,7 @@
 Logging utilities for configuring and setting up custom logging using Loguru and Rich.
 
 This module provides functionality to set up visually appealing logs with custom formatting,
-traceback handling, and suppression of detailed logs from specified modules. It includes color 
+traceback handling, and suppression of detailed logs from specified modules. It includes color
 mapping for different log levels and handlers to intercept and redirect logging to Loguru.
 """
 

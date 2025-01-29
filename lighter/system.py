@@ -143,7 +143,6 @@ class System(pl.LightningModule):
                 metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
 
-
     def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
