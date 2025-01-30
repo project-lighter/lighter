@@ -2,6 +2,7 @@ from typing import Any
 
 import cerberus
 from monai.bundle.config_parser import ConfigParser
+
 from lighter.engine.schema import SCHEMA
 
 
@@ -38,7 +39,8 @@ class Config:
         self._config_parser.read_config(config)
         self._config_parser.parse()
 
-        # TODO: verify that switching from .update(config_overrides) to .set(value, name) is a valid approach. The latter allows creation of currently non-existent keys.
+        # TODO: verify that switching from .update(config_overrides) to .set(value, name) is
+        # a valid approach. The latter allows creation of currently non-existent keys.
         for name, value in config_overrides.items():
             self._config_parser.set(value, name)
 
@@ -86,6 +88,3 @@ def format_validation_errors(errors: dict) -> str:
 
     process_error("", errors)
     return "\n".join(messages)
-
-
-

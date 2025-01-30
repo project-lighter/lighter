@@ -164,12 +164,8 @@ show_missing = true
 
 [tool.pylint."MESSAGES CONTROL"]
 max-line-length = 127
-disable = [
-    "too-many-arguments",
-    "no-else-return",
-]
-
 allowed-redefined-builtins = ["input"]
+disable = ["too-many-arguments", "no-else-return"]
 
 [tool.pylint.master]
 fail-under=8
