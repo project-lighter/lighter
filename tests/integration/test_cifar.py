@@ -1,36 +1,32 @@
 """Tests for running CIFAR training to verify integrity of the pipeline"""
-
 import pytest
-
-from lighter.engine.runner import run
-
+from lighter.engine.runner import Runner, Stage
 test_overrides = "./tests/integration/test_overrides.yaml"
-
-
 @pytest.mark.parametrize(
-    ("method_name", "config"),
+    ("stage", "config"),
     [
-        (  # Method name
-            "fit",
-            # Config fiile
+        (
+            Stage.FIT,
             "./projects/cifar10/experiments/example.yaml",
         ),
-        (  # Method name
-            "test",
-            # Config fiile
+        (
+            Stage.TEST,
             "./projects/cifar10/experiments/example.yaml",
         ),
-        (  # Method name
-            "predict",
-            # Config fiile
+        (
+            Stage.PREDICT,
             "./projects/cifar10/experiments/example.yaml",
         ),
     ],
 )
 @pytest.mark.slow
-def test_trainer_method(method_name: str, config: str):
-    """ """
-
-    kwargs = {"config": [config, test_overrides]}
-    func_return = run(method_name, **kwargs)
-    assert func_return is None
+def test_trainer_stage(stage: Stage, config: str):
+    """
+    Test the specified stage using the given configuration.
+    Args:
+        stage: The stage to run (e.g., "fit", "test", "predict").
+        config: Path to the configuration file.
+    """
+    runner = Runner()
+    runner.run(stage, config=f"{config},{test_overrides}")
+    assert runner.trainer.state.finished, f"Stage {stage} did not finish successfully."
