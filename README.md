@@ -68,9 +68,8 @@ Focus on your deep learning experiments and forget about (re)writing code. `ligh
 <details>
 <summary><b>For development:</b></summary>
 <pre><code>make setup
-make install             # Install lighter via Poetry
+make install             # Install lighter via uv
 make pre-commit-install  # Set up the pre-commit hook for code formatting
-poetry shell             # Once installed, activate the poetry shell</code></pre>
 </details>
 <br/>
 
