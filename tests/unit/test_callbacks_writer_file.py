@@ -38,7 +38,7 @@ def test_file_writer_write_tensor(tmp_path):
     """
     writer = FileWriter(path=tmp_path, writer="tensor")
     tensor = torch.tensor([1, 2, 3])
-    writer.write(tensor, id=1)
+    writer.write(tensor, identifier=1)
 
     # Verify file exists
     saved_path = writer.path / "1.pt"
@@ -62,7 +62,7 @@ def test_file_writer_write_image(tmp_path):
     """
     writer = FileWriter(path=tmp_path, writer="image")
     tensor = torch.randint(0, 256, (3, 64, 64), dtype=torch.uint8)
-    writer.write(tensor, id="image_test")
+    writer.write(tensor, identifier="image_test")
 
     # Verify file exists
     saved_path = writer.path / "image_test.png"
@@ -86,7 +86,7 @@ def test_file_writer_write_video(tmp_path):
     """
     writer = FileWriter(path=tmp_path, writer="video")
     tensor = torch.randint(0, 256, (3, 10, 64, 64), dtype=torch.uint8)
-    writer.write(tensor, id="video_test")
+    writer.write(tensor, identifier="video_test")
 
     # Verify file exists
     saved_path = writer.path / "video_test.mp4"
@@ -107,7 +107,7 @@ def test_file_writer_write_grayscale_video(tmp_path):
     writer = FileWriter(path=tmp_path, writer="video")
     # Create a grayscale video tensor with 1 channel
     tensor = torch.randint(0, 256, (1, 10, 64, 64), dtype=torch.uint8)
-    writer.write(tensor, id="grayscale_video_test")
+    writer.write(tensor, identifier="grayscale_video_test")
 
     # Verify file exists
     saved_path = writer.path / "grayscale_video_test.mp4"
@@ -130,11 +130,11 @@ def test_file_writer_write_itk_image(tmp_path):
 
     # Test with regular tensor
     with pytest.raises(TypeError, match="Tensor must be in MONAI MetaTensor format"):
-        writer.write(tensor, id="itk_image_test")
+        writer.write(tensor, identifier="itk_image_test")
 
     # Test with proper MetaTensor
     meta_tensor = monai.data.MetaTensor(tensor, affine=torch.eye(4), meta={"original_channel_dim": 1})
-    writer.write(meta_tensor, id="itk_image_test")
+    writer.write(meta_tensor, identifier="itk_image_test")
 
     # Verify file exists
     saved_path = writer.path / "itk_image_test.nrrd"

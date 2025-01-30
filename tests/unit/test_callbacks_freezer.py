@@ -2,10 +2,28 @@ import pytest
 import torch
 from pytorch_lightning import Trainer
 from torch.nn import Module
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 
 from lighter.callbacks.freezer import Freezer
 from lighter.system import System
+
+
+class DummyDataset(Dataset):
+    """
+    A simple dataset for testing purposes.
+
+    Generates random input data and labels for training.
+    """
+    def __init__(self, num_samples=100):
+        self.num_samples = num_samples
+        self.data = torch.randn(num_samples, 10)
+        self.labels = torch.randint(0, 2, (num_samples,))
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
 
 
 class DummyModel(Module):
@@ -28,20 +46,6 @@ class DummyModel(Module):
         return x
 
 
-class DummyDataset(Dataset):
-    """
-    A dummy dataset that generates random tensors for testing.
-
-    Returns random input tensors of size 10 and target tensors of 0.
-    """
-
-    def __len__(self):
-        return 10
-
-    def __getitem__(self, idx):
-        return {"input": torch.randn(10), "target": torch.tensor(0)}
-
-
 @pytest.fixture
 def dummy_system():
     """
@@ -52,9 +56,9 @@ def dummy_system():
     """
     model = DummyModel()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    dataset = DummyDataset()
     criterion = torch.nn.CrossEntropyLoss()
-    return System(model=model, batch_size=8, criterion=criterion, optimizer=optimizer, datasets={"train": dataset})
+    train_dataloader = DataLoader(DummyDataset(), batch_size=32)
+    return System(model=model, criterion=criterion, optimizer=optimizer, dataloaders={"train": train_dataloader})
 
 
 def test_freezer_initialization():
