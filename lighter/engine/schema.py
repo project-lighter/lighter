@@ -13,7 +13,6 @@ The schema ensures user configurations are correctly structured and typed. It in
 Used by the `Config` class for validation.
 """
 
-
 SCHEMA = {
     "_meta_": {"type": "dict"},
     "_requires_": {"type": ["string", "list", "dict"]},
