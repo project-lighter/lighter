@@ -15,7 +15,7 @@
 <br/>
 <div align="center">
 
-[![build](https://github.com/project-lighter/lighter/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/build.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE)
+[![build](https://github.com/project-lighter/lighter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/build.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE)
 
 <a href="https://discord.gg/zJcnp6KrUp">
   <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner2" alt="Lighter Discord Server"/>
@@ -43,7 +43,7 @@ Focus on your deep learning experiments and forget about (re)writing code. `ligh
 
 `lighter` stands on the shoulder of these two giants:
  - [MONAI Bundle](https://docs.monai.io/en/stable/bundle_intro.html) - Configuration system. Similar to [Hydra](https://github.com/facebookresearch/hydra), but with additional features.
- - [PyTorch Lightning](https://github.com/Lightning-AI/lightning) - Our [`LighterSystem`](https://project-lighter.github.io/lighter/reference/system/) is based on the PyTorch Lightning [`LightningModule`](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html) and implements all the necessary training logic for you. Couple it with the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and you're good to go.
+ - [PyTorch Lightning](https://github.com/Lightning-AI/lightning) - Our [`System`](https://project-lighter.github.io/lighter/reference/system/) is based on the PyTorch Lightning [`LightningModule`](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html) and implements all the necessary training logic for you. Couple it with the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and you're good to go.
 
 <br/>
 <div align="center">Simply put, <code>lighter = config(trainer + system)</code>  😇</div>
@@ -68,9 +68,8 @@ Focus on your deep learning experiments and forget about (re)writing code. `ligh
 <details>
 <summary><b>For development:</b></summary>
 <pre><code>make setup
-make install             # Install lighter via Poetry
+make install             # Install lighter via uv
 make pre-commit-install  # Set up the pre-commit hook for code formatting
-poetry shell             # Once installed, activate the poetry shell</code></pre>
 </details>
 <br/>
 

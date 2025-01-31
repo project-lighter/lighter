@@ -1,12 +1,12 @@
 1. [Code contribution](#code-contribution)
-   - [Dependencies](#dependencies)
-   - [Codestyle](#codestyle)
-     - [Checks](#checks)
-       - [Before submitting](#before-submitting)
-   - [Other help](#other-help)
+    - [Dependencies](#dependencies)
+    - [Codestyle](#codestyle)
+      - [Checks](#checks)
+        - [Before submitting](#before-submitting)
+    - [Other help](#other-help)
 
 2. [Documentation contribution](#documentation-contribution)
-   - [Dependencies](#dependencies-1)
+    - [Dependencies](#dependencies-1)
     - [Serving the documentation locally](#serving-the-documentation-locally)
     - [Deploying the documentation to GitHub Pages](#deploying-the-documentation-to-github-pages)
 
@@ -15,71 +15,89 @@
 
 ## Dependencies
 
-We use `poetry` to manage the [dependencies](https://github.com/python-poetry/poetry).
-If you dont have `poetry`, you should install with `make poetry-download`.
+We use `uv` for fast Python package management. To set up the development environment:
 
-To install dependencies and prepare [`pre-commit`](https://pre-commit.com/) hooks you would need to run `install` command:
-
+1. Create and activate a virtual environment:
 ```bash
-make install
-make pre-commit-install
+uv venv .venv
+source .venv/bin/activate
 ```
 
-To activate your `virtualenv` run `poetry shell`.
+2. Install development dependencies:
+```bash
+uv sync
+```
+
+3. Install pre-commit hooks:
+```bash
+uvx pre-commit install
+```
 
 ## Codestyle
 
-After installation you may execute code formatting.
+After installation you may execute code formatting:
 
+```bash
+make check-codestyle
+```
+
+To fix this run,
 ```bash
 make codestyle
 ```
 
 ### Checks
+Ensure that `check-codestyle` passes. 
 
-Many checks are configured for this project. Command `make check-codestyle` will check black and isort.
-The `make check-safety` command will look at the security of your code.
 
-Comand `make lint` applies all checks.
+### Tests
+Ensure all tests pass when running 
+
+```bash
+make test
+```
+
 
 ### Before submitting
 
-Before submitting your code please do the following steps:
+Before submitting your code:
 
 1. Add any changes you want
-1. Add tests for the new changes
-1. Edit documentation if you have changed something significant
-1. Run `make codestyle` to format your changes.
-1. Run `make lint` to ensure that types, security and docstrings are okay.
+2. Add tests for the new changes  
+3. Edit documentation if you have changed something significant
+4. Format all your code
+```bash
+make codestyle
+```
+5. Run all checks:
+```bash
+make lint
+```
 
 ## Other help
 
-You can contribute by spreading a word about this library.
-It would also be a huge contribution to write
-a short article on how you are using this project.
-You can also share your best practices with us.
+You can contribute by:
+- Spreading the word about this library
+- Writing short articles/tutorials about your use cases
+- Sharing best practices and examples
 
 
 # Documentation contribution
-Our documentation is located in the `docs/` folder and is built using `mkdocs` and `mkdocs-material`.
+Our documentation is built using mkdocs and mkdocs-material. API reference is generated from docstrings using mkdocstrings.
 
-The API reference is generated automatically from the docstrings in the code using `mkdocstrings`. Our docstrings follow the `google` style.
-
-##  Dependencies
-To install `mkdocs-material` together with the required dependencies run:
+## Dependencies
+To install documentation requirements:
 
 ```bash
-pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+uv pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
 ```
 
 ## Serving the documentation locally
-While working on the documentation, you can serve it locally to see the changes in real-time.
 
 ```bash
-cd docs/
 mkdocs serve
 ```
 
-## Deploying the documentation to GitHub Pages
+## Deploying the documentation
 
-The documentation is automatically deployed once the changes are merged into the `main` branch.
+Documentation is automatically deployed when changes are merged to main.

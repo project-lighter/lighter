@@ -28,7 +28,7 @@ Say goodbye to messy scripts and notebooks. Lighter is here to help you organize
 ## Features
 
 1. **Structured** - the pre-defined structure ensures that your experiments are standardized, organized, and reproducible.
-2. **Boilerplate-free** - forget about writing training logic over and over. `LighterSystem` handles it for you and is compatible with any task, from classification to self-supervised learning.
+2. **Boilerplate-free** - forget about writing training logic over and over. `System` handles it for you and is compatible with any task, from classification to self-supervised learning.
 3. **Readable** - wondering what learning rate or architecture was used? Just glance at the config.
 4. **Easily modifiable** - override parameters from CLI or using another config. Leave `argparse` and hardcoding in the past.
 
@@ -107,7 +107,7 @@ Say goodbye to messy scripts and notebooks. Lighter is here to help you organize
             max_epochs: 100
         
         system:
-            _target_: lighter.LighterSystem
+            _target_: lighter.System
             batch_size: 512
 
             model: torchvision.models.resnet18

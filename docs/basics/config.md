@@ -1,10 +1,14 @@
 # Configuration System
 
-Lighter is a configuration-centric framework where the config. is used for setting up the machine learning workflow from model architecture selection, loss function, optimizer, dataset preparation and running the training/evaluation/inference process.
+Lighter is a configuration-centric framework that uses YAML files to set up machine learning workflows. These configurations cover everything from model architecture selection, loss functions, and optimizers to dataset preparation and the execution of training, evaluation, and inference processes.
 
-Our configuration system is heavily based on MONAI bundle parser but with a standardized structure. For every configuration, we expect several items to be mandatorily defined. 
+Our configuration system is inspired by the MONAI bundle parser, offering a standardized structure. Each configuration requires several mandatory components to be defined.
 
-Let us take a simple example config to dig deeper into the configuration system of Lighter. You can go through the config and click on the + for more information about specific concepts.
+The configuration is divided into two main components:
+- **Trainer**: Handles the training process, including epochs, devices, etc.
+- **System**: Encapsulates the model, optimizer, datasets, and other components.
+
+Let's explore a simple example configuration to understand Lighter's configuration system better. You can expand each section for more details on specific concepts.
 
 <div class="annotate" markdown>
 
@@ -15,7 +19,7 @@ trainer:
   max_epochs (2): 100
 
 system:
-  _target_: lighter.LighterSystem
+  _target_: lighter.System
   batch_size: 512
 
   model:
@@ -49,7 +53,9 @@ system:
 1.  `_target_` is a special reserved keyword that initializes a python object from the provided text. In this case, a `Trainer` object from the `pytorch_lightning` library is initialized
 2.  `max_epochs` is an argument of the `Trainer` class which is passed through this format. Any argument for the class can be passed similarly.
 3.  `$@` is a combination of `$` which evaluates a python expression and `@` which references a python object. In this case we first reference the model with `@model` which is the `torchvision.models.resnet18` defined earlier and then access its parameters using `$@model.parameters()`
-4.  YAML allows passing a list in the format below where each `_target_` specifices a transform that is added to the list of transforms in `Compose`. The `torchvision.datasets.CIFAR10` accepts these with a `transform` argument and applies them to each item. 
+4.  YAML allows passing a list in the format below where each `_target_` specifies a transform that is added to the list of transforms in `Compose`. The `torchvision.datasets.CIFAR10` accepts these with a `transform` argument and applies them to each item.
+
+5.  Datasets are defined for different modes: train, val, test, and predict. Each dataset can have its own transforms and configurations.
 
 ## Configuration Concepts
 As seen in the [Quickstart](./quickstart.md), Lighter has two main components:
@@ -61,22 +67,22 @@ As seen in the [Quickstart](./quickstart.md), Lighter has two main components:
         max_epochs: 100
 ```
 
-The trainer object (`pytorch_lightning.Trainer`) is initialized through the `_target_` key. For more info on `_target_` and special keys, click [here](#special-syntax-and-keywords)
+The trainer object (`pytorch_lightning.Trainer`) is initialized using the `_target_` key. For more information on `_target_` and other special keys, see [Special Syntax and Keywords](#special-syntax-and-keywords).
 
-The `max_epochs` is an argument provided to the `pytorch_lightning.Trainer` object during its instantiation. All arguments that are accepted during instantiation can be provided similarly. 
+The `max_epochs` parameter is passed to the `pytorch_lightning.Trainer` object during instantiation. You can provide any argument accepted by the class in this manner.
 
-### LighterSystem Configuration
-While Lighter borrows the Trainer from Pytorch Lightning, LighterSystem is a custom component unique to Lighter that draws on several concepts of PL such as LightningModule to provide a simple way to capture all the integral elements of a deep learning system. 
+### System Configuration
+While Lighter utilizes the Trainer from PyTorch Lightning, System is a unique component that incorporates concepts from PL, such as LightningModule, to encapsulate all essential elements of a deep learning system in a straightforward manner.
 
-Concepts encapsulated by LighterSystem include,
+Concepts encapsulated by System include,
 
 #### Model definition
-The `torchvision` library is installed by default in Lighter and therefore, you can choose different torchvision models here. We also have `monai` packaged with Lighter, so if you are looking to use a ResNet, all you need to modify to fit this new model in your config is,
+The `torchvision` library is included by default in Lighter, allowing you to select various torchvision models. Additionally, Lighter includes `monai`, enabling you to easily switch to a ResNet model by adjusting your configuration as follows:
 
 === "Torchvision ResNet18"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: torchvision.models.resnet18
@@ -87,7 +93,7 @@ The `torchvision` library is installed by default in Lighter and therefore, you 
 === "MONAI ResNet50"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: monai.networks.nets.resnet50
@@ -99,7 +105,7 @@ The `torchvision` library is installed by default in Lighter and therefore, you 
 === "MONAI 3DResNet50"
 
     ```yaml
-    LighterSystem:
+    System:
       ...
       model:
         _target_: monai.networks.nets.resnet50
@@ -111,11 +117,11 @@ The `torchvision` library is installed by default in Lighter and therefore, you 
 <br/>
 #### Criterion/Loss
 
-Similar to overriding models, when exploring different loss types in Lighter, you can easily switch between various loss functions provided by libraries such as `torch` and `monai`. This flexibility allows you to experiment with different approaches to optimize your model's performance without changing code!! Below are some examples of how you can modify the criterion section in your configuration file to use different loss functions.
+Just as you can override models, Lighter allows you to switch between various loss functions from libraries like `torch` and `monai`. This flexibility lets you experiment with different optimization strategies without altering your code. Here are examples of how to modify the criterion section in your configuration to use different loss functions:
 
 === "CrossEntropyLoss"
     ```yaml
-    LighterSystem:
+    System:
       ...
       criterion:
         _target_: torch.nn.CrossEntropyLoss
@@ -124,7 +130,7 @@ Similar to overriding models, when exploring different loss types in Lighter, yo
 
 === "MONAI's Dice Loss"
     ```yaml
-    LighterSystem:
+    System:
       ...
       criterion:
         _target_: monai.losses.DiceLoss
@@ -134,9 +140,9 @@ Similar to overriding models, when exploring different loss types in Lighter, yo
 <br/>
 #### Optimizer
 
-Same as above, you can experiment with different optimizer parameters. Model parameters are directly passed to the optimizer in `params` argument.
+Similarly, you can experiment with different optimizer parameters. Model parameters are passed directly to the optimizer via the `params` argument.
 ```yaml hl_lines="5" 
-LighterSystem:
+System:
   ...
   optimizer:
     _target_: torch.optim.Adam
@@ -145,9 +151,9 @@ LighterSystem:
   ...
 ```
 
- You can also define a scheduler for the optimizer as below,
+You can also define a scheduler for the optimizer as shown below:
 ```yaml hl_lines="10"
-LighterSystem:
+System:
   ...
   optimizer:
     _target_: torch.optim.Adam
@@ -162,17 +168,17 @@ LighterSystem:
 
   ...
 ```
-Here, the optimizer is passed to the scheduler with the `optimizer` argument. `%trainer#max_epochs` is also passed to the scheduler where it fetches `max_epochs` from the Trainer class.
+In this example, the optimizer is passed to the scheduler using the `optimizer` argument. The `%trainer#max_epochs` syntax retrieves the `max_epochs` value from the Trainer class.
 
 <br/>
 #### Datasets
 
-The most commonly changed part of the config is often the datasets as common workflows involve training/inferring on your own dataset. We provide a `datasets` key with `train`, `val`, `test` and `predict` keys that generate dataloaders for each of the different workflows provided by pytorch lightning. These are described in detail [here](./workflows.md)
+Datasets are often the most frequently modified part of the configuration, as workflows typically involve training or inferring on custom datasets. The `datasets` key includes `train`, `val`, `test`, and `predict` sub-keys, which generate dataloaders for each workflow supported by PyTorch Lightning. Detailed information is available [here](./workflows.md).
 
 <div class="annotate" markdown>
 
 ```yaml
-LighterSystem:
+System:
   ...
   datasets:
     train:
@@ -191,11 +197,11 @@ LighterSystem:
 ```
 
 </div>
-1. Define your own dataset class here or use several existing dataset clases. Read more about [this](./projects.md)
-2.  Transforms can be applied to each element of the dataset by initialization a `Compose` object and providing it a list of transforms. This is often the best way to adapt constraints for your data. 
+1. Define your own dataset class here or use existing dataset classes. Learn more about this [here](./projects.md).
+2.  Transforms can be applied to each dataset element by initializing a `Compose` object and providing a list of transforms. This approach is often the best way to adapt constraints for your data.
 
 ### Special Syntax and Keywords
-- `_target_`: Indicates the Python class to instantiate. If a function is provided, a partial function is created. Any configuration key set with `_target_` will map to a python object. 
-- **@**: References another configuration value. Using this syntax, keys mapped to python objects can be accessed. For instance, the learning rate of an optimizer, `optimizer` instianted to `torch.optim.Adam` using `_target_` can be accessed using `@model#lr` where `lr` is an attribute of the `torch.optim.Adam` class.
-- **$**: Used for evaluating Python expressions.
-- **%**: Macro for textual replacement in the configuration.
+- `_target_`: Specifies the Python class to instantiate. If a function is provided, a partial function is created. Any configuration key with `_target_` maps to a Python object.
+- **@**: References another configuration value. This syntax allows access to keys mapped to Python objects. For example, the learning rate of an optimizer instantiated as `torch.optim.Adam` can be accessed using `@model#lr`, where `lr` is an attribute of the `torch.optim.Adam` class.
+- **$**: Evaluates Python expressions.
+- **%**: Acts as a macro for textual replacement in the configuration.

@@ -1,4 +1,9 @@
-from typing import Any, Callable, Dict, Union
+"""
+This module provides the base class for defining custom writers in Lighter,
+allowing predictions to be saved in various formats.
+"""
+
+from typing import Any, Callable
 
 import gc
 from abc import ABC, abstractmethod
@@ -9,10 +14,11 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 from torch import Tensor
 
-from lighter import LighterSystem
+from lighter import System
+from lighter.utils.types.enums import Data, Stage
 
 
-class LighterBaseWriter(ABC, Callback):
+class BaseWriter(ABC, Callback):
     """
     Base class for defining custom Writer. It provides the structure to save predictions in various formats.
 
@@ -21,11 +27,11 @@ class LighterBaseWriter(ABC, Callback):
         2) `self.write()` method to specify the saving strategy for a prediction.
 
     Args:
-        path (Union[str, Path]): Path for saving. It can be a directory or a specific file.
-        writer (Union[str, Callable]): Name of the writer function registered in `self.writers`, or a custom writer function.
+        path (str | Path): Path for saving predictions.
+        writer (str | Callable): Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable) -> None:
         self.path = Path(path)
 
         # Check if the writer is a string and if it exists in the writers dictionary
@@ -42,13 +48,13 @@ class LighterBaseWriter(ABC, Callback):
 
     @property
     @abstractmethod
-    def writers(self) -> Dict[str, Callable]:
+    def writers(self) -> dict[str, Callable]:
         """
         Property to define the default writer functions.
         """
 
     @abstractmethod
-    def write(self, tensor: Tensor, id: int) -> None:
+    def write(self, tensor: Tensor, identifier: int) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
         the batch dimension.
@@ -58,18 +64,19 @@ class LighterBaseWriter(ABC, Callback):
 
         Args:
             tensor (Tensor): Tensor, without the batch dimension, to be saved.
-            id (int): Identifier for the tensor, can be used for naming files or adding table records.
+            identifier (int): Identifier for the tensor, can be used for naming files or adding table records.
         """
 
-    def setup(self, trainer: Trainer, pl_module: LighterSystem, stage: str) -> None:
+    def setup(self, trainer: Trainer, pl_module: System, stage: str) -> None:
         """
-        Callback function to set up necessary prerequisites: prediction count and prediction file or directory.
-        When executing in a distributed environment, it ensures that:
-        1. Each distributed node initializes a prediction count based on its rank.
-        2. All distributed nodes write predictions to the same path.
-        3. The path is accessible to all nodes, i.e., all nodes share the same storage.
+        Sets up the writer, ensuring the path is ready for saving predictions.
+
+        Args:
+            trainer (Trainer): The trainer instance.
+            pl_module (System): The System instance.
+            stage (str): The current stage of training.
         """
-        if stage != "predict":
+        if stage != Stage.PREDICT:
             return
 
         # Initialize the prediction count with the rank of the current process
@@ -96,23 +103,36 @@ class LighterBaseWriter(ABC, Callback):
             )
 
     def on_predict_batch_end(
-        self, trainer: Trainer, pl_module: LighterSystem, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
+        self, trainer: Trainer, pl_module: System, outputs: Any, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         """
-        Callback method executed at the end of each prediction batch/step.
-        If the IDs are not provided, it generates global unique IDs based on the prediction count.
-        Finally, it writes the predictions using the specified writer.
+        Callback method executed at the end of each prediction batch to write predictions with unique IDs.
+
+        Args:
+            trainer (Trainer): The trainer instance.
+            pl_module (System): The System instance.
+            outputs (Any): The outputs from the prediction step.
+            batch (Any): The current batch.
+            batch_idx (int): The index of the batch.
+            dataloader_idx (int): The index of the dataloader.
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
-        if outputs["id"] is None:
-            batch_size = len(outputs["pred"])
+        if outputs[Data.IDENTIFIER] is None:
+            batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
-            outputs["id"] = list(range(self._pred_counter, self._pred_counter + batch_size * world_size, world_size))
+            outputs[Data.IDENTIFIER] = list(
+                range(
+                    self._pred_counter,  # Start: counted globally, initialized with the rank of the current process
+                    self._pred_counter + batch_size * world_size,  # Stop: count the total batch size across all processes
+                    world_size,  # Step: each process writes predictions for every Nth sample
+                )
+            )
             self._pred_counter += batch_size * world_size
 
-        for id, pred in zip(outputs["id"], outputs["pred"]):
-            self.write(tensor=pred, id=id)
+        for pred, identifier in zip(outputs[Data.PRED], outputs[Data.IDENTIFIER]):
+            self.write(tensor=pred, identifier=identifier)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
+        # pylint: disable=protected-access
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
         gc.collect()

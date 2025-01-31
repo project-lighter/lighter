@@ -1,4 +1,8 @@
-from typing import Any, Callable, Dict, Union
+"""
+This module provides the TableWriter class, which saves predictions in a table format, such as CSV.
+"""
+
+from typing import Any, Callable
 
 import itertools
 from pathlib import Path
@@ -7,48 +11,46 @@ import pandas as pd
 import torch
 from pytorch_lightning import Trainer
 
-from lighter import LighterSystem
-from lighter.callbacks.writer.base import LighterBaseWriter
+from lighter import System
+from lighter.callbacks.writer.base import BaseWriter
 
 
-class LighterTableWriter(LighterBaseWriter):
+class TableWriter(BaseWriter):
     """
-    Writer for saving predictions in a table format.
+    Writer for saving predictions in a table format, such as CSV.
 
     Args:
-        path (Path): CSV filepath.
-        writer (Union[str, Callable]): Name of the writer function registered in `self.writers` or a custom writer function.
-            Available writers: "tensor". A custom writer function must take a single argument: `tensor`, and return the record
-            to be saved in the CSV file under 'pred' column. The tensor will be a single tensor without the batch dimension.
+        path: CSV filepath.
+        writer: Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: Union[str, Path], writer: Union[str, Callable]) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable) -> None:
         super().__init__(path, writer)
         self.csv_records = []
 
     @property
-    def writers(self) -> Dict[str, Callable]:
+    def writers(self) -> dict[str, Callable]:
         return {
             "tensor": lambda tensor: tensor.item() if tensor.numel() == 1 else tensor.tolist(),
         }
 
-    def write(self, tensor: Any, id: Union[int, str]) -> None:
+    def write(self, tensor: Any, identifier: int | str) -> None:
         """
-        Write the tensor as a table record using the specified writer.
+        Writes the tensor as a table record using the specified writer.
 
         Args:
-            tensor (Any): Tensor, without the batch dimension, to be recorded.
-            id (Union[int, str]): Identifier, used as the key for the record.
+            tensor: The tensor to record. Should not have a batch dimension.
+            identifier: Identifier for the record.
         """
-        self.csv_records.append({"id": id, "pred": self.writer(tensor)})
+        self.csv_records.append({"identifier": identifier, "pred": self.writer(tensor)})
 
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterSystem) -> None:
+    def on_predict_epoch_end(self, trainer: Trainer, pl_module: System) -> None:
         """
-        Callback invoked at the end of the prediction epoch to save predictions to a CSV file.
+        Called at the end of the prediction epoch to save predictions to a CSV file.
 
-        This method is responsible for organizing prediction records and saving them as a CSV file.
-        If training was done in a distributed setting, it gathers predictions from all processes
-        and then saves them from the rank 0 process.
+        Args:
+            trainer: The trainer instance.
+            pl_module: The System instance.
         """
         # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:
@@ -60,7 +62,11 @@ class LighterTableWriter(LighterBaseWriter):
         # Save the records to a CSV file
         if trainer.is_global_zero:
             df = pd.DataFrame(self.csv_records)
-            df = df.sort_values("id").set_index("id")
+            try:
+                df = df.sort_values("identifier")
+            except TypeError:
+                pass
+            df = df.set_index("identifier")
             df.to_csv(self.path)
 
         # Clear the records after saving
