@@ -1,4 +1,8 @@
 trainer#fast_dev_run: True
 trainer#accelerator: cpu
-system#batch_size: 16
-system#num_workers: 2
+
+system#dataloaders#train#batch_size: 16
+system#dataloaders#train#num_workers: 2
+
+system#dataloaders#val#batch_size: 16
+system#dataloaders#val#num_workers: 2

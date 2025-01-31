@@ -1,271 +1,288 @@
+"""Unit tests for the Runner class in lighter/engine/runner.py"""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
 from pytorch_lightning import Trainer
+from pytorch_lightning.tuner import Tuner
 
-from lighter.engine.runner import cli, parse_config, run
+from lighter.engine.runner import Runner, cli
 from lighter.system import System
+from lighter.utils.types.enums import Stage
 
 
 @pytest.fixture
 def mock_system():
-    """
-    Creates a mock System instance for testing.
-
-    Returns:
-        MagicMock: A mock object that simulates a System instance.
-    """
-    return MagicMock(spec=System)
+    """Fixture providing a mock System instance."""
+    system = MagicMock(spec=System)
+    system.save_hyperparameters = MagicMock()
+    return system
 
 
 @pytest.fixture
 def mock_trainer():
-    """
-    Creates a mock PyTorch Lightning Trainer instance for testing.
-
-    Returns:
-        MagicMock: A mock object that simulates a Trainer instance.
-    """
-    return MagicMock(spec=Trainer)
-
-
-@pytest.fixture
-def mock_parse_config():
-    """
-    Patches the parse_config function for testing.
-
-    Yields:
-        MagicMock: A mock object that simulates the parse_config function.
-    """
-    with patch("lighter.engine.runner.parse_config") as mock:
-        yield mock
+    """Fixture providing a mock Trainer instance."""
+    trainer = MagicMock(spec=Trainer)
+    trainer.logger = MagicMock()
+    trainer.logger.log_hyperparams = MagicMock()
+    trainer.fit = MagicMock()
+    trainer.validate = MagicMock()
+    trainer.test = MagicMock()
+    trainer.predict = MagicMock()
+    return trainer
 
 
 @pytest.fixture
-def mock_trainer_class():
-    """
-    Patches the Trainer class for testing while maintaining its specification.
-
-    Yields:
-        MagicMock: A mock object that simulates the Trainer class.
-    """
-    with patch("lighter.engine.runner.Trainer", new=Trainer) as mock:
-        yield mock
+def mock_config():
+    """Fixture providing a mock configuration."""
+    return {
+        "system": {
+            "model": "test_model",
+            "optimizer": {"name": "Adam", "lr": 0.001},
+        },
+        "trainer": {
+            "max_epochs": 10,
+            "accelerator": "auto",
+        },
+        "args": {
+            "fit": {"some_arg": "value"},
+        },
+        "project": None,
+    }
 
 
 @pytest.fixture
-def mock_seed_everything():
-    """
-    Patches the seed_everything function for testing.
-
-    Yields:
-        MagicMock: A mock object that simulates the seed_everything function.
-    """
-    with patch("lighter.engine.runner.seed_everything") as mock:
-        yield mock
+def runner():
+    """Fixture providing a Runner instance."""
+    return Runner()
 
 
-@pytest.fixture
-def base_config(mock_system, mock_trainer):
-    """
-    Creates a basic configuration function for testing.
-
-    Args:
-        mock_system: Mock System instance
-        mock_trainer: Mock Trainer instance
-
-    Returns:
-        callable: A function that returns configuration values based on keys.
-    """
-    return lambda x, default=None: {
-        "project": None,
-        "system": mock_system,
-        "trainer": mock_trainer,
-    }.get(x, default)
+def test_runner_initialization(runner):
+    """Test that Runner initializes with correct default values."""
+    assert runner.config is None
+    assert runner.resolver is None
+    assert runner.system is None
+    assert runner.trainer is None
+    assert runner.args is None
 
 
-def test_parse_config_no_config():
-    """
-    Tests that parse_config raises ValueError when no configuration is provided.
+@patch("lighter.engine.runner.Config")
+@patch("lighter.engine.runner.Resolver")
+@patch("lighter.engine.runner.seed_everything")
+@patch("lighter.engine.runner.import_module_from_path")
+def test_run_setup(
+    mock_import, mock_seed, mock_resolver_class, mock_config_class, runner, mock_config, mock_system, mock_trainer
+):
+    """Test that run method sets up everything correctly."""
+    # Setup mocks
+    mock_config_instance = MagicMock()
+    mock_config_instance.get.return_value = None  # No project path
+    mock_config_class.return_value = mock_config_instance
 
-    Raises:
-        ValueError: Expected to be raised when parse_config is called without arguments.
-    """
-    with pytest.raises(ValueError):
-        parse_config()
+    mock_resolver_instance = MagicMock()
+    mock_stage_config = MagicMock()
+    mock_stage_config.get.return_value = None  # No project path
+    mock_stage_config.get_parsed_content.side_effect = [mock_system, mock_trainer, {}]
+    mock_resolver_instance.get_stage_config.return_value = mock_stage_config
+    mock_resolver_class.return_value = mock_resolver_instance
 
+    # Run with config
+    runner.run(Stage.FIT, mock_config)
 
-def test_cli():
-    """
-    Tests that the CLI function properly calls fire.Fire.
-    """
-    with patch("lighter.engine.runner.fire.Fire") as mock_fire:
-        cli()
-        mock_fire.assert_called_once()
+    # Verify seed was set
+    mock_seed.assert_called_once()
 
+    # Verify config was created
+    mock_config_class.assert_called_once()
 
-def test_run_invalid_method():
-    """
-    Tests that run raises ValueError when an invalid method name is provided.
+    # Verify resolver was created
+    mock_resolver_class.assert_called_once_with(mock_config_instance)
 
-    Raises:
-        ValueError: Expected to be raised when an invalid method name is passed.
-    """
-    with pytest.raises(ValueError):
-        run("invalid_method")
-
-
-def test_run_with_tuner_method(mock_system, mock_trainer, mock_parse_config, mock_seed_everything, mock_trainer_class):
-    """
-    Tests that a Tuner method is correctly called with appropriate arguments.
-
-    Args:
-        mock_system: Mock System instance
-        mock_trainer: Mock Trainer instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
-        mock_trainer_class: Mock Trainer class
-    """
-    with patch("lighter.engine.runner.Tuner") as mock_tuner_class:
-        # Configure mock parse_config to return our test configuration
-        mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-            "project": None,
-            "system": mock_system,
-            "trainer": mock_trainer,
-        }.get(x, default)
-
-        mock_trainer_class.return_value = mock_trainer
-        mock_tuner = mock_tuner_class.return_value
-
-        run("scale_batch_size")
-
-        # Verify that the scale_batch_size method was called with correct arguments
-        mock_tuner.scale_batch_size.assert_called_once_with(mock_system, **{})
+    # Verify system and trainer were set up
+    assert runner.system == mock_system
+    assert runner.trainer == mock_trainer
 
 
-def test_run_with_project_import(mock_system, mock_trainer, mock_parse_config, mock_seed_everything, mock_trainer_class):
-    """
-    Tests that the project module is correctly imported when a project path is specified.
+def test_setup_stage_with_invalid_system(runner, mock_trainer):
+    """Test that _setup_stage raises error for invalid system type."""
+    mock_config = MagicMock()
+    mock_config.get.return_value = None  # No project path
+    mock_config.get_parsed_content.side_effect = ["not a system", mock_trainer, {}]
 
-    Args:
-        mock_system: Mock System instance
-        mock_trainer: Mock Trainer instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
-        mock_trainer_class: Mock Trainer class
-    """
-    with patch("lighter.engine.runner.import_module_from_path") as mock_import_module:
-        # Set up configuration with a project path
-        mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-            "project": "some_project_path",
-            "system": mock_system,
-            "trainer": mock_trainer,
-        }.get(x, default)
+    runner.resolver = MagicMock()
+    runner.resolver.get_stage_config.return_value = mock_config
 
-        mock_trainer_class.return_value = mock_trainer
-
-        run("fit")
-
-        # Verify that the project module was imported correctly
-        mock_import_module.assert_called_once_with("project", "some_project_path")
+    with pytest.raises(ValueError, match="'system' must be an instance of System"):
+        runner._setup_stage(Stage.FIT)
 
 
-def test_run_with_invalid_system(mock_trainer, mock_parse_config, mock_seed_everything, mock_trainer_class):
-    """
-    Tests that run raises ValueError when an invalid system instance is provided.
+def test_setup_stage_with_invalid_trainer(runner, mock_system):
+    """Test that _setup_stage raises error for invalid trainer type."""
+    mock_config = MagicMock()
+    mock_config.get.return_value = None  # No project path
+    mock_config.get_parsed_content.side_effect = [mock_system, "not a trainer", {}]
 
-    Args:
-        mock_trainer: Mock Trainer instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
-        mock_trainer_class: Mock Trainer class
+    runner.resolver = MagicMock()
+    runner.resolver.get_stage_config.return_value = mock_config
 
-    Raises:
-        ValueError: Expected to be raised when system is not a System instance.
-    """
-    mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-        "project": None,
-        "system": "not_a_system_instance",  # Invalid system instance
-        "trainer": mock_trainer,
-    }.get(x, default)
-
-    mock_trainer_class.return_value = mock_trainer
-
-    with pytest.raises(ValueError, match="Expected 'system' to be an instance of 'System'"):
-        run("fit")
+    with pytest.raises(ValueError, match="'trainer' must be an instance of Trainer"):
+        runner._setup_stage(Stage.FIT)
 
 
-def test_run_with_invalid_trainer(mock_system, mock_parse_config, mock_seed_everything):
-    """
-    Tests that run raises ValueError when an invalid trainer instance is provided.
+@patch("lighter.engine.runner.import_module_from_path")
+def test_setup_stage_with_project(mock_import, runner, mock_system, mock_trainer):
+    """Test that _setup_stage correctly imports project module."""
+    mock_config = MagicMock()
+    mock_config.get.return_value = "path/to/project"
+    mock_config.get_parsed_content.side_effect = [mock_system, mock_trainer, {}]
 
-    Args:
-        mock_system: Mock System instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
+    runner.resolver = MagicMock()
+    runner.resolver.get_stage_config.return_value = mock_config
+    runner.config = MagicMock()  # Add config for _save_config
 
-    Raises:
-        ValueError: Expected to be raised when trainer is not a PyTorch Lightning Trainer instance.
-    """
-    mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-        "project": None,
-        "system": mock_system,
-        "trainer": "not_a_trainer_instance",  # Invalid trainer instance
-    }.get(x, default)
-
-    with pytest.raises(ValueError, match="Expected 'trainer' to be an instance of PyTorch Lightning 'Trainer'"):
-        run("fit")
+    runner._setup_stage(Stage.FIT)
+    mock_import.assert_called_once_with("project", "path/to/project")
 
 
-def test_run_with_trainer_logger(mock_system, mock_trainer, mock_parse_config, mock_seed_everything, mock_trainer_class):
-    """
-    Tests that the trainer logger correctly logs hyperparameters.
+def test_save_config(runner, mock_system, mock_trainer):
+    """Test that _save_config correctly saves configuration."""
+    runner.system = mock_system
+    runner.trainer = mock_trainer
+    runner.config = MagicMock()
 
-    Args:
-        mock_system: Mock System instance
-        mock_trainer: Mock Trainer instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
-        mock_trainer_class: Mock Trainer class
-    """
-    # Set up mock logger
-    mock_logger = MagicMock()
-    mock_trainer.logger = mock_logger
-    mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-        "project": None,
-        "system": mock_system,
-        "trainer": mock_trainer,
-    }.get(x, default)
+    runner._save_config()
 
-    mock_trainer_class.return_value = mock_trainer
-
-    run("fit")
-
-    # Verify that hyperparameters were logged
-    mock_logger.log_hyperparams.assert_called_once_with(mock_parse_config.return_value.config)
+    mock_system.save_hyperparameters.assert_called_once_with(runner.config.get())
+    mock_trainer.logger.log_hyperparams.assert_called_once_with(runner.config.get())
 
 
-def test_run_trainer_fit_called(mock_system, mock_trainer, mock_parse_config, mock_seed_everything, mock_trainer_class):
-    """
-    Tests that the trainer's fit method is called with correct arguments.
+def test_save_config_without_logger(runner, mock_system):
+    """Test that _save_config works when trainer has no logger."""
+    runner.system = mock_system
+    runner.trainer = MagicMock(spec=Trainer, logger=None)
+    runner.config = MagicMock()
 
-    Args:
-        mock_system: Mock System instance
-        mock_trainer: Mock Trainer instance
-        mock_parse_config: Mock parse_config function
-        mock_seed_everything: Mock seed_everything function
-        mock_trainer_class: Mock Trainer class
-    """
-    # Configure mock parse_config to return our test configuration
-    mock_parse_config.return_value.get_parsed_content.side_effect = lambda x, default=None: {
-        "project": None,
-        "system": mock_system,
-        "trainer": mock_trainer,
-    }.get(x, default)
+    runner._save_config()
 
-    mock_trainer_class.return_value = mock_trainer
+    mock_system.save_hyperparameters.assert_called_once_with(runner.config.get())
 
-    run("fit")
 
-    # Verify that the fit method was called with correct arguments
-    mock_trainer.fit.assert_called_once_with(mock_system, **{})
+@patch("lighter.engine.runner.Tuner")
+def test_run_stage_normal(mock_tuner_class, runner, mock_system, mock_trainer):
+    """Test running normal stages (fit, validate, test, predict)."""
+    runner.system = mock_system
+    runner.trainer = mock_trainer
+    runner.args = {"some_arg": "value"}
+
+    # Test fit stage
+    runner._run_stage(Stage.FIT)
+    mock_trainer.fit.assert_called_once_with(mock_system, some_arg="value")
+    mock_trainer.reset_mock()
+
+    # Test validate stage
+    runner._run_stage(Stage.VALIDATE)
+    mock_trainer.validate.assert_called_once_with(mock_system, some_arg="value")
+    mock_trainer.reset_mock()
+
+    # Test test stage
+    runner._run_stage(Stage.TEST)
+    mock_trainer.test.assert_called_once_with(mock_system, some_arg="value")
+    mock_trainer.reset_mock()
+
+    # Test predict stage
+    runner._run_stage(Stage.PREDICT)
+    mock_trainer.predict.assert_called_once_with(mock_system, some_arg="value")
+
+
+@patch("lighter.engine.runner.Tuner")
+def test_run_stage_tuner(mock_tuner_class, runner, mock_system, mock_trainer):
+    """Test running tuner stages (lr_find, scale_batch_size)."""
+    runner.system = mock_system
+    runner.trainer = mock_trainer
+    runner.args = {"some_arg": "value"}
+
+    mock_tuner = MagicMock()
+    mock_tuner_class.return_value = mock_tuner
+
+    # Test lr_find stage
+    runner._run_stage(Stage.LR_FIND)
+    mock_tuner.lr_find.assert_called_once_with(mock_system, some_arg="value")
+    mock_tuner.reset_mock()
+
+    # Test scale_batch_size stage
+    runner._run_stage(Stage.SCALE_BATCH_SIZE)
+    mock_tuner.scale_batch_size.assert_called_once_with(mock_system, some_arg="value")
+
+
+def test_run_stage_invalid_stage(runner, mock_trainer):
+    """Test that _run_stage raises AttributeError for invalid stage."""
+    runner.trainer = mock_trainer
+    runner.system = MagicMock()
+    runner.args = {}
+
+    with pytest.raises(AttributeError):
+        runner._run_stage("invalid_stage")
+
+
+@patch("lighter.engine.runner.Runner")
+@patch("lighter.engine.runner.fire.Fire")
+def test_cli_commands(mock_fire, mock_runner_class):
+    """Test CLI command functions."""
+    mock_runner = MagicMock()
+    mock_runner_class.return_value = mock_runner
+
+    # Call cli() to get the command dict
+    cli()
+    command_dict = mock_fire.call_args[0][0]
+
+    # Test each command function
+    config = "config.yaml"
+    kwargs = {"arg1": "value1"}
+
+    for command, func in command_dict.items():
+        func(config, **kwargs)
+        mock_runner.run.assert_called_with(getattr(Stage, command.upper()), config, **kwargs)
+        mock_runner.reset_mock()
+
+
+@patch("lighter.engine.runner.fire.Fire")
+def test_cli_fire_interface(mock_fire):
+    """Test that cli() calls fire.Fire with correct command dict."""
+    cli()
+    mock_fire.assert_called_once()
+    command_dict = mock_fire.call_args[0][0]
+    assert set(command_dict.keys()) == {
+        "fit",
+        "validate",
+        "test",
+        "predict",
+        "lr_find",
+        "scale_batch_size",
+    }
+
+
+def test_main_guard():
+    """Test the __main__ guard."""
+    with patch("lighter.engine.runner.cli") as mock_cli:
+        # Execute the main module
+        exec(
+            compile(
+                'if __name__ == "__main__": cli()',
+                filename="lighter/engine/runner.py",
+                mode="exec",
+            ),
+            {"__name__": "__main__", "cli": mock_cli},
+        )
+        mock_cli.assert_called_once()
+
+        # Reset mock and test when not main
+        mock_cli.reset_mock()
+        exec(
+            compile(
+                'if __name__ == "__main__": cli()',
+                filename="lighter/engine/runner.py",
+                mode="exec",
+            ),
+            {"__name__": "not_main", "cli": mock_cli},
+        )
+        mock_cli.assert_not_called()

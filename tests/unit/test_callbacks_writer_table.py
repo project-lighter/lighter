@@ -103,9 +103,9 @@ def test_table_writer_write():
     test_file.unlink()
 
 
-def test_table_writer_write_multi_process(tmp_path, monkeypatch):
+def test_table_writer_write_multi_process_rank0(tmp_path, monkeypatch):
     """
-    Test TableWriter in a multi-process environment.
+    Test TableWriter in a multi-process environment from rank 0.
 
     Tests:
     - Writing records from multiple processes
@@ -128,7 +128,6 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
     """
     test_file = tmp_path / "test.csv"
     writer = TableWriter(path=test_file, writer="tensor")
-    trainer = Trainer(max_epochs=1)
 
     # Expected records after gathering from all processes
     rank0_records = [{"identifier": 1, "pred": [1, 2, 3]}]  # records from rank 0
@@ -145,9 +144,18 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
     def mock_get_rank():
         return 0
 
+    # Create a mock strategy with is_global_zero property
+    mock_strategy = mock.MagicMock()
+    mock_strategy.world_size = 2
+    type(mock_strategy).is_global_zero = mock.PropertyMock(return_value=True)
+
+    # Create a mock trainer with the strategy
+    trainer = mock.MagicMock()
+    type(trainer).strategy = mock.PropertyMock(return_value=mock_strategy)
+    type(trainer).world_size = mock.PropertyMock(return_value=2)
+
     monkeypatch.setattr(torch.distributed, "gather_object", mock_gather)
     monkeypatch.setattr(torch.distributed, "get_rank", mock_get_rank)
-    monkeypatch.setattr(trainer.strategy, "world_size", 2)
 
     writer.on_predict_epoch_end(trainer, mock.Mock())
 
@@ -168,3 +176,106 @@ def test_table_writer_write_multi_process(tmp_path, monkeypatch):
 
     # Verify total number of records
     assert len(df) == len(expected_records)
+
+
+def test_table_writer_write_multi_process_rank1(tmp_path, monkeypatch):
+    """
+    Test TableWriter in a multi-process environment from rank 1.
+
+    Tests:
+    - Writing records from non-zero rank
+    - Proper gathering of records to rank 0
+    - No file creation on non-zero rank
+
+    Args:
+        tmp_path (Path): Pytest fixture providing temporary directory path
+        monkeypatch (MonkeyPatch): Pytest fixture for mocking
+
+    Mocked Behaviors:
+    - Simulates 2-process distributed environment from rank 1
+    - Mocks torch.distributed functions for testing
+    - Simulates gathering of records to rank 0
+
+    Verifies:
+    - Records are properly gathered to rank 0
+    - No file is created on rank 1
+    """
+    test_file = tmp_path / "test.csv"
+    writer = TableWriter(path=test_file, writer="tensor")
+
+    # Create some records for rank 1
+    writer.write(tensor=torch.tensor([4, 5, 6]), identifier=2)
+
+    # Mock distributed functions for multi-process simulation
+    def mock_gather(obj, gather_list, dst=0):
+        # Just verify obj is our records
+        assert len(obj) == 1
+        assert obj[0]["identifier"] == 2
+        assert obj[0]["pred"] == [4, 5, 6]
+        # In a real distributed environment, gather_object would handle sending
+        # our records to rank 0, but we don't need to simulate that in the test
+        # since we're just verifying rank 1's behavior
+
+    def mock_get_rank():
+        return 1
+
+    # Create a mock trainer for rank 1
+    trainer = mock.MagicMock()
+    trainer.world_size = 2
+    trainer.is_global_zero = False
+
+    # Mock torch.distributed.get_rank to return 1 (non-zero rank)
+    monkeypatch.setattr(torch.distributed, "gather_object", mock_gather)
+    monkeypatch.setattr(torch.distributed, "get_rank", mock_get_rank)
+
+    # Run the test
+    writer.on_predict_epoch_end(trainer, mock.Mock())
+
+    # Verify no file was created on rank 1
+    assert not test_file.exists()
+    # Verify records were cleared
+    assert len(writer.csv_records) == 0
+
+
+def test_table_writer_unsortable_identifiers(tmp_path):
+    """
+    Test TableWriter with identifiers that cannot be sorted.
+
+    Tests:
+    - Writing records with unsortable identifiers
+    - Proper handling of TypeError during sorting
+    - Successful file creation despite sorting failure
+
+    Args:
+        tmp_path (Path): Pytest fixture providing temporary directory path
+    """
+    test_file = tmp_path / "test.csv"
+    writer = TableWriter(path=test_file, writer="tensor")
+
+    # Create records with unsortable identifiers (mix of types)
+    records = [
+        {"identifier": 1, "pred": [1, 2]},
+        {"identifier": "a", "pred": [3, 4]},
+        {"identifier": [1, 2], "pred": [5, 6]},  # List is not comparable with str/int
+    ]
+
+    for record in records:
+        writer.write(tensor=torch.tensor(record["pred"]), identifier=record["identifier"])
+
+    trainer = Trainer(max_epochs=1)
+    writer.on_predict_epoch_end(trainer, mock.Mock())
+
+    # Verify file creation and content
+    assert test_file.exists()
+    df = pd.read_csv(test_file)
+    df["pred"] = df["pred"].apply(eval)
+
+    # Check that all records are in the CSV (order doesn't matter)
+    assert len(df) == len(records)
+    for record in records:
+        # Convert identifier to string since pandas reads it as string
+        identifier = str(record["identifier"])
+        row = df[df["identifier"] == identifier]
+        assert not row.empty
+        pred_value = row["pred"].iloc[0]
+        assert pred_value == record["pred"]
