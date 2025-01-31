@@ -27,7 +27,7 @@ formatting: codestyle
 #* Linting
 .PHONY: test
 test: 
-	uv run pytest -c pyproject.toml 
+	uv run pytest -c pyproject.toml --cov-report=html --cov=lighter tests/
 	$(MAKE) coverage
 
 .PHONY: coverage
