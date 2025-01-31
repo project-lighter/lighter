@@ -1,3 +1,3 @@
-from .freezer import LighterFreezer
-from .writer.file import LighterFileWriter
-from .writer.table import LighterTableWriter
+from .freezer import Freezer
+from .writer.file import FileWriter
+from .writer.table import TableWriter

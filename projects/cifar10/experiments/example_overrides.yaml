@@ -1,0 +1,2 @@
+trainer#max_epochs: 1
+system#optimizer#_target_: torch.optim.SGD

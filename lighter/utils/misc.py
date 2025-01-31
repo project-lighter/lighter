@@ -47,18 +47,18 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
         setattr_dot_notation(getattr(obj, obj_name), attr, value)
 
 
-def hasarg(_callable: Callable, arg_name: str) -> bool:
+def hasarg(fn: Callable, arg_name: str) -> bool:
     """
     Checks if a callable (function, method, or class) has a specific argument.
 
     Args:
-        _callable: The callable to inspect.
+        fn: The callable to inspect.
         arg_name: The name of the argument to check for.
 
     Returns:
         bool: True if the argument exists, False otherwise.
     """
-    args = inspect.signature(_callable).parameters.keys()
+    args = inspect.signature(fn).parameters.keys()
     return arg_name in args
 
 
@@ -82,22 +82,6 @@ def get_name(_callable: Callable, include_module_name: bool = False) -> str:
         name = f"{module}.{name}"
 
     return name
-
-
-def apply_fns(data: Any, fns: Callable | List[Callable]) -> Any:
-    """
-    Applies a function or a list of functions to the input data.
-
-    Args:
-        data: The data to process.
-        fns: A function or list of functions to apply.
-
-    Returns:
-        Any: The processed data after applying the function(s).
-    """
-    for fn in ensure_list(fns):
-        data = fn(data)
-    return data
 
 
 def get_optimizer_stats(optimizer: Optimizer) -> dict[str, float]:

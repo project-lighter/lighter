@@ -1,9 +1,17 @@
+"""
+Logging utilities for configuring and setting up custom logging using Loguru and Rich.
+
+This module provides functionality to set up visually appealing logs with custom formatting,
+traceback handling, and suppression of detailed logs from specified modules. It includes color
+mapping for different log levels and handlers to intercept and redirect logging to Loguru.
+"""
+
+import importlib
+
 # List of modules to suppress in Rich traceback for cleaner output
 SUPPRESSED_MODULES = [
     "fire",
-    "pydantic",
     "monai.bundle",
-    "lighter.engine.runner",
     "pytorch_lightning.trainer",
     "lightning_utilities",
     "torch.utils.data.dataloader",
@@ -69,7 +77,8 @@ def _setup_logging():
     logging.getLogger().handlers = [InterceptHandler()]
 
     # Configure Rich traceback.
-    rich.traceback.install(show_locals=False, width=120, suppress=[__import__(name) for name in SUPPRESSED_MODULES])
+    suppress = [importlib.import_module(name) for name in SUPPRESSED_MODULES]
+    rich.traceback.install(show_locals=False, width=120, suppress=suppress)
     # Rich handler for Loguru. Time and level are handled by the formatter.
     rich_handler = rich.logging.RichHandler(markup=True, show_time=False, show_level=False)
     logger.configure(handlers=[{"sink": rich_handler, "format": formatter}])

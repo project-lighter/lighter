@@ -142,15 +142,19 @@ tensorboard/
 
 # Pytorch models 
 *.torch
-prototyping.ipynb
-checkpoints/
 
 # Our ignores
+**/.DS_Store
+**/predictions/
+test_dir/
+checkpoints/
+prototyping.ipynb
+.aider*
+*.code-workspace
+.scale_batch_size*
+**/*.txt
+
+# Projects folder
 projects/*
 !projects/README.md
 !projects/cifar10
-**/predictions/
-*/.DS_Store
-.DS_Store
-.aider*
-test_dir/

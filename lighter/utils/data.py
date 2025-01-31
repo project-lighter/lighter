@@ -1,21 +1,14 @@
-"""
-This module provides custom collate functions for handling batches in PyTorch DataLoaders.
-It includes a function to replace corrupted examples in a batch with valid ones.
-"""
-
 from typing import Any, Callable
 
 import random
 
-from torch.utils.data import DataLoader
-from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
+import torch
 from torch.utils.data.dataloader import default_collate
 
-# Collate support for None. Just as a string, None is not collated. Allows elements of the batch to be None.
-default_collate_fn_map.update({type(None): collate_str_fn})
 
-
-def collate_replace_corrupted(batch: Any, dataset: DataLoader, default_collate_fn: Callable | None = None) -> Any:
+def collate_replace_corrupted(
+    batch: Any, dataset: torch.utils.data.Dataset, default_collate_fn: Callable | None = None
+) -> Any:
     """
     Collate function to handle corrupted examples in a batch by replacing them with valid ones.
 

@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 
-from lighter.utils.misc import apply_fns, ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
+from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
 
 
 def test_ensure_list():
@@ -95,31 +95,6 @@ def test_get_name():
     assert "test_utils_misc" in get_name(sample_function, include_module_name=True)
 
 
-def test_apply_fns():
-    """
-    Test the apply_fns function which applies one or more functions sequentially to an input.
-
-    Tests:
-        - Applying a single function
-        - Applying the same function twice
-        - Applying different functions in different orders
-
-    Uses simple arithmetic functions (increment and double) to verify the correct
-    order of function application and handling of both single and multiple functions.
-    """
-
-    def increment(x):
-        return x + 1
-
-    def double(x):
-        return x * 2
-
-    assert apply_fns(1, increment) == 2
-    assert apply_fns(1, [increment, increment]) == 3
-    assert apply_fns(2, [increment, double]) == 6
-    assert apply_fns(2, [double, increment]) == 5
-
-
 def test_get_optimizer_stats():
     """
     Test the get_optimizer_stats function which extracts statistics from PyTorch optimizers.
@@ -163,3 +138,44 @@ def test_get_optimizer_stats():
     assert stats["optimizer/SGD/lr/group2"] == 0.02
     assert "optimizer/SGD/momentum/group2" in stats
     assert stats["optimizer/SGD/momentum/group2"] == 0.8
+
+
+def test_get_optimizer_stats_with_betas():
+    """
+    Test the get_optimizer_stats function with optimizers that use betas instead of momentum.
+
+    Tests:
+        - Optimizer with betas parameter (e.g., Adam)
+        - Multiple parameter groups with different betas values
+
+    Verifies:
+        - Correct extraction of learning rate and beta1 values
+        - Proper handling of multiple parameter groups
+        - Correct formatting of stat names
+    """
+    model = torch.nn.Linear(10, 1)
+    optimizer = Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
+    stats = get_optimizer_stats(optimizer)
+    assert "optimizer/Adam/lr" in stats
+    assert stats["optimizer/Adam/lr"] == 0.001
+    assert "optimizer/Adam/momentum" in stats
+    assert stats["optimizer/Adam/momentum"] == 0.9  # beta1 value
+
+    # Test with multiple parameter groups with different betas
+    model1 = torch.nn.Linear(10, 1)
+    model2 = torch.nn.Linear(10, 1)
+    optimizer = Adam(
+        [
+            {"params": model1.parameters(), "lr": 0.001, "betas": (0.9, 0.999)},
+            {"params": model2.parameters(), "lr": 0.002, "betas": (0.8, 0.999)},
+        ]
+    )
+    stats = get_optimizer_stats(optimizer)
+    assert "optimizer/Adam/lr/group1" in stats
+    assert stats["optimizer/Adam/lr/group1"] == 0.001
+    assert "optimizer/Adam/momentum/group1" in stats
+    assert stats["optimizer/Adam/momentum/group1"] == 0.9
+    assert "optimizer/Adam/lr/group2" in stats
+    assert stats["optimizer/Adam/lr/group2"] == 0.002
+    assert "optimizer/Adam/momentum/group2" in stats
+    assert stats["optimizer/Adam/momentum/group2"] == 0.8

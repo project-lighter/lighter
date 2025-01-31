@@ -15,7 +15,7 @@ When reproducing a study or adapting a model to new data, you often start with a
 
 ```yaml title="cifar10.yaml"  hl_lines="18-29"
 system:
-  _target_: lighter.LighterSystem
+  _target_: lighter.System
   batch_size: 512
 
   model:
@@ -103,7 +103,7 @@ In the above example, the path of the dataset is `/home/user/project/my_xray_dat
     ```yaml hl_lines="1" hl_lines="1 20-23"
     project: /home/user/project (1)
     system:
-    _target_: lighter.LighterSystem
+    _target_: lighter.System
     batch_size: 512
 
     model:
