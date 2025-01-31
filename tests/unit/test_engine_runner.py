@@ -259,30 +259,3 @@ def test_cli_fire_interface(mock_fire):
         "lr_find",
         "scale_batch_size",
     }
-
-
-def test_main_guard():
-    """Test the __main__ guard."""
-    with patch("lighter.engine.runner.cli") as mock_cli:
-        # Execute the main module
-        exec(
-            compile(
-                'if __name__ == "__main__": cli()',
-                filename="lighter/engine/runner.py",
-                mode="exec",
-            ),
-            {"__name__": "__main__", "cli": mock_cli},
-        )
-        mock_cli.assert_called_once()
-
-        # Reset mock and test when not main
-        mock_cli.reset_mock()
-        exec(
-            compile(
-                'if __name__ == "__main__": cli()',
-                filename="lighter/engine/runner.py",
-                mode="exec",
-            ),
-            {"__name__": "not_main", "cli": mock_cli},
-        )
-        mock_cli.assert_not_called()
