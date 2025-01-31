@@ -18,7 +18,8 @@ class DummyDataset(Dataset):
     def __init__(self, num_samples=100):
         self.num_samples = num_samples
         self.data = torch.randn(num_samples, 10)
-        self.labels = torch.randint(0, 2, (num_samples,))
+        # add ", 1" after num_samples and make it .float() to ensure compatibility with BCEWithLogitsLoss
+        self.labels = torch.randint(0, 2, (num_samples, 1)).float()
 
     def __len__(self):
         return self.num_samples
@@ -57,7 +58,7 @@ def dummy_system():
     """
     model = DummyModel()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
     train_dataloader = DataLoader(DummyDataset(), batch_size=32)
     return System(model=model, criterion=criterion, optimizer=optimizer, dataloaders={"train": train_dataloader})
 
