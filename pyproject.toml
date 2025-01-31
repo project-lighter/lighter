@@ -159,7 +159,7 @@ branch = true
 cov-report= "term-missing"
 
 [tool.coverage.report]
-fail_under = 50
+fail_under = 90
 show_missing = true
 
 [tool.pylint."MESSAGES CONTROL"]

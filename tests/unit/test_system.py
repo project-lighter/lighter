@@ -119,6 +119,23 @@ def test_configure_optimizers(simple_system):
     assert "lr_scheduler" in opt_config, "LR scheduler key missing in configure_optimizers output."
 
 
+def test_configure_optimizers_without_optimizer(dummy_dataloaders):
+    """Test configure_optimizers when no optimizer is provided."""
+    model = SimpleModel()
+    system = System(
+        model=model,
+        dataloaders=dummy_dataloaders,
+        optimizer=None,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
+    with pytest.raises(ValueError, match="Please specify 'system.optimizer' in the config."):
+        system.configure_optimizers()
+
+
 def test_configure_optimizers_without_scheduler(dummy_dataloaders):
     """Test configure_optimizers when no scheduler is provided."""
     model = SimpleModel()
@@ -258,7 +275,7 @@ def test_dict_loss_without_total_raises_error(simple_system):
     simple_system.on_train_start()
 
     batch = next(iter(simple_system.dataloaders.train))
-    with pytest.raises(ValueError, match="must include a 'total' key"):
+    with pytest.raises(ValueError, match="The loss dictionary must include a 'total' key that combines all sublosses."):
         _ = simple_system.training_step(batch, 0)
 
 
@@ -361,27 +378,195 @@ def test_metric_logging(simple_system):
     simple_system._log_stats.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
 
 
-def test_dynamic_mode_hooks(simple_system):
-    """Ensure mode hooks attach dynamically"""
-    assert simple_system.training_step is not None
-    assert simple_system.train_dataloader is not None
-    assert simple_system.on_train_start is not None
-    assert simple_system.on_train_end is not None
+def test_dynamic_mode_hooks():
+    """
+    Test the dynamic attachment of mode-specific hooks in the System class.
 
-    assert simple_system.validation_step is not None
-    assert simple_system.val_dataloader is not None
-    assert simple_system.on_validation_start is not None
-    assert simple_system.on_validation_end is not None
+    This test verifies that the appropriate hooks are dynamically attached
+    based on the availability of dataloaders for different modes (train, val, test, predict).
+    It checks that the hooks are overridden when a dataloader is provided and remain
+    as the default (super) implementation when not provided.
+    """
 
-    assert simple_system.test_step is not None
-    assert simple_system.test_dataloader is not None
-    assert simple_system.on_test_start is not None
-    assert simple_system.on_test_end is not None
+    # Test case 1: All dataloaders are provided
+    model = SimpleModel()
+    optimizer = SGD(model.parameters(), lr=0.01)
+    system = System(
+        model=model,
+        dataloaders={
+            "train": DataLoader(DummyDataset()),
+            "val": DataLoader(DummyDataset()),
+            "test": DataLoader(DummyDataset()),
+            "predict": DataLoader(DummyDataset()),
+        },
+        optimizer=optimizer,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
 
-    assert simple_system.predict_step is not None
-    assert simple_system.predict_dataloader is not None
-    assert simple_system.on_predict_start is not None
-    assert simple_system.on_predict_end is not None
+    # Assert that all hooks are overridden
+    assert system.training_step != super(System, system).training_step
+    assert system.train_dataloader != super(System, system).train_dataloader
+    assert system.on_train_start != super(System, system).on_train_start
+    assert system.on_train_end != super(System, system).on_train_end
+
+    assert system.validation_step != super(System, system).validation_step
+    assert system.val_dataloader != super(System, system).val_dataloader
+    assert system.on_validation_start != super(System, system).on_validation_start
+    assert system.on_validation_end != super(System, system).on_validation_end
+
+    assert system.test_step != super(System, system).test_step
+    assert system.test_dataloader != super(System, system).test_dataloader
+    assert system.on_test_start != super(System, system).on_test_start
+    assert system.on_test_end != super(System, system).on_test_end
+
+    assert system.predict_step != super(System, system).predict_step
+    assert system.predict_dataloader != super(System, system).predict_dataloader
+    assert system.on_predict_start != super(System, system).on_predict_start
+    assert system.on_predict_end != super(System, system).on_predict_end
+
+    # Test case 2: Only train dataloader is provided
+    model = SimpleModel()
+    optimizer = SGD(model.parameters(), lr=0.01)
+    system = System(
+        model=model,
+        dataloaders={"train": DataLoader(DummyDataset())},
+        optimizer=optimizer,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
+
+    # Assert that only train hooks are overridden, other hooks remain as default
+    assert system.training_step != super(System, system).training_step
+    assert system.train_dataloader != super(System, system).train_dataloader
+    assert system.on_train_start != super(System, system).on_train_start
+    assert system.on_train_end != super(System, system).on_train_end
+
+    assert system.validation_step == super(System, system).validation_step
+    assert system.val_dataloader == super(System, system).val_dataloader
+    assert system.on_validation_start == super(System, system).on_validation_start
+    assert system.on_validation_end == super(System, system).on_validation_end
+
+    assert system.test_step == super(System, system).test_step
+    assert system.test_dataloader == super(System, system).test_dataloader
+    assert system.on_test_start == super(System, system).on_test_start
+    assert system.on_test_end == super(System, system).on_test_end
+
+    assert system.predict_step == super(System, system).predict_step
+    assert system.predict_dataloader == super(System, system).predict_dataloader
+    assert system.on_predict_start == super(System, system).on_predict_start
+    assert system.on_predict_end == super(System, system).on_predict_end
+
+    # Test case 3: Only val dataloader is provided
+    model = SimpleModel()
+    optimizer = SGD(model.parameters(), lr=0.01)
+    system = System(
+        model=model,
+        dataloaders={"val": DataLoader(DummyDataset())},
+        optimizer=optimizer,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
+
+    # Assert that only validation hooks are overridden, other hooks remain as default
+    assert system.training_step == super(System, system).training_step
+    assert system.train_dataloader == super(System, system).train_dataloader
+    assert system.on_train_start == super(System, system).on_train_start
+    assert system.on_train_end == super(System, system).on_train_end
+
+    assert system.validation_step != super(System, system).validation_step
+    assert system.val_dataloader != super(System, system).val_dataloader
+    assert system.on_validation_start != super(System, system).on_validation_start
+    assert system.on_validation_end != super(System, system).on_validation_end
+
+    assert system.test_step == super(System, system).test_step
+    assert system.test_dataloader == super(System, system).test_dataloader
+    assert system.on_test_start == super(System, system).on_test_start
+    assert system.on_test_end == super(System, system).on_test_end
+
+    assert system.predict_step == super(System, system).predict_step
+    assert system.predict_dataloader == super(System, system).predict_dataloader
+    assert system.on_predict_start == super(System, system).on_predict_start
+    assert system.on_predict_end == super(System, system).on_predict_end
+
+    # Test case 4: Only test dataloader is provided
+    model = SimpleModel()
+    optimizer = SGD(model.parameters(), lr=0.01)
+    system = System(
+        model=model,
+        dataloaders={"test": DataLoader(DummyDataset())},
+        optimizer=optimizer,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
+
+    # Assert that only test hooks are overridden, other hooks remain as default
+    assert system.training_step == super(System, system).training_step
+    assert system.train_dataloader == super(System, system).train_dataloader
+    assert system.on_train_start == super(System, system).on_train_start
+    assert system.on_train_end == super(System, system).on_train_end
+
+    assert system.validation_step == super(System, system).validation_step
+    assert system.val_dataloader == super(System, system).val_dataloader
+    assert system.on_validation_start == super(System, system).on_validation_start
+    assert system.on_validation_end == super(System, system).on_validation_end
+
+    assert system.test_step != super(System, system).test_step
+    assert system.test_dataloader != super(System, system).test_dataloader
+    assert system.on_test_start != super(System, system).on_test_start
+    assert system.on_test_end != super(System, system).on_test_end
+
+    assert system.predict_step == super(System, system).predict_step
+    assert system.predict_dataloader == super(System, system).predict_dataloader
+    assert system.on_predict_start == super(System, system).on_predict_start
+    assert system.on_predict_end == super(System, system).on_predict_end
+
+    # Test case 5: Only predict dataloader is provided
+    model = SimpleModel()
+    optimizer = SGD(model.parameters(), lr=0.01)
+    system = System(
+        model=model,
+        dataloaders={"predict": DataLoader(DummyDataset())},
+        optimizer=optimizer,
+        scheduler=None,
+        criterion=nn.CrossEntropyLoss(),
+        metrics=None,
+        adapters=None,
+        inferer=None,
+    )
+
+    # Assert that only predict hooks are overridden, other hooks remain as default
+    assert system.training_step == super(System, system).training_step
+    assert system.train_dataloader == super(System, system).train_dataloader
+    assert system.on_train_start == super(System, system).on_train_start
+    assert system.on_train_end == super(System, system).on_train_end
+
+    assert system.validation_step == super(System, system).validation_step
+    assert system.val_dataloader == super(System, system).val_dataloader
+    assert system.on_validation_start == super(System, system).on_validation_start
+    assert system.on_validation_end == super(System, system).on_validation_end
+
+    assert system.test_step == super(System, system).test_step
+    assert system.test_dataloader == super(System, system).test_dataloader
+    assert system.on_test_start == super(System, system).on_test_start
+    assert system.on_test_end == super(System, system).on_test_end
+
+    assert system.predict_step != super(System, system).predict_step
+    assert system.predict_dataloader != super(System, system).predict_dataloader
+    assert system.on_predict_start != super(System, system).on_predict_start
+    assert system.on_predict_end != super(System, system).on_predict_end
 
 
 def test_log_stats_without_logger(simple_system):
@@ -404,21 +589,26 @@ def test_log_stats_with_logger(simple_system):
     # Test single loss value
     simple_system.mode = Mode.TRAIN
     simple_system._log_stats(torch.tensor(1.0), None, 0)
-    simple_system.log.assert_called()
+    # Twice (on step, on epoch) for the loss, twice for the SGD optimizer (lr, momentum)
+    assert simple_system.log.call_count == 4
 
     # Test dict loss values
     simple_system.log.reset_mock()
     loss_dict = {"total": torch.tensor(1.0), "aux": torch.tensor(0.5)}
     simple_system._log_stats(loss_dict, None, 0)
-    assert simple_system.log.call_count >= 2  # At least one call per loss
+    # Twice (on step, on epoch) for each loss, twice for the SGD optimizer (lr, momentum)
+    assert simple_system.log.call_count == 6
 
     # Test metrics
     simple_system.log.reset_mock()
     metrics = {"accuracy": torch.tensor(0.95)}
     simple_system._log_stats(None, metrics, 0)
-    simple_system.log.assert_called()
+    # Twice (on step, on epoch) for the metric, twice for the SGD optimizer (lr, momentum)
+    assert simple_system.log.call_count == 4
 
     # Test optimizer stats (only in train mode, batch_idx=0)
     simple_system.log.reset_mock()
     simple_system._log_stats(None, None, 0)
-    simple_system.log.assert_called()  # Should log optimizer stats
+    # Twice for the SGD optimizer (lr, momentum)
+    assert simple_system.log.call_count == 2
+
