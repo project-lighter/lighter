@@ -29,7 +29,7 @@ def test_trainer_stage(stage: Stage, config: str):
     """
     Test the specified stage using the given configuration.
     Args:
-        stage: The stage to run (e.g., "fit", "test", "predict").
+        stage: The stage to run (e.g., Stage.FIT, Stage.TEST, Stage.PREDICT).
         config: Path to the configuration file.
     """
     runner = Runner()

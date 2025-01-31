@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field, is_dataclass
+from dataclasses import dataclass, is_dataclass
 
 import pytest
-from torchmetrics import Accuracy, Metric, MetricCollection
+from torchmetrics import Accuracy, MetricCollection
 
 from lighter.adapters import BatchAdapter, CriterionAdapter, LoggingAdapter, MetricsAdapter
 from lighter.utils.types.containers import Metrics, Predict, Test, Train, Val, nested

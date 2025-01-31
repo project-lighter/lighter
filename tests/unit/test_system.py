@@ -1,6 +1,6 @@
 """Unit tests for the System class."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import pytorch_lightning as pl

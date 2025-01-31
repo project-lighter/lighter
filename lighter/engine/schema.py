@@ -1,3 +1,19 @@
+"""
+Defines the schema for configuration validation in the Lighter framework.
+
+The schema ensures user configurations are correctly structured and typed. It includes:
+- `_meta_`: Metadata as a dictionary.
+- `_requires_`: Runs first, primarily to be used for imports.
+- `project`: Project name as a string.
+- `vars`: Variables as a dictionary.
+- `args`: Arguments to pass to Trainer stage methods like `fit`, `validate`, `test`.
+- `trainer`: Trainer setup.
+- `system`: System setup, encapsulates model, criterion, optimizer, scheduler, inferer, metrics, dataloaders, and adapters.
+
+Used by the `Config` class for validation.
+"""
+
+
 SCHEMA = {
     "_meta_": {"type": "dict"},
     "_requires_": {"type": ["string", "list", "dict"]},
