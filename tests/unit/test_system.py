@@ -611,4 +611,3 @@ def test_log_stats_with_logger(simple_system):
     simple_system._log_stats(None, None, 0)
     # Twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 2
-

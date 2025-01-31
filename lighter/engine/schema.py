@@ -11,8 +11,8 @@ SCHEMA = {
             "test": {"type": "dict"},
             "predict": {"type": "dict"},
             "lr_find": {"type": "dict"},
-            "scale_batch_size": {"type": "dict"}
-        }
+            "scale_batch_size": {"type": "dict"},
+        },
     },
     "trainer": {"type": "dict", "required": True},
     "system": {
@@ -29,8 +29,8 @@ SCHEMA = {
                 "schema": {
                     "train": {"type": ["list", "dict"]},
                     "val": {"type": ["list", "dict"]},
-                    "test": {"type": ["list", "dict"]}
-                }
+                    "test": {"type": ["list", "dict"]},
+                },
             },
             "dataloaders": {
                 "type": "dict",
@@ -38,8 +38,8 @@ SCHEMA = {
                     "train": {"type": "dict"},
                     "val": {"type": "dict"},
                     "test": {"type": "dict"},
-                    "predict": {"type": "dict"}
-                }, 
+                    "predict": {"type": "dict"},
+                },
             },
             "adapters": {
                 "type": "dict",
@@ -50,8 +50,8 @@ SCHEMA = {
                             "batch": {"type": "dict"},
                             "criterion": {"type": "dict"},
                             "metrics": {"type": "dict"},
-                            "logging": {"type": "dict"}
-                        }
+                            "logging": {"type": "dict"},
+                        },
                     },
                     "val": {
                         "type": "dict",
@@ -59,26 +59,16 @@ SCHEMA = {
                             "batch": {"type": "dict"},
                             "criterion": {"type": "dict"},
                             "metrics": {"type": "dict"},
-                            "logging": {"type": "dict"}
-                        }
+                            "logging": {"type": "dict"},
+                        },
                     },
                     "test": {
                         "type": "dict",
-                        "schema": {
-                            "batch": {"type": "dict"},
-                            "metrics": {"type": "dict"},
-                            "logging": {"type": "dict"}
-                        }
+                        "schema": {"batch": {"type": "dict"}, "metrics": {"type": "dict"}, "logging": {"type": "dict"}},
                     },
-                    "predict": {
-                        "type": "dict",
-                        "schema": {
-                            "batch": {"type": "dict"},
-                            "logging": {"type": "dict"}
-                        }
-                    }
-                }
-            }
-        }
-    }
+                    "predict": {"type": "dict", "schema": {"batch": {"type": "dict"}, "logging": {"type": "dict"}}},
+                },
+            },
+        },
+    },
 }
