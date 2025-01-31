@@ -26,8 +26,13 @@ formatting: codestyle
 
 #* Linting
 .PHONY: test
-test:
-	uv run pytest -c pyproject.toml --cov=lighter --cov-report=term-missing
+test: 
+	uv run pytest -c pyproject.toml 
+	$(MAKE) coverage
+
+.PHONY: coverage
+coverage:
+	uvx coverage-badge -o assets/images/coverage.svg -f
 
 .PHONY: check-codestyle
 check-codestyle:
