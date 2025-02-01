@@ -64,7 +64,6 @@ dev = [
     "itk>=5.4.0",
     "av==12.0.0",
     "pytest-metadata>=3.1.1",
-    "bump2version>=1.0.1,<2",
 ]
 
 [tool.uv]
