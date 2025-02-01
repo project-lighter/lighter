@@ -1,40 +1,58 @@
 name: Auto Publish
+
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Lighter CI"]  # Matches the CI workflow name
+    types: [completed]
 
 jobs:
-  build:
+  autopublish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+
     steps:
-        - uses: actions/checkout@v2
-        - name: Set up Python
-          uses: actions/setup-python@v2.2.2
-          with:
-            python-version: 3.11
+      - name: Download coverage badge artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: coverage-badge
 
-        - name: Install uv
-          run: make setup
-          
-        - name: Bump version
-          run: |
-            make bump-prerelease
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          # Usually, you want to check out the same commit tested by the CI
+          ref: ${{ github.event.workflow_run.head_branch }}
 
-        - name: Commit changes
-          run: |
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add .
-            git commit -m "Bump version" || echo "No changes to commit"
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
 
-        - name: Push changes
-          run: git push
+      - name: Install uv
+        run: make setup
 
-        - name: Build with lockfile versions
-          run: uv build
-          
-        - name: Publish distribution 📦 to PyPI
-          uses: pypa/gh-action-pypi-publish@release/v1
-          with:
-            password: ${{ secrets.PYPI_TOKEN }}
+      - name: Bump version & commit badge
+        run: |
+          # 1) Bump version
+          make bump-prerelease
+
+          # 2) Configure Git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # 3) Stage any changes (the version bump & coverage.svg)
+          git add .
+
+          # 4) Commit in one go
+          git commit -m "Bump version" || echo "No version bump or coverage changes to commit"
+
+          # 5) Push changes
+          git push
+
+      - name: Build distribution
+        run: uv build
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
