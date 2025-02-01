@@ -51,19 +51,19 @@ check-safety:
 .PHONY: lint
 lint: test check-codestyle mypy check-safety
 
-#* Version bumps using bump2version
+#* Version bumps (through poetry-bumpversion because uv doesn't have version bumping yet)
 .PHONY: bump-prerelease
 bump-prerelease:
-	uvx bump2version --allow-dirty --no-tag --no-commit prerelease
+	uvx --with poetry-bumpversion poetry version prerelease
 
 .PHONY: bump-patch
 bump-patch:
-	uvx bump2version --allow-dirty --no-tag --no-commit patch
+	uvx --with poetry-bumpversion poetry version patch
 
 .PHONY: bump-minor
 bump-minor:
-	uvx bump2version --allow-dirty --no-tag --no-commit minor
+	uvx --with poetry-bumpversion poetry version minor
 
 .PHONY: bump-major
 bump-major:
-	uvx bump2version --allow-dirty --no-tag --no-commit major
+	uvx --with poetry-bumpversion poetry version major

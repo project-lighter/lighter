@@ -169,3 +169,6 @@ disable = ["too-many-arguments", "no-else-return"]
 
 [tool.pylint.master]
 fail-under=8
+
+# Used in Makefile by poetry-bumpversion
+[tool.poetry_bumpversion.file."lighter/__init__.py"]
