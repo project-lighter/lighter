@@ -2,7 +2,7 @@ name: Auto Publish
 
 on:
   workflow_run:
-    workflows: ["Lighter CI"]  # Mustes the CI workflow name
+    workflows: ["Lighter CI"]  # Matches the CI workflow name
     types: [completed]
 
 jobs:
