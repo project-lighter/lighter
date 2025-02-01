@@ -1,4 +1,4 @@
-name: Lighter CI
+name: Lighter - CI & Auto Publish
 
 on:
   push:
@@ -40,12 +40,35 @@ jobs:
       - name: Check codestyle
         run: make check-codestyle
 
+      # Run tests and generate coverage report
       - name: Run tests
         run: make test
 
-      - name: Upload coverage badge
-        if: ${{ matrix.python-version == '3.11' }}
-        uses: actions/upload-artifact@v4
+      # Publish the pre-release package only when on the main branch and the Python 3.11 run.
+      # Integrating auto-publish in this workflow enables direct use of the coverage badge artifact.
+      - name: Bump version & commit badge
+        if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
+        run: |
+          # 1) Bump version
+          make bump-prerelease
+
+          # 2) Configure Git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # 3) Stage the version bump & the coverage badge
+          git add pyproject.toml lighter/__init__.py assets/images/coverage.svg
+
+          # 4) Commit in one go
+          git commit -m "Bump version" || echo "No version bump or coverage changes to commit"
+
+          # 5) Push changes
+          git push
+
+      - name: Build distribution
+        run: uv build
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-            name: coverage-badge
-            path: assets/images/coverage.svg
+          password: ${{ secrets.PYPI_TOKEN }}
