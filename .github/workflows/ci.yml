@@ -49,26 +49,23 @@ jobs:
       - name: Bump version & commit badge
         if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
         run: |
-          # 1) Bump version
+          # Bump version
           make bump-prerelease
 
-          # 2) Configure Git
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          # 3) Stage the version bump & the coverage badge
+          # Stage the version bump & the coverage badge
           git add pyproject.toml lighter/__init__.py assets/images/coverage.svg
-
-          # 4) Commit in one go
           git commit -m "Bump version" || echo "No version bump or coverage changes to commit"
-
-          # 5) Push changes
           git push
 
       - name: Build distribution
+        if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
         run: uv build
 
-      - name: Publish distribution 📦 to PyPI
+      - name: Publish pre-release distribution 📦 to PyPI
+        if: github.ref == 'refs/heads/main' && matrix.python-version == '3.11'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
