@@ -52,7 +52,7 @@ lighter = "lighter.engine.runner:cli"
 
 [dependency-groups]
 # Dependencies for dev/CI tasks
-dependencies = [
+dev = [
     "typing-extensions>=4.4.0,<5",
     "aiohttp>=3.8.3,<4",
     "pytest>=7.4.0,<8",
