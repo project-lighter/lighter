@@ -1,15 +1,13 @@
 ### Variables
-# Define shell and Python environment variables
 SHELL := /usr/bin/env bash
 PYTHON := python
 PYTHONPATH := `pwd`
 
-# Install
+# Install uv so we can do everything with it
 .PHONY: setup
-setup: 
+setup:
 	pip install uv
-	
-#* Installation
+
 .PHONY: install
 install:
 	uv pip install -e .
@@ -24,9 +22,9 @@ codestyle:
 .PHONY: formatting
 formatting: codestyle
 
-#* Linting
+#* Tests + Coverage
 .PHONY: test
-test: 
+test:
 	uv run pytest -c pyproject.toml --cov-report=html --cov=lighter tests/
 	$(MAKE) coverage
 
@@ -34,27 +32,12 @@ test:
 coverage:
 	uvx coverage-badge -o assets/images/coverage.svg -f
 
+#* Linting checks
 .PHONY: check-codestyle
 check-codestyle:
 	uvx isort --diff --check-only --settings-path pyproject.toml ./
 	uvx black --diff --check --config pyproject.toml ./
 	uv run pylint lighter
-
-.PHONY: bump-prerelease
-bump-prerelease:
-	uvx --with poetry-bumpversion poetry version prerelease
-
-.PHONY: bump-patch
-bump-patch:
-	uvx --with poetry-bumpversion poetry version patch
-
-.PHONY: bump-minor
-bump-minor:
-	uvx --with poetry-bumpversion poetry version minor
-
-.PHONY: bump-major
-bump-major:
-	uvx --with poetry-bumpversion poetry version major
 
 .PHONY: mypy
 mypy:
@@ -67,3 +50,20 @@ check-safety:
 
 .PHONY: lint
 lint: test check-codestyle mypy check-safety
+
+#* Version bumps using bump2version
+.PHONY: bump-prerelease
+bump-prerelease:
+	uvx bump2version --allow-dirty --no-tag --no-commit prerelease
+
+.PHONY: bump-patch
+bump-patch:
+	uvx bump2version --allow-dirty --no-tag --no-commit patch
+
+.PHONY: bump-minor
+bump-minor:
+	uvx bump2version --allow-dirty --no-tag --no-commit minor
+
+.PHONY: bump-major
+bump-major:
+	uvx bump2version --allow-dirty --no-tag --no-commit major

@@ -200,6 +200,15 @@ wheels = [
 ]
 
 [[package]]
+name = "bump2version"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/2a/688aca6eeebfe8941235be53f4da780c6edee05dbbea5d7abaa3aab6fad2/bump2version-1.0.1.tar.gz", hash = "sha256:762cb2bfad61f4ec8e2bdf452c7c267416f8c70dd9ecb1653fd0bbb01fa936e6", size = 36236 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/e3/fa60c47d7c344533142eb3af0b73234ef8ea3fb2da742ab976b947e717df/bump2version-1.0.1-py2.py3-none-any.whl", hash = "sha256:37f927ea17cde7ae2d7baf832f8e80ce3777624554a653006c9144f8017fe410", size = 22030 },
+]
+
+[[package]]
 name = "cerberus"
 version = "1.3.7"
 source = { registry = "https://pypi.org/simple" }
@@ -1237,9 +1246,10 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+dependencies = [
     { name = "aiohttp" },
     { name = "av" },
+    { name = "bump2version" },
     { name = "coverage" },
     { name = "coverage-badge" },
     { name = "itk" },
@@ -1270,9 +1280,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
+dependencies = [
     { name = "aiohttp", specifier = ">=3.8.3,<4" },
     { name = "av", specifier = "==12.0.0" },
+    { name = "bump2version", specifier = ">=1.0.1,<2" },
     { name = "coverage", specifier = ">=7.0.5,<8" },
     { name = "coverage-badge", specifier = ">=1.1.0,<2" },
     { name = "itk", specifier = ">=5.4.0" },

@@ -29,7 +29,7 @@ classifiers = [
 dependencies = [
     "torch>=2.1.2,<3",
     "pandas>=1.5.3,<2",
-    "numpy< 2.0.0",
+    "numpy<2.0.0",
     "pytorch-lightning>=2.1.3,<3",
     "fire>=0.5.0,<0.6",
     "loguru>=0.6.0,<0.7",
@@ -51,7 +51,8 @@ Repository = "https://github.com/lighter/lighter"
 lighter = "lighter.engine.runner:cli"
 
 [dependency-groups]
-dev = [
+# Dependencies for dev/CI tasks
+dependencies = [
     "typing-extensions>=4.4.0,<5",
     "aiohttp>=3.8.3,<4",
     "pytest>=7.4.0,<8",
@@ -63,12 +64,12 @@ dev = [
     "itk>=5.4.0",
     "av==12.0.0",
     "pytest-metadata>=3.1.1",
+    "bump2version>=1.0.1,<2",
 ]
 
 [tool.uv]
-default-groups = [
-    "dev",
-]
+# This ensures dev dependencies are always installed by default
+default-groups = ["dev"]
 
 [tool.hatch.build.targets.sdist]
 include = ["lighter"]
@@ -156,7 +157,6 @@ markers = [
 [tool.coverage.run]
 source = ["tests"]
 branch = true
-cov-report= "term-missing"
 
 [tool.coverage.report]
 fail_under = 90
@@ -169,5 +169,3 @@ disable = ["too-many-arguments", "no-else-return"]
 
 [tool.pylint.master]
 fail-under=8
-
-[tool.poetry_bumpversion.file."lighter/__init__.py"]
