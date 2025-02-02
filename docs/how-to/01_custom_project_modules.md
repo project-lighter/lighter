@@ -150,4 +150,4 @@ Using custom project modules in Lighter is a straightforward process that involv
 
 By following these steps, you can seamlessly integrate your project-specific code into Lighter workflows, leveraging the framework's flexibility and extensibility to build powerful and customized deep learning systems.
 
-Next, explore the [How-To guide on Debugging Configuration Errors](debugging_config_errors.md) to learn how to troubleshoot common configuration issues, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Debugging Configuration Errors](02_debugging_config_errors.md) to learn how to troubleshoot common configuration issues, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.

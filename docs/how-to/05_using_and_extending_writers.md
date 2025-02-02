@@ -255,4 +255,4 @@ Writers in Lighter are essential tools for saving and managing the outputs of yo
 
 With writers, Lighter provides a complete solution for not only running your deep learning experiments but also for effectively capturing and utilizing the valuable outputs they generate.
 
-Next, explore the [How-To guide on Using Freezer](using_freezer.md) to learn how to freeze and unfreeze model layers during training, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Using Freezer](06_using_freezer.md) to learn how to freeze and unfreeze model layers during training, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.

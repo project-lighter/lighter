@@ -245,4 +245,4 @@ In this tutorial, you've learned the fundamental aspects of Lighter's configurat
 
 With this knowledge, you are well-equipped to create and customize configuration files for your deep learning experiments in Lighter.
 
-In the next tutorials, we will explore more practical examples, such as [end-to-end image classification](02_image_classification.md) and [semantic segmentation](03_semantic_segmentation.md). You can also refer to the [How-To guides](../how-to/debugging_config_errors.md) for debugging common configuration issues and the [Explanation section](../explanation/configuration_system.md) for a deeper dive into the configuration system's design.
+In the next tutorials, we will explore more practical examples, such as [end-to-end image classification](02_image_classification.md) and [semantic segmentation](03_semantic_segmentation.md). You can also refer to the [How-To guides](../how-to/02_debugging_config_errors.md) for debugging common configuration issues and the [Explanation section](../explanation/02_configuration_system.md) for a deeper dive into the configuration system's design.

@@ -113,4 +113,4 @@ Lighter is designed for:
 
 Lighter offers a powerful and user-friendly approach to deep learning experimentation. By embracing configuration-driven workflows, Lighter helps you streamline your research, improve reproducibility, and focus on what matters most: building innovative deep learning models and solving challenging problems.
 
-Next, delve into the [Configuration System Explanation](../explanation/configuration_system.md) to understand the details of Lighter's configuration approach, or return to the [Explanation section](../explanation/) for more conceptual documentation. You can also explore the [Tutorials section](../tutorials/) for end-to-end examples or the [How-To guides section](../how-to/) for practical problem-solving guides.
+Next, delve into the [Configuration System Explanation](../explanation/02_configuration_system.md) to understand the details of Lighter's configuration approach, or return to the [Explanation section](../explanation/) for more conceptual documentation. You can also explore the [Tutorials section](../tutorials/) for end-to-end examples or the [How-To guides section](../how-to/) for practical problem-solving guides.

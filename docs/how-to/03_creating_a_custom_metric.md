@@ -204,4 +204,4 @@ Creating custom metrics in Lighter using `torchmetrics` involves these key steps
 
 By following these steps, you can easily extend Lighter with your own custom metrics, enabling you to evaluate your deep learning models with metrics that are perfectly aligned with your research goals and evaluation criteria.
 
-Next, explore the [How-To guide on Using Adapters](using_adapters.md) to learn how to customize data handling and argument passing in Lighter, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Using Adapters](04_using_adapters.md) to learn how to customize data handling and argument passing in Lighter, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.

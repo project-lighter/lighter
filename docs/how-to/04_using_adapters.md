@@ -157,4 +157,4 @@ Adapters are a cornerstone of Lighter's flexibility and extensibility. By using 
 
 Mastering adapters empowers you to adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
 
-Next, explore the [How-To guide on Using and Extending Writers](using_and_extending_writer.md) to learn how to save model predictions and outputs to files, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Using and Extending Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
