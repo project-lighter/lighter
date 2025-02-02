@@ -113,3 +113,46 @@ def test_import_module_from_path_with_init():
         mock_module_from_spec.assert_called_once_with(mock_spec)
         mock_spec.loader.exec_module.assert_called_once_with(mock_module)
         assert sys.modules["valid_module"] is mock_module
+
+
+def test_optional_import_success():
+    """
+    Tests that an available module is imported successfully
+    and is stored in the 'imports' dictionary.
+    """
+    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+
+    # "sys" is a built-in module, guaranteed to be there.
+    mod = OPTIONAL_IMPORTS["sys"]
+    import sys
+
+    assert mod is sys  # We expect the returned object to be Python's 'sys' module
+    assert "sys" in OPTIONAL_IMPORTS.imports  # The module name should now be in the 'imports' dictionary
+
+
+def test_optional_import_already_imported():
+    """
+    Tests that requesting the same module a second time
+    does not re-import it but just returns the stored instance.
+    """
+    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+
+    # First call forces import.
+    mod1 = OPTIONAL_IMPORTS["sys"]
+    # Second call should simply return from 'imports' dictionary.
+    mod2 = OPTIONAL_IMPORTS["sys"]
+
+    assert mod1 is mod2  # Should be the same object reference (from the dictionary)
+
+
+def test_optional_import_failure():
+    """
+    Tests that attempting to import a non-existent module
+    raises an ImportError.
+    """
+    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
+
+    with pytest.raises(ImportError) as exc_info:
+        OPTIONAL_IMPORTS["this_module_does_not_exist_12345"]
+
+    assert "this_module_does_not_exist_12345" in str(exc_info.value)

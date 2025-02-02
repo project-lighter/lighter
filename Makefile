@@ -1,15 +1,13 @@
 ### Variables
-# Define shell and Python environment variables
 SHELL := /usr/bin/env bash
 PYTHON := python
 PYTHONPATH := `pwd`
 
-# Install
+# Install uv so we can do everything with it
 .PHONY: setup
-setup: 
+setup:
 	pip install uv
-	
-#* Installation
+
 .PHONY: install
 install:
 	uv pip install -e .
@@ -24,17 +22,36 @@ codestyle:
 .PHONY: formatting
 formatting: codestyle
 
-#* Linting
+#* Tests + Coverage
 .PHONY: test
 test:
-	uv run pytest -c pyproject.toml --cov=lighter --cov-report=term-missing
+	uv run pytest -c pyproject.toml --cov-report=html --cov=lighter tests/
+	$(MAKE) coverage
 
+.PHONY: coverage
+coverage:
+	uvx coverage-badge -o assets/images/coverage.svg -f
+
+#* Linting checks
 .PHONY: check-codestyle
 check-codestyle:
 	uvx isort --diff --check-only --settings-path pyproject.toml ./
 	uvx black --diff --check --config pyproject.toml ./
 	uv run pylint lighter
 
+.PHONY: mypy
+mypy:
+	uvx mypy --config-file pyproject.toml ./
+
+.PHONY: check-safety
+check-safety:
+	uvx safety check
+	uvx bandit -ll --recursive lighter tests
+
+.PHONY: lint
+lint: test check-codestyle mypy check-safety
+
+#* Version bumps (through poetry-bumpversion because uv doesn't have version bumping yet)
 .PHONY: bump-prerelease
 bump-prerelease:
 	uvx --with poetry-bumpversion poetry version prerelease
@@ -50,15 +67,3 @@ bump-minor:
 .PHONY: bump-major
 bump-major:
 	uvx --with poetry-bumpversion poetry version major
-
-.PHONY: mypy
-mypy:
-	uvx mypy --config-file pyproject.toml ./
-
-.PHONY: check-safety
-check-safety:
-	uvx safety check
-	uvx bandit -ll --recursive lighter tests
-
-.PHONY: lint
-lint: test check-codestyle mypy check-safety

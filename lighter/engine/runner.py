@@ -109,3 +109,7 @@ def cli():
             "scale_batch_size": scale_batch_size,
         }
     )
+
+
+if __name__ == "__main__":
+    cli()
