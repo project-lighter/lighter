@@ -166,8 +166,6 @@ max-line-length = 127
 allowed-redefined-builtins = ["input"]
 disable = ["too-many-arguments", "no-else-return"]
 
-allowed-redefined-builtins = ["input"]
-
 [tool.pylint.master]
 fail-under=8
 
