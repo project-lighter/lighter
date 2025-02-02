@@ -5,6 +5,15 @@ title: Lighter
 <!-- Fake title -->
 #
 
+<!-- Remove content from the left bar (otherwise there's "Home" just sitting there) -->
+<style>
+/* Navigation sidebar */
+.md-nav--primary {
+  display: none;
+}
+</style>
+
+
 <!-- Logo -->
 <div style="display: flex; justify-content: center;"><img src="assets/images/lighter_banner.png" style="width:50%;"/></div>
 
@@ -20,83 +29,177 @@ pip install lighter-framework
 
 <!-- Body -->
 
-**Lighter** is designed to streamline your deep learning experiments through a **configuration file**, eliminating boilerplate code and allowing you to focus on what truly matters: your research.  In the complex world of deep learning, managing experiments can become a significant overhead. Lighter offers a solution by automating the repetitive aspects, letting you concentrate on model architecture, datasets, and hyperparameters.
 
-**Key Features**
+<div class="grid cards" markdown>
 
-*   **Configuration-Driven Workflow:** Define your entire experiment in a single YAML configuration file.
-*   **Seamless Integration:** Built to work harmoniously with PyTorch Lightning and MONAI.
-*   **Simplified Workflow:** Streamlines training, validation, testing, and prediction stages.
-*   **Extensible Architecture:** Easily customize and extend functionality with adapters and writers.
-*   **Dynamic Module Loading:**  Integrate your custom modules effortlessly.
+-   :material-cube-outline:{ .lg .middle }  __Task-agnostic__
 
-**Quick Start**
+    ---
 
-Let's get started with a minimal example. First, ensure you have Lighter installed:
+    Classification, segmentation, or self-supervised learning? Lighter handles it all.
 
-```bash
-pip install lighter-framework
-```
+-   :material-cog-outline:{ .lg .middle }  __Configuration-based__
 
-Now, create a `config.yaml` file for a simple MNIST classification task:
+    ---
 
-```yaml title="config.yaml"
-trainer:
+    Define, adjust, and reproduce experiments through configuration files.
+
+-   :material-puzzle-outline:{ .lg .middle }  __Customizable__
+
+    ---
+
+    Integrate custom code seamlessly, whether it's models, datasets, or any other component.
+
+</div>
+
+
+## Lighter vs. PyTorch Lightning
+
+See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightning.
+
+=== "Lighter"
+    ```bash title="Terminal"
+    lighter fit config.yaml
+    ```
+
+    ```yaml title="config.yaml"
+    trainer:
     _target_: pytorch_lightning.Trainer
-    max_epochs: 1
+    max_epochs: 2
 
-system:
-    _target_: lighter.System
+    system:
+        _target_: lighter.System
 
-    model:
-        _target_: torch.nn.Linear
-        in_features: 784
-        out_features: 10
+        model:
+            _target_: torchvision.models.resnet18
+            num_classes: 10
 
-    criterion:
-        _target_: torch.nn.CrossEntropyLoss
+        criterion:
+            _target_: torch.nn.CrossEntropyLoss
 
-    optimizer:
-        _target_: torch.optim.Adam
-        params: "$@system#model.parameters()"
-        lr: 0.001
+        optimizer:
+            _target_: torch.optim.Adam
+            params: "$@system#model.parameters()"
+            lr: 0.001
 
-    dataloaders:
-        train:
-            _target_: torch.utils.data.DataLoader
-            dataset:
-                _target_: torchvision.datasets.MNIST
-                root: .datasets/
-                download: true
-                transform:
-                    _target_: torchvision.transforms.ToTensor
-            batch_size: 64
-```
+        dataloaders:
+            train:
+                _target_: torch.utils.data.DataLoader
+                batch_size: 32
+                shuffle: True
+                dataset:
+                    _target_: torchvision.datasets.CIFAR10
+                    download: True
+                    root: .datasets
+                    train: True
+                    transform:
+                        _target_: torchvision.transforms.Compose
+                        transforms:
+                            - _target_: torchvision.transforms.ToTensor
+                            - _target_: torchvision.transforms.Normalize
+                            mean: [0.5, 0.5, 0.5]
+                            std: [0.5, 0.5, 0.5]
+    ```
 
-To run this experiment, execute the following command in your terminal:
+=== "PyTorch Lightning"
+    ```bash title="Terminal"
+    python cifar10.py
+    ```
 
-```bash
-lighter fit --config config.yaml
-```
+    ```py title="cifar10.py"
+    from pytorch_lightning import Trainer, LightningModule
+    from torch.nn import CrossEntropyLoss
+    from torch.optim import Adam
+    from torch.utils.data import DataLoader
+    from torchvision.models import resnet18
+    from torchvision.datasets import CIFAR10
+    from torchvision.transforms import ToTensor, Normalize, Compose
 
-You should see output indicating the training progress. This minimal example demonstrates how Lighter allows you to define and run deep learning experiments with just a configuration file and a single command.
 
-**Next Steps**
+    class Model(LightningModule):
+        def __init__(self):
+            super().__init__()
+            self.model = resnet18(num_classes=10)
+            self.criterion = CrossEntropyLoss()
+        
+        def forward(self, x):
+            return self.model(x)
+        
+        def training_step(self, batch, batch_idx):
+            x, y = batch
+            y_hat = self(x)
+            loss = self.criterion(y_hat, y)
+            return loss
+        
+        def configure_optimizers(self):
+            return Adam(self.model.parameters(), lr=0.001)
 
-To delve deeper into Lighter's capabilities, explore the [Tutorials](tutorials/01_configuration_basics.md) section for step-by-step guides on various tasks. For a comprehensive understanding of Lighter's design and underlying principles, refer to the [Explanation](explanation/overview.md) section.
+
+    transform = Compose([
+        ToTensor(),
+        Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    ])
+
+    train_dataset = CIFAR10(
+        root=".datasets",
+        train=True,
+        download=True,
+        transform=transform
+    )
+
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+    model = Model()
+    trainer = Trainer(max_epochs=2)
+    trainer.fit(model, train_loader)
+    ```
+
+## Next Steps
+
+<div class="grid cards" markdown>
+
+-   :material-book-open:{ .lg .middle }  __Tutorials__
+
+    ---
+
+    Step-by-step guides to help you get started with Lighter and run your first experiments
+    [:octicons-arrow-right-24: Start Learning](tutorials/01_configuration_basics.md)
+
+-   :material-hammer-wrench:{ .lg .middle }  __How-To Guides__
+    
+    ---
+    
+    Detailed instructions for using Lighter's advanced features and solving specific problems
+    [:octicons-arrow-right-24: Learn More](how-to/01_overview.md)
+
+-   :material-lightbulb:{ .lg .middle }  __Explanation__
+
+    ---
+
+    Comprehensive understanding of Lighter's design principles and architecture
+    [:octicons-arrow-right-24: Explore](explanation/01_overview.md)
+
+<!-- -   :material-api:{ .lg .middle }  __API Reference__
+    
+    ---
+    
+    Detailed documentation of Lighter's classes, functions, and interfaces
+    [:octicons-arrow-right-24: View API](api/lighter.md) -->
+
+</div>
+ 
 
 ## Cite
 
-If you find Lighter useful in your research or project, please consider citing it:
-
 ```bibtex
 @software{lighter,
-  author       = {Ibrahim Hadzic and
-                  Suraj Pai and
-                  Keno Bressem and
-                  Hugo Aerts},
-  title        = {Lighter},
-  publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.8007711},
-  url          = {https://doi.org/10.5281/zenodo.8007711}
+    author       = {Ibrahim Hadzic and
+                    Suraj Pai and
+                    Keno Bressem and
+                    Hugo Aerts},
+    title        = {Lighter},
+    publisher    = {Zenodo},
+    doi          = {10.5281/zenodo.8007711},
+    url          = {https://doi.org/10.5281/zenodo.8007711}
 }
+```
