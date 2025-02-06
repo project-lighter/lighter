@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Semantic segmentation is a crucial computer vision task that involves classifying each pixel in an image into a predefined set of categories. This tutorial will guide you through training a semantic segmentation model using Lighter, focusing on a medical imaging dataset and the popular U-Net architecture. We will cover dataset loading, model definition, configuration, training, prediction, and visualization of results.
+Semantic segmentation is key in computer vision, classifying each pixel into categories. This tutorial guides you to train a semantic segmentation model using Lighter, focusing on medical imaging data and U-Net. We'll cover dataset loading, model definition, config, training, prediction, and visualization.
 
 ## Dataset: Medical Segmentation Decathlon (MSD) - Liver
 
-For this tutorial, we will use the Liver segmentation task from the [Medical Segmentation Decathlon (MSD)](http://medicaldecathlon.com/) dataset. MSD is a collection of 10 datasets for various medical image segmentation tasks. The Liver dataset consists of CT scans and corresponding manual segmentations of the liver. We will use MONAI to easily access and process this dataset.
+We use the Liver segmentation task from MSD dataset. MSD: 10 datasets for medical image segmentation. Liver dataset: CT scans, manual liver segmentations. MONAI will be used for easy data access/processing.
 
 ### Loading MSD Liver Dataset with Lighter
 
@@ -76,69 +76,69 @@ system:
       num_workers: 2 # Adjust based on system resources
 ```
 
-Let's break down the key components of this dataloader configuration:
+Let's break down dataloader config:
 
-*   **`_target_: monai.data.DataLoader`**: Specifies the use of MONAI's `DataLoader`.
-*   **`dataset`**: Defines the dataset using MONAI's `Dataset` class.
-    *   **`data`**: Configures data loading and splitting using `monai.apps.load_and_split_data`.
-        *   **`dataset_name: "MSD_Liver"`**:  Specifies the MSD Liver dataset.
-        *   **`data_dir: ".datasets/"`**:  Directory to download/load the dataset.
-        *   **`is_Thor=False`**:  Indicates CT images (not MRI).
-        *   **`val_frac: 0.2`**:  Fraction of data to use for validation split.
-        *   **`seed: 42`**:  Random seed for reproducibility.
-        *   **`section: "training"`**:  Loads the training section of the split data.
-    *   **`transform`**: Defines a series of data transformations using `monai.transforms.Compose`.
-        *   **`LoadImaged`**: Loads image and label files.
-        *   **`AddChanneld`**: Adds a channel dimension to the 3D images.
-        *   **`Orientationd`**:  Standardizes image orientation to RAS.
-        *   **`Spacingd`**: Resamples images to a specified spacing.
-        *   **`ScaleIntensityRanged`**:  Scales intensity values to a [0, 1] range.
-        *   **`CropForegroundd`**: Crops foreground region to reduce background.
-        *   **`RandCropByPosNegLabeld`**: Extracts random patches, ensuring a balance of positive and negative labels.
-        *   **`RandAffined`**: Applies random affine transformations for data augmentation.
-        *   **`ToTensord`**: Converts data to PyTorch tensors.
-*   **`batch_size: 2`**: Sets batch size (adjust based on GPU memory).
-*   **`shuffle: true`**: Shuffles data.
-*   **`num_workers: 2`**: Number of worker processes for data loading.
+*   **`_target_: monai.data.DataLoader`**: MONAI `DataLoader`.
+*   **`dataset`**: MONAI `Dataset`.
+    *   **`data`**: Data loading/splitting via `monai.apps.load_and_split_data`.
+        *   **`dataset_name: "MSD_Liver"`**: MSD Liver dataset.
+        *   **`data_dir: ".datasets/"`**: Dataset dir.
+        *   **`is_Thor=False`**: CT images (not MRI).
+        *   **`val_frac: 0.2`**: Validation split fraction.
+        *   **`seed: 42`**: Random seed.
+        *   **`section: "training"`**: Load training split.
+    *   **`transform`**: Data transforms via `monai.transforms.Compose`.
+        *   **`LoadImaged`**: Load image/label files.
+        *   **`AddChanneld`**: Add channel dim (3D images).
+        *   **`Orientationd`**: Standardize orientation (RAS).
+        *   **`Spacingd`**: Resample to specified spacing.
+        *   **`ScaleIntensityRanged`**: Scale intensity to [0, 1].
+        *   **`CropForegroundd`**: Crop foreground.
+        *   **`RandCropByPosNegLabeld`**: Random patch extraction (balanced labels).
+        *   **`RandAffined`**: Random affine augmentation.
+        *   **`ToTensord`**: To PyTorch tensors.
+*   **`batch_size: 2`**: Training batch size.
+*   **`shuffle: true`**: Shuffle data.
+*   **`num_workers: 2`**: Data loader workers (adjust for system).
 
 You can define a validation dataloader similarly, changing `section: "validation"` in the `load_and_split_data` configuration.
 
 ## Model: U-Net
 
-We will use the classic U-Net architecture for semantic segmentation. MONAI provides a convenient implementation of U-Net that we can easily integrate.
+We use classic U-Net for semantic segmentation. MONAI provides easy U-Net integration.
 
 ### Defining U-Net in `config.yaml`
 
-Configure the model in the `system.model` section of your `config.yaml` as follows:
+Configure model in `system.model` section of `config.yaml`:
 
 ```yaml title="config.yaml"
 system:
   model:
     _target_: monai.networks.nets.UNet
     dimensions: 3 # 3D images
-    in_channels: 1 # Input channels (1 for CT)
-    out_channels: 2 # Output channels (background and liver)
-    channels: [16, 32, 64, 128, 256] # Feature channels in each layer
+    in_channels: 1 # Input channels (CT)
+    out_channels: 2 # Output channels (liver/background)
+    channels: [16, 32, 64, 128, 256] # Feature channels per layer
     dropout: 0.0 # Dropout probability
-    num_res_units: 2 # Number of residual units per layer
+    num_res_units: 2 # Residual units per layer
 ```
 
-This configuration uses `monai.networks.nets.UNet` and sets the parameters for a 3D U-Net suitable for liver segmentation:
+Config uses `monai.networks.nets.UNet`, sets params for 3D Liver segmentation U-Net:
 
-*   **`dimensions: 3`**: Specifies a 3D U-Net.
-*   **`in_channels: 1`**: Input channels are 1 (for CT scans, which are grayscale).
-*   **`out_channels: 2`**: Output channels are 2 (for background and liver classes).
-*   **`channels`**: Defines the number of feature channels in each layer of the U-Net.
-*   **`dropout: 0.0`**: Sets dropout probability to 0.
-*   **`num_res_units: 2`**: Number of residual units in each layer.
+*   **`dimensions: 3`**: 3D U-Net.
+*   **`in_channels: 1`**: 1 input channel (CT scans).
+*   **`out_channels: 2`**: 2 output channels (liver & background).
+*   **`channels`**: Feature channels per U-Net layer.
+*   **`dropout: 0.0`**: No dropout.
+*   **`num_res_units: 2`**: Residual units per layer.
 
 ## Loss Function and Inferer
 
-For semantic segmentation, Dice loss is a commonly used loss function. We will also use the `SlidingWindowInferer` from MONAI for efficient inference, especially for 3D medical images.
+Dice loss is common for semantic segmentation. We'll use MONAI's `SlidingWindowInferer` for efficient 3D medical image inference.
 
 ### Configuring Loss and Inferer in `config.yaml`
 
-Add the following to your `system` configuration in `config.yaml`:
+Add to `system` config in `config.yaml`:
 
 ```yaml title="config.yaml"
 system:
@@ -149,35 +149,35 @@ system:
 
   inferer:
     _target_: monai.inferers.SlidingWindowInferer
-    roi_size: [96, 96, 96] # Region of interest size for sliding window
-    sw_batch_size: 4 # Batch size for sliding window inference
-    overlap: 0.5 # Overlap ratio for sliding window
+    roi_size: [96, 96, 96] # Sliding window ROI size
+    sw_batch_size: 4 # Sliding window batch size
+    overlap: 0.5 # Sliding window overlap
 ```
 
-*   **`criterion`**: Configures Dice loss using `monai.losses.DiceLoss`.
-    *   **`to_onehot_y: true`**: Converts integer labels to one-hot format.
-    *   **`softmax: true`**: Applies softmax activation to the model outputs.
-*   **`inferer`**: Sets up `SlidingWindowInferer` for inference.
-    *   **`roi_size: [96, 96, 96]`**: Defines the size of the region of interest (patch size) for sliding window inference.
-    *   **`sw_batch_size: 4`**: Batch size for processing patches in the sliding window.
-    *   **`overlap: 0.5`**:  Overlap between adjacent sliding windows to reduce boundary artifacts.
+*   **`criterion`**: Dice loss via `monai.losses.DiceLoss`.
+    *   **`to_onehot_y: true`**: Convert labels to one-hot.
+    *   **`softmax: true`**: Apply softmax to predictions.
+*   **`inferer`**: `SlidingWindowInferer` setup.
+    *   **`roi_size: [96, 96, 96]`**: ROI (patch) size for sliding window inference.
+    *   **`sw_batch_size: 4`**: Batch size for sliding window patches.
+    *   **`overlap: 0.5`**: Sliding window overlap ratio.
 
 ## Metrics and Logging
 
-We will use the Dice metric to evaluate segmentation performance. We will also configure a `FileWriter` callback to save segmentation predictions during validation.
+Dice metric evaluates segmentation. `FileWriter` callback saves validation predictions.
 
 ### Configuring Metrics and FileWriter in `config.yaml`
 
-Add the following to your `system.metrics` and `trainer.callbacks` sections in `config.yaml`:
+Add to `system.metrics` and `trainer.callbacks` in `config.yaml`:
 
 ```yaml title="config.yaml"
 system:
   metrics:
     val:
       - _target_: monai.metrics.DiceMetric
-        include_background: false # Exclude background class from metric
-        reduction: "mean_batch" # Reduce metric over batch
-    test: # You can also define metrics for the test stage
+        include_background: false # Exclude background class
+        reduction: "mean_batch" # Average metric over batch
+    test: # Test stage metrics
       - _target_: monai.metrics.DiceMetric
         include_background: false
         reduction: "mean_batch"
@@ -185,21 +185,21 @@ system:
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      path: "outputs/predictions" # Directory to save predictions
-      writer: "itk_seg_nrrd" # Writer function for ITK NRRD segmentation format
+      path: "outputs/predictions" # Prediction save directory
+      writer: "itk_seg_nrrd" # ITK NRRD segmentation writer
 ```
 
-*   **`metrics`**: Defines Dice metric for validation and test stages using `monai.metrics.DiceMetric`.
-    *   **`include_background: false`**: Excludes the background class (class index 0) from the Dice metric calculation.
-    *   **`reduction: "mean_batch"`**:  Averages the Dice score over the batch.
-*   **`callbacks`**: Configures the `FileWriter` callback.
-    *   **`_target_: lighter.callbacks.FileWriter`**: Specifies the `FileWriter` callback.
-    *   **`path: "outputs/predictions"`**:  Directory where prediction files will be saved.
-    *   **`writer: "itk_seg_nrrd"`**:  Specifies the `itk_seg_nrrd` writer function to save segmentations in ITK NRRD format (suitable for medical images).
+*   **`metrics`**: Dice metric for validation/test via `monai.metrics.DiceMetric`:
+    *   **`include_background: false`**: Exclude background class (index 0).
+    *   **`reduction: "mean_batch"`**: Average Dice score over batch.
+*   **`callbacks`**: `FileWriter` callback config:
+    *   **`_target_: lighter.callbacks.FileWriter`**: `FileWriter` callback.
+    *   **`path: "outputs/predictions"`**: Prediction output directory.
+    *   **`writer: "itk_seg_nrrd"`**: `itk_seg_nrrd` writer (ITK NRRD format).
 
 ## Complete Configuration (`config.yaml`)
 
-Here is the complete `config.yaml` file for training a 3D U-Net for liver segmentation on the MSD Liver dataset:
+Complete `config.yaml` for training 3D U-Net for liver segmentation on MSD Liver dataset:
 
 ```yaml title="config.yaml"
 trainer:
@@ -208,7 +208,7 @@ trainer:
   callbacks:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint # Save best checkpoint
       monitor: "val/metrics/DiceMetric/epoch" # Monitor validation Dice metric
-      mode: "max" # Save when metric is maximized
+      mode: "max" # Save when metric maximized
       filename: "best_model" # Checkpoint file name prefix
     - _target_: lighter.callbacks.FileWriter
       path: "outputs/predictions"
@@ -220,8 +220,8 @@ system:
   model:
     _target_: monai.networks.nets.UNet
     dimensions: 3 # 3D images
-    in_channels: 1 # Input channels (1 for CT)
-    out_channels: 2 # Output channels (background and liver)
+    in_channels: 1 # Input channels (CT)
+    out_channels: 2 # Output channels (liver/background)
     channels: [16, 32, 64, 128, 256]
     dropout: 0.0
     num_res_units: 2
@@ -389,7 +389,6 @@ system:
               source_key: "image" # Use image to determine foreground
             - _target_: monai.transforms.ToTensord
               keys: ["image", "label"]
-
 optimizer:
     _target_: torch.optim.AdamW
     lr: 1.0e-4
@@ -397,9 +396,7 @@ optimizer:
 scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
     T_max: "$@trainer.max_epochs" # Cosine Annealing based on max epochs
-
-```
-
+---
 This complete configuration includes:
 
 *   **`trainer`**: Configures PyTorch Lightning Trainer for 20 epochs, saves the best model checkpoint based on validation Dice metric, and sets up the `FileWriter` callback.
@@ -442,4 +439,4 @@ In this tutorial, you have learned how to train a 3D U-Net model for semantic se
 *   Running training and prediction using the Lighter CLI.
 *   Visualizing segmentation results with ITK-SNAP.
 
-This tutorial provides a starting point for tackling more complex medical image segmentation tasks with Lighter. In the next tutorials, we will explore [transfer learning](04_transfer_learning.md) and [multi-task learning](05_multi_task_learning.md). You can also explore the [How-To guides](../how-to/) for more specific tasks and customizations, and the [Explanation section](../explanation/) for deeper insights into Lighter's design.
+This tutorial provides a starting point for tackling more complex medical image segmentation tasks with Lighter. In the next tutorials, we will explore [transfer learning](04_transfer_learning.md) and [multi-task learning](05_multi_task_learning.md). You can also explore the [How-To guides](../how-to/01_custom_project_modules.md) for more specific tasks and customizations, and the [Design section](../design/01_overview.md) for deeper insights into Lighter's design principles.

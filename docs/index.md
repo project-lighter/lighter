@@ -5,24 +5,23 @@ title: Lighter
 <!-- Fake title -->
 #
 
-<!-- Remove content from the left bar (otherwise there's "Home" just sitting there) -->
 <style>
-/* Navigation sidebar */
-.md-nav--primary {
-  display: none;
-}
+    /* Remove content from the left bar (otherwise there's "Home" just sitting there) */
+    .md-nav--primary {
+    display: none;
+    }
 </style>
 
 
 <!-- Logo -->
-<div style="display: flex; justify-content: center;"><img src="assets/images/lighter_banner.png" style="width:50%;"/></div>
+<div style="display: flex; justify-content: center;"><img src="assets/images/lighter_banner.png" style="width:65%;"/></div>
 
 <!-- pip install -->
-<div style="width:50%; margin:auto; text-align:center">
+<div style="width:65%; margin:auto; text-align:center">
 </br>
 
 ```bash
-pip install lighter-framework
+pip install lighter
 ```
 </div>
 </br>
@@ -32,23 +31,29 @@ pip install lighter-framework
 
 <div class="grid cards" markdown>
 
--   :material-cube-outline:{ .lg .middle }  __Task-agnostic__
-
-    ---
-
-    Classification, segmentation, or self-supervised learning? Lighter handles it all.
-
 -   :material-cog-outline:{ .lg .middle }  __Configuration-based__
 
     ---
 
-    Define, adjust, and reproduce experiments through configuration files.
+    Define, reproduce, and share experiments through configuration files.
+
+-   :material-cube-outline:{ .lg .middle }  __Task-agnostic__
+
+    ---
+
+    Classification, segmentation, or self-supervised learning? Lighter can handle it.
+
+-   :material-file-code-outline:{ .lg .middle }  __Minimal__
+
+    ---
+
+    Lighter handles the boilerplate, letting you run experiments with little to no code.
 
 -   :material-puzzle-outline:{ .lg .middle }  __Customizable__
 
     ---
 
-    Integrate custom code seamlessly, whether it's models, datasets, or any other component.
+    Add custom code seamlessly, whether it's models, datasets, or any other component.
 
 </div>
 
@@ -64,8 +69,8 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
 
     ```yaml title="config.yaml"
     trainer:
-    _target_: pytorch_lightning.Trainer
-    max_epochs: 2
+        _target_: pytorch_lightning.Trainer
+        max_epochs: 2
 
     system:
         _target_: lighter.System
@@ -97,8 +102,8 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
                         transforms:
                             - _target_: torchvision.transforms.ToTensor
                             - _target_: torchvision.transforms.Normalize
-                            mean: [0.5, 0.5, 0.5]
-                            std: [0.5, 0.5, 0.5]
+                              mean: [0.5, 0.5, 0.5]
+                              std: [0.5, 0.5, 0.5]
     ```
 
 === "PyTorch Lightning"
@@ -162,29 +167,29 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
 
     ---
 
-    Step-by-step guides to help you get started with Lighter and run your first experiments
+    Run your first experiments with step-by-step tutorials
     [:octicons-arrow-right-24: Start Learning](tutorials/01_configuration_basics.md)
 
 -   :material-hammer-wrench:{ .lg .middle }  __How-To Guides__
     
     ---
     
-    Detailed instructions for using Lighter's advanced features and solving specific problems
-    [:octicons-arrow-right-24: Learn More](how-to/01_overview.md)
+    Learn about Lighter's advanced features with practical guides
+    [:octicons-arrow-right-24: Learn More](how-to/01_custom_project_modules.md)
 
--   :material-lightbulb:{ .lg .middle }  __Explanation__
+-   :material-lightbulb:{ .lg .middle }  __Design__
 
     ---
 
-    Comprehensive understanding of Lighter's design principles and architecture
-    [:octicons-arrow-right-24: Explore](explanation/01_overview.md)
+    Understand Lighter's design principles and architecture
+    [:octicons-arrow-right-24: Read More](design/01_overview.md)
 
-<!-- -   :material-api:{ .lg .middle }  __API Reference__
+-   :material-api:{ .lg .middle }  __Reference__
     
     ---
     
-    Detailed documentation of Lighter's classes, functions, and interfaces
-    [:octicons-arrow-right-24: View API](api/lighter.md) -->
+    Explore Lighter's classes, functions, and interfaces
+    [:octicons-arrow-right-24: View API](reference/)
 
 </div>
  

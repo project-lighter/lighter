@@ -3,7 +3,7 @@
 ## Introduction
 
 Transfer learning is a powerful technique in machine learning that allows you to leverage knowledge gained from solving one problem and apply it to a different but related problem. In deep learning, this often involves using pre-trained models, which are models trained on large datasets (e.g., ImageNet). Finetuning a pre-trained model on a new, smaller dataset can significantly reduce training time and improve performance, especially when data is limited.
-
+  
 This tutorial will guide you through finetuning a pre-trained image classification model using Lighter. We will use a ResNet-18 model pre-trained on ImageNet and finetune it on the CIFAR-10 dataset. We will also demonstrate how to use the `Freezer` callback in Lighter to freeze and unfreeze layers during training.
 
 ## Pre-trained Model: ResNet-18 on ImageNet
@@ -28,6 +28,34 @@ system:
 
 By setting `pretrained: true`, PyTorch automatically downloads the pre-trained weights. Setting `num_classes` modifies the last fully connected layer to match the new task.
 
+### Loading Pre-trained Weights from Checkpoint
+
+For more control over loading pre-trained weights, e.g. loading from a local checkpoint file with potentially different layer names, use `adjust_prefix_and_load_state_dict` from `lighter.utils.model.py`. 
+
+Example: load weights from `checkpoints/resnet18_imagenet.ckpt` for ResNet-18:
+
+```yaml title="config.yaml"
+system:
+  model:
+    _target_: torchvision.models.resnet18
+    _partial_: true # Indicate partial config
+    _init_: # Call __init__ after partial config
+      _target_: lighter.utils.model.adjust_prefix_and_load_state_dict
+      ckpt_path: "checkpoints/resnet18_imagenet.ckpt" # Checkpoint file path
+      layers_to_ignore: # Ignore final layer(s)
+        - "fc.weight"
+        - "fc.bias"
+```
+
+Config breakdown:
+
+*   `_partial_: true`, `_init_`: Apply `adjust_prefix_and_load_state_dict` after partial model init.
+*   `_init_` calls `lighter.utils.model.adjust_prefix_and_load_state_dict` with:
+    *   **`ckpt_path`**: Path to downloaded checkpoint file.
+    *   **`layers_to_ignore`**: Layers to exclude from loading. Example ignores final FC layer (`"fc"`).
+
+This shows how to use `adjust_prefix_and_load_state_dict` for flexible pre-trained weight loading, handling different checkpoint sources/architectures and layer mismatches.
+ 
 ## Dataset: CIFAR-10
 
 We will use the [CIFAR-10](https://www.cs.toronto.edu/~kriz/cifar.html) dataset, a standard dataset for image classification. CIFAR-10 consists of 60,000 32x32 color images in 10 classes, with 6,000 images per class. We will use `torchvision.datasets.CIFAR10` to load this dataset.
@@ -82,27 +110,19 @@ system:
               std: [0.229, 0.224, 0.225] # ImageNet normalization
       batch_size: 32
       num_workers: 4
-```
-
-Key points in the dataloader configuration:
-
-*   **`transform`**:  We use different transforms for training and validation.
-    *   **Training**: Includes `RandomResizedCrop` and `RandomHorizontalFlip` for data augmentation, followed by `ToTensor` and `Normalize` (using ImageNet stats).
-    *   **Validation**: Uses `Resize` and `CenterCrop` to resize and crop images to 224x224, followed by `ToTensor` and `Normalize`.
-*   **`Normalize`**:  Crucially, we use the normalization parameters (mean and std) from ImageNet, as the model was pre-trained on ImageNet.
 
 ## Optimizer and Learning Rate Scheduler
 
-We will use AdamW optimizer and Cosine Annealing LR scheduler, similar to the previous tutorials.
+We will use AdamW optimizer and Cosine Annealing LR scheduler, like previous tutorials.
 
 ### Configuring Optimizer and Scheduler
 
-Add the optimizer and scheduler configurations to your `config.yaml`:
+Add optimizer/scheduler configs to `config.yaml`:
 
 ```yaml title="config.yaml"
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 1.0e-4 # Lower learning rate for finetuning
+  lr: 1.0e-4 # Lower LR for finetuning
   weight_decay: 1.0e-5
 
 scheduler:
@@ -110,15 +130,15 @@ scheduler:
   T_max: "$@trainer.max_epochs"
 ```
 
-Note the lower learning rate (`lr: 1.0e-4`) compared to training from scratch. Finetuning typically requires a smaller learning rate to avoid disrupting the pre-trained weights too much.
+Note lower learning rate (`lr: 1.0e-4`) vs training from scratch. Finetuning needs smaller LR to avoid disrupting pre-trained weights.
 
 ## Freezer Callback: Freezing Layers
 
-To demonstrate freezing layers, we will use the `Freezer` callback to freeze the convolutional layers of ResNet-18 for the first few epochs and then unfreeze them.
+To demonstrate freezing, we use `Freezer` callback to freeze ResNet-18 conv layers for initial epochs, then unfreeze.
 
 ### Configuring Freezer Callback
 
-Add the `Freezer` callback to the `trainer.callbacks` section in `config.yaml`:
+Add `Freezer` callback to `trainer.callbacks` in `config.yaml`:
 
 ```yaml title="config.yaml"
 trainer:
@@ -129,23 +149,23 @@ trainer:
       mode: "max"
       filename: "best_model"
     - _target_: lighter.callbacks.Freezer # Freezer callback
-      name_starts_with: ["conv1", "layer1", "layer2", "layer3"] # Freeze conv layers
-      until_epoch: 5 # Unfreeze after 5 epochs
+      name_starts_with: ["model.backbone"] # Freeze backbone initially
+      until_epoch: 5                     # Unfreeze backbone after epoch 5
 ```
 
-*   **`_target_: lighter.callbacks.Freezer`**: Specifies the `Freezer` callback.
-*   **`name_starts_with: ["conv1", "layer1", "layer2", "layer3"]`**: Freezes layers whose names start with these prefixes, which correspond to the initial convolutional layer and the first three ResNet layers.
-*   **`until_epoch: 5`**: Unfreezes these layers after epoch 5.
+*   **`_target_: lighter.callbacks.Freezer`**: `Freezer` callback.
+*   **`name_starts_with`**: Freeze layers starting with prefixes (ResNet-18 conv layers).
+*   **`until_epoch: 5`**: Unfreeze layers after epoch 5.
 
-This configuration will freeze the specified layers for the first 5 epochs and then train all layers for the remaining epochs.
+Config freezes layers for first 5 epochs, then trains all layers.
 
 ## Metrics
 
-We will use accuracy as the evaluation metric.
+We use accuracy as evaluation metric.
 
 ### Configuring Metrics
 
-Add the accuracy metric to the `system.metrics` section:
+Add accuracy metric to `system.metrics` section:
 
 ```yaml title="config.yaml"
 system:
@@ -164,11 +184,11 @@ system:
         num_classes: 10
 ```
 
-This configures `torchmetrics.Accuracy` for train, val, and test stages, suitable for multi-class classification with 10 classes.
+Config configures `torchmetrics.Accuracy` for train/val/test stages (multi-class, 10 classes).
 
 ## Complete Configuration (`config.yaml`)
 
-Here is the complete `config.yaml` for finetuning a pre-trained ResNet-18 on CIFAR-10:
+Complete `config.yaml` for finetuning pre-trained ResNet-18 on CIFAR-10:
 
 ```yaml title="config.yaml"
 trainer:
@@ -252,7 +272,7 @@ system:
               std: [0.229, 0.224, 0.225]
       batch_size: 32
       num_workers: 4
-    test: # Optional test dataloader (same as validation in this case)
+    test: # Optional test dataloader (same as validation)
       _target_: torch.utils.data.DataLoader
       dataset:
         _target_: torchvision.datasets.CIFAR10
@@ -282,36 +302,35 @@ optimizer:
 scheduler:
   _target_: torch.optim.lr_scheduler.CosineAnnealingLR
   T_max: "$@trainer.max_epochs"
-```
-
-This configuration file defines all components for finetuning: trainer, system (model, criterion, metrics, dataloaders), optimizer, scheduler, and the Freezer callback.
+---
+Config defines finetuning components: trainer, system, optimizer, scheduler, Freezer callback.
 
 ## Training and Evaluation
 
-Save the above configuration as `config_transfer_learning.yaml`. To start training, run:
+Save config as `config_transfer_learning.yaml`. Run training:
 
 ```bash title="Terminal"
 lighter fit --config config_transfer_learning.yaml
 ```
 
-Monitor the training process. You should observe that the validation accuracy increases relatively quickly due to transfer learning. The Freezer callback will freeze the initial layers for the first 5 epochs, and then train all layers.
+Monitor training. Validation accuracy should increase quickly due to transfer learning. Freezer callback freezes initial layers for 5 epochs, then trains all.
 
-After training, you can evaluate the finetuned model on the test set (or validation set, as we are using validation set as test set here for simplicity):
+Evaluate finetuned model on test set (or validation set):
 
 ```bash title="Terminal"
 lighter test --config config_transfer_learning.yaml
 ```
 
-This will evaluate the best checkpoint saved during training on the validation dataloader and report the test accuracy.
+Evaluates best checkpoint, reports test accuracy.
 
 ## Recap and Next Steps
 
-In this tutorial, you have learned how to perform transfer learning and finetune a pre-trained ResNet-18 model on the CIFAR-10 dataset using Lighter. You covered:
+Tutorial: transfer learning, finetuned pre-trained ResNet-18 on CIFAR-10. Covered:
 
-*   Loading a pre-trained ResNet-18 model from `torchvision.models`.
-*   Configuring CIFAR-10 dataset and dataloaders.
-*   Setting up optimizer, learning rate scheduler, and accuracy metric.
-*   Using the `Freezer` callback to freeze and unfreeze layers during training.
-*   Running training and evaluation using the Lighter CLI.
+*   Loading pre-trained ResNet-18 (`torchvision.models`).
+*   Configuring CIFAR-10 dataset/dataloaders.
+*   Setting up optimizer, LR scheduler, accuracy metric.
+*   `Freezer` callback for layer freezing.
+*   CLI training/evaluation.
 
-This tutorial demonstrates the effectiveness of transfer learning and how Lighter simplifies the process of finetuning pre-trained models. In the next tutorial, we will explore [multi-task learning](05_multi_task_learning.md). You can also explore the [How-To guides](../how-to/) for more specific tasks and customizations, and the [Explanation section](../explanation/) for deeper insights into Lighter's design.
+Demonstrates transfer learning effectiveness, Lighter's finetuning simplification. Next: [multi-task learning](05_multi_task_learning.md), [How-To guides](../how-to/01_custom_project_modules.md), [Design section](../design/01_overview.md), [Tutorials section](../tutorials/01_configuration_basics.md).

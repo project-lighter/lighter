@@ -2,14 +2,14 @@
 
 ## Introduction to Adapters
 
-Adapters are a core component of Lighter, designed to provide a flexible and extensible way to customize data handling and argument passing within the framework. They act as intermediaries, allowing you to adapt data and function arguments without modifying the core Lighter code. This system is crucial for:
+Adapters in Lighter offer a flexible way to customize data handling and argument passing, acting as intermediaries to adapt data and function arguments without altering Lighter's core code. This is essential for:
 
-*   **Data Format Flexibility**: Handling diverse data formats and structures in your deep learning projects.
-*   **Customizable Data Processing**: Applying specific transformations or preprocessing steps to your data at different stages of the workflow.
-*   **Argument Mapping**: Adapting function arguments to match the expected input format of your loss functions, metrics, or other components.
-*   **Code Modularity**: Keeping your data handling and customization logic separate from the core training loop and system components, improving code organization and maintainability.
+*   **Data Flexibility**: Handling diverse data formats.
+*   **Custom Processing**: Applying transformations at different workflow stages.
+*   **Argument Mapping**: Matching function arguments to loss, metric, or other component inputs.
+*   **Modularity**: Separating customization logic for better code organization and maintainability.
 
-Lighter provides several built-in adapter types, each serving a specific purpose. You can also create custom adapters to address unique requirements in your projects.
+Lighter includes built-in adapter types and supports custom adapters for specific needs.
 
 ## Types of Adapters in Lighter
 
@@ -17,8 +17,8 @@ Lighter includes the following adapter types:
 
 1.  **`BatchAdapter`**:
 
-    *   **Purpose**: The `BatchAdapter` is responsible for extracting the essential components from a data batch: **input**, **target**, and **identifier**. It standardizes the batch structure, regardless of the original dataset format.
-    *   **Mechanism**: It uses **accessors** to retrieve data from the batch. Accessors can be:
+    *   **Purpose**: The `BatchAdapter` extracts essential components from a data batch: **input**, **target**, and **identifier**. The identifier can be used to track individual samples or for specific metrics/logging. It standardizes batch structure across datasets.
+    *   **Mechanism**: It uses **accessors** to retrieve data from batches. Accessors can be:
         *   **Index (int)**: For list-like or tuple-like batches (e.g., `batch[0]` for input).
         *   **Key (str)**: For dictionary-like batches (e.g., `batch["image"]` for input).
         *   **Callable (function)**: For custom batch structures or complex extraction logic (e.g., `lambda batch: batch["data"]["image"]`).
@@ -116,7 +116,7 @@ Lighter includes the following adapter types:
     *   **Use Cases**:
         *   Formatting data for better readability in logs (e.g., converting tensors to NumPy arrays or lists).
         *   Filtering sensitive or irrelevant data from logs.
-        *   Applying specific transformations to visualize data in logging outputs.
+        *   Applying specific transformations to visualize data in logging outputs, such as formatting images.
 
     **Example Configuration (`config.yaml`)**:
 
@@ -130,12 +130,15 @@ Lighter includes the following adapter types:
               - _target_: lambda x: x.cpu().numpy() # Convert input tensor to NumPy array
             pred_transforms: # Transformations for prediction data in logs
               - _target_: lambda x: torch.argmax(x, dim=1).cpu().numpy() # Get class labels and convert to NumPy
+            target_transforms: # Transformations for target data in logs
+              - _target_: torchvision.transforms.ToPILImage # Convert target tensor to PIL Image for image logging
     ```
 
     In this example, the `LoggingAdapter` for the `train` stage is configured to:
 
     *   Convert **input** tensors to NumPy arrays before logging.
     *   Convert **prediction** tensors to class label NumPy arrays (using `argmax`) before logging.
+    *   Convert **target** tensors to PIL Images for image logging.
 
 ## Creating Custom Adapters (Advanced)
 
@@ -145,18 +148,16 @@ While Lighter's built-in adapters cover many common use cases, you might need to
 2.  **Implement the `__call__` method** in your custom adapter class. This method will contain your custom logic for data adaptation and/or argument mapping.
 3.  **Configure your custom adapter** in the `config.yaml` file, specifying the `_target_` path to your custom adapter class and any necessary arguments.
 
-**Example: Custom Adapter for a Specific Loss Function**
+**Example: Custom Adapter for a Different Argument Order in Loss Function**
 
-Let's say you have a custom loss function that expects input and target data in a specific format and order. You can create a custom adapter to handle this:
+If you have a loss function that expects arguments in a different order (e.g., `target`, `pred` instead of default `pred`, `target`), create a custom adapter:
 
 ```python title="my_project/adapters.py"
-from lighter.adapters import _ArgumentsAdapter
+from lighter.adapters import CriterionAdapter
 
-class MyCustomLossAdapter(_ArgumentsAdapter):
+class MyLossAdapter(CriterionAdapter): # Inherit from CriterionAdapter
     def __call__(self, criterion, input, target, pred):
-        # Custom argument mapping for MyLossFunction
-        args, kwargs = super().__call__(pred, target, input) # Note the order: pred, target, input
-        return criterion(*args, **kwargs)
+        return super().__call__(criterion, input, target, pred) # No changes needed in __call__
 ```
 
 **Configuration in `config.yaml`**:
@@ -166,16 +167,14 @@ system:
   adapters:
     train:
       criterion:
-        _target_: my_project.adapters.MyCustomLossAdapter # Path to custom adapter
-        pred_argument: 0 # 'pred' becomes 0-th positional argument
-        target_argument: 1 # 'target' becomes 1st positional argument
-        input_argument: 2 # 'input' becomes 2nd positional argument
+        _target_: my_project.adapters.MyLossAdapter # Path to custom adapter
+        target_argument: 0 # Target is the first argument
+        pred_argument: 1 # Prediction is the second argument
   criterion:
-    _target_: my_project.losses.MyLossFunction # Path to custom loss function
-    # ... (arguments for MyLossFunction) ...
+    _target_: my_project.losses.MyLossFunction # Your custom loss
 ```
 
-In this example, `MyCustomLossAdapter` adapts the arguments to match the order expected by `MyLossFunction` (which expects `pred`, `target`, `input` order), demonstrating how to create and use custom adapters for specialized needs.
+Here, `MyLossAdapter` configures `target_argument` and `pred_argument` to match `MyLossFunction`'s expected order. No changes to the adapter's `__call__` are needed as we are only reconfiguring argument order.
 
 ## Benefits of the Adapter System
 
@@ -188,4 +187,4 @@ In this example, `MyCustomLossAdapter` adapts the arguments to match the order e
 
 Lighter's adapter system is a powerful mechanism for tailoring the framework to your specific deep learning tasks. By using built-in adapters or creating custom ones, you can effectively handle diverse data formats, customize data processing pipelines, and seamlessly integrate your own components. Adapters contribute significantly to Lighter's flexibility, modularity, and extensibility, making it a versatile tool for a wide range of deep learning experiments.
 
-Next, delve into the [Dynamic Module Loading Explanation](../explanation/04_dynamic_module_loading.md) to understand how Lighter handles dynamic imports for custom modules, or return to the [Explanation section](../explanation/) for more conceptual documentation. You can also refer back to the [How-To guides section](../how-to/) for practical problem-solving guides or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, delve into the [Dynamic Module Loading Design](../design/04_dynamic_module_loading.md) to understand how Lighter handles dynamic imports for custom modules, or return to the [Design section](../design/01_overview.md) for more conceptual documentation. You can also refer back to the [How-To guides section](../how-to/01_custom_project_modules.md) for practical problem-solving guides or the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.

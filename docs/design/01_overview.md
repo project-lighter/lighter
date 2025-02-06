@@ -14,27 +14,27 @@ These challenges can hinder productivity, slow down experimentation, and make it
 
 ## Introducing Lighter: Configuration-Driven Deep Learning
 
-**Lighter** is a Python library designed to address these challenges and streamline the deep learning experimentation process. It provides a **configuration-driven** approach, allowing you to define and manage your experiments using simple and human-readable YAML configuration files.
+**Lighter** is a Python library designed to address these challenges and streamline deep learning experimentation. It uses YAML configuration files for experiment definition and management.
 
 **Core Philosophy**:
 
-Lighter's core philosophy is to **separate configuration from code** and to provide a **high-level, declarative way to define deep learning experiments**. By using Lighter, you can:
+Lighter's core philosophy is to **separate configuration from code** and provide a **high-level, declarative way to define deep learning experiments**. Use Lighter to:
 
-*   **Focus on the Essentials**: Concentrate on the core components of your research: models, datasets, losses, metrics, and experimental ideas, rather than getting bogged down in boilerplate code.
-*   **Simplify Experiment Setup**: Define your entire experiment in a single `config.yaml` file, including model definitions, data loading pipelines, training parameters, and more.
-*   **Enhance Reproducibility**: Configuration files make experiments more reproducible by explicitly capturing all experimental settings in a version-controlled format.
-*   **Improve Collaboration**: Share experiments easily with colleagues by sharing the `config.yaml` file, making it straightforward for others to reproduce and understand your work.
-*   **Increase Productivity**: Reduce the amount of code you need to write and maintain, freeing up time for more impactful research and development.
+*   **Focus on the Essentials**: Concentrate on core research components (models, datasets, losses, metrics) reducing boilerplate.
+*   **Simplify Experiment Setup**: Define experiments in a single `config.yaml` file.
+*   **Enhance Reproducibility**: Configuration files capture all settings in a version-controlled format.
+*   **Improve Collaboration**: Share experiments easily via `config.yaml` files.
+*   **Increase Productivity**: Reduce code maintenance, freeing time for research and development.
 
 **Key Features**:
 
-*   **Configuration-Driven Workflow**: Define your entire deep learning experiment in a `config.yaml` file.
-*   **Seamless PyTorch Lightning Integration**: Built on top of PyTorch Lightning, leveraging its powerful training engine and features.
-*   **MONAI Ecosystem Compatibility**: Integrates smoothly with MONAI (Medical Open Network for AI), making it easy to use MONAI components for medical imaging tasks.
-*   **Dynamic Module Loading**: Load custom models, datasets, metrics, and other components from your project dynamically using configuration.
-*   **Extensible Architecture**: Customize and extend Lighter with adapters, callbacks, and custom components to fit your specific needs.
-*   **Simplified Training, Validation, Testing, and Prediction**: Run training, validation, testing, and prediction workflows with simple CLI commands.
-*   **Experiment Management**: Organize and manage your experiments using configuration files and experiment tracking tools (via PyTorch Lightning integrations).
+*   **Configuration-Driven Workflow**: Define experiments in `config.yaml`.
+*   **Seamless PyTorch Lightning Integration**: Leverages PyTorch Lightning's training engine and features.
+*   **MONAI Ecosystem Compatibility**: Integrates with MONAI for medical imaging tasks.
+*   **Dynamic Module Loading**: Dynamically load custom components via configuration.
+*   **Extensible Architecture**: Customize with adapters, callbacks, and custom components.
+*   **Simplified Training, Validation, Testing, and Prediction**: Simple CLI commands for training, validation, testing, and prediction.
+*   **Experiment Management**: Organize experiments with configuration files and experiment tracking tools.
 
 ## Design Principles of Lighter
 
@@ -42,32 +42,27 @@ Lighter is built upon the following key design principles:
 
 1.  **Convention over Configuration**:
 
-    *   Lighter provides sensible defaults and conventions for common deep learning tasks, reducing the need for excessive configuration.
-    *   However, it also offers extensive customization options when you need to deviate from the defaults.
-    *   This principle aims to strike a balance between ease of use and flexibility.
+    *   Provides sensible defaults for common tasks, reducing configuration needs.
+    *   Offers customization when defaults are insufficient.
 
 2.  **Modularity and Reusability**:
 
-    *   Lighter encourages a modular approach to building deep learning systems.
-    *   Components like models, datasets, metrics, and callbacks are designed to be reusable and composable.
-    *   You can easily swap out different components and combine them in various ways through configuration.
+    *   Encourages modular design with reusable and composable components (models, datasets, metrics, callbacks).
 
 3.  **Extensibility and Customization**:
 
-    *   Lighter is designed to be extensible and customizable to accommodate a wide range of research and application needs.
-    *   You can easily add custom components, such as:
-        *   **Custom Models**: Define your own neural network architectures.
-        *   **Custom Datasets**: Integrate your specific data loading pipelines.
-        *   **Custom Metrics**: Implement specialized evaluation metrics.
-        *   **Custom Callbacks**: Add custom behavior during training (e.g., custom logging, visualization).
-        *   **Custom Inferers**: Define specialized inference logic.
-        *   **Adapters**: Customize data handling and argument passing.
+    *   Extensible and customizable for diverse research needs. Easily add:
+        *   Custom Models
+        *   Custom Datasets
+        *   Custom Metrics
+        *   Custom Callbacks
+        *   Custom Inferers
+        *   Adapters
 
 4.  **Seamless PyTorch Lightning Integration**:
 
-    *   Lighter is tightly integrated with PyTorch Lightning, a popular high-level deep learning framework.
-    *   It leverages PyTorch Lightning's training engine, distributed training capabilities, logging, and callbacks.
-    *   If you are familiar with PyTorch Lightning, you will find Lighter easy to learn and use.
+    *   Tightly integrated with PyTorch Lightning, leveraging its core features.
+    *   Easy to learn for PyTorch Lightning users.
 
 ## Comparison with Other Frameworks
 
@@ -113,4 +108,4 @@ Lighter is designed for:
 
 Lighter offers a powerful and user-friendly approach to deep learning experimentation. By embracing configuration-driven workflows, Lighter helps you streamline your research, improve reproducibility, and focus on what matters most: building innovative deep learning models and solving challenging problems.
 
-Next, delve into the [Configuration System Explanation](../explanation/02_configuration_system.md) to understand the details of Lighter's configuration approach, or return to the [Explanation section](../explanation/) for more conceptual documentation. You can also explore the [Tutorials section](../tutorials/) for end-to-end examples or the [How-To guides section](../how-to/) for practical problem-solving guides.
+Next, delve into the [Configuration System Design](../design/02_configuration_system.md) to understand the details of Lighter's configuration approach, or return to the [Design section](../design/01_overview.md) for more conceptual documentation. You can also explore the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples or the [How-To guides section](../how-to/01_custom_project_modules.md) for practical problem-solving guides.

@@ -1,36 +1,36 @@
 # Deep Dive into Lighter's Configuration System
 
-## Introduction to Configuration in Lighter
+## Introduction to Configuration
 
-Configuration is central to Lighter's design. It allows you to define and manage all aspects of your deep learning experiments in a declarative and organized manner, using human-readable YAML files. This approach offers numerous benefits:
+Configuration is key to Lighter, enabling declarative management of deep learning experiments via human-readable YAML files. Benefits include:
 
-*   **Experiment Reproducibility**: Configuration files explicitly capture all settings, ensuring experiments can be reliably reproduced.
-*   **Simplified Experiment Management**: Manage complex experiments with a single `config.yaml` file, rather than scattered code.
-*   **Parameter Sweeping**: Easily modify and iterate on experiments by changing configuration values.
-*   **Collaboration**: Share and discuss experiments by sharing the configuration file.
+*   **Reproducibility**: Explicitly capture all settings for reliable experiment reproduction.
+*   **Simplified Management**: Manage complex experiments with a single `config.yaml`.
+*   **Parameter Sweeping**: Easily modify and iterate by changing config values.
+*   **Collaboration**: Share and discuss experiments via config files.
 
-This document provides a deep dive into Lighter's configuration system, explaining its structure, key features, and how to use it effectively.
+This document details Lighter's configuration system, covering its structure, features, and effective usage.
 
 ## YAML Structure of `config.yaml`
 
-Lighter configuration files are written in YAML (YAML Ain't Markup Language), a human-friendly data serialization format. A typical Lighter `config.yaml` file has a hierarchical structure with key-value pairs, organized into sections.
+Lighter configurations use YAML, a human-readable format. `config.yaml` is hierarchical, using key-value pairs in sections.
 
 **Top-Level Keys**:
 
-A Lighter configuration file typically includes the following top-level keys:
+Typical `config.yaml` top-level keys:
 
-*   **`trainer`**: Configuration for the PyTorch Lightning `Trainer`. This section defines how the training process is executed, including settings for accelerators, devices, epochs, callbacks, loggers, and more.
-*   **`system`**: Configuration for the `lighter.System` class, which encapsulates your deep learning system. This section defines:
-    *   `model`: The neural network model.
-    *   `dataloaders`: Data loaders for training, validation, testing, and prediction.
-    *   `optimizer`: The optimizer algorithm.
-    *   `scheduler`: The learning rate scheduler.
-    *   `criterion`: The loss function (criterion).
+*   **`trainer`**: PyTorch Lightning `Trainer` configuration (training process settings).
+*   **`system`**: `lighter.System` configuration (deep learning system definition):
+    *   `model`: Neural network model.
+    *   `dataloaders`: Data loaders (train, val, test, predict).
+    *   `optimizer`: Optimizer algorithm.
+    *   `scheduler`: Learning rate scheduler.
+    *   `criterion`: Loss function.
     *   `metrics`: Evaluation metrics.
-    *   `adapters`: Adapters for customizing data handling and argument passing.
-    *   `inferer`: Inferer for controlling the inference process.
-*   **`project`**: (Optional) Specifies the path to your project directory, enabling Lighter to dynamically load custom modules (models, datasets, etc.) from your project.
-*   **`args`**: (Optional) Allows you to override configuration values from the command line when running Lighter.
+    *   `adapters`: Data handling and argument adaptation.
+    *   `inferer`: Inference control.
+*   **`project`**: (Optional) Project directory path (for dynamic module loading of custom modules).
+*   **`args`**: (Optional) Command-line config overrides.
 
 **Example `config.yaml` Structure**:
 
@@ -109,12 +109,13 @@ In this example:
 *   `_target_: my_project.models.MyModel` tells Lighter to instantiate the `MyModel` class from the `my_project.models` module.
 *   `input_size: [1, 28, 28]` and `num_classes: 10` are passed as keyword arguments to the `MyModel` class's `__init__` constructor.
 
-**Benefits of `_target_` Style**:
 
-*   **Declarative Configuration**: You declare *what* you want to create (which class to use) and *how* to create it (constructor arguments) in the config file, rather than writing imperative code.
-*   **Dynamic Instantiation**: Lighter dynamically instantiates classes based on the configuration, allowing for highly flexible and modular setups.
-*   **Integration with Custom Modules**: Easily integrate your own custom models, datasets, metrics, and other components by specifying their Python paths in the config.
+**Benefits of `_target_`**:
 
+*   **Declarative**: Config defines classes and arguments in YAML, not code.
+*   **Dynamic**: Flexible, modular setups via dynamic class instantiation.
+*   **Customizable**: Integrates custom modules by specifying Python paths, enhancing modularity.
+*   **Readable**: Clear mapping to Python class instantiation improves config readability.
 ## Stage-Specific Configurations
 
 Lighter uses the concept of **stages** to manage configurations for different phases of a deep learning workflow. The stages are:
@@ -161,11 +162,11 @@ Lighter uses a `Resolver` class (in `lighter/engine/resolver.py`) to handle conf
 
 ## Validation with Cerberus
 
-Lighter uses **Cerberus**, a powerful validation library for Python, to ensure that your `config.yaml` files adhere to a predefined schema. The schema defines the expected structure, data types, and required fields for the configuration.
+Lighter validates `config.yaml` against a schema using Cerberus. Schema defines config structure, types, and fields.
 
 **`SCHEMA` in `engine/config.py`**:
 
-The configuration schema is defined in the `SCHEMA` dictionary within the `lighter/engine/config.py` file. This schema specifies the valid structure and rules for Lighter configurations.
+Config schema is in `SCHEMA` dict in `lighter/engine/config.py`. It specifies valid config structure and rules.
 
 **Example Schema Snippet (from `engine/config.py`)**:
 
@@ -203,21 +204,21 @@ SCHEMA = {
 
 **Validation Process**:
 
-When Lighter loads your `config.yaml` file, it automatically validates it against the `SCHEMA`. If the configuration is invalid (e.g., missing required fields, incorrect data types), Lighter will raise a `ConfigurationError` with detailed error messages, helping you quickly identify and fix issues in your config file.
+Lighter validates `config.yaml` against `SCHEMA`. Invalid configs raise `ConfigurationError` with detailed messages for quick issue resolution.
 
 **Benefits of Validation**:
 
-*   **Early Error Detection**: Catch configuration errors early in the experiment setup process, before runtime.
-*   **Configuration Consistency**: Ensure that your configuration files follow a consistent structure and adhere to predefined rules.
-*   **Improved User Experience**: Provide helpful error messages to guide users in creating valid configuration files.
+*   **Early Error Detection**: Catch errors early, before runtime.
+*   **Configuration Consistency**: Ensure consistent config structure and rules.
+*   **Improved User Experience**: Helpful error messages for valid config creation.
 
-## Overriding Configuration from the CLI
+## Overriding Configuration from CLI
 
-Lighter allows you to override configuration values directly from the command line when running Lighter CLI commands (e.g., `lighter fit`, `lighter validate`). This is achieved using the `args` section in your `config.yaml` file.
+Override config values from CLI using `args` section in `config.yaml` for commands like `lighter fit`.
 
 **`args` Section**:
 
-The `args` section is an optional top-level key in `config.yaml`. It allows you to define stage-specific argument overrides.
+Optional top-level `args` in `config.yaml` defines stage-specific overrides.
 
 **Example `args` Section**:
 
@@ -235,43 +236,40 @@ args:
       devices: 2 # Override 'trainer.devices' to 2 for validation
 ```
 
-**Command-Line Overrides**:
+**CLI Overrides**:
 
-When you run a Lighter command with a `config.yaml` file that includes the `args` section, Lighter will apply the specified overrides.
+Lighter CLI commands with `config.yaml` apply `args` overrides.
 
 **Example Usage**:
 
 ```bash title="Terminal"
-lighter fit --config config.yaml # Runs 'fit' stage with overrides defined under 'args.fit'
-lighter validate --config config.yaml # Runs 'validate' stage with overrides under 'args.validate'
+lighter fit --config config.yaml # 'fit' stage with 'args.fit' overrides
+lighter validate --config config.yaml # 'validate' stage with 'args.validate' overrides
 ```
 
-In the `config.yaml` example above:
+In the `config.yaml` example:
 
-*   When you run `lighter fit`, the `trainer.max_epochs` will be overridden to `20`, `trainer.accelerator` to `"gpu"`, and `system.optimizer.lr` to `1.0e-4`.
-*   When you run `lighter validate`, the `trainer.devices` will be overridden to `2`.
+*   `lighter fit`: Overrides `trainer.max_epochs` to `20`, `trainer.accelerator` to `"gpu"`, `system.optimizer.lr` to `1.0e-4`.
+*   `lighter validate`: Overrides `trainer.devices` to `2`.
 
 **Order of Precedence**:
 
-Command-line argument overrides have the **highest precedence**. If you specify a value in the `args` section and also pass a command-line argument that modifies the same value, the command-line argument will take effect.
+CLI overrides have **highest precedence** over `args` section.
 
 **Benefits of CLI Overrides**:
 
-*   **Experiment Flexibility**: Easily modify experiment settings without editing the `config.yaml` file directly.
-*   **Parameter Tuning**: Quickly run parameter sweeps and ablation studies by overriding specific parameters from the command line.
-*   **Stage-Specific Adjustments**: Apply different settings for different stages (e.g., use more devices for validation than training).
+*   **Flexibility**: Modify settings without config file edits.
+*   **Parameter Tuning**: Run sweeps/ablations by overriding CLI parameters.
+*   **Stage-Specific Adjustments**: Stage-specific settings (e.g., more devices for validation).
 
 ## Advanced Configuration Features
 
 Lighter's configuration system offers several advanced features for more complex and flexible experiment setups:
 
-*   **Nested Configurations**: You can create nested dictionaries and lists within your `config.yaml` to organize complex configurations hierarchically.
-*   **References**: You can use references within the config file to reuse values and avoid repetition. (Further documentation on references will be added in future updates).
-*   **Environment Variables**: (Planned) Support for using environment variables within configurations for sensitive information or dynamic settings.
-*   **Custom Resolvers**: (Planned) Ability to define custom resolvers for more advanced configuration logic.
+*   **Nested Configurations**: Organize complex configurations hierarchically using nested dictionaries and lists in `config.yaml`.
+*   **Environment Variables**: (Planned) Support for environment variables in configurations for sensitive/dynamic settings.
+*   **Custom Resolvers**: (Planned) Define custom resolvers for advanced configuration logic.
 
-## Recap: Mastering Lighter's Configuration
+## Recap: Mastering Configuration
 
-Lighter's configuration system is a powerful tool for streamlining your deep learning experiments. By understanding its YAML structure, `_target_` style, stage-specific configurations, validation with Cerberus, and CLI overrides, you can effectively manage complex experiments, enhance reproducibility, and focus on your research goals.
-
-Next, explore the [Adapter System Explanation](../explanation/03_adapter_system.md) to understand how adapters provide further customization in Lighter, or return to the [Explanation section](../explanation/) for more conceptual documentation. You can also refer back to the [How-To guides section](../how-to/) for practical problem-solving guides or the [Tutorials section](../tutorials/) for end-to-end examples.
+Lighter's configuration system streamlines deep learning experiments. YAML structure, `_target_` style, stage-specific configs, Cerberus validation, and CLI overrides enable efficient experiment management, reproducibility, and focused research.

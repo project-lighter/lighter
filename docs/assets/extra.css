@@ -90,27 +90,3 @@
 [data-md-color-scheme="slate"] code {
     font-size: 14px; /* paragraph 16px, rest 14px */
 }
-
-
-
-@media only screen and (min-width: 75.25em) {
-  .md-main__inner {
-    max-width: 1000em;
-  }
-  .md-sidebar--primary {
-    /* max-width: 20em; */
-    left: 0;
-  }
-  .md-sidebar--secondary {
-    /* max-width: 20em; */
-    right: 0;
-    margin-left: 0em;
-    -webkit-transform: none;
-    transform: none;   
-  }
-}
-
-/* 
-.md-grid {
-  max-width: 2000px; 
-} */

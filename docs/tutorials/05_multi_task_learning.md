@@ -547,6 +547,6 @@ In this tutorial, you have learned how to implement multi-task learning with Lig
 *   Configuring metrics and adapters for multi-task learning in `config.yaml`.
 *   Running training and evaluation for a multi-task model using the Lighter CLI.
 
-This tutorial provides a basic example of multi-task learning. You can extend this approach to more complex multi-task scenarios with different tasks, datasets, and model architectures. Explore the [How-To guides](../how-to/) and [Explanation section](../explanation/) for more advanced features and customization options in Lighter.
+This tutorial provides a basic example of multi-task learning. You can extend this approach to more complex multi-task scenarios with different tasks, datasets, and model architectures. Explore the [How-To guides](../how-to/01_custom_project_modules.md) and [Design section](../design/01_overview.md) for more advanced features and customization options in Lighter.
 
 This concludes the Tutorials section. Next, we will proceed with the How-To guides.

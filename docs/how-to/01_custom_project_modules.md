@@ -2,30 +2,47 @@
 
 ## Introduction to Custom Modules
 
-Lighter is designed to be highly extensible, allowing you to seamlessly integrate your own custom modules (e.g., models, datasets, callbacks, metrics) into your deep learning projects. This how-to guide will walk you through the process of using custom modules in Lighter, enabling you to tailor the framework to your specific research or application needs.
+Lighter's extensibility allows seamless integration of your custom modules (e.g., models, datasets, callbacks, metrics). This guide shows how to use them to tailor Lighter to your needs.
 
-Custom modules are Python modules that you create and maintain within your project directory, as opposed to relying solely on built-in Lighter modules or external libraries. Using custom modules offers several advantages:
+Custom modules are Python modules you create within your project, unlike built-in Lighter modules or external libraries. Benefits include:
 
-*   **Encapsulation of Project-Specific Logic**: You can encapsulate your project's unique models, datasets, and other components within dedicated modules, keeping your project code organized and maintainable.
-*   **Code Reusability**: Custom modules can be reused across different experiments and configurations within your project, promoting consistency and reducing code duplication.
-*   **Version Control**: By keeping custom modules within your project, you can easily track changes, collaborate with others, and maintain version control for your project-specific code.
-*   **Flexibility and Extensibility**: Custom modules provide maximum flexibility to extend Lighter's functionality and adapt it to your evolving research directions.
+*   **Encapsulation**: Organize project-specific logic (models, datasets) in dedicated modules for maintainability.
+*   **Reusability**: Reuse custom modules across experiments, reducing code duplication.
+*   **Version Control**: Track changes and collaborate easily with project-local modules.
+*   **Flexibility**: Extend Lighter's functionality to fit your research.
 
 ## Project Structure for Custom Modules
 
-To effectively use custom modules in Lighter, it's recommended to organize your project with a clear directory structure. A typical Lighter project with custom modules might look like this:
+For effective use of custom modules, organize your project clearly. A typical Lighter project structure is:
 
 ```
 my_project/
-├── models/              # Directory for custom model modules
-│   └── my_model.py      # Example custom model definition
-├── datasets/            # Directory for custom dataset modules
-│   └── my_dataset.py    # Example custom dataset definition
-├── callbacks/           # Directory for custom callback modules (optional)
-├── metrics/             # Directory for custom metric modules (optional)
-├── utils/               # Directory for utility modules (optional)
-├── config.yaml          # Lighter configuration file
-└── train.py             # (Optional) Entry point script to run training
+├── config.yaml          
+├── models/             
+│   └── my_model.py     
+├── datasets/           
+│   └── my_dataset.py   
+├── callbacks/          
+├── metrics/            
+└── utils/              
+```
+
+*   **`my_project/`**: Root directory.
+*   **`config.yaml`**: Lighter configuration file.
+*   **`models/`, `datasets/`, `callbacks/`, `metrics/`, `utils/`**: Subdirectories for custom modules (optional).
+
+A text-based tree view of this structure:
+
+```
+my_project/
+├── config.yaml
+├── models/
+│   └── my_model.py
+├── datasets/
+│   └── my_dataset.py
+├── callbacks/
+├── metrics/
+└── utils/
 ```
 
 In this structure:
@@ -48,9 +65,11 @@ import torch.nn as nn
 class MyModel(nn.Module):
     def __init__(self, input_size, num_classes):
         super().__init__()
+        # Define a linear layer
         self.linear = nn.Linear(input_size, num_classes)
 
     def forward(self, x):
+        # Forward pass through the linear layer
         return self.linear(x)
 ```
 
@@ -63,15 +82,16 @@ class MyDataset(Dataset):
     def __init__(self, data_path, transform=None):
         self.data_path = data_path
         self.transform = transform
-        # ... load data from data_path ...
-        self.samples = [...] # List of data samples
+        # Load data from data_path (implementation not shown)
+        self.samples = [...] # List of data samples (replace [...] with actual data loading)
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        # ... preprocess sample ...
+        # Preprocess sample (implementation not shown)
+        # ... 
         if self.transform:
             sample = self.transform(sample)
         return sample
@@ -83,28 +103,28 @@ These are just simple examples. Your custom modules can be as complex as needed 
 
 To use your custom modules in Lighter, you need to reference them in your `config.yaml` file using the `_target_` key. Lighter's dynamic module loading mechanism, powered by the `import_module_from_path` function, will then import and instantiate your custom modules at runtime.
 
-### Specifying the `project` Path
+### Specifying `project` Path
 
-First, you need to tell Lighter where to find your project directory by specifying the `project` key at the top level of your `config.yaml` file. The value of the `project` key should be the path to your project's root directory, relative to the location of the `config.yaml` file itself.
+Specify your project's root directory in `config.yaml` using the `project` key. This tells Lighter where to find your custom modules.
 
-**Example: Specifying `project` Path in `config.yaml`**
+**Example:**
 
 ```yaml title="config.yaml"
-project: my_project/ # Path to the project root directory
+project: my_project/ # Project root path
 ```
 
-### Referencing Custom Modules using `_target_`
+### Referencing Modules with `_target_`
 
-Once you have specified the `project` path, you can reference your custom modules in the configuration using the `_target_` key, followed by the Python module path to your custom module, relative to the project root directory.
+Reference custom modules using `_target_` with the Python path relative to your project root.
 
-**Example: Using Custom Model and Dataset in `config.yaml`**
+**Example:**
 
 ```yaml title="config.yaml"
-project: my_project/ # Project root directory is 'my_project/'
+project: my_project/
 
 system:
   model:
-    _target_: my_project.models.MyModel # Load custom model from 'my_project/models/my_model.py'
+    _target_: project.models.MyModel # Load custom model
     input_size: 784
     num_classes: 10
 
@@ -112,19 +132,14 @@ system:
     train:
       _target_: torch.utils.data.DataLoader
       dataset:
-        _target_: my_project.datasets.MyDataset # Load custom dataset from 'my_project/datasets/my_dataset.py'
+        _target_: project.datasets.MyDataset # Load custom dataset
         data_path: "data/train.csv"
         # ... dataset arguments ...
       batch_size: 32
       shuffle: True
 ```
 
-In this example:
-
-*   `_target_: my_project.models.MyModel` tells Lighter to load the `MyModel` class from the `my_model.py` file located in the `models/` subdirectory within your project directory (`my_project/models/my_model.py`).
-*   `_target_: my_project.datasets.MyDataset` tells Lighter to load the `MyDataset` class from the `my_dataset.py` file located in the `datasets/` subdirectory within your project directory (`my_project/datasets/my_dataset.py`).
-
-Lighter will automatically prepend the `project` path (`my_project/`) to the module paths specified in `_target_` and use the `import_module_from_path` function to dynamically import your custom modules.
+In this setup, `_target_: project.models.MyModel` loads `MyModel` from `my_project/models/my_model.py`. Lighter prepends the `project` path and uses `import_module_from_path` for dynamic import.
 
 ## Running Lighter with Custom Modules
 
@@ -138,16 +153,14 @@ lighter fit --config config.yaml
 
 As long as your `config.yaml` file correctly specifies the `project` path and the `_target_` paths to your custom modules, Lighter will dynamically load and use them during the experiment execution.
 
-## Recap: Integrating Custom Modules into Lighter
+## Recap: Steps to Use Custom Modules
 
-Using custom project modules in Lighter is a straightforward process that involves:
+1.  Organize project with clear directory structure (e.g., subdirectories for modules).
+2.  Define custom modules (models, datasets) as Python files in project directories.
+3.  Specify `project` path in `config.yaml`.
+4.  Reference modules in `config.yaml` using `_target_` with project-relative paths.
+5.  Run Lighter as usual.
 
-1.  **Organizing your project** with a clear directory structure, including subdirectories for custom modules (e.g., `models/`, `datasets/`).
-2.  **Defining your custom modules** (models, datasets, etc.) as Python files within your project directories.
-3.  **Specifying the `project` path** in your `config.yaml` file.
-4.  **Referencing your custom modules** in the `config.yaml` using the `_target_` key with module paths relative to your project root.
-5.  **Running Lighter** with your `config.yaml` file as usual.
+These steps enable seamless integration of custom code, leveraging Lighter's flexibility for customized deep learning systems.
 
-By following these steps, you can seamlessly integrate your project-specific code into Lighter workflows, leveraging the framework's flexibility and extensibility to build powerful and customized deep learning systems.
-
-Next, explore the [How-To guide on Debugging Configuration Errors](02_debugging_config_errors.md) to learn how to troubleshoot common configuration issues, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Debugging Configuration Errors](02_debugging_config_errors.md) to learn how to troubleshoot common configuration issues, or return to the [How-To guides section](../how-to/01_custom_project_modules.md) for more practical problem-solving guides. You can also go back to the [Design section](../design/01_overview.md) for more conceptual documentation or the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.

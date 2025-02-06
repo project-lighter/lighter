@@ -2,14 +2,14 @@
 
 ## Introduction to Dynamic Module Loading
 
-Dynamic module loading is a powerful feature in Lighter that allows you to import and use Python modules (e.g., models, datasets, custom layers) from your own projects **at runtime**, based on the configuration specified in your `config.yaml` file. This means you don't need to modify Lighter's core code to integrate your custom components. Instead, you simply point Lighter to your project and modules in the configuration.
+Lighter's dynamic module loading lets you import and use custom Python modules (e.g., models, datasets) from your projects **at runtime**, based on `config.yaml`. This eliminates modifying Lighter's core to integrate custom components; simply configure your project and modules.
 
-This dynamic loading capability is essential for:
+Dynamic loading is key for:
 
-*   **Extensibility**: Easily extend Lighter with your custom models, datasets, loss functions, metrics, and other components without altering the framework itself.
-*   **Project Integration**: Seamlessly integrate Lighter into existing deep learning projects with custom codebases.
-*   **Modularity**: Organize your project code in a modular way, keeping custom modules separate from Lighter's core.
-*   **Experiment Flexibility**: Quickly switch between different models, datasets, or custom components by simply changing the configuration, without rewriting code.
+*   **Extensibility**: Extend Lighter with custom components without altering the framework.
+*   **Project Integration**: Integrate Lighter into existing projects with custom code.
+*   **Modularity**: Keep custom code separate from Lighter's core for modularity.
+*   **Experiment Flexibility**: Quickly switch components via configuration changes.
 
 ## `import_module_from_path` Function
 
@@ -51,9 +51,10 @@ def import_module_from_path(module_path: str, project_dir: str | None = None):
 
 *   **Path Resolution**: Resolves module paths relative to a `project_dir` if provided, or treats them as absolute paths.
 *   **Dynamic Import**: Uses `importlib.util` to dynamically load the module at runtime.
-*   **Security**: 
-    *   Internally converts paths to absolute paths using `Path(module_path).resolve()` to prevent directory traversal vulnerabilities (e.g., accessing files outside the intended project directory).
-    *   Restricts imports to Python files (`.py`) to mitigate potential risks associated with importing other file types.
+*   **Security**: Lighter prioritizes security in dynamic module loading:
+    *   **Absolute Paths**: Internally converts module paths to absolute paths using `Path(module_path).resolve()`. This prevents directory traversal attacks, ensuring modules are loaded from intended locations within the project.
+    *   **Python Files Only**: Restricts dynamic imports to Python files (`.py`). This mitigates risks from executing other file types.
+    *   **Best Practice**: Load modules only from trusted project directories. Avoid dynamic loading from external or untrusted sources to maintain security and code integrity.
 *   **Error Handling**: Raises informative `ModuleNotFoundError` or `ValueError` exceptions if the module cannot be imported.
 
 ## Dynamic Loading in Lighter Configuration
@@ -114,28 +115,30 @@ When Lighter encounters a `_target_` path that starts with the `project` directo
 
 ## Potential Drawbacks and Considerations
 
-While dynamic module loading offers significant advantages, it's important to be aware of potential drawbacks and considerations:
+While dynamic module loading offers advantages, consider these drawbacks:
 
-1.  **Security**:
+1.  **Debugging Complexity**:
 
-    *   Dynamic code loading inherently carries some security risks if not handled carefully. Lighter's `import_module_from_path` function includes security measures (absolute path resolution, Python file restriction) to mitigate these risks.
-    *   **Best Practice**: Only load modules from trusted project directories and avoid dynamically loading code from external or untrusted sources.
+    *   Dynamic loading can increase debugging complexity.
+    *   **Debugging Tips**:
+        *   **Logging**: Use logging in custom modules and Lighter.
+        *   **Print Statements**: Use `print()` for quick checks.
+        *   **Verify Paths**: Check `project` and `_target_` paths.
+        *   **Python Debugger**: Use debuggers like `pdb` or VS Code.
+        *   **Check Module Existence**: Verify module files exist.
 
-2.  **Debugging Complexity**:
+2.  **Security**:
 
-    *   Dynamic loading can sometimes make debugging slightly more complex, as the code is loaded and executed at runtime based on configuration.
-    *   **Debugging Tips**: 
-        *   Use logging and print statements to trace the module loading process.
-        *   Verify that the `project` path and `_target_` paths in your `config.yaml` are correct.
-        *   Use a Python debugger (e.g., `pdb`, VS Code debugger) to step through the code execution and inspect dynamically loaded modules.
+    *   Dynamic code loading has security risks if not careful.
+    *   **Best Practice**: Load from trusted project directories only.
 
 3.  **Initial Setup**:
 
-    *   Setting up a project with dynamic module loading might require a slightly more structured project organization compared to simpler scripts.
-    *   **Best Practice**: Follow a clear project directory structure (e.g., as shown in the [Custom Project Modules How-To guide](../how-to/custom_project_modules.md)) to keep your custom modules organized and easily accessible to Lighter.
+    *   Dynamic loading needs structured projects.
+    *   **Best Practice**: Use clear project directory structure (see How-To guide).
 
-## Recap: Unleashing Flexibility with Dynamic Module Loading
+## Recap: Dynamic Loading = Flexibility
 
-Dynamic module loading, powered by `import_module_from_path`, is a cornerstone of Lighter's flexibility and extensibility. It empowers you to seamlessly integrate your custom code, organize projects modularly, and experiment with different components effortlessly. By understanding how dynamic loading works and following best practices, you can harness its full potential to streamline your deep learning workflows with Lighter.
+Dynamic module loading, via `import_module_from_path`, is core to Lighter's flexibility and extensibility. It allows seamless custom code integration, modular projects, and effortless experimentation, streamlining deep learning workflows.
 
-Return to the [Explanation section](../explanation/) for more conceptual documentation, or explore the [How-To guides section](../how-to/) for practical problem-solving guides and the [Tutorials section](../tutorials/) for end-to-end examples.
+Return to the [Design section](../design/01_overview.md) for more conceptual documentation, or explore the [How-To guides section](../how-to/01_custom_project_modules.md) for practical problem-solving guides and the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.

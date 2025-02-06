@@ -2,9 +2,9 @@
 
 ## Introduction to Adapters
 
-Adapters are a powerful feature in Lighter that provide a flexible way to customize data handling and argument passing within your deep learning experiments. They act as intermediaries, allowing you to adapt the flow of data and arguments between different components of Lighter without modifying the core framework itself.
+Adapters are a powerful Lighter feature for customizing data handling and argument passing in deep learning experiments. They act as intermediaries, adapting data and argument flow between Lighter components without core framework changes.
 
-This how-to guide will explain the purpose and usage of adapters in Lighter. By understanding and utilizing adapters, you can tailor Lighter to seamlessly integrate with diverse data formats, model architectures, and custom logic, making your experiments more adaptable and maintainable.
+This guide explains adapter purpose and usage, showing how to tailor Lighter for seamless integration with diverse data formats, models, and custom logic, making experiments adaptable and maintainable.
 
 ## Types of Adapters in Lighter
 
@@ -157,4 +157,4 @@ Adapters are a cornerstone of Lighter's flexibility and extensibility. By using 
 
 Mastering adapters empowers you to adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
 
-Next, explore the [How-To guide on Using and Extending Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files, or return to the [How-To guides section](../how-to/) for more practical problem-solving guides. You can also go back to the [Explanation section](../explanation/) for more conceptual documentation or the [Tutorials section](../tutorials/) for end-to-end examples.
+Next, explore the [How-To guide on Using and Extending Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files, or return to the [How-To guides section](../how-to/01_custom_project_modules.md) for more practical problem-solving guides. You can also go back to the [Design section](../design/01_overview.md) for more conceptual documentation or the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.

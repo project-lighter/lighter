@@ -76,11 +76,11 @@ nav:
       - Using and Extending Writers: how-to/05_using_and_extending_writers.md
       - Using Freezer: how-to/06_using_freezer.md
       - Implementing a Custom Inferer: how-to/07_implementing_a_custom_inferer.md
-  - Explanation:
-      - Overview: explanation/01_overview.md
-      - Configuration System: explanation/02_configuration_system.md
-      - Adapter System: explanation/03_adapter_system.md
-      - Dynamic Module Loading: explanation/04_dynamic_module_loading.md
+  - Design:
+      - Overview: design/01_overview.md
+      - Configuration System: design/02_configuration_system.md
+      - Adapter System: design/03_adapter_system.md
+      - Dynamic Module Loading: design/04_dynamic_module_loading.md
   - API Reference: reference/
   
 markdown_extensions:

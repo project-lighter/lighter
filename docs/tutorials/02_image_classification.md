@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Image classification is a fundamental task in computer vision, with applications ranging from image tagging to medical diagnosis. In this tutorial, we will guide you through the process of training an image classification model using Lighter on a standard dataset, CIFAR10. We will cover dataset loading, model definition, configuration setup, training execution, and evaluation.
+Image classification, a core computer vision task with wide applications (image tagging, medical diagnosis), will be explored in this tutorial. We'll train an image classifier using Lighter on CIFAR10, covering dataset loading, model definition, config, training, and evaluation.
 
 ## Dataset: CIFAR10
 
-We will use the [CIFAR10 dataset](https://www.cs.toronto.edu/~kriz/cifar.html), a widely used dataset for image classification. It consists of 60,000 32x32 color images in 10 classes, with 6,000 images per class. There are 50,000 training images and 10,000 test images. The dataset is conveniently available through torchvision.
+We will use CIFAR10, a common image classification dataset. It has 60K 32x32 color images in 10 classes (6K images/class), split into 50K training and 10K test images. Available via torchvision.
 
 ### Loading CIFAR10 with Lighter
 
@@ -36,26 +36,26 @@ system:
 
 Let's break down this configuration:
 
-*   **`_target_: torch.utils.data.DataLoader`**:  Specifies that we are using PyTorch's `DataLoader` for loading the dataset.
-*   **`dataset`**: Defines the dataset itself.
-    *   **`_target_: torchvision.datasets.CIFAR10`**:  Indicates we are using the CIFAR10 dataset from torchvision.
-    *   **`root: .datasets/`**:  Specifies the directory where the dataset will be downloaded or loaded from.
-    *   **`download: true`**:  If the dataset is not found at `root`, it will be downloaded.
-    *   **`train: true`**:  Indicates that we are loading the training set.
-    *   **`transform`**: Defines the data transformations to be applied to the images.
-        *   **`_target_: torchvision.transforms.Compose`**:  Used to chain multiple transforms together.
-        *   **`transforms`**: A list of transforms.
-            *   **`_target_: torchvision.transforms.ToTensor`**: Converts PIL images to PyTorch tensors.
-            *   **`_target_: torchvision.transforms.Normalize`**: Normalizes the image tensors with the specified mean and standard deviation.
-*   **`batch_size: 32`**:  Sets the batch size for training.
-*   **`shuffle: true`**:  Shuffles the training data at the beginning of each epoch.
-*   **`num_workers: 4`**:  Specifies the number of worker processes for data loading (adjust this based on your CPU and system resources).
+*   **`_target_: torch.utils.data.DataLoader`**: PyTorch `DataLoader` for dataset loading.
+*   **`dataset`**: Dataset definition.
+    *   **`_target_: torchvision.datasets.CIFAR10`**: CIFAR10 dataset from torchvision.
+    *   **`root: .datasets/`**: Dataset download/load directory.
+    *   **`download: true`**: Download dataset if not found at `root`.
+    *   **`train: true`**: Load training set.
+    *   **`transform`**: Data transformations.
+        *   **`_target_: torchvision.transforms.Compose`**: Chains transforms.
+        *   **`transforms`**: List of transforms:
+            *   **`_target_: torchvision.transforms.ToTensor`**: PIL images to PyTorch tensors.
+            *   **`_target_: torchvision.transforms.Normalize`**: Normalize tensors (mean/std).
+*   **`batch_size: 32`**: Training batch size.
+*   **`shuffle: true`**: Shuffle data each epoch.
+*   **`num_workers: 4`**: Worker processes for data loading (adjust based on system).
 
 You can similarly define a validation dataloader if needed, by setting `train: false` in the dataset configuration and potentially using a different set of transforms.
 
 ## Model: Simple CNN
 
-For this tutorial, we will use a simple Convolutional Neural Network (CNN) for image classification. You can define this model in a Python file (e.g., `my_project/models/simple_cnn.py`) and then import it into your configuration.
+We will use a simple CNN for image classification. Define this model in `my_project/models/simple_cnn.py` and import in config.
 
 ```python title="my_project/models/simple_cnn.py"
 import torch.nn as nn
@@ -80,11 +80,11 @@ class SimpleCNN(nn.Module):
         return x
 ```
 
-This simple CNN consists of two convolutional layers with ReLU activations and max-pooling, followed by a flattening layer and a fully connected layer for classification.
+Simple CNN: 2 conv layers, ReLU, max-pooling, flatten, FC layer.
 
-### Defining the Model in `config.yaml`
+### Defining Model in `config.yaml`
 
-To use this model in Lighter, you need to specify it in the `system.model` section of your `config.yaml`. Assuming your project structure is set up as described in the [Custom Project Modules How-To guide](../how-to/custom_project_modules.md), you can configure the model as follows:
+To use model, specify in `system.model` section of `config.yaml`. Assuming project setup from [Custom Project Modules How-To guide](../how-to/01_custom_project_modules.md):
 
 ```yaml title="config.yaml"
 system:
@@ -93,7 +93,7 @@ system:
     num_classes: 10 # Matches CIFAR10 classes
 ```
 
-Here, `_target_: my_project.models.simple_cnn.SimpleCNN` tells Lighter to load the `SimpleCNN` class from the `my_project.models.simple_cnn` module. `num_classes: 10` is passed as an argument to the `SimpleCNN` constructor.
+`_target_: my_project.models.simple_cnn.SimpleCNN` loads `SimpleCNN` class. `num_classes: 10` passes argument to constructor.
 
 ## Complete Configuration (`config.yaml`)
 
@@ -229,4 +229,4 @@ In this tutorial, you have successfully trained and evaluated an image classific
 *   Create a complete `config.yaml` file for an image classification experiment.
 *   Execute training and evaluation using the Lighter CLI.
 
-This tutorial provides a solid foundation for building more complex image classification experiments with Lighter. In the next tutorials, we will explore [semantic segmentation](03_semantic_segmentation.md) and [transfer learning](04_transfer_learning.md). You can also refer to the [How-To guides](../how-to/01_custom_project_modules.md) for using custom modules and the [Explanation section](../explanation/01_overview.md) for a deeper understanding of Lighter's design principles.
+This tutorial provides a solid foundation for building more complex image classification experiments with Lighter. In the next tutorials, we will explore [semantic segmentation](03_semantic_segmentation.md) and [transfer learning](04_transfer_learning.md). You can also refer to the [How-To guides](../how-to/01_custom_project_modules.md) for using custom modules and the [Design section](../design/01_overview.md) for a deeper understanding of Lighter's design principles.

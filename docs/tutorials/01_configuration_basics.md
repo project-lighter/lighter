@@ -2,15 +2,15 @@
 
 ## Introduction
 
-In machine learning experiments, managing configurations is crucial for reproducibility and flexibility. Configuration files allow you to define all aspects of your experiment in a declarative manner, from hyperparameters to dataset paths and model architectures. Lighter embraces this philosophy, making configuration the central piece of your workflow. This tutorial will guide you through the fundamentals of Lighter's configuration system, enabling you to effectively customize and manage your experiments.
+Configuration management is key for reproducible and flexible ML experiments. Lighter uses config files to declaratively define experiments, from hyperparameters to models. This tutorial covers Lighter's configuration system fundamentals for effective experiment customization and management.
 
-## Basic Structure of a `config.yaml`
+## Basic Structure of `config.yaml`
 
-Lighter uses YAML files to define experiment configurations. A typical `config.yaml` file is organized into several key sections:
+Lighter uses YAML configs to define experiments. A typical `config.yaml` is organized into key sections:
 
-*   **`trainer`**: Configures the PyTorch Lightning `Trainer`, controlling aspects like accelerators, devices, and callbacks.
-*   **`system`**: Defines the core components of your system, including the model, criterion, optimizer, scheduler, and dataloaders.
-*   **`args`**: Allows you to override configuration values from the command line, providing flexibility for different runs.
+*   **`trainer`**: Configures PL `Trainer` (accelerators, devices, callbacks).
+*   **`system`**: Defines core system components (model, criterion, optimizer, scheduler, dataloaders).
+*   **`args`**: CLI overrides for config values.
 
 Here's a minimal example illustrating the basic structure:
 
@@ -54,19 +54,19 @@ In this example, we define a simple linear model, a cross-entropy loss, and an A
 
 ### Stages in Lighter
 
-Lighter operates with the concept of "stages" - `fit`, `validate`, `test`, and `predict`.  When you run a command like `lighter fit`, Lighter prunes the configuration to only include the relevant sections for the `fit` stage. This ensures that only necessary components are initialized for each stage, optimizing resource usage and clarity.
+Lighter uses "stages" (`fit`, `validate`, `test`, `predict`). When running e.g. `lighter fit`, Lighter prunes config to include only relevant sections for `fit` stage, optimizing resource use and clarity.
 
 ### Command Line Arguments with `args`
 
-The `args` section in the `config.yaml` provides a powerful mechanism to override configuration values directly from the command line. This is particularly useful for hyperparameter tuning or running quick experiments with different settings without modifying the base configuration file. We will explore this in more detail later in this tutorial.
+`args` section in `config.yaml` allows overriding config values from CLI, useful for hyperparameter tuning or quick experiments without config edits. More details later.
 
 ## MONAI Bundle Syntax for Class Instantiation
 
-Lighter adopts the MONAI Bundle configuration style, which offers a concise and flexible way to specify classes and their arguments within the YAML configuration. The key element of this syntax is the `_target_` key.
+Lighter uses MONAI Bundle config style for concise, flexible class specification in YAML. Key element: `_target_` key.
 
-To instantiate any class, you specify its fully qualified name using the `_target_` key, and its constructor arguments as key-value pairs under the same section.
+To instantiate a class, specify its fully qualified name with `_target_` and constructor arguments as key-value pairs.
 
-For example, to define a `torch.optim.Adam` optimizer:
+Example: `torch.optim.Adam` optimizer:
 
 ```yaml
 optimizer:
@@ -75,9 +75,9 @@ optimizer:
     weight_decay: 1.0e-5
 ```
 
-Here, `_target_: torch.optim.Adam` tells Lighter to instantiate the `Adam` class from the `torch.optim` module.  `lr: 0.001` and `weight_decay: 1.0e-5` are passed as arguments to the `Adam` constructor.
+`_target_: torch.optim.Adam` instantiates `Adam` class from `torch.optim` module. `lr` and `weight_decay` are `Adam` constructor arguments.
 
-This syntax extends to all configurable components in Lighter, including models, datasets, transforms, metrics, callbacks, and more.
+Syntax applies to all configurable Lighter components (models, datasets, transforms, etc.).
 
 ### Example: Defining a Model
 
@@ -89,7 +89,7 @@ system:
     num_classes: 10
 ```
 
-This configuration snippet defines a `resnet18` model from `torchvision.models`, setting `pretrained` to `false` and `num_classes` to `10`.
+Config snippet defines `resnet18` model from `torchvision.models`, `pretrained=false`, `num_classes=10`.
 
 ### Example: Defining a Dataset
 
@@ -105,13 +105,13 @@ system:
           _target_: torchvision.transforms.ToTensor
 ```
 
-This defines the CIFAR10 dataset with a `ToTensor` transform.
+Defines CIFAR10 dataset with `ToTensor` transform.
 
 ## Validation with Cerberus
 
-Lighter utilizes [Cerberus](https:// Cerberus.readthedocs.io/en/stable/) for configuration validation. Cerberus is a powerful validation library that ensures your `config.yaml` adheres to a predefined schema. This schema, defined within Lighter, specifies the expected structure and data types for each configuration section.
+Lighter uses [Cerberus](https:// Cerberus.readthedocs.io/en/stable/) for config validation. It ensures `config.yaml` adheres to schema defining expected structure/types.
 
-When you run Lighter, the configuration file is automatically validated against this schema. If any discrepancies are found, Lighter will raise a `ValidationError`, providing informative messages about the invalid parts of your configuration.
+Lighter auto-validates config files. `ValidationError` is raised for discrepancies, with messages for issue fixing.
 
 ### Example Validation Error
 
@@ -130,27 +130,27 @@ ValidationError: Configuration validation failed.
 Path: 'trainer.max_epochs', Error: Must be of integer type
 ```
 
-These validation errors are designed to help you quickly identify and fix issues in your configuration, ensuring that your experiments are set up correctly.
+These validation errors help quickly identify and fix config issues.
 
-## Overriding Configuration from the CLI
+## Overriding Configuration from CLI
 
-Lighter's `args` section in the `config.yaml` allows you to override configuration values directly from the command line. This is incredibly useful for tasks like hyperparameter tuning, running ablation studies, or quickly adjusting settings without modifying your base configuration file.
+Lighter's `args` section in `config.yaml` allows CLI overrides, useful for hyperparameter tuning, ablation studies, and quick adjustments.
 
-The `args` section is structured to mirror the main configuration, allowing you to target specific parameters for overriding.
+`args` section mirrors main config, targeting specific override parameters.
 
 ### Basic Overriding Syntax
 
-To override a value, you use dot notation to specify the path to the parameter you want to change. For example, to override `trainer.max_epochs` to `20` from the command line, you would use:
+Override value using dot notation to specify parameter path. Example: override `trainer.max_epochs` to `20`:
 
 ```bash
 lighter fit config.yaml args.fit.trainer.max_epochs=20
 ```
 
-Here, `args.fit.trainer.max_epochs=20` is appended to the `lighter fit config.yaml` command.  `fit` specifies that this override applies to the `fit` stage.
+`args.fit.trainer.max_epochs=20` appended to `lighter fit config.yaml` command. `fit` specifies override applies to `fit` stage.
 
 ### Overriding Nested Parameters
 
-You can override nested parameters in a similar fashion. For instance, to change the learning rate of the optimizer:
+Override nested parameters similarly. Example: change optimizer learning rate:
 
 ```bash
 lighter fit config.yaml args.fit.system.optimizer.lr=0.01
@@ -158,7 +158,7 @@ lighter fit config.yaml args.fit.system.optimizer.lr=0.01
 
 ### Overriding Multiple Parameters
 
-You can override multiple parameters in a single command by separating the overrides with spaces:
+Override multiple parameters in one command, separated by spaces:
 
 ```bash
 lighter fit config.yaml args.fit.trainer.max_epochs=20 args.fit.system.optimizer.lr=0.01
@@ -166,7 +166,7 @@ lighter fit config.yaml args.fit.trainer.max_epochs=20 args.fit.system.optimizer
 
 ### Structure of the `args` Section
 
-The `args` section in your `config.yaml` should be structured to reflect the stages and sections you want to override. For example:
+`args` section in `config.yaml` should reflect stages and sections for override. Example:
 
 ```yaml title="config.yaml"
 trainer:
@@ -188,17 +188,17 @@ args:
                 lr: 0.01 # Example override for learning rate
 ```
 
-In this `config.yaml`, the `args.fit` section pre-defines potential overrides for the `fit` stage. However, these overrides are only applied if you explicitly specify them in the command line. If you run `lighter fit config.yaml` without any `args` overrides, the values defined in the main `trainer` and `system` sections will be used (e.g., `max_epochs` will be `10`, and `lr` will be `0.001`).
+`args.fit` section pre-defines potential `fit` stage overrides. Applied only if specified in CLI. Without `args` overrides, values from `trainer` and `system` sections are used (e.g., `max_epochs=10`, `lr=0.001`).
 
 ## Advanced Configuration Customization
 
-Lighter's configuration system supports advanced customization options, including nested configurations and references within the config file.
+Lighter config system supports advanced customization: nested configs and references.
 
 ### Nested Configurations
 
-You can create nested configurations to organize your `config.yaml` more effectively. This is particularly useful for complex experiments with many parameters.
+Create nested configs for organized `config.yaml`, useful for complex experiments.
 
-Example of nested configuration:
+Example: nested config:
 
 ```yaml
 system:
@@ -214,13 +214,13 @@ system:
       output_dim: 10
 ```
 
-Here, the `model` section has nested `encoder` and `decoder` configurations, each defining its own class and arguments.
+`model` section has nested `encoder` and `decoder` configs, each defining class/arguments.
 
 ### References within the Config File
 
-Lighter allows you to create references within your `config.yaml` to avoid repetition and improve maintainability. You can reference any parameter defined elsewhere in the configuration file using the syntax `"$@[section]#[parameter_path]"`.
+Lighter allows references in `config.yaml` to avoid repetition and improve maintainability. Reference parameters using syntax `"$@[section]#[parameter_path]"`.
 
-In the basic structure example, we saw this in action:
+Example from basic structure:
 
 ```yaml
 optimizer:
@@ -229,20 +229,20 @@ optimizer:
     lr: 0.001
 ```
 
-`params: "$@system#model.parameters()"` references the parameters of the `model` defined in the `system` section. This ensures that the optimizer is always configured to optimize the correct model parameters.
+`params: "$@system#model.parameters()"` references `model` parameters in `system` section, ensuring optimizer uses correct model parameters.
 
-You can use references to link any part of your configuration, making it more dynamic and less prone to errors.
+Use references to link config parts, making it dynamic and less error-prone.
 
 ## Recap and Next Steps
 
-In this tutorial, you've learned the fundamental aspects of Lighter's configuration system:
+Tutorial: learned Lighter's config system basics:
 
-*   The basic structure of a `config.yaml` file and its key sections.
-*   The MONAI Bundle syntax for instantiating classes using `_target_`.
-*   How Lighter validates configurations using Cerberus and handles validation errors.
-*   How to override configuration values from the command line using the `args` section.
-*   Advanced customization options like nested configurations and references.
+*   Basic `config.yaml` structure, key sections.
+*   MONAI Bundle syntax (`_target_` for class instantiation).
+*   Cerberus validation, error handling.
+*   CLI config overrides (`args` section).
+*   Advanced customization (nested configs, references).
 
-With this knowledge, you are well-equipped to create and customize configuration files for your deep learning experiments in Lighter.
+Equipped to create/customize Lighter configs for DL experiments.
 
-In the next tutorials, we will explore more practical examples, such as [end-to-end image classification](02_image_classification.md) and [semantic segmentation](03_semantic_segmentation.md). You can also refer to the [How-To guides](../how-to/02_debugging_config_errors.md) for debugging common configuration issues and the [Explanation section](../explanation/02_configuration_system.md) for a deeper dive into the configuration system's design.
+Next tutorials: [image classification](02_image_classification.md), [semantic segmentation](03_semantic_segmentation.md). See [How-To guides](../how-to/02_debugging_config_errors.md) for debugging, [Design section](../design/02_configuration_system.md) for deeper dive.

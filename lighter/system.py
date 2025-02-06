@@ -35,7 +35,7 @@ class System(pl.LightningModule):
         criterion: Criterion (loss) function.
         metrics: Metrics for train, val, and test. Supports a single/list/dict of `torchmetrics` metrics.
         dataloaders: Dataloaders for train, val, test, and predict.
-        adapters: TODO
+        adapters: Adapters for batch preparation, criterion argument adaptation, metrics argument adaptation, and logging data adaptation.
         inferer: Inferer to use in val/test/predict modes.
             See MONAI inferers for more details: (https://docs.monai.io/en/stable/inferers.html).
 
