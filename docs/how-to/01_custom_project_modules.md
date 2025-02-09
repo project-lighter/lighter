@@ -4,60 +4,34 @@
 
 Lighter's extensibility allows seamless integration of your custom modules (e.g., models, datasets, callbacks, metrics). This guide shows how to use them to tailor Lighter to your needs.
 
-Custom modules are Python modules you create within your project, unlike built-in Lighter modules or external libraries. Benefits include:
+Custom modules are Python modules you create within your project, unlike Lighter or external libraries' modules. Benefits include:
 
 *   **Encapsulation**: Organize project-specific logic (models, datasets) in dedicated modules for maintainability.
-*   **Reusability**: Reuse custom modules across experiments, reducing code duplication.
-*   **Version Control**: Track changes and collaborate easily with project-local modules.
 *   **Flexibility**: Extend Lighter's functionality to fit your research.
+*   **Prototyping**: Quickly experiment with new ideas by integrating custom modules.
 
-## Project Structure for Custom Modules
+## Project Structure 
 
-For effective use of custom modules, organize your project clearly. A typical Lighter project structure is:
-
-```
-my_project/
-├── config.yaml          
-├── models/             
-│   └── my_model.py     
-├── datasets/           
-│   └── my_dataset.py   
-├── callbacks/          
-├── metrics/            
-└── utils/              
-```
-
-*   **`my_project/`**: Root directory.
-*   **`config.yaml`**: Lighter configuration file.
-*   **`models/`, `datasets/`, `callbacks/`, `metrics/`, `utils/`**: Subdirectories for custom modules (optional).
-
-A text-based tree view of this structure:
+Your project folder can be named and located however and wherever you want. You only need to ensure that any folder that is a Python modules contains `__init__.py`. In the example below, we see that the project root `my_project` contains `__init__.py` file, just like the `models` and `datasets` subdirectories. On the other hand, the `experiments` directory does not contain any Python modules, so it does not need an `__init__.py` file.
 
 ```
 my_project/
-├── config.yaml
+├── __init__.py
 ├── models/
+│   ├── __init__.py
 │   └── my_model.py
 ├── datasets/
+│   ├── __init__.py
 │   └── my_dataset.py
-├── callbacks/
-├── metrics/
-└── utils/
+└── experiments/
+    ├── finetune_full.yaml
+    └── finetune_decoder.yaml
 ```
 
-In this structure:
 
-*   **`my_project/`**: This is the root directory of your Lighter project. You can name it according to your project's purpose.
-*   **`models/`**, **`datasets/`**, **`callbacks/`**, **`metrics/`**, **`utils/`**: These are subdirectories within your project where you can organize your custom Python modules based on their type (models, datasets, callbacks, metrics, utility functions, etc.). You can create or omit these directories as needed, depending on your project's complexity and the types of custom modules you are using.
-*   **`my_model.py`**, **`my_dataset.py`**, etc.: These are example Python files where you define your custom classes, functions, and logic for models, datasets, etc. You can create multiple Python files within each subdirectory to further organize your custom modules.
-*   **`config.yaml`**: This is your Lighter configuration file, where you will specify how to use your custom modules.
-*   **`train.py`** (optional): This is an optional entry point script that you can create to run your Lighter training workflows. You can also run Lighter directly from the command line using `lighter fit config.yaml`.
+## Defining Project Modules
 
-## Defining Custom Modules
-
-Within the module directories (e.g., `models/`, `datasets/`), you define your custom Python modules as regular Python files (`.py`). Each file can contain one or more classes, functions, and variables, depending on your needs.
-
-**Example: Custom Model (`my_project/models/my_model.py`)**
+Within the module directories (e.g., `models/`, `datasets/`), you define your custom Python modules as regular Python files (`.py`). Let's define a custom model `MyModel` in `my_model.py`
 
 ```python title="my_project/models/my_model.py"
 import torch.nn as nn
@@ -73,7 +47,7 @@ class MyModel(nn.Module):
         return self.linear(x)
 ```
 
-**Example: Custom Dataset (`my_project/datasets/my_dataset.py`)**
+and a custom dataset `MyDataset` in `my_dataset.py`:
 
 ```python title="my_project/datasets/my_dataset.py"
 from torch.utils.data import Dataset
@@ -97,11 +71,9 @@ class MyDataset(Dataset):
         return sample
 ```
 
-These are just simple examples. Your custom modules can be as complex as needed for your project.
+## Importing Project Modules in the Config
 
-## Importing Custom Modules in `config.yaml`
-
-To use your custom modules in Lighter, you need to reference them in your `config.yaml` file using the `_target_` key. Lighter's dynamic module loading mechanism, powered by the `import_module_from_path` function, will then import and instantiate your custom modules at runtime.
+To use your project's modules in Lighter, you need to define it in your config. Lighter's dynamic module loading mechanism, powered by the [`import_module_from_path`](../../reference/utils/dynamic_imports/#lighter.utils.dynamic_imports.import_module_from_path) function, will then import that folder as a module named `project`.
 
 ### Specifying `project` Path
 
@@ -113,18 +85,18 @@ Specify your project's root directory in `config.yaml` using the `project` key. 
 project: my_project/ # Project root path
 ```
 
-### Referencing Modules with `_target_`
+### Referencing Project Modules
 
-Reference custom modules using `_target_` with the Python path relative to your project root.
+Reference your projects modules just like you reference any other module. For example, look at `system#model` and `system#dataloaders#train#dataset`:
 
 **Example:**
 
-```yaml title="config.yaml"
+```yaml title="config.yaml" hl_lines="5 13"
 project: my_project/
 
 system:
   model:
-    _target_: project.models.MyModel # Load custom model
+    _target_: project.models.MyModel
     input_size: 784
     num_classes: 10
 
@@ -132,14 +104,13 @@ system:
     train:
       _target_: torch.utils.data.DataLoader
       dataset:
-        _target_: project.datasets.MyDataset # Load custom dataset
+        _target_: project.datasets.MyDataset
         data_path: "data/train.csv"
         # ... dataset arguments ...
       batch_size: 32
       shuffle: True
 ```
 
-In this setup, `_target_: project.models.MyModel` loads `MyModel` from `my_project/models/my_model.py`. Lighter prepends the `project` path and uses `import_module_from_path` for dynamic import.
 
 ## Running Lighter with Custom Modules
 

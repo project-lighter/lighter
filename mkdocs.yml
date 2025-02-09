@@ -15,7 +15,7 @@ theme:
     - content.tooltips
     - footnotes
     - navigation.tabs
-    - navigation.tabs.sticky
+    - navigation.top
 
   palette:
     # Palette toggle for automatic mode

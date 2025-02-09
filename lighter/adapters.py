@@ -258,7 +258,7 @@ class CriterionAdapter(_ArgumentsAndTransformsAdapter):
         Applies transforms and adapts arguments before calling the provided metric function.
 
         Args:
-            crietion: The criterion (loss function).
+            criterion: The criterion (loss function).
             input: The input data to transform with `input_transforms` if specified and pass to the metric with
                 the position or argument name specified by `input_argument`.
             target: The target data to transform with `target_transforms` if specified and pass to the metric with

@@ -1,16 +1,13 @@
 # Configuration Basics
 
-## Introduction
+## Config Structure
 
-Configuration management is key for reproducible and flexible ML experiments. Lighter uses config files to declaratively define experiments, from hyperparameters to models. This tutorial covers Lighter's configuration system fundamentals for effective experiment customization and management.
+### Mandatory Sections
 
-## Basic Structure of `config.yaml`
+Lighter uses YAML configs to define experiments. A typical config is organized into two mandatory sections:
 
-Lighter uses YAML configs to define experiments. A typical `config.yaml` is organized into key sections:
-
-*   **`trainer`**: Configures PL `Trainer` (accelerators, devices, callbacks).
-*   **`system`**: Defines core system components (model, criterion, optimizer, scheduler, dataloaders).
-*   **`args`**: CLI overrides for config values.
+*   **`trainer`**: Configures [`Trainer` (PyTorch Lightning)](https://lightning.ai/docs/pytorch/stable/common/trainer.html).
+*   **`system`**: Defines [`System` (Lighter)](../../reference/system/#lighter.system.System) that encapsulates components such as model, criterion, optimizer, or dataloaders.
 
 Here's a minimal example illustrating the basic structure:
 
@@ -38,6 +35,8 @@ system:
     dataloaders:
         train:
             _target_: torch.utils.data.DataLoader
+            batch_size: 32
+            shuffle: True
             dataset:
                 _target_: torch.utils.data.TensorDataset
                 tensors:
@@ -47,202 +46,178 @@ system:
                       low: 0
                       high: 10
                       size: [1000]
-            batch_size: 32
 ```
 
 In this example, we define a simple linear model, a cross-entropy loss, and an Adam optimizer. The `dataloaders` section sets up a basic training dataloader using random tensors.
 
-### Stages in Lighter
 
-Lighter uses "stages" (`fit`, `validate`, `test`, `predict`). When running e.g. `lighter fit`, Lighter prunes config to include only relevant sections for `fit` stage, optimizing resource use and clarity.
+### Optional Sections
 
-### Command Line Arguments with `args`
+In addition to mandatory `trainer` and `system` sections, you can include the following optional sections: 
 
-`args` section in `config.yaml` allows overriding config values from CLI, useful for hyperparameter tuning or quick experiments without config edits. More details later.
+*   **`_requires_`**: Evaluated before the rest of the config. Useful for importing modules used by Python expressions in the config as explained in [Evaluating Python Expressions](#evaluating-python-expressions).
+*   **`vars`**: Store variables for use in other parts of the config. Useful to avoid repetition and easily update values. See [Referencing Other Components](#referencing-other-components).
+*   **`args`**: Arguments to pass to the the stage of the experiment being run. See [Stages](#stages).
+*   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Custom Project Modules](../how-to/01_custom_project_modules.md).
 
-## MONAI Bundle Syntax for Class Instantiation
 
-Lighter uses MONAI Bundle config style for concise, flexible class specification in YAML. Key element: `_target_` key.
+## Stages
 
-To instantiate a class, specify its fully qualified name with `_target_` and constructor arguments as key-value pairs.
+Lighter operates in *stages*: `fit`, `validate`, `test`, `predict`, `lr_find`, and `scale_batch_size`.
 
-Example: `torch.optim.Adam` optimizer:
+If you're familiar with PyTorch Lightning, you will notice that the stages correspond to methods from `Trainer` (`fit`, `validate`, `test`, `predict`) and `Tuner` (`lr_find`, `scale_batch_size`). For reference, see the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.trainer.trainer.Trainer.html#lightning.pytorch.trainer.trainer.Trainer) and [Tuner](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.tuner.tuning.Tuner.html#lightning.pytorch.tuner.tuning.Tuner) documentation.
+
+To pass arguments to a stage, use the `args` section in in your config. For example, to set the `ckpt_path` argument of the `fit` stage/method in your config:
 
 ```yaml
-optimizer:
-    _target_: torch.optim.Adam
-    lr: 0.001
-    weight_decay: 1.0e-5
+args:
+    fit:
+        ckpt_path: "path/to/checkpoint.ckpt"
+
+# ... Rest of the config
 ```
 
-`_target_: torch.optim.Adam` instantiates `Adam` class from `torch.optim` module. `lr` and `weight_decay` are `Adam` constructor arguments.
+or pass/override it from the command line:
 
-Syntax applies to all configurable Lighter components (models, datasets, transforms, etc.).
+```bash
+lighter fit experiment.yaml --args#fit#ckpt_path="path/to/checkpoint.ckpt"
+```
 
-### Example: Defining a Model
+## Config Syntax
 
-```yaml
-system:
-  model:
+Lighter relies on [MONAI Bundle configuration system](https://docs.monai.io/en/stable/config_syntax.html) to define and instantiate its components in a clear, modular fashion. This system allows you to separate your code from configuration details by specifying classes, functions, and their initialization parameters in YAML.
+
+### Instantiating a Class
+
+To create an instance of a class, use the `_target_` key with the fully qualified name of the class, and list its constructor arguments as key-value pairs. This approach is used for all configurable Lighter components (models, datasets, transforms, optimizers, etc.).
+
+Example:
+
+```yaml hl_lines="2"
+model:
     _target_: torchvision.models.resnet18
-    pretrained: false
+    pretrained: False
     num_classes: 10
 ```
 
-Config snippet defines `resnet18` model from `torchvision.models`, `pretrained=false`, `num_classes=10`.
+Here, `_target_: torchvision.models.resnet18` directs Lighter to instantiate the `resnet18` model from the `torchvision.models` module using `pretrained` and `num_classes` as constructor arguments. This is equivalent to `torchvision.models.resnet18(pretrained=False, num_classes=10)` in Python.
 
-### Example: Defining a Dataset
+### Referencing Other Components
 
-```yaml
+Referencing can be achieved either using `%` or `@`.
+
+- `%` textually replaces the reference with the YAML value that it points to.
+
+- `@` replaces the reference with the Python evaluated value that it points to.
+
+To understand the difference, consider the following example:
+
+```yaml hl_lines="4 8"
 system:
-  dataloaders:
-    train:
-      dataset:
-        _target_: torchvision.datasets.CIFAR10
-        root: .datasets/
-        download: true
-        transform:
-          _target_: torchvision.transforms.ToTensor
+# ...
+    metrics:
+        train:
+            - _target_: torchmetrics.classification.AUROC
+              task: binary
+        # Or use relative referencing "%#train" for the same effect 
+        val: "%system#metrics#train" # (1)!
 ```
 
-Defines CIFAR10 dataset with `ToTensor` transform.
+1.  Reference to the same definition as `train`, not the same instance.
 
-## Validation with Cerberus
+In this example, `val: "%system#metrics#train"` creates a new instance of `torchmetrics.classification.AUROC` metric with the same definition as the referenced `train` metric. This is because `%` is a textual reference, and the reference is replaced with the YAML value it points to. If we used `@` instead of `%`, both `train` and `val` would point to the same instance of `AUROC`, which is not the desired behavior.
 
-Lighter uses [Cerberus](https:// Cerberus.readthedocs.io/en/stable/) for config validation. It ensures `config.yaml` adheres to schema defining expected structure/types.
-
-Lighter auto-validates config files. `ValidationError` is raised for discrepancies, with messages for issue fixing.
-
-### Example Validation Error
-
-Let's say you incorrectly specify `max_epochs` as a string instead of an integer in your `config.yaml`:
-
-```yaml
-trainer:
-    _target_: pytorch_lightning.Trainer
-    max_epochs: "string"  # Incorrect type - should be an integer
-```
-
-Running Lighter with this configuration will result in a `ValidationError` similar to:
-
-```
-ValidationError: Configuration validation failed.
-Path: 'trainer.max_epochs', Error: Must be of integer type
-```
-
-These validation errors help quickly identify and fix config issues.
-
-## Overriding Configuration from CLI
-
-Lighter's `args` section in `config.yaml` allows CLI overrides, useful for hyperparameter tuning, ablation studies, and quick adjustments.
-
-`args` section mirrors main config, targeting specific override parameters.
-
-### Basic Overriding Syntax
-
-Override value using dot notation to specify parameter path. Example: override `trainer.max_epochs` to `20`:
-
-```bash
-lighter fit config.yaml args.fit.trainer.max_epochs=20
-```
-
-`args.fit.trainer.max_epochs=20` appended to `lighter fit config.yaml` command. `fit` specifies override applies to `fit` stage.
-
-### Overriding Nested Parameters
-
-Override nested parameters similarly. Example: change optimizer learning rate:
-
-```bash
-lighter fit config.yaml args.fit.system.optimizer.lr=0.01
-```
-
-### Overriding Multiple Parameters
-
-Override multiple parameters in one command, separated by spaces:
-
-```bash
-lighter fit config.yaml args.fit.trainer.max_epochs=20 args.fit.system.optimizer.lr=0.01
-```
-
-### Structure of the `args` Section
-
-`args` section in `config.yaml` should reflect stages and sections for override. Example:
-
-```yaml title="config.yaml"
-trainer:
-    _target_: pytorch_lightning.Trainer
-    max_epochs: 10
-
+On the other hand, when defining a scheduler, we want to reference the instantiated optimizer. In this case, we use `@`:
+```yaml hl_lines="5"
 system:
-    _target_: lighter.System
-    optimizer:
-        _target_: torch.optim.Adam
-        lr: 0.001
-
-args:
-    fit: # Overrides for the 'fit' stage
-        trainer:
-            max_epochs: 20 # Example override for max_epochs
-        system:
-            optimizer:
-                lr: 0.01 # Example override for learning rate
+# ...
+    scheduler:
+        _target_: torch.optim.lr_scheduler.StepLR
+        optimizer: "@system#optimizer" # (1)!
+        step_size: 1
 ```
 
-`args.fit` section pre-defines potential `fit` stage overrides. Applied only if specified in CLI. Without `args` overrides, values from `trainer` and `system` sections are used (e.g., `max_epochs=10`, `lr=0.001`).
+1.  Reference to the instantiated optimizer.
 
-## Advanced Configuration Customization
+### Evaluating Python Expressions
 
-Lighter config system supports advanced customization: nested configs and references.
+Sometimes, you may need to evaluate Python expressions in your config. To indicate that, use `$` before the expression.
+For example, we can dinamically define the `min_lr` of a `scheduler` to a fraction of `optimizer#lr`:
 
-### Nested Configurations
-
-Create nested configs for organized `config.yaml`, useful for complex experiments.
-
-Example: nested config:
-
-```yaml
+```yaml hl_lines="6"
 system:
-  model:
-    _target_: my_project.models.ComplexModel
-    encoder:
-      _target_: my_project.models.Encoder
-      num_layers: 4
-      hidden_dim: 256
-    decoder:
-      _target_: my_project.models.Decoder
-      num_layers: 2
-      output_dim: 10
+# ...
+    scheduler:
+        _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+        optimizer: "@system#optimizer"
+        end_lr: "$@system#optimizer#lr * 0.1" # (1)!
 ```
 
-`model` section has nested `encoder` and `decoder` configs, each defining class/arguments.
+1.  `$` denotes that the expression should be run as Python code.
 
-### References within the Config File
 
-Lighter allows references in `config.yaml` to avoid repetition and improve maintainability. Reference parameters using syntax `"$@[section]#[parameter_path]"`.
+**Note:** you will regularly use the combination of evaluation and referencing to pass `model.parameters()` to your optimizer:
 
-Example from basic structure:
-
-```yaml
+```yaml hl_lines="3"
 optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()" # Reference to model parameters
+    params: "$@system#model.parameters()" # (1)!
     lr: 0.001
 ```
 
-`params: "$@system#model.parameters()"` references `model` parameters in `system` section, ensuring optimizer uses correct model parameters.
+1. It first fetches the evaluated `"system#model"`, and then runs `.parameters()` on it, as indicated by the `"$"` prefix.
 
-Use references to link config parts, making it dynamic and less error-prone.
+!!! note "Difference between `#` and `.`"
+
+    Use `#` to reference elements of the config, and `.` to access attributes/methods of Python objects. For example, `"$@system#model.parameters()"` fetches the model instance from `@system#model` and runs `.parameters()` on it as indicated by `$`.
+
+
+### Overriding Config from CLI
+
+Any parameter in the config can be overridden from the command line. For example, to change `max_epochs` in `trainer` from `10` to `20`:
+
+```bash
+lighter fit config.yaml --trainer#max_epochs=20
+```
+
+To override an element of a list, simply refer its index:
+
+```bash
+lighter fit config.yaml --trainer#callbacks#1#monitor="val_loss"
+```
+```yaml title="config.yaml"
+trainer:
+    max_epochs: 10
+    callbacks:
+        - _target_: pytorch_lightning.callbacks.EarlyStopping
+          monitor: val_acc
+        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+          monitor: val_acc
+# ...
+```
+
+### Merging Configs
+
+You can merge multiple configs by combining them with `,`. For example, to merge two configs `config1.yaml` and `config2.yaml`:
+
+```bash
+lighter fit config1.yaml,config2.yaml
+```
+
+This will merge the two configs, with the second config overriding any conflicting parameters from the first one.
 
 ## Recap and Next Steps
 
-Tutorial: learned Lighter's config system basics:
+This section covered the fundamental aspects of configuring experiments with Lighter using YAML files.  Key takeaways include:
 
-*   Basic `config.yaml` structure, key sections.
-*   MONAI Bundle syntax (`_target_` for class instantiation).
-*   Cerberus validation, error handling.
-*   CLI config overrides (`args` section).
-*   Advanced customization (nested configs, references).
+*   **Structure:** Lighter configs are structured into mandatory `trainer` and `system` sections, with optional sections like `_requires_`, `vars`, `args`, and `project`.
+*   **Stages:** Lighter operates in stages (e.g., `fit`, `validate`, `test`), each configurable via the `args` section.
+*   **Config Syntax:** Lighter leverages the MONAI Bundle configuration system, using `_target_` to instantiate classes and key-value pairs for arguments.
+*   **Referencing:** Components can be referenced using `%` (textual replacement) or `@` (evaluated Python value).  Understanding the difference is crucial for correct instantiation and interaction of components.
+*   **Python Expressions:** Python expressions can be evaluated within the config using `$`. This is frequently used in conjunction with referencing (e.g., `"$@system#model.parameters()"`).
+*   **CLI Overrides:** Any config parameter can be overridden from the command line, providing flexibility for experimentation.
+*   **Config Merging:** Multiple configs can be merged using commas, allowing for modularity and reuse.
 
-Equipped to create/customize Lighter configs for DL experiments.
+By mastering these configuration basics, you can effectively define and manage your Lighter experiments.
 
 Next tutorials: [image classification](02_image_classification.md), [semantic segmentation](03_semantic_segmentation.md). See [How-To guides](../how-to/02_debugging_config_errors.md) for debugging, [Design section](../design/02_configuration_system.md) for deeper dive.

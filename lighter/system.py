@@ -182,7 +182,6 @@ class System(pl.LightningModule):
         Args:
             name (str): key to log.
             value (Any): value to log.
-            batch_size (int): batch size.
             on_step (bool, optional): if True, logs on step.
             on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
         """
