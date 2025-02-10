@@ -1,63 +1,92 @@
-# End-to-End Image Classification
+# Image Classification
 
-## Introduction
+In this tutorial we will learn how to:
 
-Image classification, a core computer vision task with wide applications (image tagging, medical diagnosis), will be explored in this tutorial. We'll train an image classifier using Lighter on CIFAR10, covering dataset loading, model definition, config, training, and evaluation.
+1. Set up the project folder
+2. Implement a custom CNN model
+3. Define the config for training and testing on CIFAR10 dataset
+4. Train and test the model using Lighter
 
-## Dataset: CIFAR10
+## Setting up the Project
 
-We will use CIFAR10, a common image classification dataset. It has 60K 32x32 color images in 10 classes (6K images/class), split into 50K training and 10K test images. Available via torchvision.
-
-### Loading CIFAR10 with Lighter
-
-To use CIFAR10 in Lighter, you need to configure the `dataloaders` section in your `config.yaml`. Here's how you can define the training dataloader:
-
-```yaml title="config.yaml"
-system:
-  dataloaders:
-    train:
-      _target_: torch.utils.data.DataLoader
-      dataset:
-        _target_: torchvision.datasets.CIFAR10
-        root: .datasets/
-        download: true
-        train: true
-        transform:
-          _target_: torchvision.transforms.Compose
-          transforms:
-            - _target_: torchvision.transforms.ToTensor
-            - _target_: torchvision.transforms.Normalize
-              mean: [0.5, 0.5, 0.5]
-              std: [0.5, 0.5, 0.5]
-      batch_size: 32
-      shuffle: true
-      num_workers: 4 # Adjust based on your system
+First, create a new project directory named `image_classification` with the following structure:
+    
+```plaintext
+image_classification/
+├── __init__.py
+├── config.yaml
+└── models/
+    ├── __init__.py
+    └── simple_cnn.py
 ```
 
-Let's break down this configuration:
+!!! warning
 
-*   **`_target_: torch.utils.data.DataLoader`**: PyTorch `DataLoader` for dataset loading.
-*   **`dataset`**: Dataset definition.
-    *   **`_target_: torchvision.datasets.CIFAR10`**: CIFAR10 dataset from torchvision.
-    *   **`root: .datasets/`**: Dataset download/load directory.
-    *   **`download: true`**: Download dataset if not found at `root`.
-    *   **`train: true`**: Load training set.
-    *   **`transform`**: Data transformations.
-        *   **`_target_: torchvision.transforms.Compose`**: Chains transforms.
-        *   **`transforms`**: List of transforms:
-            *   **`_target_: torchvision.transforms.ToTensor`**: PIL images to PyTorch tensors.
-            *   **`_target_: torchvision.transforms.Normalize`**: Normalize tensors (mean/std).
-*   **`batch_size: 32`**: Training batch size.
-*   **`shuffle: true`**: Shuffle data each epoch.
-*   **`num_workers: 4`**: Worker processes for data loading (adjust based on system).
+    Do not forget the `__init__.py` files. For more details, refer to the [Custom Project Modules](../how-to/01_custom_project_modules.md) guide.
 
-You can similarly define a validation dataloader if needed, by setting `train: false` in the dataset configuration and potentially using a different set of transforms.
+## Setting up Dataloaders
 
-## Model: Simple CNN
+`system`'s `dataloaders` section defines dataloaders for `train`, `val`, `test`, and `predict` stages. Let's start by configuring the training dataloader for CIFAR10.
 
-We will use a simple CNN for image classification. Define this model in `my_project/models/simple_cnn.py` and import in config.
+!!! note
+    The complete configuration is provided [few sections later](#complete-configuration).
 
-```python title="my_project/models/simple_cnn.py"
+```yaml
+system:
+# ...
+    dataloaders:
+        train:
+            _target_: torch.utils.data.DataLoader
+            batch_size: 32
+            shuffle: True
+            num_workers: 4
+            dataset:
+                _target_: torchvision.datasets.CIFAR10
+                root: cifar10/
+                download: True
+                train: True
+                transform:
+                _target_: torchvision.transforms.Compose
+                transforms:
+                    - _target_: torchvision.transforms.ToTensor
+                    - _target_: torchvision.transforms.Normalize
+                      mean: [0.5, 0.5, 0.5]
+                      std: [0.5, 0.5, 0.5]
+```
+
+This is equivalent to the following Python code:
+
+```python
+import torch
+import torchvision
+
+transforms = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
+
+train_dataset = torchvision.datasets.CIFAR10(
+    root="cifar10/",
+    download=True,
+    train=True,
+    transform=transforms
+)
+
+train_dataloader = torch.utils.data.DataLoader(
+    train_dataset,
+    batch_size=32,
+    shuffle=True,
+    num_workers=4
+)
+```
+
+## Setting up the Model
+
+### Defining a Custom Model
+
+We will use a simple CNN for image classification. Define this model in `image_classification/models/simple_cnn.py`.
+
+```python title="image_classification/models/simple_cnn.py"
 import torch.nn as nn
 
 class SimpleCNN(nn.Module):
@@ -80,123 +109,104 @@ class SimpleCNN(nn.Module):
         return x
 ```
 
-Simple CNN: 2 conv layers, ReLU, max-pooling, flatten, FC layer.
+### Reference the Custom Model in `config.yaml`
 
-### Defining Model in `config.yaml`
+Now that we have defined the model, let's specify it in the `config.yaml` file.
 
-To use model, specify in `system.model` section of `config.yaml`. Assuming project setup from [Custom Project Modules How-To guide](../how-to/01_custom_project_modules.md):
+```yaml title="config.yaml" hl_lines="1 5"
+project: /full/path/to/image_classification
 
-```yaml title="config.yaml"
 system:
   model:
-    _target_: my_project.models.simple_cnn.SimpleCNN
-    num_classes: 10 # Matches CIFAR10 classes
+    _target_: project.models.simple_cnn.SimpleCNN
+    num_classes: 10  # Matches CIFAR10 classes
 ```
 
-`_target_: my_project.models.simple_cnn.SimpleCNN` loads `SimpleCNN` class. `num_classes: 10` passes argument to constructor.
+The `project` section tells Lighter where to import the project module from. This allows us to use our `SimpleCNN` class by referencing `project.models.simple_cnn.SimpleCNN`.
 
-## Complete Configuration (`config.yaml`)
 
-Now, let's put together the complete `config.yaml` file for training the SimpleCNN on CIFAR10:
+## Complete Configuration
+
+Now, let's put together the complete `config.yaml` file for training the `SimpleCNN` on CIFAR10:
 
 ```yaml title="config.yaml"
+project: /full/path/to/image_classification
+
 trainer:
-  accelerator: "auto" # Use GPU if available, else CPU
-  max_epochs: 10
+    _target_: pytorch_lightning.Trainer
+    accelerator: "auto" # Use GPU if available, else CPU
+    max_epochs: 10
 
 system:
-  _target_: lighter.System
+    _target_: lighter.System
 
-  model:
-    _target_: my_project.models.simple_cnn.SimpleCNN
-    num_classes: 10
-
-  criterion:
-    _target_: torch.nn.CrossEntropyLoss
-
-  optimizer:
-    _target_: torch.optim.Adam
-    lr: 1.0e-3
-
-  metrics:
-    train:
-      - _target_: torchmetrics.Accuracy
-        task: "multiclass"
-        num_classes: 10
-    val:
-      - _target_: torchmetrics.Accuracy
-        task: "multiclass"
-        num_classes: 10
-    test:
-      - _target_: torchmetrics.Accuracy
-        task: "multiclass"
+    model:
+        _target_: project.models.simple_cnn.SimpleCNN
         num_classes: 10
 
-  dataloaders:
-    train:
-      _target_: torch.utils.data.DataLoader
-      dataset:
-        _target_: torchvision.datasets.CIFAR10
-        root: .datasets/
-        download: true
-        train: true
-        transform:
-          _target_: torchvision.transforms.Compose
-          transforms:
-            - _target_: torchvision.transforms.ToTensor
-            - _target_: torchvision.transforms.Normalize
-              mean: [0.5, 0.5, 0.5]
-              std: [0.5, 0.5, 0.5]
-      batch_size: 32
-      shuffle: true
-      num_workers: 4
-    val: # Optional validation dataloader
-      _target_: torch.utils.data.DataLoader
-      dataset:
-        _target_: torchvision.datasets.CIFAR10
-        root: .datasets/
-        download: true
-        train: false # Load validation set (test set of CIFAR10)
-        transform: # Use the same transforms as training, or define different ones
-          _target_: torchvision.transforms.Compose
-          transforms:
-            - _target_: torchvision.transforms.ToTensor
-            - _target_: torchvision.transforms.Normalize
-              mean: [0.5, 0.5, 0.5]
-              std: [0.5, 0.5, 0.5]
-      batch_size: 32
-      num_workers: 4
-    test: # Optional test dataloader (you can also use 'lighter validate' on val dataloader)
-      _target_: torch.utils.data.DataLoader
-      dataset:
-        _target_: torchvision.datasets.CIFAR10
-        root: .datasets/
-        download: true
-        train: false # Load test set (test set of CIFAR10)
-        transform: # Use the same transforms as training, or define different ones
-          _target_: torchvision.transforms.Compose
-          transforms:
-            - _target_: torchvision.transforms.ToTensor
-            - _target_: torchvision.transforms.Normalize
-              mean: [0.5, 0.5, 0.5]
-              std: [0.5, 0.5, 0.5]
-      batch_size: 32
-      num_workers: 4
+    criterion:
+        _target_: torch.nn.CrossEntropyLoss
+
+    optimizer:
+        _target_: torch.optim.Adam
+        lr: 1.0e-3
+
+    metrics:
+        train:
+            - _target_: torchmetrics.Accuracy
+              task: "multiclass"
+              num_classes: 10
+        test: "%#train"
+
+    dataloaders:
+        train:
+            _target_: torch.utils.data.DataLoader
+            batch_size: 32
+            shuffle: True
+            num_workers: 4
+            dataset:
+                _target_: torchvision.datasets.CIFAR10
+                root: cifar10/
+                download: True
+                train: True
+                transform:
+                    _target_: torchvision.transforms.Compose
+                    transforms:
+                        - _target_: torchvision.transforms.ToTensor
+                        - _target_: torchvision.transforms.Normalize
+                          mean: [0.5, 0.5, 0.5]
+                          std: [0.5, 0.5, 0.5]
+        test:
+            _target_: torch.utils.data.DataLoader
+            batch_size: 32
+            num_workers: 4
+            dataset:
+                _target_: torchvision.datasets.CIFAR10
+                root: cifar10/
+                download: True
+                train: False
+                transform:
+                    _target_: torchvision.transforms.Compose
+                    transforms:
+                        - _target_: torchvision.transforms.ToTensor
+                        - _target_: torchvision.transforms.Normalize
+                          mean: [0.5, 0.5, 0.5]
+                          std: [0.5, 0.5, 0.5]
 ```
 
-This configuration defines all the necessary components for training, validation, and testing:
+This configuration defines all the necessary components for training and testing:
 
 *   **`trainer`**: Configures the PyTorch Lightning Trainer to use automatic accelerator selection and train for a maximum of 10 epochs.
 *   **`system`**: Defines the Lighter System.
-    *   **`model`**: Specifies the `SimpleCNN` model.
+    *   **`model`**: Specifies the `SimpleCNN` model, a custom model you defined in `image_classification/models/simple_cnn.py`.
     *   **`criterion`**: Sets the loss function to `CrossEntropyLoss`.
     *   **`optimizer`**: Uses the `Adam` optimizer with a learning rate of 1.0e-3.
-    *   **`metrics`**: Defines accuracy metrics for training, validation, and testing stages.
-    *   **`dataloaders`**: Configures `DataLoader`s for `train`, `val`, and `test` stages, using the CIFAR10 dataset and appropriate transforms.
+    *   **`metrics`**: Defines accuracy metrics for training and testing stages.
+    *   **`dataloaders`**: Configures `DataLoader`s for `train` and `test` stages, using the CIFAR10 dataset and appropriate transforms.
 
 ## Training Execution
 
-To start training, save the above configuration as `config.yaml` in your project directory. Ensure that you have created the `my_project/models/simple_cnn.py` file as well. Then, open your terminal, navigate to your project directory, and run the following command:
+To start training, save the above configuration as `config.yaml` in your project directory. Ensure that you have created the `image_classification/models/simple_cnn.py` file as well. Then, open your terminal, navigate to your project directory, and run the following command:
 
 ```bash title="Terminal"
 lighter fit --config config.yaml
@@ -206,19 +216,13 @@ Lighter will parse your `config.yaml`, initialize all the components, and start 
 
 ## Evaluation
 
-After training, you can evaluate your model on the validation or test set. To run validation, use:
-
-```bash title="Terminal"
-lighter validate --config config.yaml
-```
-
-Or, to run testing:
+After training, you can evaluate your model on the test set:
 
 ```bash title="Terminal"
 lighter test --config config.yaml
 ```
 
-Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the `val` or `test` stage, respectively.
+Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the`test` stage, respectively.
 
 ## Recap and Next Steps
 

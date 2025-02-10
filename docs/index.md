@@ -35,7 +35,7 @@ pip install lighter
 
     ---
 
-    Define, reproduce, and share experiments through configuration files.
+    Define, reproduce, and share experiments through config files.
 
 -   :material-cube-outline:{ .lg .middle }  __Task-agnostic__
 

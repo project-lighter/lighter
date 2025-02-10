@@ -174,17 +174,8 @@ optimizer:
 
 ### Overriding Config from CLI
 
-Any parameter in the config can be overridden from the command line. For example, to change `max_epochs` in `trainer` from `10` to `20`:
+Any parameter in the config can be overridden from the command line. Consider the following config:
 
-```bash
-lighter fit config.yaml --trainer#max_epochs=20
-```
-
-To override an element of a list, simply refer its index:
-
-```bash
-lighter fit config.yaml --trainer#callbacks#1#monitor="val_loss"
-```
 ```yaml title="config.yaml"
 trainer:
     max_epochs: 10
@@ -196,9 +187,21 @@ trainer:
 # ...
 ```
 
+To change `max_epochs` in `trainer` from `10` to `20`:
+
+```bash
+lighter fit config.yaml --trainer#max_epochs=20
+```
+
+To override an element of a list, simply specify its index:
+
+```bash
+lighter fit config.yaml --trainer#callbacks#1#monitor="val_loss"
+```
+
 ### Merging Configs
 
-You can merge multiple configs by combining them with `,`. For example, to merge two configs `config1.yaml` and `config2.yaml`:
+You can merge multiple configs by combining them with `,`:
 
 ```bash
 lighter fit config1.yaml,config2.yaml
