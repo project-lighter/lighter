@@ -114,7 +114,7 @@ To run your Lighter experiments that use custom modules, you simply execute the 
 **Example: Running Training with Custom Modules**
 
 ```bash title="Terminal"
-lighter fit --config config.yaml
+lighter fit config.yaml
 ```
 
 As long as your `config.yaml` file correctly specifies the `project` path and the `_target_` paths to your custom modules, Lighter will dynamically load and use them during the experiment execution.

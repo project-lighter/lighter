@@ -207,7 +207,7 @@ This configuration defines all the necessary components for training and testing
 To start training, save the above configuration as `config.yaml` in your project directory. Ensure that you have created the `image_classification/models/simple_cnn.py` file as well. Then, open your terminal, navigate to your project directory, and run the following command:
 
 ```bash title="Terminal"
-lighter fit --config config.yaml
+lighter fit config.yaml
 ```
 
 Lighter will parse your `config.yaml`, initialize all the components, and start the training process using PyTorch Lightning. You will see the training progress, including loss and metrics, logged in your terminal.
@@ -217,7 +217,7 @@ Lighter will parse your `config.yaml`, initialize all the components, and start 
 After training, you can evaluate your model on the test set:
 
 ```bash title="Terminal"
-lighter test --config config.yaml
+lighter test config.yaml
 ```
 
 Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the`test` stage, respectively.
