@@ -63,24 +63,19 @@ plugins:
 nav:
   - Home: index.md
   - Tutorials:
-      - Configuration Basics: tutorials/01_configuration_basics.md
-      - Image Classification: tutorials/02_image_classification.md
-      - Semantic Segmentation: tutorials/03_semantic_segmentation.md
-      - Transfer Learning: tutorials/04_transfer_learning.md
-      - Multi-task Learning: tutorials/05_multi_task_learning.md
+      - Configuration Basics: tutorials/configuration_basics.md
+      - Image Classification: tutorials/image_classification.md
   - How-To:
-      - Custom Project Modules: how-to/01_custom_project_modules.md
-      - Debugging Config Errors: how-to/02_debugging_config_errors.md
-      - Creating a Custom Metric: how-to/03_creating_a_custom_metric.md
-      - Using Adapters: how-to/04_using_adapters.md
-      - Using and Extending Writers: how-to/05_using_and_extending_writers.md
-      - Using Freezer: how-to/06_using_freezer.md
-      - Implementing a Custom Inferer: how-to/07_implementing_a_custom_inferer.md
+      - Configure: how-to/configure.md
+      - Run: how-to/run.md
+      - Project Module: how-to/project_module.md
+      - Adapters: how-to/adapters.md
+      - Metrics: how-to/metrics.md
+      - Writers: how-to/writers.md
+      - Freezers: how-to/freezers.md
+      - Inferers: how-to/inferers.md
   - Design:
-      - Overview: design/01_overview.md
-      - Configuration System: design/02_configuration_system.md
-      - Adapter System: design/03_adapter_system.md
-      - Dynamic Module Loading: design/04_dynamic_module_loading.md
+      - Overview: design/overview.md
   - API Reference: reference/
   
 markdown_extensions:

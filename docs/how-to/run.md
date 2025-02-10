@@ -1,0 +1,2 @@
+
+If you're familiar with PyTorch Lightning, you will notice that the stages correspond to methods from `Trainer` (`fit`, `validate`, `test`, `predict`) and `Tuner` (`lr_find`, `scale_batch_size`). For reference, see the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.trainer.trainer.Trainer.html#lightning.pytorch.trainer.trainer.Trainer) and [Tuner](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.tuner.tuning.Tuner.html#lightning.pytorch.tuner.tuning.Tuner) documentation.

@@ -1,5 +1,3 @@
-# Lighter: Streamlining Deep Learning Experiments with Configuration
-
 ## The Challenges of Deep Learning Experimentation
 
 Deep learning has revolutionized many fields, but the process of conducting deep learning research and development can be complex and time-consuming. Researchers and practitioners often face challenges such as:
@@ -21,8 +19,8 @@ These challenges can hinder productivity, slow down experimentation, and make it
 Lighter's core philosophy is to **separate configuration from code** and provide a **high-level, declarative way to define deep learning experiments**. Use Lighter to:
 
 *   **Focus on the Essentials**: Concentrate on core research components (models, datasets, losses, metrics) reducing boilerplate.
-*   **Simplify Experiment Setup**: Define experiments in a single `config.yaml` file.
-*   **Enhance Reproducibility**: Configuration files capture all settings in a version-controlled format.
+*   **Simplify Experiment Setup**: Define experiments in config files.
+*   **Enhance Reproducibility**: Config files capture all settings in a version-controlled format.
 *   **Improve Collaboration**: Share experiments easily via `config.yaml` files.
 *   **Increase Productivity**: Reduce code maintenance, freeing time for research and development.
 
@@ -76,24 +74,6 @@ Lighter is built upon the following key design principles:
 | **Learning Curve**     | Gentle, especially for PL users          | Moderate, requires PL knowledge          | Moderate, MONAI specific concepts      | Moderate, Hydra and OmegaConf concepts    |
 | **Focus**              | Streamlined DL experimentation           | General DL framework                     | Medical Imaging DL                     | Config management for Python apps         |
 
-**Lighter vs. Pure PyTorch Lightning**:
-
-*   Lighter builds upon PyTorch Lightning, adding a configuration layer to further simplify experiment setup and reduce boilerplate.
-*   In pure PyTorch Lightning, you define your experiments in Python code, which can become verbose for complex setups.
-*   Lighter allows you to define most of your experiment in a `config.yaml` file, making it more concise and easier to manage.
-
-**Lighter vs. Pure MONAI**:
-
-*   MONAI provides excellent components for medical imaging, and MONAI Bundle offers a configuration-driven approach.
-*   Lighter is more general-purpose and not limited to medical imaging. It can be used for various deep learning tasks beyond medical imaging.
-*   Lighter's configuration system is inspired by MONAI Bundle but is more streamlined and easier to use for general DL experiments.
-
-**Lighter vs. Hydra-based Frameworks**:
-
-*   Hydra is a powerful configuration management framework for Python applications, including deep learning.
-*   Lighter is more specifically tailored for deep learning experimentation and provides a higher-level abstraction for defining experiments.
-*   Lighter has built-in integrations with PyTorch Lightning and MONAI, making it easier to use these libraries.
-*   Hydra-based frameworks are more general-purpose and can be used for a wider range of Python applications beyond deep learning.
 
 ## Target Audience
 

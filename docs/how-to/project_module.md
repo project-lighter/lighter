@@ -1,14 +1,10 @@
-# How to Use Custom Project Modules in Lighter
-
-## Introduction to Custom Modules
-
 Lighter's extensibility allows seamless integration of your custom modules (e.g., models, datasets, callbacks, metrics). This guide shows how to use them to tailor Lighter to your needs.
 
-Custom modules are Python modules you create within your project, unlike Lighter or external libraries' modules. Benefits include:
+Custom modules are Python modules you create within your project, unlike Lighter or other libraries' modules. Benefits include:
 
-*   **Encapsulation**: Organize project-specific logic (models, datasets) in dedicated modules for maintainability.
-*   **Flexibility**: Extend Lighter's functionality to fit your research.
-*   **Prototyping**: Quickly experiment with new ideas by integrating custom modules.
+*   **Encapsulation**: Keep project-specific code (models, datasets) organized and isolated.
+*   **Flexibility**: Extend Lighter's functionality to fit your use-case.
+*   **Prototyping**: Quickly try new ideas by integrating custom modules.
 
 ## Project Structure 
 
@@ -27,7 +23,6 @@ my_project/
     ├── finetune_full.yaml
     └── finetune_decoder.yaml
 ```
-
 
 ## Defining Project Modules
 

@@ -1,7 +1,3 @@
-# How to Create a Custom Metric in Lighter
-
-## Introduction to Custom Metrics
-
 Metrics are key for evaluating deep learning models. Lighter integrates `torchmetrics` for defining metrics in PyTorch. While `torchmetrics` offers many built-in metrics, custom metrics are often needed for specific research problems.
 
 This guide walks through creating and using custom metrics in Lighter, enabling deeper insights into model behavior and performance evaluation tailored to your needs.

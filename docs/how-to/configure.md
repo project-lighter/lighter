@@ -1,5 +1,3 @@
-# Configuration Basics
-
 ## Config Structure
 
 ### Mandatory Sections
@@ -56,16 +54,14 @@ In this example, we define a simple linear model, a cross-entropy loss, and an A
 In addition to mandatory `trainer` and `system` sections, you can include the following optional sections: 
 
 *   **`_requires_`**: Evaluated before the rest of the config. Useful for importing modules used by Python expressions in the config as explained in [Evaluating Python Expressions](#evaluating-python-expressions).
-*   **`vars`**: Store variables for use in other parts of the config. Useful to avoid repetition and easily update values. See [Referencing Other Components](#referencing-other-components).
-*   **`args`**: Arguments to pass to the the stage of the experiment being run. See [Stages](#stages).
 *   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Custom Project Modules](../how-to/01_custom_project_modules.md).
+*   **`vars`**: Store variables for use in other parts of the config. Useful to avoid repetition and easily update values. See [Referencing Other Components](#referencing-other-components).
+*   **`args`**: Arguments to pass to the the stage of the experiment being run.
 
 
-## Stages
+#### Defining `args`
 
-Lighter operates in *stages*: `fit`, `validate`, `test`, `predict`, `lr_find`, and `scale_batch_size`.
-
-If you're familiar with PyTorch Lightning, you will notice that the stages correspond to methods from `Trainer` (`fit`, `validate`, `test`, `predict`) and `Tuner` (`lr_find`, `scale_batch_size`). For reference, see the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.trainer.trainer.Trainer.html#lightning.pytorch.trainer.trainer.Trainer) and [Tuner](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.tuner.tuning.Tuner.html#lightning.pytorch.tuner.tuning.Tuner) documentation.
+Lighter operates in *stages*: `fit`, `validate`, `test`, `predict`, `lr_find`, and `scale_batch_size`. We will cover these in the [Run](run.md) guide in detail.
 
 To pass arguments to a stage, use the `args` section in in your config. For example, to set the `ckpt_path` argument of the `fit` stage/method in your config:
 
@@ -82,6 +78,14 @@ or pass/override it from the command line:
 ```bash
 lighter fit experiment.yaml --args#fit#ckpt_path="path/to/checkpoint.ckpt"
 ```
+
+The equivalent of this in Python would be:
+
+```python
+Trainer.fit(model, ckpt_path="path/to/checkpoint.ckpt")
+```
+
+where `model` is an instance of `System` defined in the `experiment.yaml`.
 
 ## Config Syntax
 
@@ -223,4 +227,4 @@ This section covered the fundamental aspects of configuring experiments with Lig
 
 By mastering these configuration basics, you can effectively define and manage your Lighter experiments.
 
-Next tutorials: [image classification](02_image_classification.md), [semantic segmentation](03_semantic_segmentation.md). See [How-To guides](../how-to/02_debugging_config_errors.md) for debugging, [Design section](../design/02_configuration_system.md) for deeper dive.
+Next, we will look at the different Lighter stages and how to [Run](run.md) them. 

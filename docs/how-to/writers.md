@@ -1,7 +1,3 @@
-# How to Use and Extend Writers in Lighter
-
-## Introduction to Writers
-
 Lighter writers are callbacks for saving model predictions and outputs to files during validation, testing, and prediction. They offer a standardized, extensible way to persist experiment results for analysis and visualization.
 
 Lighter offers two main writer types:

@@ -91,13 +91,22 @@ class System(pl.LightningModule):
         return output
 
     def _prepare_batch(self, batch: dict) -> tuple[Any, Any, Any]:
+        """
+        Prepares the batch data.
+
+        Args:
+            batch: The input batch dictionary.
+
+        Returns:
+            tuple: A tuple containing (input, target, identifier).
+        """
         adapters = getattr(self.adapters, self.mode)
         input, target, identifier = adapters.batch(batch)
         return input, target, identifier
 
     def forward(self, input: Any) -> Any:  # pylint: disable=arguments-differ
         """
-        Forward pass through the model. Supports multi-input models.
+        Forward pass through the model.
 
         Args:
             input: The input data.
@@ -119,6 +128,20 @@ class System(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def _calculate_loss(self, input: Any, target: Any, pred: Any) -> Tensor | dict[str, Tensor] | None:
+        """
+        Calculates the loss using the criterion if in train or validation mode.
+
+        Args:
+            input: The input data.
+            target: The target data.
+            pred: The model predictions.
+
+        Returns:
+            The calculated loss or None if not in train/val mode.
+
+        Raises:
+            ValueError: If criterion is not specified in train/val mode or if loss dict is missing 'total' key.
+        """
         loss = None
         if self.mode in [Mode.TRAIN, Mode.VAL]:
             if self.criterion is None:
@@ -135,6 +158,17 @@ class System(pl.LightningModule):
         return loss
 
     def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
+        """
+        Calculates the metrics if not in predict mode.
+
+        Args:
+            input: The input data.
+            target: The target data.
+            pred: The model predictions.
+
+        Returns:
+            The calculated metrics or None if in predict mode or no metrics specified.
+        """
         metrics = None
         if self.mode != Mode.PREDICT:
             metrics = getattr(self.metrics, self.mode)
@@ -197,6 +231,20 @@ class System(pl.LightningModule):
         loss: Tensor | dict[str, Tensor] | None,
         metrics: Any | None,
     ) -> dict[str, Any]:
+        """
+        Prepares the data to be returned by the step function to callbacks.
+
+        Args:
+            identifier: The batch identifier.
+            input: The input data.
+            target: The target data.
+            pred: The model predictions.
+            loss: The calculated loss.
+            metrics: The calculated metrics.
+
+        Returns:
+            dict: A dictionary containing all the step information.
+        """
         adapters = getattr(self.adapters, self.mode)
         input, target, pred = adapters.logging(input, target, pred)
         return {
@@ -216,6 +264,9 @@ class System(pl.LightningModule):
 
         Returns:
             dict: A dictionary containing the optimizer and scheduler.
+
+        Raises:
+            ValueError: If optimizer is not specified.
         """
         if self.optimizer is None:
             raise ValueError("Please specify 'system.optimizer' in the config.")
@@ -225,12 +276,18 @@ class System(pl.LightningModule):
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
     def _register_metrics(self):
-        # Register metrics to move them to the appropriate device. ModuleDict not used because 'train' is a reserved key.
+        """
+        Registers metrics as modules to ensure they are moved to the appropriate device.
+        """
+        # Workaround because ModuleDict has 'train' as a reserved key.
         for mode, metric in asdict(self.metrics).items():
             if isinstance(metric, Module):
                 self.add_module(f"{Data.METRICS}_{mode}", metric)
 
     def _setup_mode_hooks(self):
+        """
+        Sets up the training, validation, testing, and prediction hooks based on defined dataloaders.
+        """
         if self.dataloaders.train is not None:
             self.training_step = self._step
             self.train_dataloader = lambda: self.dataloaders.train
@@ -253,9 +310,18 @@ class System(pl.LightningModule):
             self.on_predict_end = self._on_mode_end
 
     def _on_mode_start(self, mode: str | None) -> None:
+        """
+        Sets the current mode at the start of a phase.
+
+        Args:
+            mode: The mode to set (train, val, test, or predict).
+        """
         self.mode = mode
 
     def _on_mode_end(self) -> None:
+        """
+        Resets the mode at the end of a phase.
+        """
         self.mode = None
 
     @property
@@ -265,6 +331,9 @@ class System(pl.LightningModule):
 
         Returns:
             float: The learning rate.
+
+        Raises:
+            ValueError: If there are multiple optimizer parameter groups.
         """
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
@@ -277,6 +346,9 @@ class System(pl.LightningModule):
 
         Args:
             value: The new learning rate.
+
+        Raises:
+            ValueError: If there are multiple optimizer parameter groups.
         """
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")

@@ -1,5 +1,3 @@
-# Image Classification
-
 In this tutorial we will learn how to:
 
 1. Set up the project folder
@@ -22,7 +20,7 @@ image_classification/
 
 !!! warning
 
-    Do not forget the `__init__.py` files. For more details, refer to the [Custom Project Modules](../how-to/01_custom_project_modules.md) guide.
+    Do not forget the `__init__.py` files. For more details, refer to the [Project Module](../how-to/project_module.md) guide.
 
 ## Setting up Dataloaders
 
@@ -233,4 +231,4 @@ In this tutorial, you have successfully trained and evaluated an image classific
 *   Create a complete `config.yaml` file for an image classification experiment.
 *   Execute training and evaluation using the Lighter CLI.
 
-This tutorial provides a solid foundation for building more complex image classification experiments with Lighter. In the next tutorials, we will explore [semantic segmentation](03_semantic_segmentation.md) and [transfer learning](04_transfer_learning.md). You can also refer to the [How-To guides](../how-to/01_custom_project_modules.md) for using custom modules and the [Design section](../design/01_overview.md) for a deeper understanding of Lighter's design principles.
+This tutorial provides a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/project_module.md) to explore Lighter's features in more detail.
