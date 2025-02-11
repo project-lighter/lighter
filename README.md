@@ -17,9 +17,9 @@
 <br/>
 <div align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="75%">
+        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="85%">
         <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
-        <img alt="Features" src="./assets/images/features_light.png" width="75%">
+        <img alt="Features" src="./assets/images/features_light.png" width="85%">
     </picture>
 </div>
 <br/>
