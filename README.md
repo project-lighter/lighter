@@ -7,21 +7,19 @@
 </div>
 <br/>
 <br/>
+
 <div align="center">
 
-[![build](https://github.com/project-lighter/lighter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/ci.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE)
+[![build](https://github.com/project-lighter/lighter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/ci.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp)
 
-<a href="https://discord.gg/zJcnp6KrUp">
-  <img src="https://discord.com/api/guilds/1252251284908539965/widget.png?style=banner2" alt="Lighter Discord Server"/>
-</a>
 </div>
 
 <br/>
 <div align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="80%">
+        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="75%">
         <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
-        <img alt="Features" src="./assets/images/features_light.png" width="80%">
+        <img alt="Features" src="./assets/images/features_light.png" width="75%">
     </picture>
 </div>
 <br/>
