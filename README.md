@@ -16,12 +16,12 @@
 </a>
 </div>
 
-<div align="center" style="pointer-events: none">
-  <img src="./assets/images/features_dark.png#gh-dark-mode-only" alt="Docs">
-  <img src="./assets/images/features_light.png#gh-light-mode-only" alt="Docs">
+<br/>
+<div align="center" width="80%">
+  <img align="center" alt="Features" src="./assets/images/features_dark.png#gh-dark-mode-only">
+  <img align="center" alt="Features" src="./assets/images/features_light.png#gh-light-mode-only">
 </div>
-
-
+<br/>
 
 
 ## 📖 Getting Started
