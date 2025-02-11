@@ -16,11 +16,9 @@
 </a>
 </div>
 
-<div align="center">
-
-![Docs](./assets/images/features_dark.png#gh-dark-mode-only)
-![Docs](./assets/images/features_light.png#gh-light-mode-only)
-
+<div align="center" style="pointer-events: none">
+  <img src="./assets/images/features_dark.png#gh-dark-mode-only" alt="Docs">
+  <img src="./assets/images/features_light.png#gh-light-mode-only" alt="Docs">
 </div>
 
 
