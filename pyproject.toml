@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "project-lighter"
+name = "lighter"
 version = "0.0.3a16"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 authors = [

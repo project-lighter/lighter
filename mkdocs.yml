@@ -1,6 +1,5 @@
 site_name: Lighter
 theme:
-  custom_dir: docs/overrides
   icon:
     repo: fontawesome/brands/github
   font:
@@ -16,21 +15,27 @@ theme:
     - content.tooltips
     - footnotes
     - navigation.tabs
-    - navigation.tabs.sticky
+    - navigation.top
 
   palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: fontawesome/solid/circle-half-stroke
+        name: Switch to light mode
+
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default 
       toggle:
-        icon: material/weather-sunny
+        icon: fontawesome/solid/lightbulb
         name: Switch to dark mode
 
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
-        icon: material/weather-night
+        icon: fontawesome/solid/moon
         name: Switch to system preference
 
 extra_css:
@@ -57,16 +62,20 @@ plugins:
 
 nav:
   - Home: index.md
-  - Basics:
-    - Quickstart: basics/quickstart.md
-    - Configuration System: basics/config.md
-    - Running workflows: basics/workflows.md
-    - Integrating your projects: basics/projects.md
-
-  - Advanced:
-    - Postprocessing: advanced/postprocessing.md
-    - Inferer: advanced/inferer.md
-    - Callbacks: advanced/callbacks.md
+  - Tutorials:
+      - Configuration Basics: tutorials/configuration_basics.md
+      - Image Classification: tutorials/image_classification.md
+  - How-To:
+      - Configure: how-to/configure.md
+      - Run: how-to/run.md
+      - Project Module: how-to/project_module.md
+      - Adapters: how-to/adapters.md
+      - Metrics: how-to/metrics.md
+      - Writers: how-to/writers.md
+      - Freezers: how-to/freezers.md
+      - Inferers: how-to/inferers.md
+  - Design:
+      - Overview: design/overview.md
   - API Reference: reference/
   
 markdown_extensions:
@@ -87,6 +96,9 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences      
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter

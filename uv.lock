@@ -1216,7 +1216,7 @@ wheels = [
 ]
 
 [[package]]
-name = "project-lighter"
+name = "lighter"
 version = "0.0.3a14"
 source = { editable = "." }
 dependencies = [
