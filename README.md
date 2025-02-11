@@ -17,11 +17,11 @@
 </div>
 
 <br/>
-<div align="center" width="50%">
+<div align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png">
+        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="70%">
         <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
-        <img alt="Features" src="./assets/images/features_light.png">
+        <img alt="Features" src="./assets/images/features_light.png" width="70%">
     </picture>
 </div>
 <br/>
