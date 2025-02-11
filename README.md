@@ -16,32 +16,11 @@
 </a>
 </div>
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
+</picture>
 
-&nbsp;
-
-
-Focus on your deep learning experiments and forget about (re)writing code. `lighter` is:
- 1. **Task-agnostic**
-
-    Classification, segmentation, or self-supervised learning? Lighter handles it all.
-
- 2. **Configuration-based**
-
-    Define, adjust, and reproduce experiments through configuration files.
-
- 3. **Customizable**
-
-    Integrate custom code seamlessly, whether it's models, datasets, or any other component.
-
-&nbsp;
-
-`lighter` stands on the shoulder of these two giants:
- - [MONAI Bundle](https://docs.monai.io/en/stable/bundle_intro.html) - Configuration system. Similar to [Hydra](https://github.com/facebookresearch/hydra), but with additional features.
- - [PyTorch Lightning](https://github.com/Lightning-AI/lightning) - Our [`System`](https://project-lighter.github.io/lighter/reference/system/) is based on the PyTorch Lightning [`LightningModule`](https://lightning.ai/docs/pytorch/stable/common/lightning_module.html) and implements all the necessary training logic for you. Couple it with the PyTorch Lightning [Trainer](https://lightning.ai/docs/pytorch/stable/common/trainer.html) and you're good to go.
-
-<br/>
-<div align="center">Simply put, <code>lighter = config(trainer + system)</code>  😇</div>
-<br/>
 
 ## 📖 Getting Started
 <div align="center">

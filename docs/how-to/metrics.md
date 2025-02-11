@@ -174,7 +174,7 @@ system:
       - _target_: my_project.metrics.MyCustomMetric
 ```
 
-## Recap: Creating and Using Custom Metrics
+## Recap and Next Steps
 
 Creating custom metrics in Lighter using `torchmetrics` involves these key steps:
 

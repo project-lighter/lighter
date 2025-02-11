@@ -224,7 +224,7 @@ Example: `TableWriter` saves data to `outputs/metrics.csv`. In `validation_step`
 
 Like `FileWriter`, extend `TableWriter` with custom writer classes for specialized table writing. See `lighter/callbacks/writer/table.py` for details.
 
-## Recap: Persisting Experiment Outputs with Writers
+## Recap and Next Steps
 
 Lighter writers are key for saving/managing experiment outputs. Use `FileWriter` and `TableWriter`, extend with custom writers as needed to:
 
@@ -234,4 +234,4 @@ Lighter writers are key for saving/managing experiment outputs. Use `FileWriter`
 
 Writers provide a complete solution for running DL experiments and capturing/utilizing valuable outputs.
 
-Next, explore [How-To guide on Using Freezer](06_using_freezer.md) for freezing model layers, or return to [How-To guides](../how-to/01_custom_project_modules.md). See also [Design section](../design/01_overview.md) or [Tutorials section](../tutorials/01_configuration_basics.md).
+Next, explore [Freezers](freezers.md) for freezing model layers.

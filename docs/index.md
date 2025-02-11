@@ -168,21 +168,21 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
     ---
 
     Run your first experiments with step-by-step tutorials
-    [:octicons-arrow-right-24: Start Learning](tutorials/01_configuration_basics.md)
+    [:octicons-arrow-right-24: Start Learning](tutorials/configuration_basics.md)
 
 -   :material-hammer-wrench:{ .lg .middle }  __How-To Guides__
     
     ---
     
     Learn about Lighter's advanced features with practical guides
-    [:octicons-arrow-right-24: Learn More](how-to/01_custom_project_modules.md)
+    [:octicons-arrow-right-24: Learn More](how-to/custom_project_modules.md)
 
 -   :material-lightbulb:{ .lg .middle }  __Design__
 
     ---
 
     Understand Lighter's design principles and architecture
-    [:octicons-arrow-right-24: Read More](design/01_overview.md)
+    [:octicons-arrow-right-24: Read More](design/overview.md)
 
 -   :material-api:{ .lg .middle }  __Reference__
     

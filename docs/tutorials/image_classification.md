@@ -112,7 +112,7 @@ class SimpleCNN(nn.Module):
 Now that we have defined the model, let's specify it in the `config.yaml` file.
 
 ```yaml title="config.yaml" hl_lines="1 5"
-project: /full/path/to/image_classification
+project: /path/to/image_classification
 
 system:
   model:
@@ -128,7 +128,7 @@ The `project` section tells Lighter where to import the project module from. Thi
 Now, let's put together the complete `config.yaml` file for training the `SimpleCNN` on CIFAR10:
 
 ```yaml title="config.yaml"
-project: /full/path/to/image_classification
+project: /path/to/image_classification
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -222,13 +222,8 @@ lighter test config.yaml
 
 Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the`test` stage, respectively.
 
-## Recap and Next Steps
+## Next Steps
 
-In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter. You learned how to:
+In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter. 
 
-*   Configure dataloaders for image datasets using torchvision.
-*   Define a simple CNN model and integrate it into your Lighter configuration.
-*   Create a complete `config.yaml` file for an image classification experiment.
-*   Execute training and evaluation using the Lighter CLI.
-
-This tutorial provides a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/project_module.md) to explore Lighter's features in more detail.
+You now have a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/project_module.md) to explore Lighter's features in more detail.

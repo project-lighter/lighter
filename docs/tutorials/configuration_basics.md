@@ -64,7 +64,7 @@ system:
 
 ### `@` and `%` Referencing: Connecting Things Together
 
-Sometimes you need to link parts of your config together.  We use `@` or `%` for this. We'll dive deeper into the difference between the two at a later stage. For the moment, we will only use `@`.
+Sometimes you need to link parts of your config together. We use `@` or `%` for this. The main difference is that `@` references the *instance* of an object, while `%` references the *definition* of an object. We'll dive deeper into the difference between the two at a later stage. For the moment, we will only use `@`.
 
 A common example is telling the optimizer *which parameters* to update – these are the parameters of your `model`:
 

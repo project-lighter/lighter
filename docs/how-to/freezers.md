@@ -1,21 +1,4 @@
-"Freezing layers" in DL prevents weight updates during training, used for:
-
-*   **Transfer Learning**: Finetune pre-trained model, freeze early layers (general features), train later layers (task-specific).
-*   **Fine-tuning**: Preserve pre-trained knowledge, adapt other model parts.
-*   **Regularization**: Prevent overfitting by reducing trainable parameters.
-*   **Efficient Training**: Speed up training, reduce memory use (no gradients for frozen layers).
-
-Lighter's `Freezer` callback offers flexible, `config.yaml`-driven way to freeze/unfreeze model layers during training.
-
-This guide explains how to use Lighter's `Freezer` callback to control training of specific model layers.
-
-## Using the `Freezer` Callback
-
-`Freezer` callback specifies which model layers/parameters to freeze/unfreeze during training, and duration.
-
-**Configuration**:
-
-Configure `Freezer` callback in `config.yaml`'s `trainer.callbacks` section:
+Lighter's `Freezer` callback specifies which model layers/parameters to freeze/unfreeze during training, and duration. For example, to freeze the encoder layers of a pre-trained model while training the classifier head or decoder
 
 ```yaml title="config.yaml"
 trainer:
@@ -133,7 +116,7 @@ Example: 2 `Freezer` callbacks for gradual unfreezing - initial backbone freeze,
 *   **Regularization**: Layer freezing for regularization.
 *   **Efficient Training**: Reduce training time/memory.
 
-## Recap: Fine-grained Layer Control with `Freezer`
+## Recap and Next Steps
 
 Lighter `Freezer` callback: flexible, fine-grained model layer training control via `config.yaml`. Optimize training, performance, pre-trained knowledge.
 

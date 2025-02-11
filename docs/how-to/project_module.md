@@ -8,7 +8,7 @@ Custom modules are Python modules you create within your project, unlike Lighter
 
 ## Project Structure 
 
-Your project folder can be named and located however and wherever you want. You only need to ensure that any folder that is a Python modules contains `__init__.py`. In the example below, we see that the project root `my_project` contains `__init__.py` file, just like the `models` and `datasets` subdirectories. On the other hand, the `experiments` directory does not contain any Python modules, so it does not need an `__init__.py` file.
+Your project folder can be named and located however and wherever you want. You only need to ensure that any folder that is a Python module contains `__init__.py`. In the example below, we see that the project root `my_project` contains `__init__.py` file, just like the `models` and `datasets` subdirectories. On the other hand, the `experiments` directory does not contain any Python modules, so it does not need an `__init__.py` file.
 
 ```
 my_project/
@@ -119,7 +119,7 @@ lighter fit config.yaml
 
 As long as your `config.yaml` file correctly specifies the `project` path and the `_target_` paths to your custom modules, Lighter will dynamically load and use them during the experiment execution.
 
-## Recap: Steps to Use Custom Modules
+## Recap and Next Steps
 
 1.  Organize project with clear directory structure (e.g., subdirectories for modules).
 2.  Define custom modules (models, datasets) as Python files in project directories.
@@ -129,4 +129,5 @@ As long as your `config.yaml` file correctly specifies the `project` path and th
 
 These steps enable seamless integration of custom code, leveraging Lighter's flexibility for customized deep learning systems.
 
-Next, explore the [How-To guide on Debugging Configuration Errors](02_debugging_config_errors.md) to learn how to troubleshoot common configuration issues, or return to the [How-To guides section](../how-to/01_custom_project_modules.md) for more practical problem-solving guides. You can also go back to the [Design section](../design/01_overview.md) for more conceptual documentation or the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.
+Next, explore the [Adapters](adapters.md) for more ways to customize Lighter.
+

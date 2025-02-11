@@ -87,42 +87,44 @@ Below, you can see an example of how to configure the `CriterionAdapter` in your
 ```yaml title="config.yaml"
 system:
     adapters:
-    train: # Adapters for the training stage
-        criterion: # CriterionAdapter configuration
-        _target_: lighter.adapters.CriterionAdapter # Use the built-in CriterionAdapter
-        pred_argument: 1         # Map 'pred' to the 2nd positional argument (index 1)
-        target_argument: 0         # Map 'target' to the 1st positional argument (index 0)
-        pred_transforms:             # Apply transforms to 'pred'
-            - _target_: torch.sigmoid         # Apply sigmoid activation to predictions
+        train:
+            criterion:
+                _target_: lighter.adapters.CriterionAdapter
+                # Map 'pred' to the 2nd positional argument (index 1)
+                pred_argument: 1
+                # Map 'target' to the 1st positional argument (index 0)
+                target_argument: 0
+                # Apply sigmoid activation to predictions                 
+                pred_transforms:
+                    - _target_: torch.sigmoid
 ```
 
-For more information, see the [CriterionAdapter documentation](https://www.google.com/url?sa=E&source=gmail&q=../../reference/adapters/#lighter.adapters.CriterionAdapter).
-
+For more information, see the [CriterionAdapter documentation](../../reference/adapters/#lighter.adapters.CriterionAdapter).
 ### MetricsAdapter
 
 The configuration of `MetricsAdapter` is **identical** to `CriterionAdapter`. You use **argument mappers** and **transforms** in the same way.
-
-MetricsAdapter **argument mappers** and **transforms** are configured using the same types and syntax as described for `CriterionAdapter`, using `pred_argument`, `target_argument`, `input_argument` for argument mapping, and `pred_transforms`, `target_transforms`, `input_transforms` for applying transforms.  Refer to the [CriterionAdapter section](https://www.google.com/url?sa=E&source=gmail&q=#criterionadapter) above for details on argument mapper and transform types.
 
 Below, you can see an example of how to configure the `MetricsAdapter` in your config file:
 
 ```yaml title="config.yaml"
 system:
     adapters:
-    val: # Adapters for the validation stage
-        metrics: # MetricsAdapter configuration
-        _target_: lighter.adapters.MetricsAdapter # Use the built-in MetricsAdapter
-        pred_argument: "prediction"         # Map 'pred' to keyword argument "prediction"
-        target_argument: "ground_truth"         # Map 'target' to keyword argument "ground_truth"
-        pred_transforms:             # Apply transforms to 'pred'
-            - _target_: torch.argmax          # Convert predictions to class labels
-            dim: 1
+        val:
+            metrics:
+                _target_: lighter.adapters.MetricsAdapter
+                # Map 'pred' to keyword argument "prediction"
+                pred_argument: "prediction"
+                # Map 'target' to keyword argument "ground_truth"
+                target_argument: "ground_truth"
+                # Convert pred to class labels
+                pred_transforms:
+                    - _target_: torch.argmax              
+                      dim: 1
 ```
 
-For more information, see the [MetricsAdapter documentation](https://www.google.com/url?sa=E&source=gmail&q=../../reference/adapters/#lighter.adapters.MetricsAdapter).
 
+For more information, see the [MetricsAdapter documentation](../../reference/adapters/#lighter.adapters.MetricsAdapter).
 ### LoggingAdapter
-
 
 LoggingAdapter configuration focuses on applying **transforms** to `pred`, `target`, and `input` tensors before they are logged.
 
@@ -137,20 +139,20 @@ Below, you can see an example of how to configure the `LoggingAdapter` in your c
 ```yaml title="config.yaml"
 system:
     adapters:
-    train: # Adapters for the training stage
-        logging: # LoggingAdapter configuration
-        _target_: lighter.adapters.LoggingAdapter # Use the built-in LoggingAdapter
-        input_transforms:                 # Apply transforms to 'input' before logging
-            - _target_: monai.transforms.ToNumpy # Convert input tensor to NumPy array
-        pred_transforms:                  # Apply transforms to 'pred' before logging
-            - _target_: torch.argmax           # Convert predictions to class labels
-            dim: 1
+    train:
+        logging:
+            _target_: lighter.adapters.LoggingAdapter # Use the built-in LoggingAdapter
+            # Turn grayscale into rgb by repeating the channels
+            input_transforms: "$lambda x: x.repeat(1, 3, 1, 1)"
+            pred_transforms:
+                - _target_: torch.argmax
+                  dim: 1
 ```
 
-For more information, see the [LoggingAdapter documentation](https://www.google.com/url?sa=E&source=gmail&q=../../reference/adapters/#lighter.adapters.LoggingAdapter).
 
+For more information, see the [LoggingAdapter documentation](../../reference/adapters/#lighter.adapters.LoggingAdapter).
 
-## Recap: Unleashing Flexibility with Adapters
+## Recap and Next Steps
 
 Adapters are a cornerstone of Lighter's flexibility and extensibility. By using adapters effectively, you can:
 
@@ -160,6 +162,6 @@ Adapters are a cornerstone of Lighter's flexibility and extensibility. By using 
 *   Tailor the data that is logged for monitoring and analysis.
 *   Create highly specialized and reusable customization components.
 
-Mastering adapters empowers you to adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
+With adapters, you adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
 
-Next, explore the [How-To guide on Using and Extending Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files, or return to the [How-To guides section](../how-to/01_custom_project_modules.md) for more practical problem-solving guides. You can also go back to the [Design section](../design/01_overview.md) for more conceptual documentation or the [Tutorials section](../tutorials/01_configuration_basics.md) for end-to-end examples.
+Next, explore the [Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files. For a further read on Lighter's design principles and why we designed adapters, check out the [Design section](../design/overview.md).
