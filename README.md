@@ -37,13 +37,13 @@
 </div>
 
 <b>Install:</b>
-<pre><code>pip install project-lighter</code></pre>
+<pre><code>pip install lighter</code></pre>
 <details>
 
 <summary><b>Install pre-release</b></summary>
 <p>Get the latest features and fixes from the main branch.</p>
 <pre>
-<code>pip install project-lighter --pre</code>
+<code>pip install lighter --pre</code>
 </pre>
 </details>
 
