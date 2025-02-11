@@ -16,10 +16,12 @@
 </a>
 </div>
 
+<div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png">
   <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
 </picture>
+</div>
 
 
 ## 📖 Getting Started
