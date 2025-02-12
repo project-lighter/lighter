@@ -164,4 +164,4 @@ Adapters are a cornerstone of Lighter's flexibility and extensibility. By using 
 
 With adapters, you adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
 
-Next, explore the [Writers](05_using_and_extending_writers.md) to learn how to save model predictions and outputs to files. For a further read on Lighter's design principles and why we designed adapters, check out the [Design section](../design/overview.md).
+Next, explore the [Writers](writers.md) to learn how to save model predictions and outputs to files. For a further read on Lighter's design principles and why we designed adapters, check out the [Design section](../design/overview.md).

@@ -54,7 +54,7 @@ In this example, we define a simple linear model, a cross-entropy loss, and an A
 In addition to mandatory `trainer` and `system` sections, you can include the following optional sections: 
 
 *   **`_requires_`**: Evaluated before the rest of the config. Useful for importing modules used by Python expressions in the config as explained in [Evaluating Python Expressions](#evaluating-python-expressions).
-*   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Custom Project Modules](../how-to/01_custom_project_modules.md).
+*   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Custom Project Modules](../how-to/project_module.md).
 *   **`vars`**: Store variables for use in other parts of the config. Useful to avoid repetition and easily update values. See [Referencing Other Components](#referencing-other-components).
 *   **`args`**: Arguments to pass to the the stage of the experiment being run.
 

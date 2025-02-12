@@ -175,7 +175,7 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
     ---
     
     Learn about Lighter's advanced features with practical guides
-    [:octicons-arrow-right-24: Learn More](how-to/custom_project_modules.md)
+    [:octicons-arrow-right-24: Learn More](how-to/project_module.md)
 
 -   :material-lightbulb:{ .lg .middle }  __Design__
 

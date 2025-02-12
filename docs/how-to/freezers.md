@@ -120,4 +120,4 @@ Example: 2 `Freezer` callbacks for gradual unfreezing - initial backbone freeze,
 
 Lighter `Freezer` callback: flexible, fine-grained model layer training control via `config.yaml`. Optimize training, performance, pre-trained knowledge.
 
-Next: [Custom Inferer How-To guide](07_using_inferers.md), [How-To guides](../how-to/01_custom_project_modules.md), [Design section](../design/01_overview.md), [Tutorials section](../tutorials/01_configuration_basics.md).
+Next: [Inferers](inferers.md).
