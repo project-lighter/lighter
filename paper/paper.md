@@ -34,7 +34,7 @@ affiliations:
    index: 5
  - name: Department of Cardiovascular Radiology and Nuclear Medicine, Technical University of Munich, School of Medicine and Health, German Heart Center, TUM University Hospital, Germay
    index: 6
-date: 22 February 2025
+date: 24 February 2025
 bibliography: paper.bib
 
 ---
@@ -64,13 +64,11 @@ Lighter's architecture is built upon three fundamental components that work toge
 
 1.  **`Config`**: This component serves as the experiment's blueprint, parsing and validating YAML configuration files that comprehensively define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
 
-2.  **`System`**: At the heart of Lighter, the `System` class orchestrates between experimental components. It integrates the model architecture, optimization strategy (optimizer and scheduler), loss function (criterion), evaluation metrics, data pipelines, and adapters. The `System` implements the scientific logic that governs how these components interact during all experimental phases: training, validation, testing, and inference.
+2.  **`System`**: At the heart of Lighter, the `System` class orchestrates between experimental components. It integrates the model architecture, optimization strategy (optimizer and scheduler), loss function (criterion), evaluation metrics, data pipelines, and adapters. The `System` implements the logic that governs how these components interact during all experimental phases: training, validation, testing, and inference.
 
-3. **`Trainer`**: Building upon PyTorch Lightning's robust `Trainer` class, this component handles the technical aspects of the training process. It manages advanced features such as distributed training across multiple GPUs, mixed precision computation for memory efficiency, and checkpoint management for experiment continuity. Lighter employs the `Trainer` to execute the experimental protocol defined by the `System`.
+3. **`Trainer`**: PyTorch Lightning's robust `Trainer` class handles the technical aspects of the training process. It manages advanced features such as distributed training across multiple GPUs, mixed precision computation for memory efficiency, and checkpoint management for experiment continuity. Lighter employs the `Trainer` to execute the experimental protocol defined by the `System`.
 
 ![**Lighter Overview.** Lighter revolves around three main components -- `Trainer,` `System` and `Config`, which contains the definition for the former two. `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configuration files, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizeable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).](overview_all.png)
-
-<!-- ## Config -->
 
 ## System
 
