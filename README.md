@@ -2,7 +2,7 @@
 <br/>
 <div align="center">
 <picture>
-  <img align="center" alt="Lighter logo" src="./assets/images/lighter.png" width="80%">
+  <img align="center" alt="Lighter logo" src="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/lighter.png" width="80%">
 </picture>
 </div>
 <br/>
@@ -17,9 +17,9 @@
 <br/>
 <div align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="./assets/images/features_dark.png" width="85%">
-        <source media="(prefers-color-scheme: light)" srcset="./assets/images/features_light.png">
-        <img alt="Features" src="./assets/images/features_light.png" width="85%">
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_dark.png" width="85%">
+        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_light.png" width="85%">
+        <img alt="Features" src="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_light.png" width="85%">
     </picture>
 </div>
 <br/>
