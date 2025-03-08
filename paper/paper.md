@@ -8,20 +8,24 @@ tags:
   - framework
 authors:
   - name: Ibrahim Hadzic
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0002-8397-5940
     corresponding: true
     affiliation: "1, 2"
   - name: Suraj Pai
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0001-8043-2230
     affiliation: "2, 3, 4"
   - name: Keno Bressem
     affiliation: "5, 6"
+    orcid: 0000-0001-9249-8624
   - name: Borek Foldyna
     affiliation: 1
+    orcid: 0000-0002-2466-4827
   - given-names: Hugo
     dropping-particle: JWL
     surname: Aerts
     affiliation: "2, 3, 4"
+    orcid: 0000-0002-2122-2003
+
 affiliations:
  - name: Cardiovascular Imaging Research Center, Massachusetts General Hospital, Harvard Medical School, United States of America
    index: 1
@@ -42,7 +46,7 @@ bibliography: paper.bib
 
 # Summary
 
-Lighter is an open-source Python [framework](https://github.com/project-lighter/lighter) for deep learning research that builds upon PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] and the [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022]. With its declarative YAML-based configuration system that is both transparent and self-documenting, Lighter aims to streamline deep learning research. Researchers define experimental protocols—including neural network architectures, optimization strategies, data pipelines, and evaluation metrics—through structured configuration files, which effectively decouple scientific hypotheses from implementation details. This separation reduces boilerplate code while preserving complete experimental control. Lighter enables reproducibility through comprehensive configuration snapshots that document all experimental parameters and dependencies. A modular adapter system and support for project-specific extensions ensure the extensibility of the framework enabling researchers to implement specialized methodologies without modifying core framework components. By abstracting the engineering complexities of deep learning experimentation, Lighter allows researchers to focus on scientific innovation, accelerate hypothesis testing, and facilitate rigorous validation of research findings across application domains.
+Lighter is an open-source Python [framework](https://github.com/project-lighter/lighter) for deep learning research that builds upon PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] and the [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022]. With its declarative YAML-based configuration system that is both transparent and self-documenting, Lighter aims to streamline deep learning research. Researchers define experimental protocols—including neural network architectures, optimization strategies, data pipelines, and evaluation metrics—through structured configuration files, effectively decoupling scientific hypotheses from implementation details. This separation reduces boilerplate code while preserving complete experimental control. Lighter enables reproducibility through comprehensive configuration snapshots that document all experimental parameters and dependencies. A modular adapter system and support for project-specific extensions ensure the extensibility of the framework enabling researchers to implement specialized methodologies without modifying core framework components. By abstracting the engineering complexities of deep learning experimentation, Lighter allows researchers to focus on scientific innovation, accelerate hypothesis testing, and facilitate rigorous validation of research findings across application domains.
 
 # Statement of Need
 
@@ -61,19 +65,19 @@ Lighter is designed to address several key challenges in deep learning experimen
 
 # Design
 
-Lighter's architecture is built upon three fundamental components that work together to streamline deep learning experimentation:
+Lighter is built upon three fundamental components:
 
-1.  **`Config`**: This component serves as the experiment's blueprint, parsing and validating YAML configuration files that comprehensively define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
+1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configuration files that comprehensively define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
 
-2.  **`System`**: The `System` orchestrates the main building blocks of an experiment: model, optimizer, scheduler, loss function, evaluation metrics, and dataloaders. It implements the logic controlling how these components interact during training, validation, testing, and inference phases, that is modifiable through [adapters](#adapters).
+2.  **`System`**: orchestrates the main building blocks of an experiment: model, optimizer, scheduler, loss function, evaluation metrics, and dataloaders. It implements the logic controlling how these components interact during training, validation, testing, and inference phases, that is modifiable through [adapters](#adapters).
 
-3. **`Trainer`**: PyTorch Lightning's robust `Trainer` class handles the technical aspects of the training process. It manages advanced features such as distributed training across multiple GPUs, mixed precision computation for memory efficiency, and checkpoint management for experiment continuity. Lighter employs the `Trainer` to execute the experimental protocol defined by the `System`.
+3. **`Trainer`**:  PyTorch Lightning's `Trainer` handles technical aspects like distributed GPU training, mixed precision computation, and checkpoint management. Lighter uses it to execute the experimental protocol defined by the System.
 
 ![**Lighter Overview.** Lighter revolves around three main components -- `Trainer,` `System` and `Config`, which contains the definition for the former two. `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configuration files, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).](overview_all.png)
 
 ## System
 
-The `System` component in Lighter serves as a comprehensive abstraction layer that encapsulates the essential experimental elements—including neural network architectures, optimization strategies, learning rate schedulers, loss functions, evaluation metrics, and data pipelines. This component implements a generalized data flow paradigm that orchestrates interactions between these elements during the experimental lifecycle. A distinguishing feature of the `System` is its configurable nature through the [adapter](#adapters) mechanism, which provides the flexibility required to address diverse research tasks without architectural modifications. The systematic flow of information through the `System` is illustrated in \autoref{fig:overview_system}, demonstrating how data traverses from input through model inference to evaluation and logging.
+The `System` encapsulates experimental elements—neural network architectures, optimization strategies, learning rate schedulers, loss functions, evaluation metrics, and data loaders. It implements a generalized data flow that orchestrates interactions between these elements  during experiments. Through the [adapter](#adapters) mechanism, `System` provides flexibility for diverse research tasks without architectural modifications (\autoref{fig:overview_system}).
 
 ![**Flowchart of the `lighter.System`.** A `batch` from the `DataLoader` is processed by `BatchAdapter` to extract `input`, `target` (optional), and `identifier` (optional). The `Model` generates `pred` (predictions) from the `input`. `CriterionAdapter` and `MetricsAdapter` compute loss and metrics, respectively, by applying optional transformations and adapting arguments for the loss and metric functions.  Argument adaptation reorders or names inputs; for example, if a loss function expects `loss_fn(predictions, ground_truth)`, the `CriterionAdapter` maps `pred` to `predictions` and `target` to `ground_truth`. `LoggingAdapter` prepares data for logging. Results, including loss, metrics, and processed data, are returned to the `Trainer`.\label{fig:overview_system}](overview_system.png)
 
@@ -83,7 +87,7 @@ The `System` component in Lighter serves as a comprehensive abstraction layer th
 Lighter achieves task-agnostic flexibility through two key concepts: adapters and project-specific module integration.
 
 ### Adapters
-The adapter pattern implements a transformation layer between core system components, enabling customized data flow between the dataloader, criterion, metrics computation, and logging subsystems (\autoref{fig:overview_system}). This abstraction allows researchers to modify component interactions without altering the underlying framework. Consider the following configuration excerpt that demonstrates the adapter's capability to transform prediction outputs and remap function arguments:
+The adapter pattern implements an interface layer between core system components, enabling customized data flow between the dataloader, criterion, metrics computation, and logging subsystems (\autoref{fig:overview_system}). For example, to apply a sigmoid activation on predictions and to pass the predictions and target data to the appropriate criterion arguments, you can configure the criterion adapter as follows:
 
 ```yaml
 adapters:
@@ -96,7 +100,7 @@ adapters:
             target_argument: 1 # Pass 'target' to criterion's 2nd arg
 ```
 
-As a result, Lighter can execute a wide range of deep learning tasks, from classification and segmentation to self-supervised learning, without requiring changes to the core framework.
+This abstraction layer allows researchers to modify how components interact without changing the core framework code, enabling Lighter to flexibly support diverse tasks, ranging from standard classification to self-supervised learning, through simple adapter configuration changes.
 
 ### Project-specific modules
 
