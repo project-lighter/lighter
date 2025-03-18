@@ -46,7 +46,7 @@ bibliography: paper.bib
 
 # Summary
 
-Lighter is an open-source Python [framework](https://github.com/project-lighter/lighter) for deep learning research that builds upon PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] and the [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022]. With its declarative YAML-based configuration system that is both transparent and self-documenting, Lighter aims to streamline deep learning research. Researchers define experimental protocols—including neural network architectures, optimization strategies, data pipelines, and evaluation metrics—through structured configuration files, effectively decoupling scientific hypotheses from implementation details. This separation reduces boilerplate code while preserving complete experimental control. Lighter enables reproducibility through comprehensive configuration snapshots that document all experimental parameters and dependencies. A modular adapter system and support for project-specific extensions ensure the extensibility of the framework enabling researchers to implement specialized methodologies without modifying core framework components. By abstracting the engineering complexities of deep learning experimentation, Lighter allows researchers to focus on scientific innovation, accelerate hypothesis testing, and facilitate rigorous validation of research findings across application domains.
+Lighter is an open-source Python deep learning [framework](https://github.com/project-lighter/lighter) that builds upon PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] and [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022]. It streamlines deep learning research through YAML-based configuration that decouples experiment setup from implementation details. Researchers define models, datasets, and other components via structured configuration files, reducing boilerplate while maintaining control. The framework enhances reproducibility through configuration snapshots and supports extensibility via adapters and project-specific modules. By abstracting engineering complexities, Lighter allows researchers to focus on innovation, accelerate hypothesis testing, and facilitate rigorous validation across domains.
 
 # Statement of Need
 
@@ -84,10 +84,9 @@ The `System` encapsulates experimental elements—neural network architectures, 
 
 ## Adaptability Through Modular Design
 
-Lighter achieves task-agnostic flexibility through two key concepts: adapters and project-specific module integration.
-
 ### Adapters
-The adapter pattern implements an interface layer between core system components, enabling customized data flow between the dataloader, criterion, metrics computation, and logging subsystems (\autoref{fig:overview_system}). For example, to apply a sigmoid activation on predictions and to pass the predictions and target data to the appropriate criterion arguments, you can configure the criterion adapter as follows:
+
+The adapter pattern creates an interface layer between core system components, allowing customized data flow across the system. This flexibility enables the framework to support diverse tasks from classification to self-supervised learning. Researchers can modify component interactions without changing framework code—simply by configuring adapters. For example, applying sigmoid activation and routing predictions to the right criterion arguments can be done through criterion adapter configuration:
 
 ```yaml
 adapters:
@@ -100,13 +99,12 @@ adapters:
             target_argument: 1 # Pass 'target' to criterion's 2nd arg
 ```
 
-This abstraction layer allows researchers to modify how components interact without changing the core framework code, enabling Lighter to flexibly support diverse tasks, ranging from standard classification to self-supervised learning, through simple adapter configuration changes.
 
 ### Project-specific modules
 
-Lighter provides the integration of project-specific implementations through a modular project structure. Researchers can use their custom components—including novel architectures, specialized datasets, task-specific metrics, and domain-adapted transforms—within a structured project directory. This organization promotes code reusability and maintains a clear separation between framework functionality and project-specific implementations.
+Lighter enables custom implementations through its modular structure. Researchers can integrate specialized components (architectures, datasets, metrics, transforms) in organized project directories, maintaining clear separation between framework functionality and project code.
 
-For example, given a project folder `joss_project` with the following structure:
+For example, a project folder `joss_project`:
 
 ```
 joss_project
@@ -116,8 +114,7 @@ joss_project
     └── mlp.py
 ```
 
-This folder will be imported as a module named `project`, which can then be used to reference the components defined within it:
-
+is imported as the project module, with components accessible in configuration:
 
 ```yaml
 project: /path/to/joss_project
@@ -130,13 +127,11 @@ system:
 
 # Research Contributions That Use Lighter
 
-Lighter has enabled advancements in medical imaging research:
-
 - Foundation model for cancer imaging biomarkers [@Pai2024]
 - Vision Foundation Models for Computed Tomography [@Pai2025]
 
 # Acknowledgments
 
-We thank John Zielke for the idea to use adapter design pattern. We thank the MONAI team (Wenqi Li, Nic Ma, Yun Liu, Eric Kerfoot) for their continuous support with features and improvements related to MONAI Bundle. 
+We thank John Zielke for the adapter design pattern idea. We thank Wenqi Li, Nic Ma, Yun Liu, and Eric Kerfoot for their continuous support with MONAI Bundle. 
 
 # References
