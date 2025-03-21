@@ -65,28 +65,24 @@ Lighter is designed to address several key challenges in deep learning experimen
 
 # Design
 
-Lighter is built upon three fundamental components:
+Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
-1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configuration files that comprehensively define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
+1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configuration files that define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
 
-2.  **`System`**: orchestrates the main building blocks of an experiment: model, optimizer, scheduler, loss function, evaluation metrics, and dataloaders. It implements the logic controlling how these components interact during training, validation, testing, and inference phases, that is modifiable through [adapters](#adapters).
+2.  **`System`**: encapsulates the model, optimizer, scheduler, loss function, metrics, and dataloaders. Importantly, it implements the flow between them that can be customized through [adapters](#adapters) (\autoref{fig:overview_system}).
 
-3. **`Trainer`**:  PyTorch Lightning's `Trainer` handles technical aspects like distributed GPU training, mixed precision computation, and checkpoint management. Lighter uses it to execute the experimental protocol defined by the System.
+3. **`Trainer`**:  PyTorch Lightning's `Trainer` handles aspects like distributed or mixed-precision training and checkpoint management. Lighter uses it to execute the protocol defined by the `System`.
 
-![**Lighter Overview.** Lighter revolves around three main components -- `Trainer,` `System` and `Config`, which contains the definition for the former two. `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configuration files, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).](overview_all.png)
+![**Lighter Overview.** `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configuration files, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).\label{fig:overview_all}](overview_all.png)
 
-## System
-
-The `System` encapsulates experimental elements—neural network architectures, optimization strategies, learning rate schedulers, loss functions, evaluation metrics, and data loaders. It implements a generalized data flow that orchestrates interactions between these elements  during experiments. Through the [adapter](#adapters) mechanism, `System` provides flexibility for diverse research tasks without architectural modifications (\autoref{fig:overview_system}).
-
-![**Flowchart of the `lighter.System`.** A `batch` from the `DataLoader` is processed by `BatchAdapter` to extract `input`, `target` (optional), and `identifier` (optional). The `Model` generates `pred` (predictions) from the `input`. `CriterionAdapter` and `MetricsAdapter` compute loss and metrics, respectively, by applying optional transformations and adapting arguments for the loss and metric functions.  Argument adaptation reorders or names inputs; for example, if a loss function expects `loss_fn(predictions, ground_truth)`, the `CriterionAdapter` maps `pred` to `predictions` and `target` to `ground_truth`. `LoggingAdapter` prepares data for logging. Results, including loss, metrics, and processed data, are returned to the `Trainer`.\label{fig:overview_system}](overview_system.png)
+![**Flowchart of the `lighter.System`.** A `batch` from the `DataLoader` is processed by `BatchAdapter` to extract `input`, `target` (optional), and `identifier` (optional). The `Model` generates `pred` (predictions) from the `input`. `CriterionAdapter` and `MetricsAdapter` compute loss and metrics, respectively, by applying optional transformations and routing arguments for the loss and metric functions. Results, including loss, metrics, and other data prepared for logging by the `LoggingAdapter` are returned to the `Trainer`.\label{fig:overview_system}](overview_system.png)
 
 
 ## Adaptability Through Modular Design
 
 ### Adapters
 
-The adapter pattern creates an interface layer between core system components, allowing customized data flow across the system. This flexibility enables the framework to support diverse tasks from classification to self-supervised learning. Researchers can modify component interactions without changing framework code—simply by configuring adapters. For example, applying sigmoid activation and routing predictions to the right criterion arguments can be done through criterion adapter configuration:
+The adapter pattern creates an interface between core system components, allowing customization of the data flow. By configuring adapters, users can modify how components interact without changing the underlying code. Consequently, Lighter is task-agnostic and applicable to tasks ranging from classification to self-supervised learning. For example, you can implement the following criterion adapter to apply sigmoid activation to predictions and route the data to a criterion's respective arguments:
 
 ```yaml
 adapters:
@@ -102,9 +98,7 @@ adapters:
 
 ### Project-specific modules
 
-Lighter enables custom implementations through its modular structure. Researchers can integrate specialized components (architectures, datasets, metrics, transforms) in organized project directories, maintaining clear separation between framework functionality and project code.
-
-For example, a project folder `joss_project`:
+Lighter's modular design lets researchers add custom components in organized project directories. For example, a project folder like:
 
 ```
 joss_project
@@ -114,7 +108,7 @@ joss_project
     └── mlp.py
 ```
 
-is imported as the project module, with components accessible in configuration:
+is imported as a module named `project`, with its components accessible in configuration:
 
 ```yaml
 project: /path/to/joss_project
