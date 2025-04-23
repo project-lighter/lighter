@@ -2,7 +2,6 @@ from typing import Any
 
 import fire
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.tuner import Tuner
 
 from lighter.engine.config import Config
 from lighter.engine.resolver import Resolver
@@ -39,10 +38,7 @@ class Runner:
 
     def _run_stage(self, stage: str) -> None:
         """Execute the specified stage (method) of the trainer."""
-        if stage in [Stage.LR_FIND, Stage.SCALE_BATCH_SIZE]:
-            stage_method = getattr(Tuner(self.trainer), stage)
-        else:
-            stage_method = getattr(self.trainer, stage)
+        stage_method = getattr(self.trainer, stage)
         stage_method(self.system, **self.args)
 
     def _setup_stage(self, stage: str) -> None:
@@ -93,20 +89,12 @@ def cli():
     def predict(config: str, **config_overrides: Any):
         runner.run(Stage.PREDICT, config, **config_overrides)
 
-    def lr_find(config: str, **config_overrides: Any):
-        runner.run(Stage.LR_FIND, config, **config_overrides)
-
-    def scale_batch_size(config: str, **config_overrides: Any):
-        runner.run(Stage.SCALE_BATCH_SIZE, config, **config_overrides)
-
     fire.Fire(
         {
             "fit": fit,
             "validate": validate,
             "test": test,
             "predict": predict,
-            "lr_find": lr_find,
-            "scale_batch_size": scale_batch_size,
         }
     )
 

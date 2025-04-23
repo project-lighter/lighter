@@ -6,10 +6,8 @@ Lighter uses PyTorch Lightning's Trainer to manage deep learning experiments. Th
 *   **`validate`**: Evaluate model performance on validation data
 *   **`test`**: Evaluate final model performance on test data
 *   **`predict`**: Generate predictions on new data
-*   **`lr_find`**: Find optimal learning rate
-*   **`scale_batch_size`**: Find largest batch size that fits in GPU memory
 
-For documentation on each, please refer to PyTorch Lightning: [`fit`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#fit), [`validate`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#validate), [`test`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#test), [`predict`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#predict), [`lr_find`](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.tuner.tuning.Tuner.html#lightning.pytorch.tuner.tuning.Tuner.lr_find), [`scale_batch_size`](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.tuner.tuning.Tuner.html#lightning.pytorch.tuner.tuning.Tuner.scale_batch_size).
+For documentation on each, please refer to PyTorch Lightning: [`fit`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#fit), [`validate`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#validate), [`test`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#test), [`predict`](https://lightning.ai/docs/pytorch/stable/common/trainer.html#predict).
 
 ## Running a Stage
 
@@ -21,7 +19,7 @@ lighter <stage> config.yaml
 
 Where:
 
-*   `<stage>` is one of the stages mentioned above (e.g., `fit`, `validate`, `test`, `predict`, `lr_find`, `scale_batch_size`).
+*   `<stage>` is one of the stages mentioned above (e.g., `fit`, `validate`, `test`, `predict`).
 *   `config.yaml` is the configuration file that defines your experiment. You can also define multiple config files separated by commas, which will be merged (e.g., `config1.yaml,config2.yaml`).
 
 For example, to train your model, you would use:

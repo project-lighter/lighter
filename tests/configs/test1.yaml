@@ -10,7 +10,3 @@ args:
     some_arg: "value"
   test:
     some_arg: "value"
-  lr_find:
-    some_arg: "value"
-  scale_batch_size:
-    some_arg: "value"
