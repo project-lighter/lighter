@@ -61,7 +61,7 @@ In addition to mandatory `trainer` and `system` sections, you can include the fo
 
 #### Defining `args`
 
-Lighter operates in *stages*: `fit`, `validate`, `test`, `predict`, `lr_find`, and `scale_batch_size`. We will cover these in the [Run](run.md) guide in detail.
+Lighter operates in *stages*: `fit`, `validate`, `test`, and `predict`. We will cover these in the [Run](run.md) guide in detail.
 
 To pass arguments to a stage, use the `args` section in in your config. For example, to set the `ckpt_path` argument of the `fit` stage/method in your config:
 

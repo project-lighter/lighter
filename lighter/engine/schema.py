@@ -25,8 +25,6 @@ SCHEMA = {
             "validate": {"type": "dict"},
             "test": {"type": "dict"},
             "predict": {"type": "dict"},
-            "lr_find": {"type": "dict"},
-            "scale_batch_size": {"type": "dict"},
         },
     },
     "trainer": {"type": "dict", "required": True},

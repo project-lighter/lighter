@@ -12,8 +12,6 @@ class Resolver:
         Stage.VALIDATE: [Mode.VAL],
         Stage.TEST: [Mode.TEST],
         Stage.PREDICT: [Mode.PREDICT],
-        Stage.LR_FIND: [Mode.TRAIN, Mode.VAL],
-        Stage.SCALE_BATCH_SIZE: [Mode.TRAIN, Mode.VAL],
     }
 
     def __init__(self, config: Config):

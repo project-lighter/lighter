@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pytorch_lightning import Trainer
-from pytorch_lightning.tuner import Tuner
 
 from lighter.engine.runner import Runner, cli
 from lighter.system import System
@@ -167,8 +166,7 @@ def test_save_config_without_logger(runner, mock_system):
     mock_system.save_hyperparameters.assert_called_once_with(runner.config.get())
 
 
-@patch("lighter.engine.runner.Tuner")
-def test_run_stage_normal(mock_tuner_class, runner, mock_system, mock_trainer):
+def test_run_stage_normal(runner, mock_system, mock_trainer):
     """Test running normal stages (fit, validate, test, predict)."""
     runner.system = mock_system
     runner.trainer = mock_trainer
@@ -192,26 +190,6 @@ def test_run_stage_normal(mock_tuner_class, runner, mock_system, mock_trainer):
     # Test predict stage
     runner._run_stage(Stage.PREDICT)
     mock_trainer.predict.assert_called_once_with(mock_system, some_arg="value")
-
-
-@patch("lighter.engine.runner.Tuner")
-def test_run_stage_tuner(mock_tuner_class, runner, mock_system, mock_trainer):
-    """Test running tuner stages (lr_find, scale_batch_size)."""
-    runner.system = mock_system
-    runner.trainer = mock_trainer
-    runner.args = {"some_arg": "value"}
-
-    mock_tuner = MagicMock()
-    mock_tuner_class.return_value = mock_tuner
-
-    # Test lr_find stage
-    runner._run_stage(Stage.LR_FIND)
-    mock_tuner.lr_find.assert_called_once_with(mock_system, some_arg="value")
-    mock_tuner.reset_mock()
-
-    # Test scale_batch_size stage
-    runner._run_stage(Stage.SCALE_BATCH_SIZE)
-    mock_tuner.scale_batch_size.assert_called_once_with(mock_system, some_arg="value")
 
 
 def test_run_stage_invalid_stage(runner, mock_trainer):
@@ -256,6 +234,4 @@ def test_cli_fire_interface(mock_fire):
         "validate",
         "test",
         "predict",
-        "lr_find",
-        "scale_batch_size",
     }
