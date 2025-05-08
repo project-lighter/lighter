@@ -112,7 +112,7 @@ class SimpleCNN(nn.Module):
 Now that we have defined the model, let's specify it in the `config.yaml` file.
 
 ```yaml title="config.yaml" hl_lines="1 5"
-project: /path/to/image_classification
+project: ./image_classification
 
 system:
   model:
@@ -128,7 +128,7 @@ The `project` section tells Lighter where to import the project module from. Thi
 Now, let's put together the complete `config.yaml` file for training the `SimpleCNN` on CIFAR10:
 
 ```yaml title="config.yaml"
-project: /path/to/image_classification
+project: ./image_classification
 
 trainer:
     _target_: pytorch_lightning.Trainer
