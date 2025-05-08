@@ -174,6 +174,10 @@ class System(pl.LightningModule):
             metrics = getattr(self.metrics, self.mode)
             if metrics is not None:
                 adapters = getattr(self.adapters, self.mode)
+                try:
+                    metrics = metrics.to(input.device)
+                except AttributeError:
+                    pass
                 metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
 
