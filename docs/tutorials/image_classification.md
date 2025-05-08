@@ -10,9 +10,9 @@ In this tutorial we will learn how to:
 First, create a new project directory named `image_classification` with the following structure:
 
 ```plaintext
+config.yaml
 image_classification/
 ├── __init__.py
-├── config.yaml
 └── models/
     ├── __init__.py
     └── simple_cnn.py
