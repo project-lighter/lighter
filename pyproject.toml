@@ -74,10 +74,6 @@ docs = [
     "mkdocstrings[python]>=0.29.1",
 ]
 
-[tool.uv]
-# This ensures dev dependencies are always installed by default
-default-groups = ["dev"]
-
 [tool.hatch.build.targets.sdist]
 include = ["lighter"]
 
