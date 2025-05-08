@@ -8,7 +8,7 @@ In this tutorial we will learn how to:
 ## Setting up the Project
 
 First, create a new project directory named `image_classification` with the following structure:
-    
+
 ```plaintext
 image_classification/
 ├── __init__.py
@@ -147,6 +147,7 @@ system:
 
     optimizer:
         _target_: torch.optim.Adam
+        params: "$@system#model.parameters()" # Link to model's learnable parameters
         lr: 1.0e-3
 
     metrics:
@@ -224,6 +225,6 @@ Lighter will load the best checkpoint saved during training (if a `ModelCheckpoi
 
 ## Next Steps
 
-In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter. 
+In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter.
 
 You now have a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/project_module.md) to explore Lighter's features in more detail.
