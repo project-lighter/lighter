@@ -111,7 +111,7 @@ indent = 4
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = 3.10
+python_version = "3.10"
 pretty = true
 show_traceback = true
 
