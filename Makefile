@@ -6,11 +6,11 @@ PYTHONPATH := `pwd`
 # Install uv so we can do everything with it
 .PHONY: setup
 setup:
-	pip install uv
+	curl -LsSf https://astral.sh/uv/install.sh | sh
 
 .PHONY: install
 install:
-	uv pip install -e .
+	uv sync
 
 #* Formatters
 .PHONY: codestyle
@@ -67,3 +67,7 @@ bump-minor:
 .PHONY: bump-major
 bump-major:
 	uvx --with poetry-bumpversion poetry version major
+
+.PHONY: docs
+docs:
+	uv run --group docs mkdocs serve
