@@ -15,7 +15,7 @@ install:
 #* Formatters
 .PHONY: codestyle
 codestyle:
-	uvx pyupgrade --exit-zero-even-if-changed --py37-plus **/*.py
+	uvx pyupgrade --exit-zero-even-if-changed --py310-plus **/*.py
 	uvx isort --settings-path pyproject.toml ./
 	uvx black --config pyproject.toml ./
 
