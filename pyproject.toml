@@ -39,7 +39,6 @@ dependencies = [
     "monai>=1.4.0",
     "rich>=13.7.0",
     "torchvision>=0.20.0",
-    "lightly>=1.5.13",
     "cerberus>=1.3.7",
 ]
 
