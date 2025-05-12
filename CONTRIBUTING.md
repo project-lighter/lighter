@@ -47,11 +47,11 @@ make codestyle
 ```
 
 ### Checks
-Ensure that `check-codestyle` passes. 
+Ensure that `check-codestyle` passes.
 
 
 ### Tests
-Ensure all tests pass when running 
+Ensure all tests pass when running
 
 ```bash
 make test
@@ -63,7 +63,7 @@ make test
 Before submitting your code:
 
 1. Add any changes you want
-2. Add tests for the new changes  
+2. Add tests for the new changes
 3. Edit documentation if you have changed something significant
 4. Format all your code
 ```bash
@@ -85,17 +85,10 @@ You can contribute by:
 # Documentation contribution
 Our documentation is built using mkdocs and mkdocs-material. API reference is generated from docstrings using mkdocstrings.
 
-## Dependencies
-To install documentation requirements:
-
-```bash
-uv pip install mkdocs-material mkdocs-autorefs mkdocstrings mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
-```
-
 ## Serving the documentation locally
 
 ```bash
-mkdocs serve
+make docs
 ```
 
 ## Deploying the documentation
