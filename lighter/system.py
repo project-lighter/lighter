@@ -3,8 +3,9 @@ This module defines the System class, which encapsulates the components of a dee
 including the model, optimizer, datasets, and more. It extends PyTorch Lightning's LightningModule.
 """
 
-from typing import Any, Callable
+from typing import Any
 
+from collections.abc import Callable
 from dataclasses import asdict
 
 import pytorch_lightning as pl
