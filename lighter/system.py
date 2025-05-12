@@ -3,10 +3,10 @@ This module defines the System class, which encapsulates the components of a dee
 including the model, optimizer, datasets, and more. It extends PyTorch Lightning's LightningModule.
 """
 
-from typing import Any
-
+import contextlib
 from collections.abc import Callable
 from dataclasses import asdict
+from typing import Any
 
 import pytorch_lightning as pl
 from torch import Tensor
@@ -175,10 +175,10 @@ class System(pl.LightningModule):
             metrics = getattr(self.metrics, self.mode)
             if metrics is not None:
                 adapters = getattr(self.adapters, self.mode)
-                try:
+                # Move metrics to the same device as input if they have the 'to' method,
+                # which probably means they are an instance of torchmetrics.MetricCollection
+                with contextlib.suppress(AttributeError):
                     metrics = metrics.to(input.device)
-                except AttributeError:
-                    pass
                 metrics = adapters.metrics(metrics, input, target, pred)
         return metrics
 
