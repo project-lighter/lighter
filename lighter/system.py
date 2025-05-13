@@ -18,6 +18,7 @@ from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_m
 from torchmetrics import Metric, MetricCollection
 
 from lighter.utils.misc import get_optimizer_stats, hasarg
+from lighter.utils.patches import PatchedModuleDict
 from lighter.utils.types.containers import Adapters, DataLoaders, Metrics
 from lighter.utils.types.enums import Data, Mode
 
@@ -55,19 +56,22 @@ class System(pl.LightningModule):
     ) -> None:
         super().__init__()
 
-        # Model setup
         self.model = model
-        self.dataloaders = DataLoaders(**(dataloaders or {}))
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
+        self.inferer = inferer
+
+        #  Containers
+        self.dataloaders = DataLoaders(**(dataloaders or {}))
         self.metrics = Metrics(**(metrics or {}))
         self.adapters = Adapters(**(adapters or {}))
-        self.inferer = inferer
+
+        # Turn metrics container into a ModuleDict to register them properly.
+        self.metrics = PatchedModuleDict(asdict(self.metrics))
 
         self.mode = None
         self._setup_mode_hooks()
-        self._register_metrics()
 
     def _step(self, batch: dict, batch_idx: int) -> dict[str, Any] | Any:
         """
@@ -170,12 +174,11 @@ class System(pl.LightningModule):
         Returns:
             The calculated metrics or None if in predict mode or no metrics specified.
         """
-        metrics = None
-        if self.mode != Mode.PREDICT:
-            metrics = getattr(self.metrics, self.mode)
-            if metrics is not None:
-                adapters = getattr(self.adapters, self.mode)
-                metrics = adapters.metrics(metrics, input, target, pred)
+        if self.mode == Mode.PREDICT or self.metrics[self.mode] is None:
+            return None
+
+        adapters = getattr(self.adapters, self.mode)
+        metrics = adapters.metrics(self.metrics[self.mode], input, target, pred)
         return metrics
 
     def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
@@ -275,15 +278,6 @@ class System(pl.LightningModule):
             return {"optimizer": self.optimizer}
         else:
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
-
-    def _register_metrics(self):
-        """
-        Registers metrics as modules to ensure they are moved to the appropriate device.
-        """
-        # Workaround because ModuleDict has 'train' as a reserved key.
-        for mode, metric in asdict(self.metrics).items():
-            if isinstance(metric, Module):
-                self.add_module(f"{Data.METRICS}_{mode}", metric)
 
     def _setup_mode_hooks(self):
         """
