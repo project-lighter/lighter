@@ -10,17 +10,25 @@ In this tutorial we will learn how to:
 First, create a new project directory named `image_classification` with the following structure:
 
 ```plaintext
-config.yaml
 image_classification/
 ├── __init__.py
+├── experiments/
+    └── config.yaml
 └── models/
     ├── __init__.py
     └── simple_cnn.py
 ```
 
+If you're using Unix/Linux, you can create this structure with the following command:
+```bash
+mkdir -p image_classification/{models,experiments} && touch image_classification/__init__.py image_classification/experiments/config.yaml image_classification/models/__init__.py image_classification/models/simple_cnn.py
+
+```
+
 !!! warning
 
-    Do not forget the `__init__.py` files. For more details, refer to the [Project Module](../how-to/project_module.md) guide.
+    Do not forget to add `__init__.py` to folders that contain Python modules. For more details, refer to the [Project Module](../how-to/project_module.md) guide.
+
 
 ## Setting up Dataloaders
 
@@ -112,7 +120,7 @@ class SimpleCNN(nn.Module):
 Now that we have defined the model, let's specify it in the `config.yaml` file.
 
 ```yaml title="config.yaml" hl_lines="1 5"
-project: ./image_classification
+project: /path/to/image_classification
 
 system:
   model:
@@ -120,19 +128,30 @@ system:
     num_classes: 10  # Matches CIFAR10 classes
 ```
 
-The `project` section tells Lighter where to import the project module from. This allows us to use our `SimpleCNN` class by referencing `project.models.simple_cnn.SimpleCNN`.
+The `project` specifies the root directory that Lighter will import as a Python module, allowing access to custom code and models. This is why we needed to set up `__init__.py` files. As a result, we reference the custom model we defined simply using `project.models.simple_cnn.SimpleCNN`.
 
+!!! note
+    Learn more about the [Project Module](../how-to/project_module.md) in the How-To guide.
+
+!!! warning
+    Change `/path/to/image_classification` to the location of your project directory. Both absolute and relative paths work. To get the absolute path of your `image_classification/` directory, run:
+    ```bash
+    cd image_classification
+    pwd
+    ```
+    
+    If you're using a relative path, pay attention to where you are executing `lighter` from. For example, if running `lighter` while in the `image_classification/` folder, you can simply set `project: .` to reference the current directory.
 
 ## Complete Configuration
 
 Now, let's put together the complete `config.yaml` file for training the `SimpleCNN` on CIFAR10:
 
 ```yaml title="config.yaml"
-project: ./image_classification
+project: /path/to/image_classification  # Update as noted above
 
 trainer:
     _target_: pytorch_lightning.Trainer
-    accelerator: "auto" # Use GPU if available, else CPU
+    accelerator: "auto"  # Use GPU if available, else CPU
     max_epochs: 10
 
 system:
@@ -147,7 +166,7 @@ system:
 
     optimizer:
         _target_: torch.optim.Adam
-        params: "$@system#model.parameters()" # Link to model's learnable parameters
+        params: "$@system#model.parameters()"  # Link to model's learnable parameters
         lr: 1.0e-3
 
     metrics:
@@ -208,7 +227,7 @@ This configuration defines all the necessary components for training and testing
 To start training, save the above configuration as `config.yaml` in your project directory. Ensure that you have created the `image_classification/models/simple_cnn.py` file as well. Then, open your terminal, navigate to your project directory, and run the following command:
 
 ```bash title="Terminal"
-lighter fit config.yaml
+lighter fit experiments/config.yaml
 ```
 
 Lighter will parse your `config.yaml`, initialize all the components, and start the training process using PyTorch Lightning. You will see the training progress, including loss and metrics, logged in your terminal.
@@ -218,7 +237,7 @@ Lighter will parse your `config.yaml`, initialize all the components, and start 
 After training, you can evaluate your model on the test set:
 
 ```bash title="Terminal"
-lighter test config.yaml
+lighter test experiments/config.yaml
 ```
 
 Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the`test` stage, respectively.
