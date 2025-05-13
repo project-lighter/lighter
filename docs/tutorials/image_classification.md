@@ -246,4 +246,4 @@ Lighter will load the best checkpoint saved during training (if a `ModelCheckpoi
 
 In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter.
 
-You now have a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/project_module.md) to explore Lighter's features in more detail.
+You now have a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/configure.md) to explore Lighter's features in more detail.
