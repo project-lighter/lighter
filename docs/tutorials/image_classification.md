@@ -13,16 +13,16 @@ First, create a new project directory named `image_classification` with the foll
 image_classification/
 ├── __init__.py
 ├── experiments/
-    └── config.yaml
+│  └── config.yaml
 └── models/
     ├── __init__.py
     └── simple_cnn.py
 ```
 
 If you're using Unix/Linux, you can create this structure with the following command:
+
 ```bash
 mkdir -p image_classification/{models,experiments} && touch image_classification/__init__.py image_classification/experiments/config.yaml image_classification/models/__init__.py image_classification/models/simple_cnn.py
-
 ```
 
 !!! warning
