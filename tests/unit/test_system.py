@@ -100,9 +100,9 @@ def test_system_initialization(simple_system):
     assert simple_system.optimizer is not None
     assert simple_system.scheduler is not None
     assert simple_system.criterion is not None
-    assert simple_system.metrics.train is not None
-    assert simple_system.metrics.val is not None
-    assert simple_system.metrics.test is not None
+    assert simple_system.metrics["train"] is not None
+    assert simple_system.metrics["val"] is not None
+    assert simple_system.metrics["test"] is not None
 
 
 def test_configure_optimizers(simple_system):

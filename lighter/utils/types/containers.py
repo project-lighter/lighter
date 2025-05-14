@@ -42,10 +42,9 @@ class Metrics:
         self.test = self._convert_to_collection(self.test)
 
     def _convert_to_collection(self, x):
-        if x is None:
-            return x
-        if not isinstance(x, MetricCollection):
+        if x is not None and not isinstance(x, MetricCollection):
             return MetricCollection(x)
+        return x
 
 
 @dataclass
