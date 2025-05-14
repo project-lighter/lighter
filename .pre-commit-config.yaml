@@ -6,8 +6,8 @@ repos:
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
-      - id: trailing-whitespace
         exclude: LICENSE
+      - id: trailing-whitespace
 
   - repo: local
     hooks:
