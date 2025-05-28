@@ -140,7 +140,7 @@ tensorboard/
 *.csv
 *.npy
 
-# Pytorch models 
+# Pytorch models
 *.torch
 
 # Our ignores
@@ -153,6 +153,7 @@ prototyping*
 *.code-workspace
 .scale_batch_size*
 **/*.txt
+.ruff_cache
 
 # Projects folder
 projects/*

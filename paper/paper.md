@@ -46,34 +46,29 @@ bibliography: paper.bib
 
 # Summary
 
-Lighter is an open-source Python deep learning [framework](https://github.com/project-lighter/lighter) that builds upon PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] and [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022]. It streamlines deep learning research through YAML-based configuration that decouples experiment setup from implementation details. Researchers define models, datasets, and other components via structured configuration files, reducing boilerplate while maintaining control. The framework enhances reproducibility through configuration snapshots and supports extensibility via adapters and project-specific modules. By abstracting engineering complexities, Lighter allows researchers to focus on innovation, accelerate hypothesis testing, and facilitate rigorous validation across domains.
+Lighter is a configuration-driven deep learning (DL) [framework](https://github.com/project-lighter/lighter) that separates experimental setup from code implementation. Models, datasets, and other components are defined through structured configuration files (configs). Configs serve as snapshots of the experiments, enhancing reproducibility while eliminating unstructured and repetitive scripts. Lighter uses (i) PyTorch Lightning [@Falcon_PyTorch_Lightning_2019] to implement a task-agnostic DL logic, and (ii) [MONAI Bundle configuration](https://docs.monai.io/en/stable/config_syntax.html#) [@Cardoso_MONAI_An_open-source_2022] to manage experiments using YAML configs.
 
 # Statement of Need
 
-Lighter is designed to address several key challenges in deep learning experimentation:
+Lighter addresses several challenges in DL experimentation:
 
-1.  **Boilerplate Code:** Writing code for training loops, data loading, metric calculations, and experiment setups is repetitive and can vary greatly between projects. *Lighter abstracts these repetitive tasks, exposing only the components that differ across projects.*
+1. **Repetitive and Error-Prone Setups**: DL typically involves significant boilerplate code for training loops, data loading, and metric calculations. The numerous hyperparameters and components across experiments can easily become complex and error-prone. Lighter abstracts these repetitive tasks and uses centralized configs for a clear, manageable experimental setup, reducing tedium and potential for errors.
 
-2.  **Experiment Management:** Handling numerous hyperparameters and configurations across various experiments can become cumbersome and error-prone. *Lighter offers organized configuration through YAML files, providing a **centralized record of all experiment parameters**.*
+2. **Reproducibility and Collaboration**: Inconsistent or complex codebases hinder collaboration and experiment reproduction. Lighter's self-documenting configs offer clear, structured snapshots of each experiment. This greatly improves reproducibility and simplifies how teams share and reuse setups.
 
-3.  **Reproducibility:** Reproducing experiments from different implementations can be challenging. *Lighter's **self-contained configuration files** serve as comprehensive documentation, facilitating the exact recreation of experimental setups.*
-
-4.  **Collaboration:** Collaborating on experiments often requires understanding complex codebases. *Lighter enhances collaboration by using standardized configurations, making it easier to share and reuse experiment setups within and across research teams.*
-
-5.  **Slowed Iteration:** The cumulative effect of these challenges slows down the research iteration cycle. *Lighter accelerates iteration by streamlining the experiment setup process, allowing researchers to focus on core experiment choices without being bogged down by infrastructure concerns.*
-
+3. **Pace of Research Iteration**: The cumulative effect of these challenges inherently slows down the research cycle. Lighter streamlines the entire experimental process, allowing researchers to focus on core hypotheses and iterate on ideas  efficiently.
 
 # Design
 
 Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
-1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configuration files that define all aspects of the experimental setup. Within these configuration files, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
+1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configs that define all aspects of the experimental setup. Within these configs, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
 
 2.  **`System`**: encapsulates the model, optimizer, scheduler, loss function, metrics, and dataloaders. Importantly, it implements the flow between them that can be customized through [adapters](#adapters) (\autoref{fig:overview_system}).
 
 3. **`Trainer`**:  PyTorch Lightning's `Trainer` handles aspects like distributed or mixed-precision training and checkpoint management. Lighter uses it to execute the protocol defined by the `System`.
 
-![**Lighter Overview.** `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configuration files, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).\label{fig:overview_all}](overview_all.png)
+![**Lighter Overview.** `Config` leverages MONAI's `ConfigParser` for parsing the user-defined YAML configs, and its features are used by Runner to instantiate the `System` and `Trainer`. `Trainer` is used directly from PyTorch Lightning, whereas `System` inherits from `LightningModule`, ensuring its compatibility with `Trainer` while implementing a logic generalizable to any task or type of data. Finally, `Runner` runs the paired `Trainer` and `System` for a particular stage (e.g., fit or test).\label{fig:overview_all}](overview_all.png)
 
 ![**Flowchart of the `lighter.System`.** A `batch` from the `DataLoader` is processed by `BatchAdapter` to extract `input`, `target` (optional), and `identifier` (optional). The `Model` generates `pred` (predictions) from the `input`. `CriterionAdapter` and `MetricsAdapter` compute loss and metrics, respectively, by applying optional transformations and routing arguments for the loss and metric functions. Results, including loss, metrics, and other data prepared for logging by the `LoggingAdapter` are returned to the `Trainer`.\label{fig:overview_system}](overview_system.png)
 
@@ -82,9 +77,10 @@ Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
 ### Adapters
 
-The adapter pattern creates an interface between core system components, allowing customization of the data flow. By configuring adapters, users can modify how components interact without changing the underlying code. Consequently, Lighter is task-agnostic and applicable to tasks ranging from classification to self-supervised learning. For example, you can implement the following criterion adapter to apply sigmoid activation to predictions and route the data to a criterion's respective arguments:
+If we consider all possible DL tasks, we will find it challenging to implement a single flow that supports all. Some frameworks have handled this by introducing a flow for each task (e.g., segmentation, classification, etc.). However, to allow full flexibility, Lighter's design allows researchers to modify the generalized flow via *adapter* classes. In software design, adapter design pattern enables components with incompatible interfaces to work together by bridging them using an adapter class. In Lighter, these bridges (\autoref{fig:overview_system}) specify how, for example, the model's predictions and other data are routed to the loss function or metrics. They additionally allow transformations to be applied to the data before passing it to the next component. This can be useful for tasks like binary classification, where the model's output needs to be transformed (e.g., applying a sigmoid activation function) before computing the loss or metrics. Another example would be logging, where the data often needs to be transformed before it is logged.
 
 ```yaml
+# Example of an adapter transforming and routing data to the loss function
 adapters:
     train:
         criterion:
@@ -124,8 +120,11 @@ system:
 - Foundation model for cancer imaging biomarkers [@Pai2024]
 - Vision Foundation Models for Computed Tomography [@Pai2025]
 
+# Comparison with Other Tools
+<!-- TODO -->
+
 # Acknowledgments
 
-We thank John Zielke for the adapter design pattern idea. We thank Wenqi Li, Nic Ma, Yun Liu, and Eric Kerfoot for their continuous support with MONAI Bundle. 
+We thank John Zielke for the adapter design pattern idea. We thank Wenqi Li, Nic Ma, Yun Liu, and Eric Kerfoot for their continuous support with MONAI Bundle.
 
 # References
