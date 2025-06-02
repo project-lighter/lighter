@@ -58,6 +58,11 @@ Lighter addresses several challenges in DL experimentation:
 
 3. **Pace of Research Iteration**: The cumulative effect of these challenges inherently slows down the research cycle. Lighter streamlines the entire experimental process, allowing researchers to focus on core hypotheses and iterate on ideas  efficiently.
 
+# State of the Field
+
+Config-driven frameworks like Ludwig [@Ludwig], Quadra [@Quadra], and GaNDLF [@Gandlf] provide high levels of abstraction by encapsulating all components within predefined structures. While this approach simplifies usage, it limits flexibility to modify the flow or extend components, often requiring direct source code changes.
+Lighter takes a different approach by providing medium-level abstraction. It implements a unified flow while maintaining direct compatibility with standard PyTorch components (models, datasets, optimizers). The flow itself is modifiable to any task via [adapters](#adapters), while custom code is [importable via config](#project-specific-modules) without source code modifications.
+
 # Design
 
 Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
@@ -72,12 +77,11 @@ Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
 ![**Flowchart of the `lighter.System`.** A `batch` from the `DataLoader` is processed by `BatchAdapter` to extract `input`, `target` (optional), and `identifier` (optional). The `Model` generates `pred` (predictions) from the `input`. `CriterionAdapter` and `MetricsAdapter` compute loss and metrics, respectively, by applying optional transformations and routing arguments for the loss and metric functions. Results, including loss, metrics, and other data prepared for logging by the `LoggingAdapter` are returned to the `Trainer`.\label{fig:overview_system}](overview_system.png)
 
-
 ## Adaptability Through Modular Design
 
 ### Adapters
 
-If we consider all possible DL tasks, we will find it challenging to implement a single flow that supports all. Some frameworks have handled this by introducing a flow for each task (e.g., segmentation, classification, etc.). However, to allow full flexibility, Lighter's design allows researchers to modify the generalized flow via *adapter* classes. In software design, adapter design pattern enables components with incompatible interfaces to work together by bridging them using an adapter class. In Lighter, these bridges (\autoref{fig:overview_system}) specify how, for example, the model's predictions and other data are routed to the loss function or metrics. They additionally allow transformations to be applied to the data before passing it to the next component. This can be useful for tasks like binary classification, where the model's output needs to be transformed (e.g., applying a sigmoid activation function) before computing the loss or metrics. Another example would be logging, where the data often needs to be transformed before it is logged.
+If we consider all possible DL tasks, we will find it challenging to implement a single flow that supports all. Instead, frameworks often implement per-task flows (e.g., segmentation, classification, etc.). Lighter, however, implements a unified flow modifiable via *adapter classes*. In software design, *adapter design pattern* enables components with incompatible interfaces to work together by *bridging* them using an adapter class. In Lighter, these bridges (\autoref{fig:overview_system}) specify how, for example, the model's predictions and other data are routed to the loss function or metrics. They additionally allow transformations to be applied to the data before passing it to the next component. This can be useful for tasks like binary classification, where the model's output needs to be transformed (e.g., applying a sigmoid activation function) before computing the loss or metrics. Another example would be logging, where the data often needs to be transformed before it is logged.
 
 ```yaml
 # Example of an adapter transforming and routing data to the loss function
@@ -87,14 +91,14 @@ adapters:
             _target_: lighter.adapters.CriterionAdapter
             pred_transforms:   # Apply sigmoid activation to predictions
                 _target_: torch.sigmoid
-            pred_argument: 0   # Pass 'pred' to criterion's 1st arg
-            target_argument: 1 # Pass 'target' to criterion's 2nd arg
+            pred_argument: 0   # Pass 'pred' to criterion's first arg
+            target_argument: 1 # Pass 'target' to criterion's second arg
 ```
 
 
 ### Project-specific modules
 
-Lighter's modular design lets researchers add custom components in organized project directories. For example, a project folder like:
+Using custom components does not require modifying the framework. Instead, they can be defined within a *project folder* like:
 
 ```
 joss_project
@@ -104,13 +108,13 @@ joss_project
     └── mlp.py
 ```
 
-is imported as a module named `project`, with its components accessible in configuration:
+By specifying the project path in the config, it is imported as a module whose components can be referenced in the config:
 
 ```yaml
-project: /path/to/joss_project
+project: /path/to/joss_project  # Path to the directory above
 system:
     model:
-        _target_: project.models.mlp.MLP
+        _target_: project.models.mlp.MLP  # Reference to the custom model
         input_size: 784
         num_classes: 10
 ```
@@ -119,9 +123,6 @@ system:
 
 - Foundation model for cancer imaging biomarkers [@Pai2024]
 - Vision Foundation Models for Computed Tomography [@Pai2025]
-
-# Comparison with Other Tools
-<!-- TODO -->
 
 # Acknowledgments
 
