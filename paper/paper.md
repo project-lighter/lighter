@@ -60,16 +60,16 @@ Lighter addresses several challenges in DL experimentation:
 
 # State of the Field
 
-Config-driven frameworks like Ludwig [@Ludwig], Quadra [@Quadra], and GaNDLF [@Gandlf] provide high levels of abstraction by encapsulating all components within predefined structures. While this approach simplifies usage, it limits flexibility to modify the flow or extend components, often requiring direct source code changes.
-Lighter takes a different approach by providing medium-level abstraction. It implements a unified flow while maintaining direct compatibility with standard PyTorch components (models, datasets, optimizers). The flow itself is modifiable to any task via [adapters](#adapters), while custom code is [importable via config](#project-specific-modules) without source code modifications.
+Config-driven frameworks like Ludwig [@Ludwig], Quadra [@Quadra], and GaNDLF [@Gandlf] offer high level of abstraction by providing predefined structures and pipelines. While this approach simplifies usage, it limits flexibility to modify the pipeline or extend components, often requiring direct source code changes.
+Lighter takes a different approach by providing medium-level abstraction. It implements a flexible pipeline that maintains direct compatibility with standard PyTorch components (models, datasets, optimizers). The pipeline itself is modifiable to any task via [adapters](#adapters), while custom code is [importable via config](#project-specific-modules) without source code modifications.
 
 # Design
 
 Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
-1.  **`Config`**: serves as the experiment's blueprint, parsing and validating YAML configs that define all aspects of the experimental setup. Within these configs, researchers specify the `System` and `Trainer` parameters, creating a self-documenting record of the experiment.
+1.  **`Config`**: serves as the primary interface for interacting with Lighter. It parses and validates YAML configs that define all components, creating a self-documenting record of each experiment.
 
-2.  **`System`**: encapsulates the model, optimizer, scheduler, loss function, metrics, and dataloaders. Importantly, it implements the flow between them that can be customized through [adapters](#adapters) (\autoref{fig:overview_system}).
+2.  **`System`**: encapsulates the components (model, optimizer, scheduler, loss function, metrics, and dataloaders) and connects them into a pipeline that can be customized through [adapters](#adapters) (\autoref{fig:overview_system}).
 
 3. **`Trainer`**:  PyTorch Lightning's `Trainer` handles aspects like distributed or mixed-precision training and checkpoint management. Lighter uses it to execute the protocol defined by the `System`.
 
@@ -81,7 +81,7 @@ Lighter is built upon three fundamental components (\autoref{fig:overview_all}):
 
 ### Adapters
 
-If we consider all possible DL tasks, we will find it challenging to implement a single flow that supports all. Instead, frameworks often implement per-task flows (e.g., segmentation, classification, etc.). Lighter, however, implements a unified flow modifiable via *adapter classes*. In software design, *adapter design pattern* enables components with incompatible interfaces to work together by *bridging* them using an adapter class. In Lighter, these bridges (\autoref{fig:overview_system}) specify how, for example, the model's predictions and other data are routed to the loss function or metrics. They additionally allow transformations to be applied to the data before passing it to the next component. This can be useful for tasks like binary classification, where the model's output needs to be transformed (e.g., applying a sigmoid activation function) before computing the loss or metrics. Another example would be logging, where the data often needs to be transformed before it is logged.
+If we consider all possible DL tasks, we will find it challenging to implement a single pipeline that supports all. Instead, frameworks often implement per-task pipelines (e.g., segmentation, classification, etc.). By contrast, Lighter implements a unified pipeline modifiable via *adapter classes*. In software design, *adapter design pattern* enables components with incompatible interfaces to work together by *bridging* them using an adapter class. In Lighter, these bridges (\autoref{fig:overview_system}) specify how components should interact across data types and tasks. For example, a model's output will differ based on the task (e.g., segmentation, regression), and the adapter will specify how to pass them on to the next component (e.g., criterion or metrics). This design allows Lighter to handle any task without requiring changes to the source code.
 
 ```yaml
 # Example of an adapter transforming and routing data to the loss function
@@ -94,7 +94,6 @@ adapters:
             pred_argument: 0   # Pass 'pred' to criterion's first arg
             target_argument: 1 # Pass 'target' to criterion's second arg
 ```
-
 
 ### Project-specific modules
 
