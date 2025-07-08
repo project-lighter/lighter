@@ -3,6 +3,7 @@ This module provides utilities for dynamic imports, allowing optional imports an
 """
 
 import importlib
+import importlib.util
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -62,7 +63,7 @@ class OptionalImports:
 OPTIONAL_IMPORTS = OptionalImports()
 
 
-def import_module_from_path(module_name: str, module_path: str) -> None:
+def import_module_from_path(module_name: str, module_path: Path) -> None:
     """
     Import a module from a given path and assign it a specified name.
 
@@ -84,6 +85,8 @@ def import_module_from_path(module_name: str, module_path: str) -> None:
     if not module_path.is_file():
         raise FileNotFoundError(f"No `__init__.py` in `{module_path}`.")
     spec = importlib.util.spec_from_file_location(module_name, str(module_path))
+    if spec is None:
+        raise ModuleNotFoundError(f"Could not find module '{module_name}' at '{module_path}'.")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules[module_name] = module

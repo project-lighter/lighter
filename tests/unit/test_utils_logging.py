@@ -25,7 +25,7 @@ def test_warnings_handler():
     # Mock logger to verify warning is captured
     with patch.object(logger, "opt", mock_logger.opt):
         # Trigger a warning
-        warnings.warn("Test warning")
+        warnings.warn("Test warning", stacklevel=2)
         # Verify the warning was captured by loguru
         mock_logger.opt.assert_called_with(depth=2)
         mock_opt.warning.assert_called_once()

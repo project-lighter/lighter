@@ -26,7 +26,7 @@ theme:
 
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      scheme: default 
+      scheme: default
       toggle:
         icon: fontawesome/solid/lightbulb
         name: Switch to dark mode
@@ -55,6 +55,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          paths: [src]
           options:
             # Removed the default filter that excludes private members (that is, members whose names start with a single underscore).
             filters: null
@@ -76,7 +77,7 @@ nav:
   - Design:
       - Overview: design/overview.md
   - API Reference: reference/
-  
+
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
@@ -88,13 +89,13 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - attr_list
-  - md_in_html      
+  - md_in_html
   - def_list
   - pymdownx.tasklist:
-      custom_checkbox: true  
+      custom_checkbox: true
   - admonition
   - pymdownx.details
-  - pymdownx.superfences      
+  - pymdownx.superfences
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg

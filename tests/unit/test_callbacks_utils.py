@@ -1,4 +1,3 @@
-import pytest
 import torch
 
 from lighter.callbacks.utils import preprocess_image

@@ -1,0 +1,37 @@
+name: Code quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  check:
+    name: tox env ${{ matrix.tox_env }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tox_env:
+          - format
+          - lint
+          # - types
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run check for tox env "${{ matrix.tox_env }}"
+        run: uvx --with tox-uv -- tox -e ${{ matrix.tox_env }}

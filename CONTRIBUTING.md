@@ -25,7 +25,7 @@ source .venv/bin/activate
 
 2. Install development dependencies:
 ```bash
-uv sync
+uv sync --dev
 ```
 
 3. Install pre-commit hooks:
@@ -38,23 +38,18 @@ uvx pre-commit install
 After installation you may execute code formatting:
 
 ```bash
-make check-codestyle
-```
-
-To fix this run,
-```bash
-make codestyle
+just format
 ```
 
 ### Checks
-Ensure that `check-codestyle` passes.
+Ensure that `just format`, `just lint`, and `just types` pass.
 
 
 ### Tests
 Ensure all tests pass when running
 
 ```bash
-make test
+just test
 ```
 
 
@@ -67,12 +62,42 @@ Before submitting your code:
 3. Edit documentation if you have changed something significant
 4. Format all your code
 ```bash
-make codestyle
+just format
 ```
 5. Run all checks:
 ```bash
-make lint
+just lint
+just types
 ```
+
+## Version Management and Releases
+
+This project uses `bump-my-version` for versioning and Git tags for releases, similar to [TorchIO](https://github.com/fepegar/torchio).
+
+**Versioning:**
+The version is managed in `pyproject.toml` and `src/lighter/__init__.py`. To update the version, use `bump-my-version` via `just`:
+
+```bash
+just bump-version <patch|minor|major>
+```
+For example, to bump a patch version:
+```bash
+just bump-version patch
+```
+This command will automatically:
+1.  Update the `version` in `pyproject.toml`.
+2.  Update the `__version__` in `src/lighter/__init__.py`.
+3.  Create a Git commit with the version bump.
+4.  Create a Git tag (e.g., `v0.1.1`) corresponding to the new version.
+
+**Automated Release Process:**
+Upon pushing a Git tag (e.g., `git push origin v0.1.1`), a GitHub Actions workflow automatically:
+1.  Builds the package using `uv build`.
+2.  Publishes the package to PyPI using `uv publish`.
+
+**Important:**
+*   For PyPI publishing to work, ensure the `PYPI_TOKEN` secret is configured in the GitHub repository settings.
+*   This setup does *not* automatically create a GitHub Release. You will need to create GitHub Releases manually if desired.
 
 ## Other help
 
@@ -88,7 +113,7 @@ Our documentation is built using mkdocs and mkdocs-material. API reference is ge
 ## Serving the documentation locally
 
 ```bash
-make docs
+just docs
 ```
 
 ## Deploying the documentation

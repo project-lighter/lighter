@@ -10,7 +10,7 @@
 
 <div align="center">
 
-[![build](https://github.com/project-lighter/lighter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/ci.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp)
+[![build](https://github.com/project-lighter/lighter/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/tests.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp)
 
 </div>
 

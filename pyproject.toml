@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
 
 [project]
 name = "lighter"
@@ -50,21 +50,17 @@ Repository = "https://github.com/lighter/lighter"
 lighter = "lighter.engine.runner:cli"
 
 [dependency-groups]
-# Dependencies for dev/CI tasks
 dev = [
-    "typing-extensions>=4.4.0",
-    "aiohttp>=3.8.3",
-    "pytest>=7.4.0",
-    "pytest-html>=3.2.0",
-    "pytest-cov>=4.0.0",
-    "coverage>=7.0.5",
-    "coverage-badge>=1.1.0",
-    "pylint>=3.3.3",
-    "itk>=5.4.0",
-    "av==12.0.0",
-    "pytest-metadata>=3.1.1",
+    { include-group = "doc" },
+    { include-group = "maintain" },
+    { include-group = "quality" },
+    { include-group = "types" },
+    { include-group = "test" },
+    "ipykernel==6.29.5",
+    "ipywidgets==8.1.5",
+    "pre-commit-uv==4.1.4",
 ]
-docs = [
+doc = [
     "mkdocs-autorefs>=1.4.1",
     "mkdocs-gen-files>=0.5.0",
     "mkdocs-literate-nav>=0.6.2",
@@ -72,45 +68,23 @@ docs = [
     "mkdocs-section-index>=0.3.10",
     "mkdocstrings[python]>=0.29.1",
 ]
-
-[tool.hatch.build.targets.sdist]
-include = ["lighter"]
-
-[tool.hatch.build.targets.wheel]
-include = ["lighter"]
-
-[tool.black]
-# https://github.com/psf/black
-target-version = ["py310"]
-line-length = 127
-
-exclude = '''
-/(
-    \.git
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-    | env
-    | venv
-)/
-'''
-
-[tool.isort]
-# https://github.com/timothycrosley/isort/
-py_version = 310
-line_length = 127
-
-known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
-sections = ["FUTURE", "TYPING", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-include_trailing_comma = true
-profile = "black"
-multi_line_output = 3
-indent = 4
+maintain = ["bump-my-version==0.30.1"]
+quality = ["ruff>=0.5.0"]
+types = [
+    "mypy>=1.14.1",
+    "typing-extensions>=4.4.0",
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-html>=3.2.0",
+    "pytest-cov>=4.0.0",
+    "coverage>=7.0.5",
+    "coverage-badge>=1.1.0",
+    "pytest-metadata>=3.1.1",
+    "aiohttp>=3.8.3",
+    "itk>=5.4.0",
+    "av>=12.0.0",
+]
 
 [tool.mypy]
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
@@ -164,13 +138,27 @@ branch = true
 fail_under = 90
 show_missing = true
 
-[tool.pylint."MESSAGES CONTROL"]
-max-line-length = 127
-allowed-redefined-builtins = ["input"]
-disable = ["too-many-arguments", "no-else-return"]
+[tool.ruff]
+# https://docs.astral.sh/ruff/configuration/
+line-length = 127
+target-version = "py310"
 
-[tool.pylint.master]
-fail-under=8
+[tool.ruff.lint]
+preview = true
+select = ["B", "E", "F", "I", "W"]
+ignore = ["E203", "E501", "N813"]
 
-# Used in Makefile by poetry-bumpversion
-[tool.poetry_bumpversion.file."lighter/__init__.py"]
+[tool.bumpversion]
+current_version = "0.0.3a31"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "src/lighter/__init__.py"
+search = "__version__ = '{current_version}'"
+replace = "__version__ = '{new_version}'"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'

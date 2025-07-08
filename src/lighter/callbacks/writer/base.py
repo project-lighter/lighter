@@ -3,11 +3,10 @@ This module provides the base class for defining custom writers in Lighter,
 allowing predictions to be saved in various formats.
 """
 
-from typing import Any, Callable
-
 import gc
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any, Callable
 
 import torch
 from loguru import logger
@@ -54,7 +53,7 @@ class BaseWriter(ABC, Callback):
         """
 
     @abstractmethod
-    def write(self, tensor: Tensor, identifier: int) -> None:
+    def write(self, tensor: Tensor, identifier: int | str) -> None:
         """
         Method to define how a tensor should be saved. The input tensor will be a single tensor without
         the batch dimension.
@@ -129,10 +128,16 @@ class BaseWriter(ABC, Callback):
             )
             self._pred_counter += batch_size * world_size
 
-        for pred, identifier in zip(outputs[Data.PRED], outputs[Data.IDENTIFIER]):
+        # Ensure equal number of predictions and identifiers
+        if len(outputs[Data.IDENTIFIER]) != len(outputs[Data.PRED]):
+            raise ValueError(
+                f"The number of predictions ({len(outputs[Data.PRED])}) does not"
+                f"match the number of identifiers ({len(outputs[Data.IDENTIFIER])})"
+            )
+
+        for pred, identifier in zip(outputs[Data.PRED], outputs[Data.IDENTIFIER], strict=True):
             self.write(tensor=pred, identifier=identifier)
 
         # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
-        # pylint: disable=protected-access
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
         gc.collect()

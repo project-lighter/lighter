@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  pytest:
+    name: Unit tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+    env:
+      OS: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install tox
+        run: uv tool install --python ${{ matrix.python }} --with tox-uv tox
+
+      - name: Setup test suite
+        run: tox run -v --notest --skip-missing-interpreters false -e ${{ matrix.python }}
+
+      # Run all tests on schedule, but only non-slow tests on push
+      - name: Run pytest
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            tox -e pytest
+          else
+            tox -e pytest -- -m "not slow"
+          fi
+        shell: bash # this wouldn't work on Powershell
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        uses: codecov/codecov-action@v5.4.3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

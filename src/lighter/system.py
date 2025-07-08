@@ -3,10 +3,9 @@ This module defines the System class, which encapsulates the components of a dee
 including the model, optimizer, datasets, and more. It extends PyTorch Lightning's LightningModule.
 """
 
-from typing import Any
-
 from collections.abc import Callable
 from dataclasses import asdict
+from typing import Any
 
 import pytorch_lightning as pl
 from torch import Tensor
@@ -109,7 +108,7 @@ class System(pl.LightningModule):
         input, target, identifier = adapters.batch(batch)
         return input, target, identifier
 
-    def forward(self, input: Any) -> Any:  # pylint: disable=arguments-differ
+    def forward(self, input: Any) -> Any:
         """
         Forward pass through the model.
 

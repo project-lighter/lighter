@@ -2,8 +2,6 @@
 This module provides utility functions for manipulating PyTorch models, such as replacing layers or loading state_dicts.
 """
 
-from typing import List
-
 import torch
 from loguru import logger
 from torch.nn import Identity, Module, Sequential
@@ -61,7 +59,7 @@ def adjust_prefix_and_load_state_dict(
     model: Module,
     ckpt_path: str,
     ckpt_to_model_prefix: dict[str, str] | None = None,
-    layers_to_ignore: List[str] | None = None,
+    layers_to_ignore: list[str] | None = None,
 ) -> Module:
     """
     This function loads a state dictionary from a checkpoint file into a model using `torch.load(strict=False)`.
