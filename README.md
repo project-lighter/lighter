@@ -34,28 +34,11 @@
 </p>
 </div>
 
-<b>Install:</b>
+### Installation
 <pre><code>pip install lighter</code></pre>
-<details>
 
-<summary><b>Install pre-release</b></summary>
-<p>Get the latest features and fixes from the main branch.</p>
-<pre>
-<code>pip install lighter --pre</code>
-</pre>
-</details>
-
-<details>
-<summary><b>Development:</b></summary>
-<p>To contribute to the project, clone the repository and run the following commands. Also, refer to the <a href="CONTRIBUTING.md">contributing guide</a>.</p>
-<pre>
-<code>make setup
-make install             # Install lighter via uv
-make pre-commit-install  # Set up the pre-commit hook for code formatting</code>
-</pre>
-</details>
-<br/>
-
+### Development
+To contribute, clone the repository and follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md) to set up your environment and run quality checks.
 
 ## 💡 Projects
 Projects that use `lighter`:
@@ -69,13 +52,17 @@ Projects that use `lighter`:
 
 ## Cite
 <pre><code>@software{lighter,
-author       = {Ibrahim Hadzic and
-                Suraj Pai and
-                Keno Bressem and
-                Hugo Aerts},
-title        = {Lighter},
-publisher    = {Zenodo},
-doi          = {10.5281/zenodo.8007711},
-url          = {https://doi.org/10.5281/zenodo.8007711}
+  author       = {Hadzic, Ibrahim and
+                  Pai, Suraj and
+                  Bressem, Keno and
+                  Foldyna, Borek and
+                  Aerts, Hugo JWL},
+  title        = {Lighter: Configuration-Driven Deep Learning},
+  month        = jul,
+  year         = 2025,
+  publisher    = {Zenodo},
+  version      = {v0.0.4},
+  doi          = {10.5281/zenodo.15844257},
+  url          = {https://doi.org/10.5281/zenodo.15844257},
 }</code></pre>
 </div>
