@@ -38,7 +38,7 @@ def add_submodules_as_list(parent_folder: Path) -> str:
     return "".join(output)
 
 
-def generate_api_reference(src: Path, exclude: list) -> None:
+def generate_api_reference(src: Path, exclude: list[str]) -> None:
     """
     Generates the API reference documentation for a given package.
 
@@ -96,6 +96,6 @@ def generate_api_reference(src: Path, exclude: list) -> None:
 # Generate the API reference.
 # Control whether to include private members under `mkdocstrings.handlers.python.options.filters` in `mkdocs.yml`.
 # To exclude specific modules, add them to the `exclude_modules` list.
-src_path = Path(__file__).parent.parent / "lighter"
-exclude_modules = []
+src_path = Path(__file__).parent.parent / "src" / "lighter"
+exclude_modules: list[str] = []
 generate_api_reference(src_path, exclude_modules)

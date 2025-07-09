@@ -20,7 +20,7 @@ class Config:
 
     def __init__(
         self,
-        config: str | dict,
+        config: str | dict[str, Any] | None,
         validate: bool,
         **config_overrides: Any,
     ):
@@ -63,7 +63,7 @@ class Config:
         return self._config_parser.get_parsed_content(key, default=default)
 
 
-def format_validation_errors(errors: dict) -> str:
+def format_validation_errors(errors: dict[str, Any]) -> str:
     """
     Recursively format validation errors into a readable string.
     """

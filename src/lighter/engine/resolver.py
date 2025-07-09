@@ -17,7 +17,7 @@ class Resolver:
     def __init__(self, config: Config):
         self.config = config
 
-    def get_stage_config(self, stage: str) -> Config:
+    def get_stage_config(self, stage: Stage) -> Config:
         """Get stage-specific configuration by filtering unused components."""
         if stage not in self.STAGE_MODES:
             raise ValueError(f"Invalid stage: {stage}. Allowed stages are {list(self.STAGE_MODES)}")

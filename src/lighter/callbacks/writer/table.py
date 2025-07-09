@@ -2,10 +2,9 @@
 This module provides the TableWriter class, which saves predictions in a table format, such as CSV.
 """
 
-from typing import Any, Callable
-
 import itertools
 from pathlib import Path
+from typing import Any, Callable
 
 import pandas as pd
 import torch

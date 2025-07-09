@@ -97,20 +97,73 @@ def test_on_predict_batch_end(target_path):
     writer = MockWriter(path=target_path, writer="tensor")
     writer._pred_counter = 0
 
-    outputs = {"pred": [torch.tensor([1, 2, 3])], "identifier": None}
+    # Test with batch size of 4 and no provided identifiers
+    outputs = {"pred": torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]]), "identifier": None}
     batch = MagicMock()
     batch_idx = 0
 
     writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
 
-    assert outputs["identifier"] == [0]
+    assert outputs["identifier"] == [0, 1, 2, 3]
     assert trainer.predict_loop._predictions == [[]]
-    assert writer._pred_counter == 1
+    assert writer._pred_counter == 4
 
-    # Test with provided identifiers
-    outputs = {"pred": [torch.tensor([1, 2, 3])], "identifier": [1, 2, 3]}
+    # Test with provided identifiers (batch size 4)
+    outputs = {"pred": torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]]), "identifier": [10, 11, 12, 13]}
     writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
-    assert writer._pred_counter == 1
+    assert writer._pred_counter == 4  # Should not increment when identifiers are provided
+
+    # Check for incorrect identifier length (3 identifiers for 4 predictions)
+    outputs = {"pred": torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]]), "identifier": [10, 11, 12]}
+    with pytest.raises(ValueError, match="The number of predictions"):
+        writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
+    # Test with list of tensors (batch size 4) and no provided identifiers
+    writer._pred_counter = 0  # Reset counter
+    outputs = {
+        "pred": [torch.tensor([1, 2]), torch.tensor([3, 4]), torch.tensor([5, 6]), torch.tensor([7, 8])],
+        "identifier": None,
+    }
+
+    writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
+    assert outputs["identifier"] == [0, 1, 2, 3]
+    assert trainer.predict_loop._predictions == [[]]
+    assert writer._pred_counter == 4
+
+    # Test with list of tensors and provided identifiers
+    outputs = {
+        "pred": [torch.tensor([1, 2]), torch.tensor([3, 4]), torch.tensor([5, 6]), torch.tensor([7, 8])],
+        "identifier": [20, 21, 22, 23],
+    }
+
+    writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+    assert writer._pred_counter == 4  # Should not increment when identifiers are provided
+
+    # Test list of tensors with incorrect identifier length
+    outputs = {
+        "pred": [torch.tensor([1, 2]), torch.tensor([3, 4]), torch.tensor([5, 6]), torch.tensor([7, 8])],
+        "identifier": [20, 21],
+    }
+    with pytest.raises(ValueError, match="The number of predictions"):
+        writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
+    # Test with mixed tensor shapes in list
+    outputs = {
+        "pred": [
+            torch.tensor([[1, 2, 3]]),
+            torch.tensor([[4, 5, 6]]),
+            torch.tensor([[7, 8, 9]]),
+            torch.tensor([[10, 11, 12]]),
+        ],
+        "identifier": None,
+    }
+
+    writer._pred_counter = 0  # Reset counter
+    writer.on_predict_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
+    assert outputs["identifier"] == [0, 1, 2, 3]
+    assert writer._pred_counter == 4
 
 
 def test_writer_setup_predict(target_path, caplog):

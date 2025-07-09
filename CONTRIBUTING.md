@@ -1,96 +1,100 @@
-1. [Code contribution](#code-contribution)
-    - [Dependencies](#dependencies)
-    - [Codestyle](#codestyle)
-      - [Checks](#checks)
-        - [Before submitting](#before-submitting)
-    - [Other help](#other-help)
+# Contributing to Lighter
 
-2. [Documentation contribution](#documentation-contribution)
-    - [Dependencies](#dependencies-1)
-    - [Serving the documentation locally](#serving-the-documentation-locally)
-    - [Deploying the documentation to GitHub Pages](#deploying-the-documentation-to-github-pages)
+Thank you for your interest in contributing to Lighter! This guide will help you get started.
 
+## Quick Start
 
-# Code contribution
+1. **Set up your development environment:**
+    ```bash
+    just setup
+    ```
+    This will install `uv` (if needed), sync all dependencies, and set up pre-commit hooks.
 
-## Dependencies
+2. **Make your changes and test them:**
+    ```bash
+    just test        # Run tests
+    just lint        # Check code style
+    just types       # Run type checking
+    ```
 
-We use `uv` for fast Python package management. To set up the development environment:
+3. **Submit your contribution** via a pull request.
 
-1. Create and activate a virtual environment:
-```bash
-uv venv .venv
-source .venv/bin/activate
+## Available Commands
+
+We use [just](https://github.com/casey/just) as our command runner. Here are the available commands:
+
+### Development Setup
+- `just setup` - Complete development environment setup (installs uv, syncs dependencies, installs pre-commit)
+- `just clean` - Clean up build artifacts, caches, and temporary files
+
+### Code Quality
+- `just lint` - Run linting checks
+- `just types` - Run type checking with mypy
+- `just test` - Run the test suite
+- `just coverage` - Generate test coverage report and badge
+
+### Documentation
+- `just docs` - Serve documentation locally at http://localhost:8000
+
+### Version Management
+- `just bump [patch|minor|major]` - Bump version and create git tag (default: patch)
+- `just bump-dry [patch|minor|major]` - Preview version bump without making changes
+- `just push` - Push commits and tags to remote
+
+## Development Workflow
+
+### Making Changes
+
+1. **Fork and clone** the repository
+2. **Set up your environment:**
+    ```bash
+    just setup
+    ```
+
+3. **Create a feature branch:**
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+
+4. **Make your changes** and add tests for new functionality
+
+5. **Run quality checks:**
+    ```bash
+    just lint
+    just types
+    just test
+    ```
+
+6. **Commit your changes** (pre-commit hooks will run automatically)
+
+7. **Push and create a pull request**
+
+### Before Submitting a PR
+
+Ensure all of these pass:
+- ✅ `just lint` - Code follows style guidelines
+- ✅ `just types` - No type checking errors
+- ✅ `just test` - All tests pass
+- ✅ Add tests for any new functionality
+- ✅ Update documentation if needed
+
+## Project Structure
+
+```
+src/lighter/           # Main package code
+├── __init__.py       # Package initialization and version
+├── engine/           # Core engine components
+├── system.py         # System class
+└── utils/            # Utility modules
+
+tests/                # Test suite
+docs/                 # Documentation source
 ```
 
-2. Install development dependencies:
-```bash
-uv sync
-```
+## Release Process
 
-3. Install pre-commit hooks:
-```bash
-uvx pre-commit install
-```
+Releases are automated:
 
-## Codestyle
-
-After installation you may execute code formatting:
-
-```bash
-make check-codestyle
-```
-
-To fix this run,
-```bash
-make codestyle
-```
-
-### Checks
-Ensure that `check-codestyle` passes.
-
-
-### Tests
-Ensure all tests pass when running
-
-```bash
-make test
-```
-
-
-### Before submitting
-
-Before submitting your code:
-
-1. Add any changes you want
-2. Add tests for the new changes
-3. Edit documentation if you have changed something significant
-4. Format all your code
-```bash
-make codestyle
-```
-5. Run all checks:
-```bash
-make lint
-```
-
-## Other help
-
-You can contribute by:
-- Spreading the word about this library
-- Writing short articles/tutorials about your use cases
-- Sharing best practices and examples
-
-
-# Documentation contribution
-Our documentation is built using mkdocs and mkdocs-material. API reference is generated from docstrings using mkdocstrings.
-
-## Serving the documentation locally
-
-```bash
-make docs
-```
-
-## Deploying the documentation
-
-Documentation is automatically deployed when changes are merged to main.
+1. **Bump version:** `just bump patch` (or `minor`/`major`)
+2. **Push tags:** `just push`
+3. **Automated publishing:** GitHub Actions will automatically build and publish to PyPI when a tag is pushed

@@ -2,14 +2,13 @@
 This module contains miscellaneous utility functions for handling lists, attributes, and function arguments.
 """
 
-from typing import Any, Callable, List
-
 import inspect
+from typing import Any, Callable
 
 from torch.optim.optimizer import Optimizer
 
 
-def ensure_list(input: Any) -> List:
+def ensure_list(input: Any) -> list:
     """
     Ensures that the input is wrapped in a list. If the input is None, returns an empty list.
 
@@ -109,8 +108,8 @@ def get_optimizer_stats(optimizer: Optimizer) -> dict[str, float]:
 
         # Add group index to the key if there are multiple parameter groups
         if len(optimizer.param_groups) > 1:
-            lr_key += f"/group{group_idx+1}"
-            momentum_key += f"/group{group_idx+1}"
+            lr_key += f"/group{group_idx + 1}"
+            momentum_key += f"/group{group_idx + 1}"
 
         # Extracting learning rate
         stats_dict[lr_key] = group["lr"]

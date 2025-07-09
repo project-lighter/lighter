@@ -2,7 +2,7 @@
 This module provides the Freezer callback, which allows freezing model parameters during training.
 """
 
-from typing import Any, List
+from typing import Any
 
 from loguru import logger
 from pytorch_lightning import Callback, Trainer
@@ -33,10 +33,10 @@ class Freezer(Callback):
 
     def __init__(
         self,
-        names: str | List[str] | None = None,
-        name_starts_with: str | List[str] | None = None,
-        except_names: str | List[str] | None = None,
-        except_name_starts_with: str | List[str] | None = None,
+        names: str | list[str] | None = None,
+        name_starts_with: str | list[str] | None = None,
+        except_names: str | list[str] | None = None,
+        except_name_starts_with: str | list[str] | None = None,
         until_step: int | None = None,
         until_epoch: int | None = None,
     ) -> None:

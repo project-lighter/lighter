@@ -1,6 +1,5 @@
-from typing import Any, Callable
-
 import random
+from typing import Any, Callable
 
 import torch
 from torch.utils.data.dataloader import default_collate

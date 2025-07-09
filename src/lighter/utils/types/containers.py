@@ -1,6 +1,5 @@
-from typing import Any
-
 from dataclasses import dataclass, field, fields, is_dataclass
+from typing import Any
 
 from torchmetrics import Metric, MetricCollection
 

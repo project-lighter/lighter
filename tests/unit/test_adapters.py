@@ -34,7 +34,7 @@ class TestTransformsAdapter:
 
     def test_single_transform(self):
         """Test adapter with a single transform for each input."""
-        transform = lambda x: x + 1
+        transform = lambda x: x + 1  # noqa: E731
         adapter = _TransformsAdapter(input_transforms=transform, target_transforms=transform, pred_transforms=transform)
         input, target, pred = create_tensor(), create_tensor(), create_tensor()
         transformed_input, transformed_target, transformed_pred = adapter(input, target, pred)
@@ -44,8 +44,8 @@ class TestTransformsAdapter:
 
     def test_multiple_transforms(self):
         """Test adapter with multiple transforms that are applied in sequence."""
-        transform1 = lambda x: x * 2
-        transform2 = lambda x: x - 1
+        transform1 = lambda x: x * 2  # noqa: E731
+        transform2 = lambda x: x - 1  # noqa: E731
         adapter = _TransformsAdapter(
             input_transforms=[transform1, transform2],
             target_transforms=[transform1, transform2],
@@ -276,7 +276,7 @@ class TestLoggingAdapter:
 
     def test_single_transform(self):
         """Test LoggingAdapter works correctly with single transform."""
-        transform = lambda x: x + 1
+        transform = lambda x: x + 1  # noqa: E731
         adapter = LoggingAdapter(input_transforms=transform, target_transforms=transform, pred_transforms=transform)
         input, target, pred = create_tensor(), create_tensor(), create_tensor()
         transformed_input, transformed_target, transformed_pred = adapter(input, target, pred)
@@ -286,8 +286,9 @@ class TestLoggingAdapter:
 
     def test_multiple_transforms(self):
         """Test LoggingAdapter works correctly with multiple transforms."""
-        transform1 = lambda x: x * 2
-        transform2 = lambda x: x - 1
+        transform1 = lambda x: x * 2  # noqa: E731
+        transform2 = lambda x: x - 1  # noqa: E731
+
         adapter = LoggingAdapter(
             input_transforms=[transform1, transform2],
             target_transforms=[transform1, transform2],

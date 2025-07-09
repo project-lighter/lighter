@@ -1,6 +1,5 @@
-from typing import Any
-
 from collections.abc import Callable
+from typing import Any
 
 from lighter.utils.misc import ensure_list
 
