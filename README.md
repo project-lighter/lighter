@@ -10,7 +10,7 @@
 
 <div align="center">
 
-[![build](https://github.com/project-lighter/lighter/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/tests.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp)
+[![build](https://github.com/project-lighter/lighter/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/tests.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp) [![JOSS Paper](https://joss.theoj.org/papers/10.21105/joss.08101/status.svg)](https://joss.theoj.org/papers/10.21105/joss.08101)
 
 </div>
 
@@ -51,18 +51,20 @@ Projects that use `lighter`:
 <br/>
 
 ## Cite
-<pre><code>@software{lighter,
-  author       = {Hadzic, Ibrahim and
-                  Pai, Suraj and
-                  Bressem, Keno and
-                  Foldyna, Borek and
-                  Aerts, Hugo JWL},
-  title        = {Lighter: Configuration-Driven Deep Learning},
-  month        = jul,
-  year         = 2025,
-  publisher    = {Zenodo},
-  version      = {v0.0.4},
-  doi          = {10.5281/zenodo.15844257},
-  url          = {https://doi.org/10.5281/zenodo.15844257},
-}</code></pre>
-</div>
+
+Please cite our paper if you use `lighter` in your research:
+
+```bibtex
+@article{lighter,
+    doi = {10.21105/joss.08101},
+    url = {https://doi.org/10.21105/joss.08101},
+    year = {2025},
+    publisher = {The Open Journal},
+    volume = {10},
+    number = {111},
+    pages = {8101},
+    author = {Hadzic, Ibrahim and Pai, Suraj and Bressem, Keno and Foldyna, Borek and Aerts, Hugo JWL},
+    title = {Lighter: Configuration-Driven Deep Learning},
+    journal = {Journal of Open Source Software}
+}
+```
