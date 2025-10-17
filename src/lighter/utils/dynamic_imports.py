@@ -2,7 +2,6 @@
 This module provides utilities for dynamic imports, allowing optional imports and importing modules from paths.
 """
 
-import importlib
 import importlib.util
 import sys
 from dataclasses import dataclass, field

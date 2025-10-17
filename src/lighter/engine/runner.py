@@ -15,7 +15,7 @@ class Runner:
     Executes the specified stage using the validated and resolved configurations.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = None
         self.resolver = None
         self.system = None
@@ -77,16 +77,16 @@ class Runner:
 def cli():
     runner = Runner()
 
-    def fit(config: str, **config_overrides: Any):
+    def fit(config: str, **config_overrides: Any) -> None:
         runner.run(Stage.FIT, config, **config_overrides)
 
-    def validate(config: str, **config_overrides: Any):
+    def validate(config: str, **config_overrides: Any) -> None:
         runner.run(Stage.VALIDATE, config, **config_overrides)
 
-    def test(config: str, **config_overrides: Any):
+    def test(config: str, **config_overrides: Any) -> None:
         runner.run(Stage.TEST, config, **config_overrides)
 
-    def predict(config: str, **config_overrides: Any):
+    def predict(config: str, **config_overrides: Any) -> None:
         runner.run(Stage.PREDICT, config, **config_overrides)
 
     fire.Fire(

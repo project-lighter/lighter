@@ -261,7 +261,7 @@ class System(pl.LightningModule):
             Data.EPOCH: self.current_epoch,
         }
 
-    def configure_optimizers(self) -> dict:
+    def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:
         """
         Configures the optimizers and learning rate schedulers.
 
