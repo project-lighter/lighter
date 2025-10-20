@@ -1,23 +1,73 @@
-Adapters are a powerful Lighter feature that allow data flow customization between different steps. This enables Lighter to handle any task without modifying code.
+# Adapters: Data Flow Control
 
-Examples of when you might need adapters include:
+Adapters are the **secret sauce** that makes Lighter incredibly flexible. They act as intelligent translators between different components of your pipeline, ensuring data flows correctly regardless of format differences.
 
-!!! example "Handling Different Batch Structures"
+## Why Adapters Matter 🎟️
 
-    Often, a batch is simply a tuple of input and target tensors. Other times, a batch may be just the input tensor (e.g. prediction dataset or self-supervised learning). With adapters, you can handle any batch format without changing the core code.
+Imagine connecting ML components that expect different data formats:
 
+**Without adapters:** You'd need to modify code for each component combination
 
-!!! example "Adapting Argument Order"
-    
-    One loss function may require `(pred, target)` arguments, while another may require `(target, pred)`. The third may require `(input,  pred, target)`. You can specify what should be passed using adapters.
+**With adapters:** You configure the connections once, and Lighter handles the format conversion
 
-!!! example "Transforming Data"
+| Component | What it expects | Adapter handles |
+|-----------|----------------|------------------|
+| Dataset 📦 | Returns dictionaries | Extract tensors |
+| Model 🧠 | Needs tensors | Format inputs |
+| Loss 📉 | Specific argument order | Reorder arguments |
+| Metrics 📏 | Named arguments | Map predictions |
+| Logger 📊 | RGB images | Convert grayscale |
 
-    You're dealing with grayscale images, but the logger expects RGB images for visualization. Adapters allow you to transform data before such operations.
+## Real-World Scenarios
+
+### Scenario 1: Medical Imaging Pipeline
+```yaml
+# Problem: Dataset returns dict, but model expects tensor
+system:
+    adapters:
+        train:
+            batch:
+                _target_: lighter.adapters.BatchAdapter
+                input_accessor: "image"  # Extract from dict
+                target_accessor: "mask"  # Extract mask
+                identifier_accessor: "patient_id"  # Track patient
+```
+
+### Scenario 2: Multi-Task Learning
+```yaml
+# Problem: Multiple losses need different arguments
+system:
+    adapters:
+        train:
+            criterion:
+                _target_: lighter.adapters.CriterionAdapter
+                pred_argument: "predictions"  # Named argument
+                target_argument: "labels"     # Named argument
+                input_argument: "features"    # Pass input too
+```
+
+### Scenario 3: Self-Supervised Learning
+```yaml
+# Problem: No targets in SSL, only inputs
+system:
+    adapters:
+        train:
+            batch:
+                _target_: lighter.adapters.BatchAdapter
+                input_accessor: 0
+                target_accessor: null  # No targets!
+```
 
 ## Types of Adapters in Lighter
 
 Lighter provides four adapter types, each designed to address specific customization needs:
+
+| Adapter | Purpose | When to Use |
+|---------|---------|-------------|
+| **BatchAdapter** | Extract data from batches | Different dataset formats |
+| **CriterionAdapter** | Format loss function inputs | Custom loss functions |
+| **MetricsAdapter** | Format metric inputs | Third-party metrics |
+| **LoggingAdapter** | Transform before logging | Visualization needs |
 
 ###  BatchAdapter
 
@@ -94,7 +144,7 @@ system:
                 pred_argument: 1
                 # Map 'target' to the 1st positional argument (index 0)
                 target_argument: 0
-                # Apply sigmoid activation to predictions                 
+                # Apply sigmoid activation to predictions
                 pred_transforms:
                     - _target_: torch.sigmoid
 ```
@@ -118,7 +168,7 @@ system:
                 target_argument: "ground_truth"
                 # Convert pred to class labels
                 pred_transforms:
-                    - _target_: torch.argmax              
+                    - _target_: torch.argmax
                       dim: 1
 ```
 
@@ -152,16 +202,99 @@ system:
 
 For more information, see the [LoggingAdapter documentation](../../reference/adapters/#lighter.adapters.LoggingAdapter).
 
+## Practical Example: Custom Adapter
+
+```python
+# my_project/adapters/custom_adapter.py
+from lighter.adapters import BatchAdapter
+
+class MultiModalBatchAdapter(BatchAdapter):
+    """Handle multi-modal data (image + text + tabular)."""
+    def __call__(self, batch):
+        return {
+            "image": batch["image_data"],
+            "text": batch["text_embeddings"],
+            "tabular": batch["clinical_features"],
+            "target": batch["diagnosis"]
+        }
+```
+
+Use in config:
+```yaml
+system:
+    adapters:
+        train:
+            batch:
+                _target_: my_project.adapters.MultiModalBatchAdapter
+```
+
+## Pro Tips 💡
+
+1. **Debug outputs**: Add print transforms to see data flow
+2. **Reuse configs**: Use YAML anchors (`&` and `*`) for DRY configs
+3. **Performance**: Put expensive transforms in datasets, not adapters
+4. **Type consistency**: Ensure tensors have matching dtypes
+
+## Common Issues & Solutions
+
+| Issue | Solution |
+|-------|----------|
+| **KeyError in batch** | Print batch keys: `"$lambda b: print(b.keys()) or b"` |
+| **Wrong argument order** | Use named arguments in CriterionAdapter |
+| **Transform not applied** | Ensure transforms are in a list |
+| **Memory issues** | Process on CPU, then move to GPU |
+
+## Complete Example: Segmentation Pipeline
+
+```yaml
+system:
+    adapters:
+        train:
+            batch:
+                _target_: lighter.adapters.BatchAdapter
+                input_accessor: "image"  # Extract from dict
+                target_accessor: "mask"
+                identifier_accessor: "patient_id"
+
+            criterion:
+                _target_: lighter.adapters.CriterionAdapter
+                pred_argument: 0  # First positional arg
+                target_argument: 1  # Second positional arg
+                pred_transforms:
+                    - _target_: torch.nn.functional.softmax
+                      dim: 1
+
+            metrics:
+                _target_: lighter.adapters.MetricsAdapter
+                pred_argument: "preds"  # Named argument
+                target_argument: "target"
+                pred_transforms:
+                    - _target_: torch.argmax
+                      dim: 1
+
+        val:
+            batch: "%system#adapters#train#batch"  # Reuse train config
+```
+
 ## Recap and Next Steps
 
-Adapters are a cornerstone of Lighter's flexibility and extensibility. By using adapters effectively, you can:
+Adapters are what make Lighter truly flexible:
 
-*   Seamlessly integrate Lighter with diverse data formats and batch structures.
-*   Customize argument passing to loss functions and metrics.
-*   Apply pre-processing and post-processing transforms at various stages of your experiment.
-*   Tailor the data that is logged for monitoring and analysis.
-*   Create highly specialized and reusable customization components.
+✅ **Key Benefits:**
 
-With adapters, you adapt Lighter to your specific research needs and build complex, yet well-organized and maintainable deep learning experiment configurations.
+- Handle any data format without code changes
+- Connect incompatible components seamlessly
+- Transform data at the right pipeline stage
+- Debug and monitor data flow easily
 
-Next, explore the [Writers](writers.md) to learn how to save model predictions and outputs to files. For a further read on Lighter's design principles and why we designed adapters, check out the [Design section](../design/overview.md).
+🎯 **Best Practices:**
+
+- Keep transforms simple and composable
+- Move expensive operations to datasets
+- Use debug prints during development
+- Reuse configurations with YAML anchors
+
+## Related Guides
+- [Metrics](metrics.md) - Using MetricsAdapter
+- [Writers](writers.md) - Using LoggingAdapter
+- [Inferers](inferers.md) - Inference-time adaptation

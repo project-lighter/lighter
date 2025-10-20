@@ -16,6 +16,8 @@ theme:
     - footnotes
     - navigation.tabs
     - navigation.top
+    - content.action.edit
+    - content.action.view
 
   palette:
     # Palette toggle for automatic mode
@@ -63,19 +65,26 @@ plugins:
 nav:
   - Home: index.md
   - Tutorials:
-      - Configuration Basics: tutorials/configuration_basics.md
+      - From Zero to Hero: tutorials/zero_to_hero.md
       - Image Classification: tutorials/image_classification.md
   - How-To:
-      - Configure: how-to/configure.md
       - Run: how-to/run.md
+      - Configure: how-to/configure.md
       - Project Module: how-to/project_module.md
       - Adapters: how-to/adapters.md
       - Metrics: how-to/metrics.md
       - Writers: how-to/writers.md
       - Freezers: how-to/freezers.md
       - Inferers: how-to/inferers.md
+      - Troubleshooting: how-to/troubleshooting.md
+      - Experiment Tracking: how-to/experiment_tracking.md
   - Design:
       - Overview: design/overview.md
+      - Adapter Pattern: design/adapters.md
+      - Philosophy: design/philosophy.md
+  - Migration:
+      - From PyTorch Lightning: migration/from-pytorch-lightning.md
+  - FAQ: faq.md
   - API Reference: reference/
 
 markdown_extensions:
@@ -102,3 +111,4 @@ markdown_extensions:
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter
+edit_uri: edit/main/docs/

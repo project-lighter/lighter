@@ -1,12 +1,25 @@
-Lighter's extensibility allows seamless integration of your custom modules (e.g., models, datasets, callbacks, metrics). This guide shows how to use them to tailor Lighter to your needs.
+# Project Modules: Your Code, Your Way
 
-Custom modules are Python modules you create within your project, unlike Lighter or other libraries' modules. Benefits include:
+Lighter isn't just a framework—it's a platform for your innovation. This guide shows you how to seamlessly integrate custom code while maintaining clean, reusable project structure.
 
-*   **Encapsulation**: Keep project-specific code (models, datasets) organized and isolated.
-*   **Flexibility**: Extend Lighter's functionality to fit your use-case.
-*   **Prototyping**: Quickly try new ideas by integrating custom modules.
+## Why Project Modules? 🎯
 
-## Project Structure 
+Project modules let you seamlessly integrate your custom code into Lighter:
+
+- **🧠 Custom Models** - Your neural network architectures
+- **📦 Custom Datasets** - Your data loading logic
+- **🎯 Custom Metrics** - Your evaluation methods
+- **🔄 Custom Transforms** - Your data preprocessing
+- **🎛️ Custom Callbacks** - Your training hooks
+
+**Key Benefits:**
+
+- 📦 **Encapsulation**: Keep research code organized
+- ♾️ **Reusability**: Share modules across experiments
+- 🚀 **Rapid Prototyping**: Test ideas without framework modifications
+- 🌐 **Collaboration**: Easy to share and version control
+
+## Project Structure
 
 Your project folder can be named and located however and wherever you want. You only need to ensure that any folder that is a Python module contains `__init__.py`. In the example below, we see that the project root `my_project` contains `__init__.py` file, just like the `models` and `datasets` subdirectories. On the other hand, the `experiments` directory does not contain any Python modules, so it does not need an `__init__.py` file.
 
@@ -60,7 +73,7 @@ class MyDataset(Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
         # Preprocess sample (implementation not shown)
-        # ... 
+        # ...
         if self.transform:
             sample = self.transform(sample)
         return sample
@@ -107,27 +120,135 @@ system:
 ```
 
 
-## Running Lighter with Custom Modules
+## Practical Example: Custom Model Architecture
 
-To run your Lighter experiments that use custom modules, you simply execute the `lighter fit` command (or other Lighter CLI commands) with your `config.yaml` file, just as you would with built-in modules.
+```python
+# my_project/models/custom_unet.py
+import torch
+import torch.nn as nn
 
-**Example: Running Training with Custom Modules**
+class CustomUNet(nn.Module):
+    """U-Net for segmentation tasks."""
+    def __init__(self, in_channels=3, num_classes=2, features=[64, 128, 256, 512]):
+        super().__init__()
+        self.encoder = nn.ModuleList()
+        self.decoder = nn.ModuleList()
+        self.pool = nn.MaxPool2d(2, 2)
 
-```bash title="Terminal"
-lighter fit config.yaml
+        # Encoder
+        for feature in features:
+            self.encoder.append(self._block(in_channels, feature))
+            in_channels = feature
+
+        # Decoder
+        for feature in reversed(features[:-1]):
+            self.decoder.append(
+                nn.ConvTranspose2d(feature*2, feature, kernel_size=2, stride=2)
+            )
+            self.decoder.append(self._block(feature*2, feature))
+
+        self.final = nn.Conv2d(features[0], num_classes, kernel_size=1)
+
+    def _block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        skip_connections = []
+
+        # Encoder
+        for encode in self.encoder:
+            x = encode(x)
+            skip_connections.append(x)
+            x = self.pool(x)
+
+        skip_connections = skip_connections[::-1]
+
+        # Decoder
+        for idx in range(0, len(self.decoder), 2):
+            x = self.decoder[idx](x)
+            skip = skip_connections[idx//2]
+            x = torch.cat((skip, x), dim=1)
+            x = self.decoder[idx+1](x)
+
+        return self.final(x)
 ```
 
-As long as your `config.yaml` file correctly specifies the `project` path and the `_target_` paths to your custom modules, Lighter will dynamically load and use them during the experiment execution.
+Use in config:
+```yaml
+project: my_project/
+
+system:
+    model:
+        _target_: project.models.custom_unet.CustomUNet
+        in_channels: 3
+        num_classes: 10
+        features: [64, 128, 256, 512]
+```
+
+## Best Practices for Project Organization 🏆
+
+### Recommended Structure
+```
+my_project/
+├── __init__.py
+├── models/           # Neural network architectures
+├── datasets/         # Data loading and processing
+├── metrics/          # Custom evaluation metrics
+├── callbacks/        # Training callbacks
+└── utils/            # Helper functions
+```
+
+### Key Guidelines
+
+1. **Always include `__init__.py`** in each directory
+2. **Use type hints** for better IDE support
+3. **Write tests** for critical components
+4. **Document with docstrings** for team collaboration
+5. **Keep modules focused** - one concept per file
+
+## Running with Custom Modules
+
+```bash
+# Basic training
+lighter fit config.yaml
+
+# With module path override
+lighter fit config.yaml --project=./my_research_project
+
+# Multiple configs with custom modules
+lighter fit base.yaml,models/unet.yaml,data/custom.yaml
+```
+
+## Common Issues & Solutions
+
+| Issue | Solution |
+|-------|----------|
+| **ModuleNotFoundError** | Check `__init__.py` files and project path |
+| **AttributeError** | Import classes in `__init__.py` |
+| **Circular imports** | Use lazy imports inside functions |
+| **Path issues** | Use absolute imports or `project: ./my_project` |
 
 ## Recap and Next Steps
 
-1.  Organize project with clear directory structure (e.g., subdirectories for modules).
-2.  Define custom modules (models, datasets) as Python files in project directories.
-3.  Specify `project` path in `config.yaml`.
-4.  Reference modules in `config.yaml` using `_target_` with project-relative paths.
-5.  Run Lighter as usual.
+You're now equipped to build sophisticated custom modules:
 
-These steps enable seamless integration of custom code, leveraging Lighter's flexibility for customized deep learning systems.
+🎯 **Key Takeaways:**
 
-Next, explore the [Adapters](adapters.md) for more ways to customize Lighter.
+- Structure projects with clear module organization
+- Use type hints and documentation for maintainability
+- Leverage advanced patterns (multi-modal, caching, custom augmentations)
+- Test your modules for reliability
 
+💡 **Remember:** Great research code is modular, tested, and reusable!
+
+## Related Guides
+- [Configuration](configure.md) - Referencing project modules
+- [Adapters](adapters.md) - Custom adapter creation
+- [Metrics](metrics.md) - Custom metric creation

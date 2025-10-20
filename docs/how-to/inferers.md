@@ -1,14 +1,40 @@
-In deep learning, inference is the process of using a trained model to make predictions on new, unseen data. Within the Lighter framework, **inferers** are specialized components that dictate how this inference process is executed during the validation, testing, and prediction stages of your machine learning experiments.
+# Inferers: Bridging Training and Inference
 
-Inferers are responsible for handling a variety of tasks, including:
+Inferers adapt how your model processes data at inference time based on how it was trained and what your deployment needs are. Lighter's inferer system handles these adaptations seamlessly.
 
-*   **Sliding Window Inference:**  Essential for processing large images or volumes that exceed available memory, this technique involves breaking down the input into smaller, overlapping windows, performing inference on each window, and then stitching the results back together.
-*   **Model Ensembling:** This involves combining the predictions from multiple models to produce a more accurate and stable final prediction.
-*   **Custom Output Processing:**  Inferers can also apply custom post-processing logic to the model's raw outputs. This might include thresholding, applying a softmax function for probabilities, or any other transformation specific to your task.
+## Why Inferers Matter 🎯
 
-Lighter seamlessly integrates with MONAI's powerful inferer implementations, providing a strong foundation for your inference workflows. You can readily utilize and customize these pre-built inferers, or you can implement your own custom inferers to address specific inference requirements.
+The way you train a model often differs from how you need to use it:
 
-This guide will walk you through the process of implementing and utilizing custom inferers within the Lighter framework, giving you fine-grained control over the inference process in your deep learning experiments.
+| Training Scenario | Inference Challenge | Solution (Inferer) |
+|------------------|--------------------|--------------------|
+| Trained on fixed-size patches | Need to process full images | **Sliding Window** - breaks large images into patches |
+| Trained on clean data | Noisy test data | **Test-Time Augmentation** - average multiple predictions |
+| Single model | Need confidence scores | **Monte Carlo Dropout** - uncertainty estimation |
+| Multiple models trained | Want best performance | **Ensemble** - combine predictions |
+
+## Common Inference Patterns
+
+### Sliding Window Inference
+**When to use:** Your model was trained on fixed-size patches but you need to process larger images/volumes
+
+**Why it works:** The model only knows how to process the patch size it was trained on
+
+**Example:** A model trained on 256×256 patches from CT scans needs to process full 512×512×400 volumes
+
+### Test-Time Augmentation (TTA)
+**When to use:** You want more robust predictions and can afford extra compute time
+
+**Why it works:** Averaging predictions from augmented inputs reduces noise
+
+**Example:** Medical image segmentation where rotation/flip invariance improves boundaries
+
+### Monte Carlo Dropout
+**When to use:** You need uncertainty estimates along with predictions
+
+**Why it works:** Dropout at inference creates an ensemble effect
+
+**Example:** Medical diagnosis where you need to know prediction confidence
 
 ## Using MONAI Inferers in Lighter
 
@@ -22,7 +48,7 @@ To use a MONAI inferer, you simply need to configure it within the `system.infer
 system:
   inferer:
     _target_: monai.inferers.SlidingWindowInferer  # Specify the inferer class
-    roi_size:                         # Region of interest size for each window
+    roi_size: [128, 128, 128]                      # Region of interest size for each window
     sw_batch_size: 4                               # Batch size for processing windows
     overlap: 0.5                                   # Overlap ratio between windows
 ```
@@ -47,7 +73,7 @@ system:
 
   inferer:
     _target_: monai.inferers.SlidingWindowInferer
-    roi_size:
+    roi_size: [128, 128, 128]
     sw_batch_size: 8
     overlap: 0.25
 
@@ -173,3 +199,129 @@ class MyCustomInferer:
     *   **`arg1` and `arg2`:**  Arguments passed to your inferer's `__init__` method.
 
 With this configuration, Lighter will create an instance of your custom inferer and use it during the appropriate stages of your experiment.
+
+## Example: Test-Time Augmentation Inferer
+
+```python
+# my_project/inferers/tta_inferer.py
+import torch
+import torchvision.transforms.functional as TF
+from torch.nn import Module
+
+class TTAInferer:
+    """Test-Time Augmentation for robust predictions."""
+    def __init__(self, num_augmentations=4, aggregate="mean"):
+        self.num_augmentations = num_augmentations
+        self.aggregate = aggregate
+
+    def __call__(self, inputs: torch.Tensor, network: Module) -> torch.Tensor:
+        predictions = []
+
+        # Define augmentations
+        augmentations = [
+            lambda x: x,  # Original
+            lambda x: TF.hflip(x),  # Horizontal flip
+            lambda x: TF.vflip(x),  # Vertical flip
+            lambda x: torch.rot90(x, k=2, dims=[-2, -1])  # 180 rotation
+        ]
+
+        for aug_fn in augmentations[:self.num_augmentations]:
+            # Apply augmentation
+            aug_input = aug_fn(inputs)
+
+            # Get prediction
+            with torch.no_grad():
+                pred = network(aug_input)
+
+            # Reverse augmentation on prediction
+            if aug_fn != augmentations[0]:  # Skip original
+                pred = aug_fn(pred)  # Most augmentations are self-inverse
+
+            predictions.append(pred)
+
+        # Aggregate predictions
+        stacked = torch.stack(predictions)
+        if self.aggregate == "mean":
+            return stacked.mean(dim=0)
+        elif self.aggregate == "voting":
+            votes = stacked.argmax(dim=-1)
+            return torch.mode(votes, dim=0)[0]
+        else:
+            return stacked.mean(dim=0)
+```
+
+Use in config:
+```yaml
+system:
+    inferer:
+        _target_: my_project.inferers.TTAInferer
+        num_augmentations: 4
+        aggregate: mean
+```
+
+## Performance Tips ⚡
+
+| Optimization | Technique | Impact |
+|-------------|-----------|--------|
+| **Batch TTA** | Process all augmentations in one batch | 2-3x faster |
+| **Mixed Precision** | Use `torch.cuda.amp.autocast()` | 30-50% speedup |
+| **Reduce Augmentations** | Use only most impactful transforms | Proportional speedup |
+
+## Choosing the Right Inferer
+
+```mermaid
+graph TD
+    A[What was your model trained on?] --> B{Training Setup}
+    B -->|Fixed patches| C[Use Sliding Window]
+    B -->|Full images| D{Memory constraints?}
+    D -->|Yes| C
+    D -->|No| E[Use Simple Inferer]
+
+    A --> F{Need uncertainty?}
+    F -->|Yes| G[Add MC Dropout]
+
+    A --> H{Want robustness?}
+    H -->|Yes| I[Add TTA]
+
+    A --> J{Have multiple models?}
+    J -->|Yes| K[Use Ensemble]
+```
+
+## Configuration Examples
+
+### Model Trained on Patches → Full Image Inference
+```yaml
+# Model was trained on 128×128×128 patches
+# Now need to process 512×512×200 volumes
+system:
+    inferer:
+        _target_: monai.inferers.SlidingWindowInferer
+        roi_size: [128, 128, 128]  # Must match training patch size!
+        sw_batch_size: 4
+        overlap: 0.5  # 50% overlap for smooth predictions
+        mode: gaussian  # Smooth blending at boundaries
+```
+
+### Adding Robustness with TTA
+```yaml
+# Model trained normally, but test data is noisier
+system:
+    inferer:
+        _target_: my_project.inferers.TTAInferer
+        num_augmentations: 4  # Balance speed vs robustness
+        aggregate: mean  # Average predictions
+```
+
+### Uncertainty Quantification with MC Dropout
+```yaml
+# Model has dropout layers, need confidence intervals
+system:
+    inferer:
+        _target_: my_project.inferers.MCDropoutInferer
+        num_samples: 20  # Multiple forward passes
+        return_std: true  # Return standard deviation as uncertainty
+```
+
+## Related Guides
+- [Adapters](adapters.md) - Transform inference outputs
+- [Writers](writers.md) - Save predictions

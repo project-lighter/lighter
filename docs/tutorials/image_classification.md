@@ -1,98 +1,44 @@
-In this tutorial we will learn how to:
+# Image Classification with CIFAR-10
 
-1. Set up the project folder
-2. Implement a custom CNN model
-3. Define the config for training and testing on CIFAR10 dataset
-4. Train and test the model using Lighter
+This tutorial shows you how to train a CNN on CIFAR-10 using Lighter.
 
-## Setting up the Project
+**What you'll build:**
 
-First, create a new project directory named `image_classification` with the following structure:
+- A custom CNN model
+- Complete training configuration
+- Working image classification pipeline
 
-```plaintext
+## Step 1: Project Structure
+
+Create this folder structure:
+
+```
 image_classification/
-├── __init__.py
+├── __init__.py             # Makes it a Python module
 ├── experiments/
-│  └── config.yaml
+│   └── config.yaml         # Configuration file
 └── models/
     ├── __init__.py
-    └── simple_cnn.py
+    └── simple_cnn.py       # Your model
 ```
 
-If you're using Unix/Linux, you can create this structure with the following command:
-
+**Quick setup (Unix/Linux/Mac):**
 ```bash
-mkdir -p image_classification/{models,experiments} && touch image_classification/__init__.py image_classification/experiments/config.yaml image_classification/models/__init__.py image_classification/models/simple_cnn.py
+mkdir -p image_classification/{models,experiments}
+touch image_classification/__init__.py \
+      image_classification/models/{__init__.py,simple_cnn.py} \
+      image_classification/experiments/config.yaml
 ```
 
-!!! warning
+!!! tip
+    The `__init__.py` files are essential - they make folders importable as Python modules.
 
-    Do not forget to add `__init__.py` to folders that contain Python modules. For more details, refer to the [Project Module](../how-to/project_module.md) guide.
 
+## Step 2: Create the Model
 
-## Setting up Dataloaders
-
-`system`'s `dataloaders` section defines dataloaders for `train`, `val`, `test`, and `predict` stages. Let's start by configuring the training dataloader for CIFAR10.
-
-!!! note
-    The complete configuration is provided [few sections later](#complete-configuration).
-
-```yaml
-system:
-# ...
-    dataloaders:
-        train:
-            _target_: torch.utils.data.DataLoader
-            batch_size: 32
-            shuffle: True
-            num_workers: 4
-            dataset:
-                _target_: torchvision.datasets.CIFAR10
-                root: cifar10/
-                download: True
-                train: True
-                transform:
-                _target_: torchvision.transforms.Compose
-                transforms:
-                    - _target_: torchvision.transforms.ToTensor
-                    - _target_: torchvision.transforms.Normalize
-                      mean: [0.5, 0.5, 0.5]
-                      std: [0.5, 0.5, 0.5]
-```
-
-This is equivalent to the following Python code:
+Save this CNN model in `image_classification/models/simple_cnn.py`:
 
 ```python
-import torch
-import torchvision
-
-transforms = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-])
-
-train_dataset = torchvision.datasets.CIFAR10(
-    root="cifar10/",
-    download=True,
-    train=True,
-    transform=transforms
-)
-
-train_dataloader = torch.utils.data.DataLoader(
-    train_dataset,
-    batch_size=32,
-    shuffle=True,
-    num_workers=4
-)
-```
-
-## Setting up the Model
-
-### Defining a Custom Model
-
-We will use a simple CNN for image classification. Define this model in `image_classification/models/simple_cnn.py`.
-
-```python title="image_classification/models/simple_cnn.py"
 import torch.nn as nn
 
 class SimpleCNN(nn.Module):
@@ -115,39 +61,12 @@ class SimpleCNN(nn.Module):
         return x
 ```
 
-### Reference the Custom Model in `config.yaml`
+## Step 3: Complete Configuration
 
-Now that we have defined the model, let's specify it in the `config.yaml` file.
+Save this in `image_classification/experiments/config.yaml`:
 
-```yaml title="config.yaml" hl_lines="1 5"
-project: /path/to/image_classification
-
-system:
-  model:
-    _target_: project.models.simple_cnn.SimpleCNN
-    num_classes: 10  # Matches CIFAR10 classes
-```
-
-The `project` specifies the root directory that Lighter will import as a Python module, allowing access to custom code and models. This is why we needed to set up `__init__.py` files. As a result, we reference the custom model we defined simply using `project.models.simple_cnn.SimpleCNN`.
-
-!!! note
-    Learn more about the [Project Module](../how-to/project_module.md) in the How-To guide.
-
-!!! warning
-    Change `/path/to/image_classification` to the location of your project directory. Both absolute and relative paths work. To get the absolute path of your `image_classification/` directory, run:
-    ```bash
-    cd image_classification
-    pwd
-    ```
-    
-    If you're using a relative path, pay attention to where you are executing `lighter` from. For example, if running `lighter` while in the `image_classification/` folder, you can simply set `project: .` to reference the current directory.
-
-## Complete Configuration
-
-Now, let's put together the complete `config.yaml` file for training the `SimpleCNN` on CIFAR10:
-
-```yaml title="config.yaml"
-project: /path/to/image_classification  # Update as noted above
+```yaml
+project: .  # Use '.' if running from image_classification folder
 
 trainer:
     _target_: pytorch_lightning.Trainer
@@ -212,38 +131,60 @@ system:
                           std: [0.5, 0.5, 0.5]
 ```
 
-This configuration defines all the necessary components for training and testing:
+!!! info "Path Configuration"
+    - Use `project: .` if running from inside `image_classification/`
+    - Use `project: ./image_classification` if running from parent directory
+    - Or use absolute path: `project: /home/user/image_classification`
 
-*   **`trainer`**: Configures the PyTorch Lightning Trainer to use automatic accelerator selection and train for a maximum of 10 epochs.
-*   **`system`**: Defines the Lighter System.
-    *   **`model`**: Specifies the `SimpleCNN` model, a custom model you defined in `image_classification/models/simple_cnn.py`.
-    *   **`criterion`**: Sets the loss function to `CrossEntropyLoss`.
-    *   **`optimizer`**: Uses the `Adam` optimizer with a learning rate of 1.0e-3.
-    *   **`metrics`**: Defines accuracy metrics for training and testing stages.
-    *   **`dataloaders`**: Configures `DataLoader`s for `train` and `test` stages, using the CIFAR10 dataset and appropriate transforms.
+## Step 4: Train the Model
 
-## Training Execution
+Navigate to your project folder and run:
 
-To start training, save the above configuration as `config.yaml` in your project directory. Ensure that you have created the `image_classification/models/simple_cnn.py` file as well. Then, open your terminal, navigate to your project directory, and run the following command:
-
-```bash title="Terminal"
+```bash
+cd image_classification
 lighter fit experiments/config.yaml
 ```
 
-Lighter will parse your `config.yaml`, initialize all the components, and start the training process using PyTorch Lightning. You will see the training progress, including loss and metrics, logged in your terminal.
+You'll see training progress with loss and accuracy metrics.
 
-## Evaluation
+## Step 5: Test the Model
 
-After training, you can evaluate your model on the test set:
+Evaluate on the test set:
 
-```bash title="Terminal"
+```bash
 lighter test experiments/config.yaml
 ```
 
-Lighter will load the best checkpoint saved during training (if a `ModelCheckpoint` callback is used in the configuration, which is often the default in more complex setups) and evaluate the model on the specified dataloader, reporting the metrics defined in the `system.metrics` section for the`test` stage, respectively.
+## Tips & Tricks
 
-## Next Steps
+**Quick experiments:**
+```bash
+# Change epochs from CLI
+lighter fit experiments/config.yaml --trainer#max_epochs=20
 
-In this tutorial, you have successfully trained and evaluated an image classification model on the CIFAR10 dataset using Lighter.
+# Use GPU if available
+lighter fit experiments/config.yaml --trainer#accelerator=gpu
 
-You now have a solid foundation for building more complex experiments with Lighter. Head over to the [How-To guides](../how-to/configure.md) to explore Lighter's features in more detail.
+# Fast debugging (2 batches only)
+lighter fit experiments/config.yaml --trainer#fast_dev_run=2
+```
+
+**Common issues:**
+
+- **ModuleNotFoundError**: Check that all folders have `__init__.py`
+- **Wrong project path**: Use `pwd` to check current directory
+- **CIFAR-10 download fails**: Check internet connection
+
+## What's Next?
+
+✓ You've trained a CNN on CIFAR-10!
+
+✓ You understand project structure and configuration
+
+✓ You can run training and testing
+
+Explore more:
+
+- [Configuration Guide](../how-to/configure.md) - Advanced config features
+- [Custom Metrics](../how-to/metrics.md) - Add custom evaluation metrics
+- [Adapters](../how-to/adapters.md) - Handle complex data flows
