@@ -81,7 +81,7 @@ Only 3 things are Lighter-specific:
 
 1. **YAML Configuration Syntax** - [Configuration Guide](../how-to/configure.md)
 2. **Adapters** (Lighter's key feature) - [Adapters Guide](../how-to/adapters.md)
-3. **Project Modules** (optional) - [Project Module Guide](../how-to/project_module.md)
+3. **Project Module** (optional) - [Project Module Guide](../how-to/project_module.md)
 
 ## What Stays the Same
 

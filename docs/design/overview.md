@@ -38,17 +38,17 @@ Lighter follows four core principles: **Configuration over Code**, **Composition
 
 ## Framework Comparison
 
-Lighter occupies a unique position in the configuration-driven deep learning landscape:
+Lighter's goal is to brings reproducibility and structure, while keeping you in full control of your code. This is different from other configuration-driven frameworks that provide higher-level abstractions.
 
 | Feature | **Lighter** | **[Ludwig](https://github.com/ludwig-ai/ludwig)** | **[Quadra](https://github.com/orobix/quadra)** | **[GaNDLF](https://github.com/mlcommons/GaNDLF)** |
-|---------|------------|-----------|------------|------------|
-| **Lines of Code** | ~1,000 | ~100,000 | ~10,000 | ~50,000 |
-| **Abstraction Level** | Medium | High | High | High |
-| **Task Coverage** | Any PyTorch task | Multi-modal | Vision | Medical |
-| **Custom Code** | Seamless | Limited | Moderate | Limited |
-| **Flexibility** | Maximum (adapters) | Low | Moderate | Domain-specific |
+|---|---|---|---|---|
+| **Primary Focus** | Config-driven, task-agnostic DL | Config-driven, multi-task DL | Config-driven computer vision | Config-driven medical imaging |
+| **Configuration** | YAML (MONAI) | YAML (Custom) | YAML (Hydra) | YAML (Custom) |
+| **Abstraction** | Medium. Extends PyTorch Lightning, expects standard PyTorch components. | High. Provides pre-built flows for various tasks. | High. Pre-defined structures for computer vision. | High. Pre-defined structures for medical imaging. |
+| **Flexibility** | High. New components are added via project module. | Medium. Adding new components requires code editing. | Low. Adding new components requires code editing. | Low. Adding new components requires code editing. |
+| **Use Case** | Organized experimentation | Production-level applications | Traditional computer vision | Established medical imaging methods |
 
-Each framework serves different needs. Lighter's strength: minimal abstraction for maximum control.
+Lighter is the tool for you if you like PyTorch's flexibility but want to manage your experiments in a structured and reproducible way.
 
 ## Next Steps
 
