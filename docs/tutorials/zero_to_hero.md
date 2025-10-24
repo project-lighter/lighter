@@ -197,13 +197,10 @@ optimizer:
 - `@` - Instantiate that model
 - `.parameters()` - Call its `.parameters()` method using `$` that lets you run Python code
 
-!!! note "`#` vs. `@`"
-
-    - **`#`** — Returns the raw config object (no instantiation). Use this when you want the configuration itself.
-    - **`@`** — Instantiate the referenced config definition. Use this when you need the actual runtime object.
+**Common reference patterns:**
 
 ```yaml
-# Reference the model
+# Reference the model parameters
 "$@system#model.parameters()"
 
 # Reference the optimizer (for schedulers)
@@ -212,6 +209,9 @@ optimizer:
 # Reference training dataloader
 "@system#dataloaders#train"
 ```
+
+!!! tip "Learn More"
+    For advanced configuration details and the differences between `#`, `@`, `$`, and `%`, see the [Configuration Guide](../how-to/configure.md).
 
 ## Your Superpower: CLI Overrides
 

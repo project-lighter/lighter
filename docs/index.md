@@ -196,7 +196,7 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
 
 ## Cite
 
-If you find it useful, please cite our [*Journal of Open Source Sofware* paper](https://joss.theoj.org/papers/10.21105/joss.08101):
+If you find it useful, please cite our [*Journal of Open Source Software* paper](https://joss.theoj.org/papers/10.21105/joss.08101):
 
 ```bibtex
 @article{lighter,

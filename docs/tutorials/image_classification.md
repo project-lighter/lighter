@@ -12,7 +12,7 @@ This tutorial shows you how to train a CNN on CIFAR-10 using Lighter.
 
 Create this folder structure:
 
-```
+```bash
 image_classification/
 ├── __init__.py             # Makes it a Python module
 ├── experiments/

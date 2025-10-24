@@ -93,6 +93,19 @@ Specify your project's root directory in `config.yaml` using the `project` key. 
 project: my_project/ # Project root path
 ```
 
+!!! warning "Relative Path Behavior"
+    The `project` path is relative to your **current working directory** when running the `lighter` command, not relative to the config file location.
+
+    ```bash
+    # If you run from parent directory
+    cd /path/to/parent && lighter fit /path/to/my_project/experiments/config.yaml --project=/path/to/my_project/
+
+    # If you run from project directory
+    cd /path/to/parent/my_project && lighter fit experiments/config.yaml --project=.
+    ```
+
+    **Tip:** Use absolute paths to avoid confusion, or be mindful of your current working directory.
+
 ### Referencing Project Modules
 
 Reference your projects modules just like you reference any other module. For example, look at `system#model` and `system#dataloaders#train#dataset`:

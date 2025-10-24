@@ -16,7 +16,7 @@ trainer:
 ## Why Freeze Layers? 🤔
 
 | Scenario | Strategy | Benefit |
-|----------|----------|---------||
+|----------|----------|---------|
 | **Transfer Learning** | Freeze pretrained layers initially | Preserve learned features |
 | **Limited Data** | Freeze most layers | Prevent overfitting |
 | **Fine-tuning** | Gradual unfreezing | Stable adaptation |
@@ -103,13 +103,14 @@ Combine `Freezer` callbacks in `config.yaml` for complex freezing schedules. E.g
 ```yaml title="config.yaml"
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.Freezer # Freezer callback for initial freezing
-      name_starts_with: ["model.backbone"] # Freeze backbone initially
-      until_epoch: 5                     # Unfreeze backbone after epoch 5
-    - _target_: lighter.callbacks.Freezer # 2nd Freezer callback for gradual unfreezing
-      name_starts_with: ["model.encoder.layer1", "model.encoder.layer2"] # Gradually unfreeze layer1/layer2
-      start_epoch: 5                     # Start unfreezing from epoch 5
-      unfreeze_every_n_epochs: 5        # Unfreeze every 5 epochs
+    # Unfreeze backbone layers at epoch 5
+    - _target_: lighter.callbacks.Freezer
+      name_starts_with: ["model.backbone"]
+      until_epoch: 5
+    # Unfreeze early encoder layers at epoch 10
+    - _target_: lighter.callbacks.Freezer
+      name_starts_with: ["model.encoder.layer1", "model.encoder.layer2"]
+      until_epoch: 10
 ```
 
 Example: 2 `Freezer` callbacks for gradual unfreezing - initial backbone freeze, gradual encoder layer unfreezing.

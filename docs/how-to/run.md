@@ -38,8 +38,8 @@ lighter predict config.yaml
 # Train + validate (automatic validation during training)
 lighter fit config.yaml
 
-# Then test on held-out data
-lighter test config.yaml --args#test#ckpt_path="best_model.ckpt"
+# Then test on held-out data - equivalent to Trainer.test(..., ckpt_path="best")
+lighter test config.yaml --args#test#ckpt_path="best.ckpt"
 ```
 
 #### 2. Resume Training from Checkpoint
@@ -57,6 +57,8 @@ lighter fit base_config.yaml,finetune_config.yaml
 
 ### Stage-Specific Arguments
 
+The `args` key provides a way to pass arguments directly to the PyTorch Lightning `Trainer`'s stage methods: `fit`, `validate`, `test`, and `predict`. Each key under `args` corresponds to a stage, and the arguments within it are passed to that stage's method. For instance, `args.test.ckpt_path` is passed as `Trainer.test(ckpt_path=...)`.
+
 Configure stage arguments in your YAML or via CLI:
 
 ```yaml title="config.yaml"
@@ -64,11 +66,11 @@ args:
     fit:
         ckpt_path: null  # Start from scratch
     validate:
-        ckpt_path: "checkpoints/best_model.ckpt"
+        ckpt_path: "checkpoints/best.ckpt"
     test:
-        ckpt_path: "checkpoints/best_model.ckpt"
+        ckpt_path: "checkpoints/best.ckpt"
     predict:
-        ckpt_path: "checkpoints/best_model.ckpt"
+        ckpt_path: "checkpoints/best.ckpt"
         return_predictions: true
 ```
 
