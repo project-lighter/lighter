@@ -1,3 +1,70 @@
+# Configuration Guide
+
+Lighter's YAML configuration system provides a powerful, modular way to define experiments. This guide covers everything from basics to advanced patterns.
+
+## Quick Start Example
+
+```yaml title="config.yaml"
+# Minimal working configuration
+trainer:
+    _target_: pytorch_lightning.Trainer
+    max_epochs: 5
+
+system:
+    _target_: lighter.System
+    model:
+        _target_: torchvision.models.resnet18
+        num_classes: 10
+    criterion:
+        _target_: torch.nn.CrossEntropyLoss
+    optimizer:
+        _target_: torch.optim.Adam
+        params: "$@system#model.parameters()"
+        lr: 0.001
+```
+
+Run with: `lighter fit config.yaml`
+
+## Quick Reference 🚀
+
+### Config Syntax Cheat Sheet
+
+| Symbol | Purpose | Example |
+|--------|---------|------|
+| `_target_` | Instantiate a class | `_target_: torch.nn.Linear` |
+| `%` | Text reference (copy YAML) | `val: "%system#metrics#train"` |
+| `@` | Object reference (Python instance) | `optimizer: "@system#optimizer"` |
+| `$` | Evaluate Python expression | `lr: "$0.001 * 2"` |
+| `#` | Navigate config paths | `@system#model#parameters` |
+| `.` | Access object attributes | `$@system#model.parameters()` |
+
+### Common Patterns
+
+```yaml
+# Pattern 1: Model with optimizer
+model:
+    _target_: torchvision.models.resnet18
+    pretrained: true
+optimizer:
+    _target_: torch.optim.Adam
+    params: "$@system#model.parameters()"  # Get model parameters
+    lr: 0.001
+
+# Pattern 2: Scheduler with optimizer reference
+scheduler:
+    _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+    optimizer: "@system#optimizer"  # Reference optimizer instance
+    factor: 0.5
+
+# Pattern 3: Reusing configurations
+metrics:
+    train:
+        - _target_: torchmetrics.Accuracy
+          task: multiclass
+          num_classes: 10
+    val: "%system#metrics#train"  # Copy train metrics config
+```
+
 ## Config Structure
 
 ### Mandatory Sections
@@ -51,10 +118,10 @@ In this example, we define a simple linear model, a cross-entropy loss, and an A
 
 ### Optional Sections
 
-In addition to mandatory `trainer` and `system` sections, you can include the following optional sections: 
+In addition to mandatory `trainer` and `system` sections, you can include the following optional sections:
 
 *   **`_requires_`**: Evaluated before the rest of the config. Useful for importing modules used by Python expressions in the config as explained in [Evaluating Python Expressions](#evaluating-python-expressions).
-*   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Custom Project Modules](../how-to/project_module.md).
+*   **`project`**: Path to your project directory. Used to import custom modules. For more details, see [Project Module](../how-to/project_module.md).
 *   **`vars`**: Store variables for use in other parts of the config. Useful to avoid repetition and easily update values. See [Referencing Other Components](#referencing-other-components).
 *   **`args`**: Arguments to pass to the the stage of the experiment being run.
 
@@ -123,7 +190,7 @@ system:
         train:
             - _target_: torchmetrics.classification.AUROC
               task: binary
-        # Or use relative referencing "%#train" for the same effect 
+        # Or use relative referencing "%#train" for the same effect
         val: "%system#metrics#train" # (1)!
 ```
 
@@ -171,9 +238,11 @@ optimizer:
 
 1. It first fetches the evaluated `"system#model"`, and then runs `.parameters()` on it, as indicated by the `"$"` prefix.
 
-!!! note "Difference between `#` and `.`"
 
-    Use `#` to reference elements of the config, and `.` to access attributes/methods of Python objects. For example, `"$@system#model.parameters()"` fetches the model instance from `@system#model` and runs `.parameters()` on it as indicated by `$`.
+!!! note "`#` vs. `@`"
+
+    - **`#`** — Returns the raw config object (no instantiation). Use this when you want the configuration itself.
+    - **`@`** — Instantiate the referenced config definition. Use this when you need the actual runtime object.
 
 
 ### Overriding Config from CLI
@@ -213,18 +282,205 @@ lighter fit config1.yaml,config2.yaml
 
 This will merge the two configs, with the second config overriding any conflicting parameters from the first one.
 
+#### Advanced Merging Patterns
+
+```bash
+# Modular configuration
+lighter fit base.yaml,models/unet.yaml,data/brats.yaml,train/adam.yaml
+
+# Environment-specific configs
+lighter fit config.yaml,envs/local.yaml  # For local development
+lighter fit config.yaml,envs/cluster.yaml  # For cluster training
+```
+
+## Pro Tips 💡
+
+### 1. Use Variables for DRY Configs
+```yaml
+vars:
+    batch_size: 32
+    num_classes: 10
+    base_lr: 0.001
+
+system:
+    model:
+        _target_: torchvision.models.resnet18
+        num_classes: "%vars#num_classes"
+
+    optimizer:
+        _target_: torch.optim.Adam
+        lr: "%vars#base_lr"
+
+    dataloaders:
+        train:
+            batch_size: "%vars#batch_size"
+        val:
+            batch_size: "$%vars#batch_size * 2"  # Double for validation
+```
+
+### 2. Conditional Configurations
+```yaml
+# Use Python expressions for conditional logic
+system:
+    model:
+        _target_: "$'torchvision.models.resnet50' if %vars#large_model else 'torchvision.models.resnet18'"
+        pretrained: true
+```
+
+### 3. Dynamic Imports in _requires_
+```yaml
+_requires_:
+    - "$import math"
+    - "$import numpy as np"
+
+vars:
+    # Now you can use imported modules
+    pi_squared: "$math.pi ** 2"
+    random_seed: "$np.random.randint(0, 1000)"
+```
+
+## Common Configuration Recipes
+
+### Recipe 1: Multi-GPU Training Setup
+```yaml
+trainer:
+    _target_: pytorch_lightning.Trainer
+    devices: -1  # Use all available GPUs
+    strategy: ddp  # Distributed Data Parallel
+    precision: "16-mixed"  # Mixed precision training
+
+system:
+    dataloaders:
+        train:
+            batch_size: 32  # Per GPU
+            num_workers: 4
+            pin_memory: true
+            persistent_workers: true
+```
+
+### Recipe 2: Experiment Tracking
+```yaml
+trainer:
+    logger:
+        - _target_: pytorch_lightning.loggers.TensorBoardLogger
+          save_dir: logs
+          name: experiment_name
+          version: "$import datetime; datetime.datetime.now().strftime('%Y%m%d_%H%M%S')"
+        - _target_: pytorch_lightning.loggers.WandbLogger
+          project: my_project
+          name: experiment_name
+```
+
+### Recipe 3: Advanced Callbacks
+```yaml
+trainer:
+    callbacks:
+        - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+          monitor: val_loss
+          mode: min
+          save_top_k: 3
+          filename: "{epoch}-{val_loss:.4f}"
+
+        - _target_: pytorch_lightning.callbacks.EarlyStopping
+          monitor: val_loss
+          patience: 10
+          mode: min
+
+        - _target_: pytorch_lightning.callbacks.LearningRateMonitor
+          logging_interval: step
+```
+
+### Recipe 4: Complex Data Augmentation
+```yaml
+system:
+    dataloaders:
+        train:
+            dataset:
+                transform:
+                    _target_: torchvision.transforms.Compose
+                    transforms:
+                        - _target_: torchvision.transforms.RandomResizedCrop
+                          size: 224
+                          scale: [0.8, 1.0]
+                        - _target_: torchvision.transforms.RandomHorizontalFlip
+                          p: 0.5
+                        - _target_: torchvision.transforms.ColorJitter
+                          brightness: 0.4
+                          contrast: 0.4
+                        - _target_: torchvision.transforms.ToTensor
+                        - _target_: torchvision.transforms.Normalize
+                          mean: [0.485, 0.456, 0.406]
+                          std: [0.229, 0.224, 0.225]
+```
+
+## Troubleshooting Common Issues
+
+### Issue: "Module not found" errors
+```yaml
+# Solution: Use _requires_ to import modules
+_requires_:
+    - "$import sys; sys.path.append('.')"
+
+project: ./my_project  # Ensure project path is correct
+```
+
+### Issue: Reference not resolving
+```yaml
+# Wrong: Using # with Python attributes
+params: "$@system#model#parameters()"  # ❌
+
+# Correct: Use . for Python attributes
+params: "$@system#model.parameters()"  # ✅
+```
+
+### Issue: Circular references
+```yaml
+# Avoid circular references by using lazy evaluation
+system:
+    model:
+        _target_: MyModel
+        optimizer_lr: "@system#optimizer#lr"  # ❌ Circular!
+
+    optimizer:
+        _target_: torch.optim.Adam
+        lr: "$@system#model.get_lr()"  # ❌ Circular!
+
+# Solution: Use vars or computed values
+vars:
+    lr: 0.001
+
+system:
+    model:
+        _target_: MyModel
+        lr: "%vars#lr"  # ✅
+
+    optimizer:
+        _target_: torch.optim.Adam
+        lr: "%vars#lr"  # ✅
+```
+
+## Best Practices
+
+1. **Organize configs modularly**: Separate base, model, data, and training configs
+2. **Use variables**: Define commonly used values in `vars` section
+3. **Document your configs**: Add comments explaining non-obvious choices
+4. **Version control**: Track config changes alongside code
+5. **Validate early**: Test configs with `--trainer#fast_dev_run=true`
+6. **Use type hints**: When creating custom classes, use type hints for better IDE support
+
 ## Recap and Next Steps
 
-This section covered the fundamental aspects of configuring experiments with Lighter using YAML files.  Key takeaways include:
+This guide covered the comprehensive configuration system in Lighter. Key takeaways:
 
-*   **Structure:** Lighter configs are structured into mandatory `trainer` and `system` sections, with optional sections like `_requires_`, `vars`, `args`, and `project`.
-*   **Stages:** Lighter operates in stages (e.g., `fit`, `validate`, `test`), each configurable via the `args` section.
-*   **Config Syntax:** Lighter leverages the MONAI Bundle configuration system, using `_target_` to instantiate classes and key-value pairs for arguments.
-*   **Referencing:** Components can be referenced using `%` (textual replacement) or `@` (evaluated Python value).  Understanding the difference is crucial for correct instantiation and interaction of components.
-*   **Python Expressions:** Python expressions can be evaluated within the config using `$`. This is frequently used in conjunction with referencing (e.g., `"$@system#model.parameters()"`).
-*   **CLI Overrides:** Any config parameter can be overridden from the command line, providing flexibility for experimentation.
-*   **Config Merging:** Multiple configs can be merged using commas, allowing for modularity and reuse.
+*   **Quick Reference**: Symbols (`_target_`, `%`, `@`, `$`, `#`, `.`) provide powerful configuration capabilities
+*   **Structure**: Mandatory `trainer` and `system` sections, with optional `_requires_`, `vars`, `args`, and `project`
+*   **Flexibility**: Override from CLI, merge configs, use Python expressions
+*   **Patterns**: Reusable recipes for common scenarios
+*   **Best Practices**: Modular organization and validation
 
-By mastering these configuration basics, you can effectively define and manage your Lighter experiments.
+With these configuration skills, you can create sophisticated, maintainable experiment definitions.
 
-Next, we will look at the different Lighter stages and how to [Run](run.md) them. 
+## Related Guides
+- [Project Module](project_module.md) - Custom components
+- [Troubleshooting](troubleshooting.md) - Config error solutions
+- [Run Guide](run.md) - Running experiments

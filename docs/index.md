@@ -35,7 +35,7 @@ pip install lighter
 
     ---
 
-    Define, reproduce, and share experiments through config files.
+    Define, reproduce, and share experiments through YAML configs. No more scattered Python scripts!
 
 -   :material-cube-outline:{ .lg .middle }  __Task-agnostic__
 
@@ -47,13 +47,13 @@ pip install lighter
 
     ---
 
-    Lighter handles the boilerplate, letting you run experiments with little to no code.
+    Lighter handles the boilerplate so that your projects stay lightweight and maintainable.
 
 -   :material-puzzle-outline:{ .lg .middle }  __Customizable__
 
     ---
 
-    Add custom code seamlessly, whether it's models, datasets, or any other component.
+    Add custom models, datasets, losses, or any other component. If it's Python, Lighter can use it.
 
 </div>
 
@@ -126,16 +126,16 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
             super().__init__()
             self.model = resnet18(num_classes=10)
             self.criterion = CrossEntropyLoss()
-        
+
         def forward(self, x):
             return self.model(x)
-        
+
         def training_step(self, batch, batch_idx):
             x, y = batch
             y_hat = self(x)
             loss = self.criterion(y_hat, y)
             return loss
-        
+
         def configure_optimizers(self):
             return Adam(self.model.parameters(), lr=0.001)
 
@@ -163,48 +163,52 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
 
 <div class="grid cards" markdown>
 
--   :material-book-open:{ .lg .middle }  __Tutorials__
+-   :material-school:{ .lg .middle }  __Start Here: Tutorials__
 
     ---
 
-    Run your first experiments with step-by-step tutorials
-    [:octicons-arrow-right-24: Start Learning](tutorials/configuration_basics.md)
+    New to Lighter? Start with our Zero to Hero guide
+    [:octicons-arrow-right-24: Get Started](tutorials/zero_to_hero.md)
 
 -   :material-hammer-wrench:{ .lg .middle }  __How-To Guides__
-    
-    ---
-    
-    Learn about Lighter's advanced features with practical guides
-    [:octicons-arrow-right-24: Learn More](how-to/project_module.md)
-
--   :material-lightbulb:{ .lg .middle }  __Design__
 
     ---
 
-    Understand Lighter's design principles and architecture
-    [:octicons-arrow-right-24: Read More](design/overview.md)
+    Learn Lighter's features with concept and practice guides
+    [:octicons-arrow-right-24: Explore](how-to/run.md)
 
--   :material-api:{ .lg .middle }  __Reference__
-    
+-   :material-lightbulb:{ .lg .middle }  __Design & Architecture__
+
     ---
-    
-    Explore Lighter's classes, functions, and interfaces
+
+    Understand Lighter's design principles
+    [:octicons-arrow-right-24: Learn More](design/overview.md)
+
+-   :material-api:{ .lg .middle }  __API Reference__
+
+    ---
+
+    Explore Lighter's classes and functions
     [:octicons-arrow-right-24: View API](reference/)
 
 </div>
- 
+
 
 ## Cite
 
+If you find it useful, please cite our [*Journal of Open Source Software* paper](https://joss.theoj.org/papers/10.21105/joss.08101):
+
 ```bibtex
-@software{lighter,
-    author       = {Ibrahim Hadzic and
-                    Suraj Pai and
-                    Keno Bressem and
-                    Hugo Aerts},
-    title        = {Lighter},
-    publisher    = {Zenodo},
-    doi          = {10.5281/zenodo.8007711},
-    url          = {https://doi.org/10.5281/zenodo.8007711}
+@article{lighter,
+    doi = {10.21105/joss.08101},
+    url = {https://doi.org/10.21105/joss.08101},
+    year = {2025},
+    publisher = {The Open Journal},
+    volume = {10},
+    number = {111},
+    pages = {8101},
+    author = {Hadzic, Ibrahim and Pai, Suraj and Bressem, Keno and Foldyna, Borek and Aerts, Hugo JWL},
+    title = {Lighter: Configuration-Driven Deep Learning},
+    journal = {Journal of Open Source Software}
 }
 ```

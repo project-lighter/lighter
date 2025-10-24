@@ -1,11 +1,30 @@
-Lighter writers are callbacks for saving model predictions and outputs to files during validation, testing, and prediction. They offer a standardized, extensible way to persist experiment results for analysis and visualization.
+# Writers: Save Your Results Like a Pro
 
-Lighter offers two main writer types:
+Writers are your data persistence layer—they capture model outputs and save them in formats ready for analysis, visualization, or deployment.
 
-1.  **`FileWriter`**: Saves tensors (predictions, images) to files (NIfTI, NRRD, PNG, MP4, NumPy).
-2.  **`TableWriter`**: Saves tabular data (metrics, aggregated predictions) to CSV files.
+## Quick Start 🚀
 
-This guide explains how to use and extend `FileWriter` and `TableWriter` in Lighter to effectively manage experiment outputs.
+```yaml
+# Save predictions as images
+trainer:
+    callbacks:
+        - _target_: lighter.callbacks.FileWriter
+          path: "outputs/predictions"
+          writer: "image"  # PNG for 2D, MP4 for 3D
+
+# Save metrics to CSV
+trainer:
+    callbacks:
+        - _target_: lighter.callbacks.TableWriter
+          path: "outputs/metrics.csv"
+```
+
+## Writer Types at a Glance
+
+| Writer | Purpose | Output Format | Best For |
+|--------|---------|---------------|----------|
+| **FileWriter** | Save predictions/tensors | NIfTI, PNG, MP4, NPY | Images, volumes, arrays |
+| **TableWriter** | Save tabular data | CSV | Metrics, statistics, results |
 
 ## Using `FileWriter`
 
@@ -220,18 +239,94 @@ Example: `TableWriter` saves data to `outputs/metrics.csv`. In `validation_step`
 
 `TableWriter` captures dict from `validation_step`/`test_step`/`predict_step`, saves as CSV rows. Dict keys become CSV column headers.
 
-## Extending `TableWriter` (Advanced)
+## Custom Writer Example
 
-Like `FileWriter`, extend `TableWriter` with custom writer classes for specialized table writing. See `lighter/callbacks/writer/table.py` for details.
+```python
+# my_project/writers/visualization_writer.py
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+class VisualizationWriter:
+    """Save comparison plots of input, target, and prediction."""
+    def __init__(self, path):
+        self.path = Path(path)
+        self.path.mkdir(exist_ok=True)
+
+    def write_comparison(self, input_img, target, prediction, identifier):
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+        axes[0].imshow(input_img.cpu().numpy().transpose(1, 2, 0))
+        axes[0].set_title("Input")
+
+        axes[1].imshow(target.cpu().numpy(), cmap='tab20')
+        axes[1].set_title("Ground Truth")
+
+        axes[2].imshow(prediction.argmax(0).cpu().numpy(), cmap='tab20')
+        axes[2].set_title("Prediction")
+
+        for ax in axes:
+            ax.axis('off')
+
+        plt.tight_layout()
+        plt.savefig(self.path / f"{identifier}_comparison.png")
+        plt.close()
+```
+
+## Quick Reference 📄
+
+### FileWriter Formats
+```yaml
+# Medical imaging
+writer: "itk_nifti"     # .nii.gz files
+writer: "itk_nrrd"      # .nrrd files
+writer: "itk_seg_nrrd"  # Segmentation masks
+
+# Standard formats
+writer: "tensor"        # NumPy .npy files
+writer: "image"         # PNG (2D) or MP4 (3D)
+writer: "video"         # MP4 for time series
+
+# Custom
+writer: my_project.writers.custom_writer
+```
+
+### TableWriter Patterns
+```python
+# Return dict from step methods for TableWriter
+def validation_step(self, batch, batch_idx):
+    # ... compute metrics ...
+    return {
+        "patient_id": batch["id"],
+        "dice_score": dice,
+        "loss": loss.item(),
+        "prediction_confidence": pred.max()
+    }
+```
+
+## Common Issues & Solutions
+
+| Issue | Solution |
+|-------|----------|
+| **Permission denied** | Create output directory: `Path("outputs").mkdir(exist_ok=True)` |
+| **Out of disk space** | Use compression or write less frequently |
+| **Slow writing** | Reduce precision to FP16 or use async writing |
 
 ## Recap and Next Steps
 
-Lighter writers are key for saving/managing experiment outputs. Use `FileWriter` and `TableWriter`, extend with custom writers as needed to:
+✅ **You've Learned:**
+- Use FileWriter for predictions and tensors
+- Use TableWriter for metrics and results
+- Create custom writers for special needs
+- Optimize writing for performance
 
-*   Save model predictions in various formats for visualization/analysis.
-*   Log metrics/tabular data to CSV for experiment tracking/reporting.
-*   Create custom output saving logic.
+🎯 **Best Practices:**
+- Organize outputs hierarchically
+- Use compression for large outputs
+- Consider async writing for speed
+- Save metadata with predictions
 
-Writers provide a complete solution for running DL experiments and capturing/utilizing valuable outputs.
+💡 **Pro Tip:** Always save enough information to reproduce your results!
 
-Next, explore [Freezers](freezers.md) for freezing model layers.
+## Related Guides
+- [Adapters](adapters.md) - Transform before writing
+- [Inferers](inferers.md) - Write inference results

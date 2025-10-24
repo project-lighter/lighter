@@ -1,15 +1,56 @@
-Metrics are key for evaluating deep learning models. Lighter integrates `torchmetrics` for defining metrics in PyTorch. While `torchmetrics` offers many built-in metrics, custom metrics are often needed for specific research problems.
+# Custom Metrics: Beyond Standard Evaluation
 
-This guide walks through creating and using custom metrics in Lighter, enabling deeper insights into model behavior and performance evaluation tailored to your needs.
+Metrics are the compass that guides your model development. While `torchmetrics` provides excellent built-in metrics, real-world projects often need custom evaluation logic. This guide shows you how to create powerful custom metrics that provide deep insights into your model's behavior.
 
-## `torchmetrics` Basics for Custom Metrics
+## Quick Start: Your First Custom Metric in 30 Seconds 🚀
 
-Lighter uses `torchmetrics` as the metric system foundation. To create custom metrics, understand these `torchmetrics` concepts:
+```python
+# my_project/metrics/weighted_accuracy.py
+from torchmetrics import Metric
+import torch
 
-- **Metric Class**: Base class for custom metrics, inheriting from `torchmetrics.Metric`. Provides structure and methods.
-- **`update()` Method**: Called for each data batch during train/val/test. Accumulates statistics based on predictions and targets.
-- **`compute()` Method**: Called at epoch end (or val/test end). Calculates final metric value from accumulated stats.
-- **`add_state()`**: Method to store accumulated stats in custom metric class. Registers state variables managed by `torchmetrics` (distributed computation, state resetting).
+class WeightedAccuracy(Metric):
+    """Accuracy that cares more about certain classes."""
+    def __init__(self, class_weights):
+        super().__init__()
+        self.class_weights = class_weights
+        self.add_state("weighted_correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total_weight", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        pred_classes = preds.argmax(dim=1)
+        correct = pred_classes == target
+        weights = torch.tensor([self.class_weights[t.item()] for t in target])
+        self.weighted_correct += (correct * weights).sum()
+        self.total_weight += weights.sum()
+
+    def compute(self):
+        return self.weighted_correct / self.total_weight
+```
+
+Use it in your config:
+```yaml
+system:
+    metrics:
+        val:
+            - _target_: my_project.metrics.WeightedAccuracy
+              class_weights: [1.0, 2.0, 5.0]  # Class 2 is 5x more important
+```
+
+## Core Concepts: The Metric Trinity 🏆
+
+Every custom metric needs three essential components:
+
+| Component | Purpose | When Called |
+|-----------|---------|-------------|
+| **1. `add_state()`** | Register variables to track | Once at initialization |
+| **2. `update()`** | Process batch & accumulate stats | Every batch |
+| **3. `compute()`** | Calculate final metric value | End of epoch/validation |
+
+**The lifecycle flow:**
+1. **Initialize** → Set up state variables
+2. **Update** (repeated) → Process each batch
+3. **Compute** → Calculate final metric
 
 ## Creating a Custom Metric: Step-by-Step
 
@@ -135,53 +176,98 @@ Let's walk through the steps of creating a custom metric in Lighter using `torch
 
     This config uses both built-in `Accuracy` and `MyCustomMetric` during train/val stages.
 
-## Complete Custom Metric Example
+## Practical Example: Domain-Specific Metric
 
-Here's the complete code for our example custom metric, `MyCustomMetric` (in `my_project/metrics/my_custom_metric.py`):
-
-```python title="my_project/metrics/my_custom_metric.py"
+```python
 from torchmetrics import Metric
 import torch
 
-class MyCustomMetric(Metric):
-    def __init__(self):
+class DiceScore(Metric):
+    """Dice coefficient for segmentation tasks."""
+    def __init__(self, smooth=1e-6):
         super().__init__()
-        self.add_state("correct", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.smooth = smooth
+        self.add_state("intersection", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("union", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        binary_preds = (preds >= 0.5).int()
-        self.correct += torch.sum(binary_preds == target)
-        self.total += target.numel()
+        # Flatten predictions and targets
+        preds = preds.view(-1)
+        target = target.view(-1)
+
+        # Calculate intersection and union
+        intersection = (preds * target).sum()
+        union = preds.sum() + target.sum()
+
+        self.intersection += intersection
+        self.union += union
 
     def compute(self):
-        return self.correct.float() / self.total
+        # Calculate Dice score
+        dice = (2 * self.intersection + self.smooth) / (self.union + self.smooth)
+        return dice
 ```
 
-And here's how you would use it in your `config.yaml`:
-
-```yaml title="config.yaml"
-project: my_project/
-
+Use in config:
+```yaml
 system:
-  metrics:
-    train:
-      - _target_: torchmetrics.Accuracy
-      - _target_: my_project.metrics.MyCustomMetric
+    metrics:
+        val:
+            - _target_: my_project.metrics.DiceScore
+              smooth: 1e-6
+```
 
-    val:
-      - _target_: torchmetrics.Accuracy
-      - _target_: my_project.metrics.MyCustomMetric
+## Key Optimization Tips ⚡
+
+| Tip | Do | Don't |
+|-----|----|---------|
+| **Use Vectorization** | `(preds == target).sum()` | Loop through elements |
+| **Accumulate Stats** | Store sums and counts | Store all predictions |
+| **Handle Edge Cases** | Check for zero division | Assume valid inputs |
+
+## Common Pitfalls 🛡️
+
+| Pitfall | Solution |
+|---------|----------|
+| **State accumulation across epochs** | Lighter resets automatically |
+| **Wrong distributed reduction** | Use `dist_reduce_fx="sum"` for counts |
+| **Type mismatches** | Convert tensors to same dtype |
+
+## Quick Reference Card 📄
+
+```python
+# Minimal custom metric template
+from torchmetrics import Metric
+import torch
+
+class YourMetric(Metric):
+    def __init__(self, your_param=1.0):
+        super().__init__()
+        # 1. Register state variables
+        self.add_state("state_var", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        # 2. Process batch and update state
+        self.state_var += your_computation(preds, target)
+
+    def compute(self):
+        # 3. Calculate final metric
+        return self.state_var / normalization_factor
 ```
 
 ## Recap and Next Steps
 
-Creating custom metrics in Lighter using `torchmetrics` involves these key steps:
+You now have the power to create sophisticated custom metrics:
 
-1.  **Subclass `torchmetrics.Metric`**.
-2.  **Initialize State with `add_state()`** in `__init__`.
-3.  **Implement `update()`** to process batches and update state.
-4.  **Implement `compute()`** to calculate final metric value.
-5.  **Integrate in `config.yaml`** using `_target_`.
+🎨 **What You Learned:**
 
-This enables extending Lighter with custom metrics for tailored model evaluation.
+- Core metric lifecycle: `add_state()` → `update()` → `compute()`
+- Performance optimization techniques
+- Testing strategies for robust metrics
+- Common patterns for classification, regression, and calibration
+
+💡 **Pro Tip:** Start simple, test thoroughly, optimize later!
+
+## Related Guides
+- [Adapters](adapters.md) - Transform data for metrics
+- [Writers](writers.md) - Save metric results
