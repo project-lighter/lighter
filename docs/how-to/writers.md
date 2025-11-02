@@ -64,7 +64,7 @@ Once configured, `FileWriter` is used by Lighter in validation, test, and predic
 In these stages, per batch, `FileWriter`:
 
 1.  Receives `pred` tensor from `predict_step`, `validation_step`, or `test_step`.
-2.  Applies `LoggingAdapter` transforms (if configured).
+2.  Applies `logging` transforms (if configured in the `Flow`).
 3.  Uses writer function (e.g., `"itk_nifti"`) to save `pred` tensor to file in `path` dir.
 4.  Names file using batch `identifier` (if available) or generates unique name.
 
@@ -328,5 +328,5 @@ def validation_step(self, batch, batch_idx):
 💡 **Pro Tip:** Always save enough information to reproduce your results!
 
 ## Related Guides
-- [Adapters](adapters.md) - Transform before writing
+- [Flows](flows.md) - Transform before writing
 - [Inferers](inferers.md) - Write inference results

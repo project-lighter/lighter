@@ -92,6 +92,13 @@ system:
     params: "$@system#model.parameters()"
     lr: 0.001
 
+  flows:
+    train:
+      _target_: lighter.flow.Flow
+      batch: ["input", "target"]
+      model: ["input"]
+      criterion: ["pred", "target"]
+
   dataloaders:
     train:
       _target_: torch.utils.data.DataLoader
@@ -260,6 +267,18 @@ system:
     params: "$@system#model.parameters()"
     lr: 0.001
 
+  flows:
+    train:
+      _target_: lighter.flow.Flow
+      batch: ["input", "target"]
+      model: ["input"]
+      criterion: ["pred", "target"]
+    val:
+      _target_: lighter.flow.Flow
+      batch: ["input", "target"]
+      model: ["input"]
+      criterion: ["pred", "target"]
+
   dataloaders:
     train:
       _target_: torch.utils.data.DataLoader
@@ -349,7 +368,7 @@ You're ready for more advanced topics:
 
 - **[Image Classification Tutorial](image_classification.md)** - Build a complete project with validation, callbacks, and logging
 - **[Configuration Guide](../how-to/configure.md)** - Deep dive into advanced config patterns
-- **[Adapters](../how-to/adapters.md)** - Lighter's secret weapon for task-agnostic training
+- **[Flows](../how-to/flows.md)** - Lighter's secret weapon for task-agnostic training
 
 ### Quick Tips
 

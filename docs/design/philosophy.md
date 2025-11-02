@@ -12,7 +12,7 @@ Experiments are data, not code. YAML configs are easier to:
 - Audit and validate
 
 ### 2. Composition Over Inheritance
-Instead of subclassing for behavior changes, compose with adapters. More flexible, less coupled.
+Instead of subclassing for behavior changes, compose with Flows. More flexible, less coupled.
 
 ### 3. Convention Over Configuration
 Sensible defaults (like BatchAdapter assuming `(input, target)` tuples) reduce boilerplate. Override when needed.
@@ -22,10 +22,10 @@ Clear boundaries:
 - **Config** - Experiment definition
 - **System** - Component orchestration
 - **Trainer** - Execution engine
-- **Adapters** - Interface translation
+- **Flows** - Interface translation
 
 ### 5. Task-Agnostic by Design
-No per-task pipelines. Adapters handle variability, enabling unlimited flexibility for novel research.
+No per-task pipelines. Flows handle variability, enabling unlimited flexibility for novel research.
 
 ## Why ~1,000 Lines of Code?
 
@@ -56,7 +56,7 @@ No per-task pipelines. Adapters handle variability, enabling unlimited flexibili
 - Dynamic instantiation
 - [→ MONAI config docs](https://docs.monai.io/en/stable/config_syntax.html)
 
-Lighter adds: adapters + System orchestration.
+Lighter adds: Flows + System orchestration.
 
 ## Trade-offs
 
@@ -77,5 +77,5 @@ Lighter adds: adapters + System orchestration.
 ## Learn More
 
 - [Architecture Overview](overview.md) - Component details
-- [Adapter Pattern](adapters.md) - Deep dive
+- [Flows](flows.md) - Deep dive
 - [Configuration Guide](../how-to/configure.md) - Practical usage

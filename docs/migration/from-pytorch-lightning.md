@@ -65,6 +65,13 @@ system:
     params: "$@system#model.parameters()"
     lr: 0.001
 
+  flows:
+    train:
+      _target_: lighter.flow.Flow
+      batch: ["input", "target"]
+      model: ["input"]
+      criterion: ["pred", "target"]
+
   dataloaders:
     train: ...  # DataLoader config
 ```
@@ -80,7 +87,7 @@ lighter fit config.yaml
 Only 3 things are Lighter-specific:
 
 1. **YAML Configuration Syntax** - [Configuration Guide](../how-to/configure.md)
-2. **Adapters** (Lighter's key feature) - [Adapters Guide](../how-to/adapters.md)
+2. **Flows** (Lighter's key feature) - [Flows Guide](../how-to/flows.md)
 3. **Project Module** (optional) - [Project Module Guide](../how-to/project_module.md)
 
 ## What Stays the Same
@@ -151,4 +158,4 @@ Lighter might not fit if:
 1. Start with the [Zero to Hero tutorial](../tutorials/zero_to_hero.md)
 2. Try the [Image Classification Tutorial](../tutorials/image_classification.md)
 3. Understand [Design Philosophy](../design/philosophy.md)
-4. Learn about [Adapters](../how-to/adapters.md) (Lighter's superpower)
+4. Learn about [Flows](../how-to/flows.md) (Lighter's superpower)

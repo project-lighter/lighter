@@ -269,5 +269,5 @@ You now have the power to create sophisticated custom metrics:
 💡 **Pro Tip:** Start simple, test thoroughly, optimize later!
 
 ## Related Guides
-- [Adapters](adapters.md) - Transform data for metrics
+- [Flows](flows.md) - Transform data for metrics
 - [Writers](writers.md) - Save metric results

@@ -270,5 +270,5 @@ You're now equipped to build sophisticated custom modules:
 
 ## Related Guides
 - [Configuration](configure.md) - Referencing the project module
-- [Adapters](adapters.md) - Custom adapter creation
+- [Flows](flows.md) - Custom flow creation
 - [Metrics](metrics.md) - Custom metric creation

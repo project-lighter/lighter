@@ -24,11 +24,11 @@ PyTorch Lightning's Trainer executes experiments with multi-GPU, mixed precision
 
 [→ Running experiments](../how-to/run.md)
 
-## The Adapter Pattern
+## The Flow
 
-Adapters make Lighter task-agnostic by handling data format differences between components.
+Flows make Lighter task-agnostic by handling data format differences between components.
 
-[→ Learn more about adapters](adapters.md)
+[→ Learn more about Flows](flows.md)
 
 ## Design Philosophy
 
@@ -52,6 +52,6 @@ Lighter is the tool for you if you like PyTorch's flexibility but want to manage
 
 ## Next Steps
 
-- Deep dive into [the Adapter Pattern](adapters.md)
+- Deep dive into [the Flow](flows.md)
 - Understand [Design Philosophy](philosophy.md)
 - Get started with the [Zero to Hero tutorial](../tutorials/zero_to_hero.md)

@@ -42,18 +42,22 @@ Lighter provides out-of-the-box integration with MONAI's inferers, offering a wi
 
 #### Configuration
 
-To use a MONAI inferer, you simply need to configure it within the `system.inferer` section of your `config.yaml` file. Here's an example of how to configure the `SlidingWindowInferer`:
+To use a MONAI inferer, you simply need to configure it within the `system.flows` section of your `config.yaml` file, as part of the `model` component. Here's an example of how to configure the `SlidingWindowInferer`:
 
 ```yaml title="config.yaml"
 system:
-  inferer:
-    _target_: monai.inferers.SlidingWindowInferer  # Specify the inferer class
-    roi_size: [128, 128, 128]                      # Region of interest size for each window
-    sw_batch_size: 4                               # Batch size for processing windows
-    overlap: 0.5                                   # Overlap ratio between windows
+  flows:
+    predict:
+      model:
+        _target_: monai.inferers.SlidingWindowInferer  # Specify the inferer class
+        roi_size: [128, 128, 128]                      # Region of interest size for each window
+        sw_batch_size: 4                               # Batch size for processing windows
+        overlap: 0.5                                   # Overlap ratio between windows
+        network: "model"                               # Reference to the actual model
 ```
 
 *   **`_target_`:** This key specifies the fully qualified class name of the inferer you want to use. In this case, it's `monai.inferers.SlidingWindowInferer`.
+*   **`network`:** This is a special argument that tells the inferer which model to use for inference. You should always set it to `"model"` to reference the main model defined in your `System`.
 *   **Inferer-Specific Arguments:** The remaining keys (`roi_size`, `sw_batch_size`, `overlap`) are arguments specific to the `SlidingWindowInferer`. Consult the MONAI documentation for detailed information about the available inferers and their respective arguments.
 
 #### Commonly Used MONAI Inferers
@@ -71,11 +75,14 @@ Here are some of the commonly used MONAI inferers:
 system:
   model: #... your model definition...
 
-  inferer:
-    _target_: monai.inferers.SlidingWindowInferer
-    roi_size: [128, 128, 128]
-    sw_batch_size: 8
-    overlap: 0.25
+  flows:
+    val:
+      model:
+        _target_: monai.inferers.SlidingWindowInferer
+        roi_size: [128, 128, 128]
+        sw_batch_size: 8
+        overlap: 0.25
+        network: "model" # Reference to the actual model
 
   def validation_step(self, batch, batch_idx):
     output = super().validation_step(batch, batch_idx)
@@ -83,7 +90,7 @@ system:
     #... rest of your validation logic...
 ```
 
-In this example, the `SlidingWindowInferer` is configured to process inputs during the validation stage. Lighter automatically incorporates this inferer into the `forward` pass of your `System` (defined in `system.py`). When `self.forward(input)` is called within `validation_step`, Lighter checks if an inferer is configured and if the current mode is 'val', 'test', or 'predict'. If so, it utilizes the inferer to process the input and obtain predictions.
+In this example, the `SlidingWindowInferer` is configured to process inputs during the validation stage. Lighter automatically incorporates this inferer into the `Flow` definition for the `val` stage. When `flow(batch, model)` is called within `validation_step`, the inferer processes the input and obtains predictions.
 
 ## Implementing a Custom Inferer
 
@@ -166,7 +173,7 @@ class MyCustomInferer:
     *   This method makes your class callable like a function, enabling it to be used directly for inference.
     *   **Arguments:**
         *   `inputs (torch.Tensor)`: The input tensor(s) to your model.
-        *   `network (torch.nn.Module)`: Your deep learning model (equivalent to `self.model` in your `System`).
+        *   `network (torch.nn.Module)`: Your deep learning model (equivalent to `self.model` in your `System`). This is passed to the inferer via the `network` argument in the `Flow` configuration.
         *   `*args`, `**kwargs`:  These allow you to pass additional arguments if required, although they are not typically used in inferers.
     *   **Logic:**
         *   This is where you implement your core inference logic.
@@ -253,10 +260,13 @@ class TTAInferer:
 Use in config:
 ```yaml
 system:
-    inferer:
-        _target_: my_project.inferers.TTAInferer
-        num_augmentations: 4
-        aggregate: mean
+    flows:
+        predict:
+            model:
+                _target_: my_project.inferers.TTAInferer
+                num_augmentations: 4
+                aggregate: mean
+                network: "model"
 ```
 
 ## Performance Tips ⚡
@@ -294,34 +304,43 @@ graph TD
 # Model was trained on 128×128×128 patches
 # Now need to process 512×512×200 volumes
 system:
-    inferer:
-        _target_: monai.inferers.SlidingWindowInferer
-        roi_size: [128, 128, 128]  # Must match training patch size!
-        sw_batch_size: 4
-        overlap: 0.5  # 50% overlap for smooth predictions
-        mode: gaussian  # Smooth blending at boundaries
+    flows:
+        predict:
+            model:
+                _target_: monai.inferers.SlidingWindowInferer
+                roi_size: [128, 128, 128]  # Must match training patch size!
+                sw_batch_size: 4
+                overlap: 0.5  # 50% overlap for smooth predictions
+                mode: gaussian  # Smooth blending at boundaries
+                network: "model"
 ```
 
 ### Adding Robustness with TTA
 ```yaml
 # Model trained normally, but test data is noisier
 system:
-    inferer:
-        _target_: my_project.inferers.TTAInferer
-        num_augmentations: 4  # Balance speed vs robustness
-        aggregate: mean  # Average predictions
+    flows:
+        predict:
+            model:
+                _target_: my_project.inferers.TTAInferer
+                num_augmentations: 4  # Balance speed vs robustness
+                aggregate: mean  # Average predictions
+                network: "model"
 ```
 
 ### Uncertainty Quantification with MC Dropout
 ```yaml
 # Model has dropout layers, need confidence intervals
 system:
-    inferer:
-        _target_: my_project.inferers.MCDropoutInferer
-        num_samples: 20  # Multiple forward passes
-        return_std: true  # Return standard deviation as uncertainty
+    flows:
+        predict:
+            model:
+                _target_: my_project.inferers.MCDropoutInferer
+                num_samples: 20  # Multiple forward passes
+                return_std: true  # Return standard deviation as uncertainty
+                network: "model"
 ```
 
 ## Related Guides
-- [Adapters](adapters.md) - Transform inference outputs
+- [Flows](flows.md) - Transform inference outputs
 - [Writers](writers.md) - Save predictions

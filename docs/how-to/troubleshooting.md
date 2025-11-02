@@ -107,14 +107,13 @@ optimizer:
   lr: "$print('LR:', 0.001) or 0.001"
 ```
 
-### Check Adapter Outputs
-Temporarily add print transforms in adapters:
+### Check Flow Outputs
+Temporarily add print transforms in flows:
 ```yaml
-adapters:
+flows:
   train:
     criterion:
-      pred_transforms:
-        - "$lambda x: print('Pred shape:', x.shape) or x"
+      pred: "$lambda x: print('Pred shape:', x.shape) or x"
 ```
 
 ## Getting Help

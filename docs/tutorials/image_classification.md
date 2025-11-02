@@ -95,6 +95,19 @@ system:
               num_classes: 10
         test: "%#train"
 
+    flows:
+        train:
+            _target_: lighter.flow.Flow
+            batch: ["input", "target"]
+            model: ["input"]
+            criterion: ["pred", "target"]
+            metrics: ["pred", "target"]
+        test:
+            _target_: lighter.flow.Flow
+            batch: ["input", "target"]
+            model: ["input"]
+            metrics: ["pred", "target"]
+
     dataloaders:
         train:
             _target_: torch.utils.data.DataLoader
@@ -187,4 +200,4 @@ Explore more:
 
 - [Configuration Guide](../how-to/configure.md) - Advanced config features
 - [Custom Metrics](../how-to/metrics.md) - Add custom evaluation metrics
-- [Adapters](../how-to/adapters.md) - Handle complex data flows
+- [Flows](../how-to/flows.md) - Handle complex data flows

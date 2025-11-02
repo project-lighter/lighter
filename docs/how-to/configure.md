@@ -72,7 +72,7 @@ metrics:
 Lighter uses YAML configs to define experiments. A typical config is organized into two mandatory sections:
 
 *   **`trainer`**: Configures [`Trainer` (PyTorch Lightning)](https://lightning.ai/docs/pytorch/stable/common/trainer.html).
-*   **`system`**: Defines [`System` (Lighter)](../../reference/system/#lighter.system.System) that encapsulates components such as model, criterion, optimizer, or dataloaders.
+*   **`system`**: Defines [`System` (Lighter)](../../reference/system/#lighter.system.System) that encapsulates components such as model, criterion, optimizer, flows, or dataloaders.
 
 Here's a minimal example illustrating the basic structure:
 
@@ -96,6 +96,14 @@ system:
         _target_: torch.optim.Adam
         params: "$@system#model.parameters()"
         lr: 0.001
+
+    flows:
+        train:
+            _target_: lighter.flow.Flow
+            batch: ["input", "target"]
+            model: ["input"]
+            criterion: ["pred", "target"]
+            metrics: ["pred", "target"]
 
     dataloaders:
         train:
@@ -481,6 +489,7 @@ This guide covered the comprehensive configuration system in Lighter. Key takeaw
 With these configuration skills, you can create sophisticated, maintainable experiment definitions.
 
 ## Related Guides
+- [Flows Guide](flows.md) - Defining the data flow
 - [Project Module](project_module.md) - Custom components
 - [Troubleshooting](troubleshooting.md) - Config error solutions
 - [Run Guide](run.md) - Running experiments

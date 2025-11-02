@@ -87,6 +87,14 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
             params: "$@system#model.parameters()"
             lr: 0.001
 
+        flows:
+            train:
+                _target_: lighter.flow.Flow
+                batch: ["input", "target"]
+                model: ["input"]
+                criterion: ["pred", "target"]
+                metrics: ["pred", "target"]
+
         dataloaders:
             train:
                 _target_: torch.utils.data.DataLoader
