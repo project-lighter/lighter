@@ -58,11 +58,17 @@ class System(pl.LightningModule):
 
         #  Containers
         self.dataloaders = DataLoaders(**(dataloaders or {}))
-        self.metrics = PatchedModuleDict(Metrics(**(metrics or {})).__dict__)
+        self.metrics = Metrics(**(metrics or {}))
         self.flows = Flows(**(flows or {}))
 
+        # Register metrics as a ModuleDict for proper device handling
+        self.metrics = PatchedModuleDict(self.metrics.__dict__)
+
+        # train/val/test/predict
         self.mode = None
-        self._setup_mode_hooks()
+
+        # Set up LightningModule hooks for train/val/test/predict
+        self._setup_hooks()
 
     def _step(self, batch: dict, batch_idx: int) -> dict[str, Any] | Any:
         """
@@ -76,11 +82,13 @@ class System(pl.LightningModule):
             For other steps, returns a dict with loss, metrics, input, target, pred, and identifier.
             Loss is None for the test step, and metrics is None if unspecified.
         """
-        flow = getattr(self.flows, self.mode)
         context = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}
-        output = flow(
-            batch=batch, model=self.model, criterion=self.criterion, metrics=self.metrics.get(self.mode), context=context
-        )
+
+        metrics = self.metrics[self.mode]
+        criterion = self.criterion if self.mode in [Mode.TRAIN, Mode.VAL] else None
+
+        flow = getattr(self.flows, self.mode)
+        output = flow(batch=batch, model=self.model, criterion=criterion, metrics=metrics, context=context)
 
         self._log_stats(output, batch_idx)
         return output
@@ -96,40 +104,41 @@ class System(pl.LightningModule):
         if self.trainer.logger is None:
             return
 
+        def log(name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
+            """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
+
+            Args:
+                name (str): key to log.
+                value (Any): value to log.
+                on_step (bool, optional): if True, logs on step.
+                on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
+            """
+            dataloader = getattr(self.dataloaders, self.mode)
+            batch_size = getattr(dataloader, "batch_size", None)
+            self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
+
         # Loss
         loss = output.get(Data.LOSS)
         if loss is not None:
             if not isinstance(loss, dict):
-                self._log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
-                self._log(f"{self.mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
+                log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
+                log(f"{self.mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
             else:
                 for name, subloss in loss.items():
-                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
-                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
+                    log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
+                    log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
 
         # Metrics
         metrics = output.get(Data.METRICS)
         if metrics is not None:
             for name, metric in metrics.items():
-                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
-                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
+                log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
+                log(f"{self.mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
 
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
         if self.mode == Mode.TRAIN and batch_idx == 0:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
-                self._log(f"{self.mode}/{name}", optimizer_stat, on_epoch=True)
-
-    def _log(self, name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
-        """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
-
-        Args:
-            name (str): key to log.
-            value (Any): value to log.
-            on_step (bool, optional): if True, logs on step.
-            on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
-        """
-        batch_size = getattr(self.dataloaders, self.mode).batch_size
-        self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
+                log(f"{self.mode}/{name}", optimizer_stat, on_epoch=True)
 
     def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:
         """
@@ -148,9 +157,9 @@ class System(pl.LightningModule):
         else:
             return {"optimizer": self.optimizer, "lr_scheduler": self.scheduler}
 
-    def _setup_mode_hooks(self):
+    def _setup_hooks(self):
         """
-        Sets up the training, validation, testing, and prediction hooks based on defined dataloaders.
+        Sets up the LightningModule hooks for train/val/test/predict if the corresponding dataloaders are provided.
         """
         if self.dataloaders.train is not None:
             self.training_step = self._step
