@@ -2,14 +2,18 @@ import random
 from typing import Any, Callable
 
 import torch
+from loguru import logger
 from torch.utils.data.dataloader import default_collate
 
 
 def collate_replace_corrupted(
-    batch: Any, dataset: torch.utils.data.Dataset, default_collate_fn: Callable | None = None
+    batch: list[Any], dataset: torch.utils.data.Dataset, default_collate_fn: Callable | None = None
 ) -> Any:
     """
-    Collate function to handle corrupted examples in a batch by replacing them with valid ones.
+    Collate function that handles corrupted examples in a batch by replacing them with valid ones.
+
+    This function is designed to prevent training interruptions due to data corruption.
+    It logs a warning to alert the user about the number of corrupted samples found.
 
     Args:
         batch: The batch of data from the DataLoader.
@@ -21,17 +25,29 @@ def collate_replace_corrupted(
     """
     # Use `torch.utils.data.dataloader.default_collate` if no other default collate function is specified.
     default_collate_fn = default_collate_fn if default_collate_fn is not None else default_collate
-    # Idea from https://stackoverflow.com/a/57882783
-    original_batch_len = len(batch)
-    # Filter out all the Nones (corrupted examples).
-    batch = list(filter(lambda x: x is not None, batch))
-    filtered_batch_len = len(batch)
-    # Num of corrupted examples.
-    num_corrupted = original_batch_len - filtered_batch_len
+
+    num_corrupted = 0
+    while True:
+        # Filter out corrupted samples (None).
+        original_len = len(batch)
+        batch = [sample for sample in batch if sample is not None]
+        current_len = len(batch)
+
+        # Calculate the number of corrupted samples in this iteration.
+        newly_corrupted = original_len - current_len
+        if newly_corrupted == 0:
+            # No more corrupted samples, break the loop.
+            break
+
+        num_corrupted += newly_corrupted
+
+        # Replace corrupted samples with new random samples from the dataset.
+        replacements = [dataset[random.randint(0, len(dataset) - 1)] for _ in range(newly_corrupted)]
+        batch.extend(replacements)
+
+    # Log a warning if any corrupted samples were found and replaced.
     if num_corrupted > 0:
-        # Replace a corrupted example with another randomly selected example.
-        batch.extend([dataset[random.randint(0, len(dataset) - 1)] for _ in range(num_corrupted)])
-        # Recursive call to replace the replacements if they are corrupted.
-        return collate_replace_corrupted(batch, dataset)
-    # Finally, when the whole batch is fine, apply the default collate function.
+        logger.warning(f"Found and replaced {num_corrupted} corrupted samples in a batch.")
+
+    # Apply the default collate function to the clean batch.
     return default_collate_fn(batch)

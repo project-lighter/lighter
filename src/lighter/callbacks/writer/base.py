@@ -138,6 +138,9 @@ class BaseWriter(ABC, Callback):
         for pred, identifier in zip(outputs[Data.PRED], outputs[Data.IDENTIFIER], strict=True):
             self.write(tensor=pred, identifier=identifier)
 
-        # Clear the predictions to save CPU memory. https://github.com/Lightning-AI/pytorch-lightning/issues/19398
+        # Clear the predictions to save CPU memory. This is a temporary workaround for a known issue in PyTorch
+        # Lightning, where predictions can accumulate in memory. This line accesses a private attribute
+        # `_predictions` of the `predict_loop`, which is a brittle dependency and may break in future
+        # versions of Lightning. For more details, see: https://github.com/Lightning-AI/pytorch-lightning/issues/19398
         trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
         gc.collect()

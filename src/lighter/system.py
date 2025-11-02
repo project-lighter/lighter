@@ -72,9 +72,9 @@ class System(pl.LightningModule):
             batch: The batch of data.
             batch_idx: The index of the batch.
         Returns:
-            dict or Any: For predict step, returns prediction only. For other steps,
-            returns dict with loss, metrics, input, target, pred, and identifier. Loss is None
-            for test step, metrics is None if unspecified.
+            dict or Any: For a prediction step, returns a dictionary containing the prediction and identifier.
+            For other steps, returns a dict with loss, metrics, input, target, pred, and identifier.
+            Loss is None for the test step, and metrics is None if unspecified.
         """
         flow = getattr(self.flows, self.mode)
         context = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}

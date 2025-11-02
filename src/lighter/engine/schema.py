@@ -36,7 +36,6 @@ SCHEMA = {
             "criterion": {"type": "dict"},
             "optimizer": {"type": "dict"},
             "scheduler": {"type": "dict"},
-            "inferer": {"type": "dict"},
             "metrics": {
                 "type": "dict",
                 "schema": {
