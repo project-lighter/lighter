@@ -8,7 +8,7 @@ The schema ensures user configurations are correctly structured and typed. It in
 - `vars`: Variables as a dictionary.
 - `args`: Arguments to pass to Trainer stage methods like `fit`, `validate`, `test`.
 - `trainer`: Trainer setup.
-- `system`: System setup, encapsulates model, criterion, optimizer, scheduler, inferer, metrics, dataloaders, and adapters.
+- `system`: System setup, encapsulates model, criterion, optimizer, scheduler, inferer, metrics, dataloaders, and flows.
 
 Used by the `Config` class for validation.
 """
@@ -54,33 +54,9 @@ SCHEMA = {
                     "predict": {"type": "dict"},
                 },
             },
-            "adapters": {
+            "flows": {
                 "type": "dict",
-                "schema": {
-                    "train": {
-                        "type": "dict",
-                        "schema": {
-                            "batch": {"type": "dict"},
-                            "criterion": {"type": "dict"},
-                            "metrics": {"type": "dict"},
-                            "logging": {"type": "dict"},
-                        },
-                    },
-                    "val": {
-                        "type": "dict",
-                        "schema": {
-                            "batch": {"type": "dict"},
-                            "criterion": {"type": "dict"},
-                            "metrics": {"type": "dict"},
-                            "logging": {"type": "dict"},
-                        },
-                    },
-                    "test": {
-                        "type": "dict",
-                        "schema": {"batch": {"type": "dict"}, "metrics": {"type": "dict"}, "logging": {"type": "dict"}},
-                    },
-                    "predict": {"type": "dict", "schema": {"batch": {"type": "dict"}, "logging": {"type": "dict"}}},
-                },
+                "valuesrules": {"type": "dict"},
             },
         },
     },

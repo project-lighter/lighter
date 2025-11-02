@@ -92,13 +92,3 @@ system:
 
         test: "%#val"
         predict: "%#val"
-
-    adapters:
-        train:
-            batch:
-                _target_: lighter.adapters.BatchAdapter
-                input_accessor: 0
-                target_accessor: 1
-        val: "%#train"
-        test: "%#train"
-        predict: "%#train"

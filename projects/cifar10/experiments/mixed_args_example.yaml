@@ -1,0 +1,51 @@
+project: ./projects/cifar10
+
+trainer:
+    _target_: pytorch_lightning.Trainer
+    max_epochs: 1
+    accelerator: cpu
+
+system:
+    _target_: lighter.System
+
+    model:
+        _target_: "project.models.net.Net"
+
+    criterion:
+        _target_: torch.nn.CrossEntropyLoss
+
+    optimizer:
+        _target_: torch.optim.Adam
+        params: "$@system#model.parameters()"
+
+    dataloaders:
+        train:
+            _target_: torch.utils.data.DataLoader
+            dataset:
+                _target_: torchvision.datasets.FakeData
+                size: 10
+                num_classes: 10
+                transform:
+                    _target_: torchvision.transforms.ToTensor
+
+    flows:
+        train:
+            _target_: lighter.Flow
+            batch:
+                input: 0
+                target: 1
+            # Assuming a model that takes one positional and one keyword argument: model(x, y=None)
+            model:
+                x: "input"
+                y: "target"
+            # Keyword arguments for criterion
+            criterion:
+                pred: "pred"
+                target: "target"
+            # Positional arguments for metrics
+            metrics:
+                - "pred"
+                - "target"
+            output:
+                pred: "pred"
+                loss: "loss"

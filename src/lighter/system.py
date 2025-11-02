@@ -4,21 +4,20 @@ including the model, optimizer, datasets, and more. It extends PyTorch Lightning
 """
 
 from collections.abc import Callable
-from dataclasses import asdict
 from typing import Any
 
 import pytorch_lightning as pl
-from torch import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import collate_str_fn, default_collate_fn_map
-from torchmetrics import Metric, MetricCollection
+from torchmetrics import Metric
 
-from lighter.utils.misc import get_optimizer_stats, hasarg
+from lighter.flow import Flow
+from lighter.utils.misc import get_optimizer_stats
 from lighter.utils.patches import PatchedModuleDict
-from lighter.utils.types.containers import Adapters, DataLoaders, Metrics
+from lighter.utils.types.containers import DataLoaders, Flows, Metrics
 from lighter.utils.types.enums import Data, Mode
 
 # Patch the original collate function to allow None values in the batch.
@@ -36,7 +35,7 @@ class System(pl.LightningModule):
         criterion: Criterion (loss) function.
         metrics: Metrics for train, val, and test. Supports a single/list/dict of `torchmetrics` metrics.
         dataloaders: Dataloaders for train, val, test, and predict.
-        adapters: Adapters for batch preparation, criterion argument adaptation, metrics argument adaptation, and logging data adaptation.
+        flows: Flow objects that define the logic for each step (train, val, test, predict).
         inferer: Inferer to use in val/test/predict modes.
             See MONAI inferers for more details: (https://docs.monai.io/en/stable/inferers.html).
 
@@ -50,7 +49,7 @@ class System(pl.LightningModule):
         scheduler: LRScheduler | None = None,
         criterion: Callable | None = None,
         metrics: dict[str, Metric | list[Metric] | dict[str, Metric]] | None = None,
-        adapters: dict[str, Callable] | None = None,
+        flows: dict[str, Flow] | None = None,
         inferer: Callable | None = None,
     ) -> None:
         super().__init__()
@@ -63,11 +62,8 @@ class System(pl.LightningModule):
 
         #  Containers
         self.dataloaders = DataLoaders(**(dataloaders or {}))
-        self.metrics = Metrics(**(metrics or {}))
-        self.adapters = Adapters(**(adapters or {}))
-
-        # Turn metrics container into a ModuleDict to register them properly.
-        self.metrics = PatchedModuleDict(asdict(self.metrics))
+        self.metrics = PatchedModuleDict(Metrics(**(metrics or {})).__dict__)
+        self.flows = Flows(**(flows or {}))
 
         self.mode = None
         self._setup_mode_hooks()
@@ -84,115 +80,25 @@ class System(pl.LightningModule):
             returns dict with loss, metrics, input, target, pred, and identifier. Loss is None
             for test step, metrics is None if unspecified.
         """
-        input, target, identifier = self._prepare_batch(batch)
-        pred = self.forward(input)
+        flow = getattr(self.flows, self.mode)
+        output = flow(batch=batch, model=self.model, criterion=self.criterion, metrics=self.metrics.get(self.mode))
 
-        loss = self._calculate_loss(input, target, pred)
-        metrics = self._calculate_metrics(input, target, pred)
-
-        self._log_stats(loss, metrics, batch_idx)
-        output = self._prepare_output(identifier, input, target, pred, loss, metrics)
+        self._log_stats(output, batch_idx)
         return output
 
-    def _prepare_batch(self, batch: dict) -> tuple[Any, Any, Any]:
-        """
-        Prepares the batch data.
-
-        Args:
-            batch: The input batch dictionary.
-
-        Returns:
-            tuple: A tuple containing (input, target, identifier).
-        """
-        adapters = getattr(self.adapters, self.mode)
-        input, target, identifier = adapters.batch(batch)
-        return input, target, identifier
-
-    def forward(self, input: Any) -> Any:
-        """
-        Forward pass through the model.
-
-        Args:
-            input: The input data.
-
-        Returns:
-            Any: The model's output.
-        """
-
-        # Pass `epoch` and/or `step` argument to forward if it accepts them
-        kwargs = {}
-        if hasarg(self.model.forward, Data.EPOCH):
-            kwargs[Data.EPOCH] = self.current_epoch
-        if hasarg(self.model.forward, Data.STEP):
-            kwargs[Data.STEP] = self.global_step
-
-        # Predict. Use inferer if available in val, test, and predict modes.
-        if self.inferer and self.mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
-            return self.inferer(input, self.model, **kwargs)
-        return self.model(input, **kwargs)
-
-    def _calculate_loss(self, input: Any, target: Any, pred: Any) -> Tensor | dict[str, Tensor] | None:
-        """
-        Calculates the loss using the criterion if in train or validation mode.
-
-        Args:
-            input: The input data.
-            target: The target data.
-            pred: The model predictions.
-
-        Returns:
-            The calculated loss or None if not in train/val mode.
-
-        Raises:
-            ValueError: If criterion is not specified in train/val mode or if loss dict is missing 'total' key.
-        """
-        loss = None
-        if self.mode in [Mode.TRAIN, Mode.VAL]:
-            if self.criterion is None:
-                raise ValueError("Please specify 'system.criterion' in the config.")
-
-            adapters = getattr(self.adapters, self.mode)
-            loss = adapters.criterion(self.criterion, input, target, pred)
-
-            if isinstance(loss, dict) and "total" not in loss:
-                raise ValueError(
-                    "The loss dictionary must include a 'total' key that combines all sublosses. "
-                    "Example: {'total': combined_loss, 'subloss1': loss1, ...}"
-                )
-        return loss
-
-    def _calculate_metrics(self, input: Any, target: Any, pred: Any) -> Any | None:
-        """
-        Calculates the metrics if not in predict mode.
-
-        Args:
-            input: The input data.
-            target: The target data.
-            pred: The model predictions.
-
-        Returns:
-            The calculated metrics or None if in predict mode or no metrics specified.
-        """
-        if self.mode == Mode.PREDICT or self.metrics[self.mode] is None:
-            return None
-
-        adapters = getattr(self.adapters, self.mode)
-        metrics = adapters.metrics(self.metrics[self.mode], input, target, pred)
-        return metrics
-
-    def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
+    def _log_stats(self, output: dict[str, Any], batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
 
         Args:
-            loss: The calculated loss.
-            metrics: The calculated metrics.
+            output: The output dictionary from the `_step` method.
             batch_idx: The index of the batch.
         """
         if self.trainer.logger is None:
             return
 
         # Loss
+        loss = output.get(Data.LOSS)
         if loss is not None:
             if not isinstance(loss, dict):
                 self._log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
@@ -203,6 +109,7 @@ class System(pl.LightningModule):
                     self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
 
         # Metrics
+        metrics = output.get(Data.METRICS)
         if metrics is not None:
             for name, metric in metrics.items():
                 self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
@@ -224,42 +131,6 @@ class System(pl.LightningModule):
         """
         batch_size = getattr(self.dataloaders, self.mode).batch_size
         self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
-
-    def _prepare_output(
-        self,
-        identifier: Any,
-        input: Any,
-        target: Any,
-        pred: Any,
-        loss: Tensor | dict[str, Tensor] | None,
-        metrics: Any | None,
-    ) -> dict[str, Any]:
-        """
-        Prepares the data to be returned by the step function to callbacks.
-
-        Args:
-            identifier: The batch identifier.
-            input: The input data.
-            target: The target data.
-            pred: The model predictions.
-            loss: The calculated loss.
-            metrics: The calculated metrics.
-
-        Returns:
-            dict: A dictionary containing all the step information.
-        """
-        adapters = getattr(self.adapters, self.mode)
-        input, target, pred = adapters.logging(input, target, pred)
-        return {
-            Data.IDENTIFIER: identifier,
-            Data.INPUT: input,
-            Data.TARGET: target,
-            Data.PRED: pred,
-            Data.LOSS: loss,
-            Data.METRICS: metrics,
-            Data.STEP: self.global_step,
-            Data.EPOCH: self.current_epoch,
-        }
 
     def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:
         """
