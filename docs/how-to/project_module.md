@@ -1,45 +1,52 @@
-# Project Modules: Your Code, Your Way
+# Project Module: Seamless Custom Code Integration
 
-Lighter isn't just a framework—it's a platform for your innovation. This guide shows you how to seamlessly integrate custom code while maintaining clean, reusable project structure.
+As an ML practitioner, you often develop custom components like models, datasets, or metrics. Integrating these efficiently into your training framework, while maintaining a clean and reusable structure, is key for rapid experimentation. Lighter solves this with its Project Module system.
 
-## Why Project Modules? 🎯
+## What is a Project Module? 🎯
 
-Project modules let you seamlessly integrate your custom code into Lighter:
+A Project Module in Lighter utilizes Python's native module system. In Python, a **module** can be a single `.py` file, or a directory containing an `__init__.py` file, used to organize related code hierarchically.
 
-- **🧠 Custom Models** - Your neural network architectures
-- **📦 Custom Datasets** - Your data loading logic
-- **🎯 Custom Metrics** - Your evaluation methods
-- **🔄 Custom Transforms** - Your data preprocessing
-- **🎛️ Custom Callbacks** - Your training hooks
+Lighter lets you designate a directory as your "project root." This root and its subdirectories (if they contain `__init__.py`) become dynamically importable in your Lighter configurations. This allows you to reference and instantiate custom classes and functions directly from your YAML files.
+
+This integration enables you to define and manage:
+
+- **🧠 Custom Models**: Your neural network architectures.
+- **📦 Custom Datasets**: Your data loading logic.
+- **🎯 Custom Metrics**: Your evaluation methods.
+- **🔄 Custom Transforms**: Your data preprocessing.
+- **🎛️ Custom Callbacks**: Your training hooks.
 
 **Key Benefits:**
 
-- 📦 **Encapsulation**: Keep research code organized
-- ♾️ **Reusability**: Share modules across experiments
-- 🚀 **Rapid Prototyping**: Test ideas without framework modifications
-- 🌐 **Collaboration**: Easy to share and version control
+- 📦 **Encapsulation**: Project-specific code.
+- 🚀 **Rapid Prototyping**: Test ideas quickly without changing other code.
 
-## Project Structure
+## Project Structure: Organizing Your Custom Code
 
-Your project folder can be named and located however and wherever you want. You only need to ensure that any folder that is a Python module contains `__init__.py`. In the example below, we see that the project root `my_project` contains `__init__.py` file, just like the `models` and `datasets` subdirectories. On the other hand, the `experiments` directory does not contain any Python modules, so it does not need an `__init__.py` file.
+**Key Principle:** For Lighter to import your custom code, it must be a valid Python module.
+
+-   **Python Module (File)**: A single `.py` file (e.g., `my_model.py`).
+-   **Python Module (Directory)**: A directory with an `__init__.py` file (e.g., `models/` with `models/__init__.py`). This groups related submodules.
+
+Example: `my_project/` is a Python module due to `__init__.py`. `models/` and `datasets/` are also modules. `experiments/` is not a module, typically holding config files.
 
 ```
 my_project/
-├── __init__.py
+├── __init__.py         # Makes 'my_project' a module
 ├── models/
-│   ├── __init__.py
-│   └── my_model.py
+│   ├── __init__.py     # Makes 'models' a module
+│   └── my_model.py     # A module within the 'models' module
 ├── datasets/
-│   ├── __init__.py
-│   └── my_dataset.py
-└── experiments/
+│   ├── __init__.py     # Makes 'datasets' a module
+│   └── my_dataset.py   # A module within the 'datasets' module
+└── experiments/        # Not a Python; typically for config files
     ├── finetune_full.yaml
     └── finetune_decoder.yaml
 ```
 
 ## Defining Project Modules
 
-Within the module directories (e.g., `models/`, `datasets/`), you define your custom Python modules as regular Python files (`.py`). Let's define a custom model `MyModel` in `my_model.py`
+With your project structure set up, defining custom components is straightforward. Within your module directories (e.g., `models/`, `datasets/`), define your custom Python modules as regular `.py` files. For example, define `MyModel` in `my_model.py`:
 
 ```python title="my_project/models/my_model.py"
 import torch.nn as nn
@@ -79,13 +86,13 @@ class MyDataset(Dataset):
         return sample
 ```
 
-## Importing Project Modules in the Config
+## Importing Project Module in the Config
 
-To use your project's modules in Lighter, you need to define it in your config. Lighter's dynamic module loading mechanism, powered by the [`import_module_from_path`](../../reference/utils/dynamic_imports/#lighter.utils.dynamic_imports.import_module_from_path) function, will then import that folder as a module named `project`.
+After defining your custom modules, make them accessible to Lighter by configuring it to dynamically load your project. Lighter's [`import_module_from_path`](../../reference/utils/dynamic_imports/#lighter.utils.dynamic_imports.import_module_from_path) function imports your designated project root as a top-level module named `project`.
 
 ### Specifying `project` Path
 
-Specify your project's root directory in `config.yaml` using the `project` key. This tells Lighter where to find your custom modules.
+Specify your project's root directory in `config.yaml` using the `project` key. This tells Lighter the path to your custom module collection.
 
 **Example:**
 
@@ -106,9 +113,9 @@ project: my_project/ # Project root path
 
     **Tip:** Use absolute paths to avoid confusion, or be mindful of your current working directory.
 
-### Referencing Project Modules
+### Referencing Your Project Module
 
-Reference your projects modules just like you reference any other module. For example, look at `system#model` and `system#dataloaders#train#dataset`:
+With the `project` path specified, Lighter makes your custom modules available under the top-level module name `project`. Reference your project's modules and classes like any other Python module. See `system#model` and `system#dataloaders#train#dataset` in the config below:
 
 **Example:**
 
@@ -220,7 +227,7 @@ my_project/
 
 ### Key Guidelines
 
-1. **Always include `__init__.py`** in each directory
+1.  **Ensure `__init__.py` files are present** in all directories intended to be Python modules (i.e., containing code you wish to import).
 2. **Use type hints** for better IDE support
 3. **Write tests** for critical components
 4. **Document with docstrings** for team collaboration
@@ -244,7 +251,7 @@ lighter fit base.yaml,models/unet.yaml,data/custom.yaml
 | Issue | Solution |
 |-------|----------|
 | **ModuleNotFoundError** | Check `__init__.py` files and project path |
-| **AttributeError** | Import classes in `__init__.py` |
+| **AttributeError** | Ensure classes/functions are correctly imported or exposed in `__init__.py` files if accessing them directly from the package. |
 | **Circular imports** | Use lazy imports inside functions |
 | **Path issues** | Use absolute imports or `project: ./my_project` |
 
@@ -262,6 +269,6 @@ You're now equipped to build sophisticated custom modules:
 💡 **Remember:** Great research code is modular, tested, and reusable!
 
 ## Related Guides
-- [Configuration](configure.md) - Referencing project modules
+- [Configuration](configure.md) - Referencing the project module
 - [Adapters](adapters.md) - Custom adapter creation
 - [Metrics](metrics.md) - Custom metric creation
