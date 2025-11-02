@@ -3,7 +3,8 @@ from typing import Any
 
 from torchmetrics import Metric, MetricCollection
 
-from lighter.adapters import BatchAdapter, CriterionAdapter, LoggingAdapter, MetricsAdapter
+from lighter.flow import Flow
+from lighter.utils.types.enums import Mode
 
 
 def nested(cls):
@@ -54,49 +55,10 @@ class DataLoaders:
     predict: Any | None = None
 
 
-@dataclass
-class Train:
-    """Train mode sub-dataclass for Adapters."""
-
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
-    criterion: CriterionAdapter = field(default_factory=lambda: CriterionAdapter(pred_argument=0, target_argument=1))
-    metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
-    logging: LoggingAdapter = field(default_factory=LoggingAdapter)
-
-
-@dataclass
-class Val:
-    """Val mode sub-dataclass for Adapters."""
-
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
-    criterion: CriterionAdapter = field(default_factory=lambda: CriterionAdapter(pred_argument=0, target_argument=1))
-    metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
-    logging: LoggingAdapter = field(default_factory=LoggingAdapter)
-
-
-@dataclass
-class Test:
-    """Test mode sub-dataclass for Adapters."""
-
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=0, target_accessor=1))
-    metrics: MetricsAdapter = field(default_factory=lambda: MetricsAdapter(pred_argument=0, target_argument=1))
-    logging: LoggingAdapter = field(default_factory=LoggingAdapter)
-
-
-@dataclass
-class Predict:
-    """Predict mode sub-dataclass for Adapters."""
-
-    batch: BatchAdapter = field(default_factory=lambda: BatchAdapter(input_accessor=lambda batch: batch))
-    logging: LoggingAdapter = field(default_factory=LoggingAdapter)
-
-
 @nested
 @dataclass
-class Adapters:
-    """Root configuration class for all adapters across different modes."""
-
-    train: Train = field(default_factory=Train)
-    val: Val = field(default_factory=Val)
-    test: Test = field(default_factory=Test)
-    predict: Predict = field(default_factory=Predict)
+class Flows:
+    train: Flow = field(default_factory=lambda: Flow.get_default(Mode.TRAIN))
+    val: Flow = field(default_factory=lambda: Flow.get_default(Mode.VAL))
+    test: Flow = field(default_factory=lambda: Flow.get_default(Mode.TEST))
+    predict: Flow = field(default_factory=lambda: Flow.get_default(Mode.PREDICT))

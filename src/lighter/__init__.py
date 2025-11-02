@@ -10,6 +10,7 @@ _setup_logging()
 
 from .engine.config import Config  # noqa: E402
 from .engine.runner import Runner  # noqa: E402
+from .flow import Flow  # noqa: E402
 from .system import System  # noqa: E402
 
-__all__ = ["Config", "Runner", "System"]
+__all__ = ["Config", "Runner", "System", "Flow"]
