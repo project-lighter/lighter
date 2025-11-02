@@ -116,7 +116,7 @@ class BaseWriter(ABC, Callback):
             dataloader_idx (int): The index of the dataloader.
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
-        if outputs[Data.IDENTIFIER] is None:
+        if outputs.get(Data.IDENTIFIER) is None:
             batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
             outputs[Data.IDENTIFIER] = list(

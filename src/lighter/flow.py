@@ -35,19 +35,19 @@ class Flow:
         model: Module,
         criterion: Optional[Callable] = None,
         metrics: Optional[MetricCollection] = None,
-        **kwargs: Any,
+        context: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         # 1. Unpack the batch data into a new context dictionary
-        context = self._unpack_batch(batch)
+        context = self._unpack_batch(batch, context)
 
         # 2. Run the model and add its prediction to the context
-        self._run_model(context, model)
+        context = self._run_model(context, model)
 
         # 3. Run the criterion (if provided) and add the loss to the context
-        self._run_criterion(context, criterion)
+        context = self._run_criterion(context, criterion)
 
         # 4. Update the metrics (if provided)
-        self._run_metrics(context, metrics)
+        context = self._run_metrics(context, metrics)
 
         # 5. Apply logging transformations to produce the final context for output
         final_context = self._apply_logging_transforms(context)
@@ -59,9 +59,9 @@ class Flow:
 
     # --- Private Helper Methods ---
 
-    def _unpack_batch(self, batch: Any) -> dict[str, Any]:
+    def _unpack_batch(self, batch: Any, context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """Handles the logic for the 'batch' configuration."""
-        context: dict[str, Any] = {}
+        context = context.copy() if context else {}
         if isinstance(self.batch_config, dict):
             for key, accessor in self.batch_config.items():
                 if callable(accessor):
@@ -83,23 +83,26 @@ class Flow:
             raise TypeError(f"Unsupported batch config type: {type(self.batch_config)}")
         return context
 
-    def _run_model(self, context: dict[str, Any], model: Module) -> None:
+    def _run_model(self, context: dict[str, Any], model: Module) -> dict[str, Any]:
         """Handles the logic for the 'model' configuration."""
         model_args, model_kwargs = self._prepare_args_kwargs(context, self.model_config)
         context[Data.PRED] = model(*model_args, **model_kwargs)
+        return context
 
-    def _run_criterion(self, context: dict[str, Any], criterion: Optional[Callable]) -> None:
+    def _run_criterion(self, context: dict[str, Any], criterion: Optional[Callable]) -> dict[str, Any]:
         """Handles the logic for the 'criterion' configuration."""
         if criterion and self.criterion_config:
             criterion_args, criterion_kwargs = self._prepare_args_kwargs(context, self.criterion_config)
             context[Data.LOSS] = criterion(*criterion_args, **criterion_kwargs)
+        return context
 
-    def _run_metrics(self, context: dict[str, Any], metrics: Optional[MetricCollection]) -> None:
+    def _run_metrics(self, context: dict[str, Any], metrics: Optional[MetricCollection]) -> dict[str, Any]:
         """Handles the logic for the 'metrics' configuration."""
         if metrics and self.metrics_config:
             metrics_args, metrics_kwargs = self._prepare_args_kwargs(context, self.metrics_config)
             metrics.update(*metrics_args, **metrics_kwargs)
             context[Data.METRICS] = metrics
+        return context
 
     def _apply_logging_transforms(self, context: dict[str, Any]) -> dict[str, Any]:
         """Handles the logic for the 'logging' configuration."""
@@ -114,7 +117,10 @@ class Flow:
         return {arg: self._get_value(context, key) for arg, key in self.output_config.items()}
 
     def _get_value(self, context: dict[str, Any], key: Union[str, Callable, list]) -> Any:
-        """Resolves a value from the context given a key, which can be a string, a callable, or a list of callables for a pipeline."""
+        """
+        Resolves a value from the context given a key, which can be a string, a callable,
+        or a list of callables for a pipeline.
+        """
         if isinstance(key, list):
             value = self._get_value(context, key[0])
             for transform in key[1:]:
@@ -136,10 +142,10 @@ class Flow:
                     except (KeyError, AttributeError) as e:
                         raise KeyError(f"Could not resolve nested key '{key}' from context.\n{e}") from e
                 return value
-            if key in context:
-                return context[key]
-            else:
-                return key
+            # A key not found in the context should raise an error.
+            if key not in context:
+                raise KeyError(f"Key '{key}' not found in the context.")
+            return context[key]
 
         raise TypeError(f"Unsupported key type: {type(key)}")
 

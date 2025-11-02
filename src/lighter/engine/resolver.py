@@ -1,3 +1,5 @@
+import copy
+
 from lighter.engine.config import Config
 from lighter.utils.types.enums import Mode, Stage
 
@@ -22,7 +24,7 @@ class Resolver:
         if stage not in self.STAGE_MODES:
             raise ValueError(f"Invalid stage: {stage}. Allowed stages are {list(self.STAGE_MODES)}")
 
-        stage_config = self.config.get().copy()
+        stage_config = copy.deepcopy(self.config.get())
         system_config = stage_config.get("system", {})
         dataloader_config = system_config.get("dataloaders", {})
         metrics_config = system_config.get("metrics", {})

@@ -36,8 +36,6 @@ class System(pl.LightningModule):
         metrics: Metrics for train, val, and test. Supports a single/list/dict of `torchmetrics` metrics.
         dataloaders: Dataloaders for train, val, test, and predict.
         flows: Flow objects that define the logic for each step (train, val, test, predict).
-        inferer: Inferer to use in val/test/predict modes.
-            See MONAI inferers for more details: (https://docs.monai.io/en/stable/inferers.html).
 
     """
 
@@ -50,7 +48,6 @@ class System(pl.LightningModule):
         criterion: Callable | None = None,
         metrics: dict[str, Metric | list[Metric] | dict[str, Metric]] | None = None,
         flows: dict[str, Flow] | None = None,
-        inferer: Callable | None = None,
     ) -> None:
         super().__init__()
 
@@ -58,7 +55,6 @@ class System(pl.LightningModule):
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
-        self.inferer = inferer
 
         #  Containers
         self.dataloaders = DataLoaders(**(dataloaders or {}))
@@ -81,7 +77,10 @@ class System(pl.LightningModule):
             for test step, metrics is None if unspecified.
         """
         flow = getattr(self.flows, self.mode)
-        output = flow(batch=batch, model=self.model, criterion=self.criterion, metrics=self.metrics.get(self.mode))
+        context = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}
+        output = flow(
+            batch=batch, model=self.model, criterion=self.criterion, metrics=self.metrics.get(self.mode), context=context
+        )
 
         self._log_stats(output, batch_idx)
         return output
