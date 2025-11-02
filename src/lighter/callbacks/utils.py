@@ -28,4 +28,5 @@ def preprocess_image(image: Tensor) -> Tensor:
         image = torch.cat([*image], dim=-1).unsqueeze(0)
     # If only one image in the batch, select it and return it. Same happens when the images are 3D as they
     # are combined into a single image. `make_grid` is called when a batch of multiple 2D image is provided.
-    return image[0] if image.shape[0] == 1 else torchvision.utils.make_grid(image, nrow=8)
+    image = image[0] if image.shape[0] == 1 else torchvision.utils.make_grid(image, nrow=8)
+    return image.squeeze(0) if image.ndim == 4 and image.shape[0] == 1 else image

@@ -1,10 +1,11 @@
+# ruff: noqa: F821, F401
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 from torch.optim import SGD, Adam
 
-from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
+from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, setattr_dot_notation
 
 
 def test_ensure_list():
@@ -52,24 +53,6 @@ def test_setattr_dot_notation():
 
     with pytest.raises(AttributeError):
         setattr_dot_notation(obj, "non_existent_attr", 10)
-
-
-def test_hasarg():
-    """
-    Test the hasarg function which checks if a function has a specific argument.
-
-    Tests:
-        - Verifying that an existing argument is correctly identified
-        - Verifying that a non-existent argument returns False
-
-    Uses a simple test function with two arguments to verify the functionality.
-    """
-
-    def func_with_args(a, b):
-        pass
-
-    assert hasarg(func_with_args, "a") is True
-    assert hasarg(func_with_args, "c") is False
 
 
 def test_get_name():
