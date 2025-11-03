@@ -72,37 +72,43 @@ class System(pl.LightningModule):
 
     def _step(self, batch: dict, batch_idx: int) -> dict[str, Any] | Any:
         """
-        Performs a step in the specified mode, processing the batch and calculating loss and metrics.
+        Performs a step in the specified mode. It uses the `Flow` to process the batch,
+        and returns the data dictionary, which includes loss, metrics, and predictions.
 
         Args:
             batch: The batch of data.
             batch_idx: The index of the batch.
         Returns:
-            dict or Any: For a prediction step, returns a dictionary containing the prediction and identifier.
-            For other steps, returns a dict with loss, metrics, input, target, pred, and identifier.
-            Loss is None for the test step, and metrics is None if unspecified.
+            The data dictionary from the `Flow`. For training, it includes the loss.
+            For prediction, it includes the predictions.
         """
-        context = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}
+        data = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}
 
         metrics = self.metrics[self.mode]
+
         criterion = self.criterion if self.mode in [Mode.TRAIN, Mode.VAL] else None
 
         flow = getattr(self.flows, self.mode)
-        output = flow(batch=batch, model=self.model, criterion=criterion, metrics=metrics, context=context)
 
-        self._log_stats(output, batch_idx)
-        return output
+        data = flow(batch=batch, model=self.model, criterion=criterion, metrics=metrics, data=data)
 
-    def _log_stats(self, output: dict[str, Any], batch_idx: int) -> None:
+        self._log(data, batch_idx)
+
+        return data
+
+    def _log(self, data: dict[str, Any], batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
 
         Args:
-            output: The output dictionary from the `_step` method.
+            data: The data dictionary from the `_step` method.
             batch_idx: The index of the batch.
         """
         if self.trainer.logger is None:
             return
+
+        dataloader = getattr(self.dataloaders, self.mode)
+        batch_size = getattr(dataloader, "batch_size", None)
 
         def log(name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
             """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
@@ -113,12 +119,10 @@ class System(pl.LightningModule):
                 on_step (bool, optional): if True, logs on step.
                 on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
             """
-            dataloader = getattr(self.dataloaders, self.mode)
-            batch_size = getattr(dataloader, "batch_size", None)
             self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
 
         # Loss
-        loss = output.get(Data.LOSS)
+        loss = data.get(Data.LOSS)
         if loss is not None:
             if not isinstance(loss, dict):
                 log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
@@ -129,7 +133,7 @@ class System(pl.LightningModule):
                     log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
 
         # Metrics
-        metrics = output.get(Data.METRICS)
+        metrics = data.get(Data.METRICS)
         if metrics is not None:
             for name, metric in metrics.items():
                 log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)

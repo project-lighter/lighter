@@ -1,33 +1,10 @@
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from torchmetrics import Metric, MetricCollection
 
 from lighter.flow import Flow
 from lighter.utils.types.enums import Mode
-
-
-def nested(cls):
-    """
-    Decorator to handle nested dataclass creation.
-    Example:
-        ```
-        @nested
-        @dataclass
-        class Example:
-            ...
-        ```
-    """
-    original_init = cls.__init__
-
-    def __init__(self, *args, **kwargs):
-        for f in fields(cls):
-            if is_dataclass(f.type) and f.name in kwargs:
-                kwargs[f.name] = f.type(**kwargs[f.name])
-        original_init(self, *args, **kwargs)
-
-    cls.__init__ = __init__
-    return cls
 
 
 @dataclass
@@ -55,7 +32,6 @@ class DataLoaders:
     predict: Any | None = None
 
 
-@nested
 @dataclass
 class Flows:
     train: Flow = field(default_factory=lambda: Flow.get_default(Mode.TRAIN))
