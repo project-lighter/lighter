@@ -59,7 +59,7 @@ class Freezer(Callback):
 
     def on_train_batch_start(self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int) -> None:
         """
-        Called at the start of each training batch to potentially freeze parameters.
+        Called at the start of each training batch to freeze or unfreeze model parameters.
 
         Args:
             trainer: The trainer instance.
@@ -67,52 +67,31 @@ class Freezer(Callback):
             batch: The current batch.
             batch_idx: The index of the batch.
         """
-        self._on_batch_start(trainer, pl_module)
-
-    def on_validation_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def on_test_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def on_predict_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def _on_batch_start(self, trainer: Trainer, pl_module: System) -> None:
-        """
-        Freezes or unfreezes model parameters based on the current step or epoch.
-
-        Args:
-            trainer: The trainer instance.
-            pl_module: The System instance.
-        """
         current_step = trainer.global_step
         current_epoch = trainer.current_epoch
 
-        if self.until_step is not None and current_step >= self.until_step:
+        # Unfreeze if the step or epoch limit has been reached.
+        unfreeze_step = self.until_step is not None and current_step >= self.until_step
+        unfreeze_epoch = self.until_epoch is not None and current_epoch >= self.until_epoch
+        if unfreeze_step or unfreeze_epoch:
             if self._frozen_state:
-                logger.info(f"Reached step {self.until_step} - unfreezing the previously frozen layers.")
-                self._set_model_requires_grad(pl_module, True)
+                logger.info("Unfreezing the model.")
+                self._set_model_requires_grad(pl_module, requires_grad=True)
+                self._frozen_state = False
             return
 
-        if self.until_epoch is not None and current_epoch >= self.until_epoch:
-            if self._frozen_state:
-                logger.info(f"Reached epoch {self.until_epoch} - unfreezing the previously frozen layers.")
-                self._set_model_requires_grad(pl_module, True)
-            return
-
+        # Freeze if not already frozen.
         if not self._frozen_state:
-            self._set_model_requires_grad(pl_module, False)
+            logger.info("Freezing the model.")
+            self._set_model_requires_grad(pl_module, requires_grad=False)
+            self._frozen_state = True
 
     def _set_model_requires_grad(self, model: Module | System, requires_grad: bool) -> None:
         """
-        Sets the requires_grad attribute for model parameters, effectively freezing or unfreezing them.
+        Sets the `requires_grad` attribute for model parameters.
+
+        This method first sets the `requires_grad` for all parameters of the model,
+        and then selectively modifies the parameters based on the freezing criteria.
 
         Args:
             model: The model whose parameters to modify.
@@ -122,36 +101,40 @@ class Freezer(Callback):
         if isinstance(model, System):
             model = model.model
 
+        # First, set the requires_grad for all parameters.
+        for param in model.parameters():
+            param.requires_grad = requires_grad
+
+        # Then, handle the specified layers.
         frozen_layers = []
-        # Freeze the specified parameters.
+        unfrozen_layers = []
         for name, param in model.named_parameters():
-            # Leave the excluded-from-freezing parameters trainable.
-            if self.except_names and name in self.except_names:
+            # Check if the parameter should be excluded from freezing.
+            is_excepted = (self.except_names and name in self.except_names) or (
+                self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with)
+            )
+            if is_excepted:
                 param.requires_grad = True
-                continue
-            if self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with):
-                param.requires_grad = True
+                unfrozen_layers.append(name)
                 continue
 
-            # Freeze/unfreeze the specified parameters, based on the `requires_grad` argument.
-            if self.names and name in self.names:
+            # Check if the parameter should be frozen.
+            is_to_freeze = (self.names and name in self.names) or (
+                self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with)
+            )
+            if is_to_freeze:
                 param.requires_grad = requires_grad
-                frozen_layers.append(name)
-                continue
-            if self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
-                param.requires_grad = requires_grad
-                frozen_layers.append(name)
-                continue
+                if not requires_grad:
+                    frozen_layers.append(name)
+                else:
+                    unfrozen_layers.append(name)
 
-            # Otherwise, leave the parameter trainable.
-            param.requires_grad = True
-
-        self._frozen_state = not requires_grad
-        # Log only when freezing the parameters.
-        if self._frozen_state:
+        # Log the frozen/unfrozen layers.
+        if frozen_layers:
             logger.info(
-                f"Setting requires_grad={requires_grad} the following layers"
+                f"Froze layers: {frozen_layers}"
                 + (f" until step {self.until_step}" if self.until_step is not None else "")
                 + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
-                + f": {frozen_layers}"
             )
+        if unfrozen_layers:
+            logger.info(f"Unfroze layers: {unfrozen_layers}")
