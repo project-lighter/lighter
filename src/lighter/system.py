@@ -4,6 +4,7 @@ including the model, optimizer, datasets, and more. It extends PyTorch Lightning
 """
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import pytorch_lightning as pl
@@ -109,40 +110,34 @@ class System(pl.LightningModule):
 
         dataloader = getattr(self.dataloaders, self.mode)
         batch_size = getattr(dataloader, "batch_size", None)
-
-        def log(name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
-            """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
-
-            Args:
-                name (str): key to log.
-                value (Any): value to log.
-                on_step (bool, optional): if True, logs on step.
-                on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
-            """
-            self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
+        log = partial(self.log, batch_size=batch_size, logger=True)
 
         # Loss
         loss = data.get(Data.LOSS)
         if loss is not None:
             if not isinstance(loss, dict):
-                log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
-                log(f"{self.mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
+                # Log step loss, no sync.
+                log(f"{self.mode}/{Data.LOSS}/step", loss, on_step=True, on_epoch=False, sync_dist=False)
+                # Log epoch loss, with sync.
+                log(f"{self.mode}/{Data.LOSS}/epoch", loss, on_step=False, on_epoch=True, sync_dist=True)
             else:
                 for name, subloss in loss.items():
-                    log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
-                    log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
+                    # Log step loss, no sync.
+                    log(f"{self.mode}/{Data.LOSS}/{name}/step", subloss, on_step=True, on_epoch=False, sync_dist=False)
+                    # Log epoch loss, with sync.
+                    log(f"{self.mode}/{Data.LOSS}/{name}/epoch", subloss, on_step=False, on_epoch=True, sync_dist=True)
 
         # Metrics
         metrics = data.get(Data.METRICS)
         if metrics is not None:
             for name, metric in metrics.items():
-                log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
-                log(f"{self.mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
+                # Log metric object on step and epoch. `torchmetrics` handles its own synchronization.
+                log(f"{self.mode}/{Data.METRICS}/{name}", metric, on_step=True, on_epoch=True)
 
-        # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
+        # Optimizer's lr, momentum, beta, etc. Logged in train mode, once per epoch.
         if self.mode == Mode.TRAIN and batch_idx == 0:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
-                log(f"{self.mode}/{name}", optimizer_stat, on_epoch=True)
+                log(f"{self.mode}/{name}", optimizer_stat, on_step=False, on_epoch=True)
 
     def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:
         """
