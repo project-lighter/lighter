@@ -6,7 +6,8 @@ allowing predictions to be saved in various formats.
 import gc
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import torch
 from loguru import logger

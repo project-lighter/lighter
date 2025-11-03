@@ -2,8 +2,8 @@
 This module provides the FileWriter class, which writes predictions to files in various formats.
 """
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 import torch
 import torchvision

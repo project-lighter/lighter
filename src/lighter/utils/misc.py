@@ -2,7 +2,8 @@
 This module contains miscellaneous utility functions for handling lists, attributes, and function arguments.
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from torch.optim.optimizer import Optimizer
 

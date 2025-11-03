@@ -191,7 +191,6 @@ class System(pl.LightningModule):
         """
         self.mode = mode
 
-
     @property
     def learning_rate(self) -> float:
         """
