@@ -15,13 +15,11 @@ class Flow:
 
     def __init__(
         self,
-        batch: dict[str, Any] | list[str],
-        model: dict[str, Any] | list[Any] | str | None = None,
+        model: dict[str, Any] | list[Any] | None = None,
         criterion: dict[str, Any] | list[Any] | None = None,
         metrics: dict[str, Any] | list[Any] | None = None,
         output: dict[str, Any] | None = None,
     ):
-        self.batch_config = batch
         self.model_config = model or {}
         self.criterion_config = criterion or {}
         self.metrics_config = metrics or {}
@@ -35,8 +33,9 @@ class Flow:
         metrics: MetricCollection | None = None,
         data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        # 1. Unpack the batch data into a new data dictionary
-        data = self._unpack_batch(batch, data)
+        # 1. Initialize data dictionary and add the batch to it.
+        data = data or {}
+        data["batch"] = batch
 
         # 2. Run the model and add its prediction to the data
         data = self._run_model(data, model)
@@ -53,30 +52,6 @@ class Flow:
         return data
 
     # --- Private Helper Methods ---
-
-    def _unpack_batch(self, batch: Any, data: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Handles the logic for the 'batch' configuration."""
-        data = data or {}
-        if isinstance(self.batch_config, dict):
-            for key, accessor in self.batch_config.items():
-                if callable(accessor):
-                    data[key] = accessor(batch)
-                elif isinstance(accessor, str):
-                    try:
-                        data[key] = batch[accessor]
-                    except (KeyError, TypeError) as e:
-                        raise ValueError(f"Could not access '{accessor}' from batch.\n{e}") from e
-                else:
-                    raise TypeError(f"Unsupported accessor type: {type(accessor)}")
-        elif isinstance(self.batch_config, list):
-            for i, key in enumerate(self.batch_config):
-                try:
-                    data[key] = batch[i]
-                except IndexError as e:
-                    raise ValueError(f"Could not access index {i} from batch.\n{e}") from e
-        else:
-            raise TypeError(f"Unsupported batch config type: {type(self.batch_config)}")
-        return data
 
     def _run_model(self, data: dict[str, Any], model: Module) -> dict[str, Any]:
         """Handles the logic for the 'model' configuration."""
@@ -121,15 +96,36 @@ class Flow:
             return key(data)
 
         if isinstance(key, str):
+            # Bracket notation for batch access, e.g., 'batch[0]' or 'batch["input"]'
+            if key.startswith("batch["):
+                try:
+                    value = data["batch"]
+                    import re
+
+                    accessors = re.findall(r"\[(.*?)\]", key)
+                    for acc in accessors:
+                        acc = acc.strip()
+                        if (acc.startswith('"') and acc.endswith('"')) or (acc.startswith("'") and acc.endswith("'")):
+                            value = value[acc[1:-1]]
+                        elif acc.isdigit() or (acc.startswith("-") and acc[1:].isdigit()):
+                            value = value[int(acc)]
+                        else:
+                            raise ValueError(f"Unsupported accessor '{acc}' in key '{key}'")
+                    return value
+                except (KeyError, IndexError, ValueError) as e:
+                    raise KeyError(f"Could not resolve nested key '{key}' from data.\n{e}") from e
+
             if "." in key:
                 value = data
                 for k in key.split("."):
                     try:
                         if isinstance(value, dict):
                             value = value[k]
+                        elif isinstance(value, (list, tuple)) and k.isdigit():
+                            value = value[int(k)]
                         else:
                             value = getattr(value, k)
-                    except (KeyError, AttributeError) as e:
+                    except (KeyError, AttributeError, IndexError) as e:
                         raise KeyError(f"Could not resolve nested key '{key}' from data.\n{e}") from e
                 return value
             # A key not found in the data should raise an error.
@@ -140,39 +136,37 @@ class Flow:
         raise TypeError(f"Unsupported key type: {type(key)}")
 
     def _prepare_args_kwargs(
-        self, data: dict[str, Any], config: dict[str, Any] | list[Any] | str
-    ) -> tuple[list[Any], dict[str, Any]]:
+        self, data: dict[str, Any], config: dict[str, Any] | list[Any]) -> tuple[list[Any], dict[str, Any]]:
+
         """Prepares args and kwargs by resolving values from the data based on the given config."""
+
         if isinstance(config, dict):
+
             kwargs = {arg: self._get_value(data, key) for arg, key in config.items()}
             return [], kwargs
+
         if isinstance(config, list):
             args = [self._get_value(data, key) for key in config]
             return args, {}
-        if isinstance(config, str):
-            args = [self._get_value(data, config)]
-            return args, {}
-        return [], {}
+
+        raise TypeError(f"Flow configuration must either be a list (for positional args) or a dict (for keyword args), but got {type(config)}.")
 
     @staticmethod
     def get_default(mode: str) -> "Flow":
         if mode in ["train", "val"]:
             return Flow(
-                batch=[Data.INPUT, Data.TARGET],
-                model=[Data.INPUT],
-                criterion=[Data.PRED, Data.TARGET],
-                metrics=[Data.PRED, Data.TARGET],
+                model=["batch.0"],
+                criterion=["pred", "batch.1"],
+                metrics=["pred", "batch.1"],
             )
         elif mode == "test":
             return Flow(
-                batch=[Data.INPUT, Data.TARGET],
-                model=[Data.INPUT],
-                metrics=[Data.PRED, Data.TARGET],
+                model=["batch.0"],
+                metrics=["pred", "batch.1"],
             )
         elif mode == "predict":
             return Flow(
-                batch={Data.INPUT: lambda batch: batch[0] if isinstance(batch, (list, tuple)) else batch},
-                model=[Data.INPUT],
+                model=[lambda data: data["batch"][0] if isinstance(data["batch"], (list, tuple)) else data["batch"]],
             )
         else:
             raise ValueError(f"Invalid mode for default Flow: {mode}")
