@@ -169,22 +169,18 @@ class System(pl.LightningModule):
             self.training_step = self._step
             self.train_dataloader = lambda: self.dataloaders.train
             self.on_train_start = lambda: self._on_mode_start(Mode.TRAIN)
-            self.on_train_end = self._on_mode_end
         if self.dataloaders.val is not None:
             self.validation_step = self._step
             self.val_dataloader = lambda: self.dataloaders.val
             self.on_validation_start = lambda: self._on_mode_start(Mode.VAL)
-            self.on_validation_end = self._on_mode_end
         if self.dataloaders.test is not None:
             self.test_step = self._step
             self.test_dataloader = lambda: self.dataloaders.test
             self.on_test_start = lambda: self._on_mode_start(Mode.TEST)
-            self.on_test_end = self._on_mode_end
         if self.dataloaders.predict is not None:
             self.predict_step = self._step
             self.predict_dataloader = lambda: self.dataloaders.predict
             self.on_predict_start = lambda: self._on_mode_start(Mode.PREDICT)
-            self.on_predict_end = self._on_mode_end
 
     def _on_mode_start(self, mode: str | None) -> None:
         """
@@ -195,11 +191,6 @@ class System(pl.LightningModule):
         """
         self.mode = mode
 
-    def _on_mode_end(self) -> None:
-        """
-        Resets the mode at the end of a phase.
-        """
-        self.mode = None
 
     @property
     def learning_rate(self) -> float:

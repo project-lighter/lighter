@@ -1,5 +1,7 @@
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+import torch
 from torch.nn import Module
 from torchmetrics import MetricCollection
 
@@ -115,23 +117,40 @@ class Flow:
                 except (KeyError, IndexError, ValueError) as e:
                     raise KeyError(f"Could not resolve nested key '{key}' from data.\n{e}") from e
 
+            # Handle indexing (e.g., 'pred[0]')
+            if '[' in key and key.endswith(']'):
+                base_key, index_str = key[:-1].split('[')
+                index = int(index_str)
+                value = self._get_value(data, base_key)  # Recursively get the base value
+                if isinstance(value, (list, tuple, torch.Tensor)):
+                    return value[index]
+                else:
+                    raise TypeError(f"Cannot index type {type(value).__name__} with key '{key}'")
+
+            # Nested key resolution (e.g., 'loss.total')
             if "." in key:
                 value = data
                 for k in key.split("."):
-                    try:
-                        if isinstance(value, dict):
-                            value = value[k]
-                        elif isinstance(value, (list, tuple)) and k.isdigit():
-                            value = value[int(k)]
-                        else:
-                            value = getattr(value, k)
-                    except (KeyError, AttributeError, IndexError) as e:
-                        raise KeyError(f"Could not resolve nested key '{key}' from data.\n{e}") from e
+                    # Handles dict access like 'metrics.accuracy'
+                    if isinstance(value, dict) and k in value:
+                        value = value[k]
+                    # Handles list/tuple access like 'batch.0'
+                    elif isinstance(value, (list, tuple)) and k.isdigit():
+                        value = value[int(k)]
+                    elif hasattr(value, k):  # Fallback to attribute lookup
+                        value = getattr(value, k)
+                    else:
+                        raise KeyError(f"Could not resolve nested key '{key}' from data. "
+                                       f"'{type(value).__name__}' object has no attribute or key '{k}'")
                 return value
+            # Direct key lookup
+            if key in data:
+                return data[key]
+            # Fallback to attribute lookup
+            if hasattr(data, key):
+                return getattr(data, key)
             # A key not found in the data should raise an error.
-            if key not in data:
-                raise KeyError(f"Key '{key}' not found in the data.")
-            return data[key]
+            raise KeyError(f"Could not resolve key '{key}' from data.")
 
         raise TypeError(f"Unsupported key type: {type(key)}")
 
