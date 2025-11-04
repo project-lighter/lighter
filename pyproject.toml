@@ -82,7 +82,6 @@ test = [
     "coverage-badge>=1.1.0",
     "pytest-metadata>=3.1.1",
     "aiohttp>=3.8.3",
-    "itk>=5.4.0",
     "av>=12.0.0",
 ]
 
