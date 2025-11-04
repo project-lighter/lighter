@@ -85,7 +85,7 @@ class System(pl.LightningModule):
         """
         data = {Data.STEP: self.global_step, Data.EPOCH: self.current_epoch}
 
-        metrics = self.metrics[self.mode]
+        metrics = self.metrics[self.mode] if self.mode != Mode.PREDICT else None
 
         criterion = self.criterion if self.mode in [Mode.TRAIN, Mode.VAL] else None
 
