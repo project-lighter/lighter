@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from lighter.callbacks.writer.file import FileWriter
+from lighter.callbacks.file_writer import FileWriter
 
 
 def test_file_writer_initialization(tmp_path):

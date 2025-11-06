@@ -10,8 +10,10 @@ trainer:
     logger: False
     callbacks:
         - _target_: lighter.callbacks.FileWriter
-          path: '$f"{@project}/predictions"'
-          writer: tensor
+          directory: '$f"{@project}/predictions"'
+          writer_fn: tensor
+          value_key: "pred_class"
+          name_key: "true_label"
 
 system:
     _target_: lighter.System
@@ -92,3 +94,14 @@ system:
 
         test: "%#val"
         predict: "%#val"
+
+    flows:
+        predict:
+            _target_: lighter.flow.Flow
+            model:
+                - "batch[0]"
+            output:
+                pred_class:
+                    - "pred"
+                    - "$lambda tensor: tensor.argmax(dim=1)"
+                true_label: "batch[1]"

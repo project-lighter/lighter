@@ -160,7 +160,9 @@ class Flow:
                 data[key] = resolve_value(original_data, transform_key)
         return data
 
-    def _prepare_args_kwargs(self, data: dict[str, Any], config: dict[str, Any] | list[Any]) -> tuple[list[Any], dict[str, Any]]:
+    def _prepare_args_kwargs(
+        self, data: dict[str, Any], config: dict[str, Any] | list[Any]
+    ) -> tuple[list[Any], dict[str, Any]]:
         """
         Prepares `args` and `kwargs` by resolving values from `data` based on `config`.
 
@@ -186,7 +188,9 @@ class Flow:
             args = [resolve_value(data, key) for key in config]
             return args, {}
 
-        raise TypeError(f"Flow configuration must either be a list (for positional args) or a dict (for keyword args), but got {type(config)}.")
+        raise TypeError(
+            f"Flow configuration must either be a list (for positional args) or a dict (for keyword args), but got {type(config)} {config}."
+        )
 
     @staticmethod
     def get_default(mode: str) -> "Flow":

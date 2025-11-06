@@ -21,7 +21,6 @@ class DummyModel(nn.Module):
 def test_flow_model_single_string_arg():
     """Test that Flow can handle a single string as a model argument."""
     flow = Flow(
-        batch={"input_data": "data"},
         model="input_data",  # Single string argument
         output={Data.PRED: Data.PRED},
     )
@@ -38,7 +37,6 @@ def test_flow_model_single_string_arg():
 def test_flow_model_list_arg():
     """Test that Flow can handle a list as a model argument."""
     flow = Flow(
-        batch={"input_data": "data"},
         model=["input_data"],  # List argument
         output={Data.PRED: Data.PRED},
     )
@@ -55,7 +53,6 @@ def test_flow_model_list_arg():
 def test_flow_model_dict_arg():
     """Test that Flow can handle a dict as a model argument."""
     flow = Flow(
-        batch={"input_data": "data"},
         model={"x": "input_data"},  # Dict argument
         output={Data.PRED: Data.PRED},
     )

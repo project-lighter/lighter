@@ -80,8 +80,6 @@ def simple_system(dummy_dataloaders):
         scheduler=scheduler,
         criterion=criterion,
         metrics=metrics,
-        adapters=None,
-        inferer=None,
     )
 
     # Initialize a Trainer without logger and checkpointing
@@ -129,8 +127,6 @@ def test_configure_optimizers_without_optimizer(dummy_dataloaders):
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
     with pytest.raises(ValueError, match="Please specify 'system.optimizer' in the config."):
         system.configure_optimizers()
@@ -147,10 +143,7 @@ def test_configure_optimizers_without_scheduler(dummy_dataloaders):
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
-
     opt_config = system.configure_optimizers()
     assert isinstance(opt_config, dict)
     assert "optimizer" in opt_config
@@ -161,7 +154,7 @@ def test_on_mode_start_and_end_train(simple_system):
     """Check that _on_mode_start sets the correct mode and _on_mode_end resets it."""
     simple_system._on_mode_start(Mode.TRAIN)
     assert simple_system.mode == Mode.TRAIN
-    simple_system._on_mode_end()
+    simple_system.on_train_end()
     assert simple_system.mode is None
 
 
@@ -303,8 +296,6 @@ def test_learning_rate_multiple_param_groups_raises():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
     system.trainer = pl.Trainer(logger=False, enable_checkpointing=False, max_epochs=1)
     system.log = MagicMock()
@@ -347,7 +338,7 @@ def test_loss_logging_single_value(simple_system):
     output = simple_system.training_step(batch, batch_idx=0)
 
     assert Data.LOSS in output
-    simple_system._log_stats.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
+    simple_system._log.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
 
 
 def test_loss_logging_dict_values(simple_system):
@@ -364,8 +355,7 @@ def test_loss_logging_dict_values(simple_system):
     output = simple_system.training_step(batch, batch_idx=0)
 
     assert "total" in output[Data.LOSS]
-    assert "aux" in output[Data.LOSS]
-    simple_system._log_stats.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
+    simple_system._log.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
 
 
 def test_metric_logging(simple_system):
@@ -375,7 +365,7 @@ def test_metric_logging(simple_system):
     output = simple_system.training_step(batch, batch_idx=0)
 
     assert Data.METRICS in output
-    simple_system._log_stats.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
+    simple_system._log.assert_called_once_with(output[Data.LOSS], output[Data.METRICS], 0)
 
 
 def test_dynamic_mode_hooks():
@@ -403,8 +393,6 @@ def test_dynamic_mode_hooks():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
 
     # Assert that all hooks are overridden
@@ -438,8 +426,6 @@ def test_dynamic_mode_hooks():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
 
     # Assert that only train hooks are overridden, other hooks remain as default
@@ -473,8 +459,6 @@ def test_dynamic_mode_hooks():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
 
     # Assert that only validation hooks are overridden, other hooks remain as default
@@ -508,8 +492,6 @@ def test_dynamic_mode_hooks():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
 
     # Assert that only test hooks are overridden, other hooks remain as default
@@ -543,8 +525,6 @@ def test_dynamic_mode_hooks():
         scheduler=None,
         criterion=nn.CrossEntropyLoss(),
         metrics=None,
-        adapters=None,
-        inferer=None,
     )
 
     # Assert that only predict hooks are overridden, other hooks remain as default
@@ -572,42 +552,39 @@ def test_dynamic_mode_hooks():
 def test_log_stats_without_logger(simple_system):
     """Test _log_stats when trainer has no logger."""
     # Override the mock to test actual _log_stats behavior
-    simple_system._log_stats = System._log_stats.__get__(simple_system)
-    simple_system.trainer.logger = None
-
-    # This should not raise any errors and should return early
-    simple_system._log_stats(torch.tensor(1.0), None, 0)
+    simple_system._log = System._log.__get__(simple_system)
+    simple_system._log({Data.LOSS: torch.tensor(1.0)}, 0)
 
 
 def test_log_stats_with_logger(simple_system):
     """Test _log_stats with a logger."""
     # Override the mock to test actual _log_stats behavior
-    simple_system._log_stats = System._log_stats.__get__(simple_system)
+    simple_system._log = System._log.__get__(simple_system)
     simple_system.trainer.logger = MagicMock()
     simple_system.log = MagicMock()
 
     # Test single loss value
     simple_system.mode = Mode.TRAIN
-    simple_system._log_stats(torch.tensor(1.0), None, 0)
+    simple_system._log({Data.LOSS: torch.tensor(1.0)}, 0)
     # Twice (on step, on epoch) for the loss, twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 4
 
     # Test dict loss values
     simple_system.log.reset_mock()
     loss_dict = {"total": torch.tensor(1.0), "aux": torch.tensor(0.5)}
-    simple_system._log_stats(loss_dict, None, 0)
+    simple_system._log({Data.LOSS: loss_dict}, 0)
     # Twice (on step, on epoch) for each loss, twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 6
 
     # Test metrics
     simple_system.log.reset_mock()
     metrics = {"accuracy": torch.tensor(0.95)}
-    simple_system._log_stats(None, metrics, 0)
+    simple_system._log({Data.METRICS: metrics}, 0)
     # Twice (on step, on epoch) for the metric, twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 4
 
     # Test optimizer stats (only in train mode, batch_idx=0)
     simple_system.log.reset_mock()
-    simple_system._log_stats(None, None, 0)
+    simple_system._log({}, 0)  # No loss or metrics, just optimizer stats
     # Twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 2

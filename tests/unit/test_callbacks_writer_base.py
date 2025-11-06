@@ -6,7 +6,7 @@ import pytest
 import torch
 from loguru import logger
 
-from lighter.callbacks.writer.base import BaseWriter
+from lighter.callbacks.base_writer import BaseWriter
 
 
 @pytest.fixture
@@ -60,10 +60,10 @@ def test_writer_initialization(target_path):
     - Raises TypeError when initialized with invalid path
     """
     # Test initialization with a valid writer
-    writer = MockWriter(path=target_path, writer="tensor")
+    writer = MockWriter(path=target_path)
     assert callable(writer.writer)
     with pytest.raises(TypeError):
-        BaseWriter(path=target_path, writer="tensor")
+        BaseWriter(path=target_path)
 
     # Test initialization with invalid writer
     with pytest.raises(ValueError, match="Writer for format invalid_writer does not exist"):
@@ -71,7 +71,7 @@ def test_writer_initialization(target_path):
 
     # Test initialization with invalid path
     with pytest.raises(TypeError):
-        MockWriter(path=123, writer="tensor")
+        MockWriter(path=123)
 
 
 def test_on_predict_batch_end(target_path):
