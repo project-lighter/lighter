@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import monai
 import numpy as np
 import pytest
 import torch
@@ -111,33 +110,6 @@ def test_file_writer_write_grayscale_video(tmp_path):
 
     # Verify file exists
     saved_path = writer.path / "grayscale_video_test.mp4"
-    assert saved_path.exists()
-
-
-def test_file_writer_write_itk_image(tmp_path):
-    """Test ITK image writing functionality of FileWriter.
-
-    This test verifies that:
-    1. The writer correctly handles MONAI MetaTensor format
-    2. Invalid tensor formats raise appropriate exceptions
-    3. Valid MetaTensors can be successfully written to disk as NRRD files
-
-    The test attempts to write both regular tensors and MetaTensors,
-    verifying proper error handling and successful writes.
-    """
-    writer = FileWriter(path=tmp_path, writer="itk_nrrd")
-    tensor = torch.rand(1, 1, 64, 64, 64)  # Example 3D tensor
-
-    # Test with regular tensor
-    with pytest.raises(TypeError, match="Tensor must be in MONAI MetaTensor format"):
-        writer.write(tensor, identifier="itk_image_test")
-
-    # Test with proper MetaTensor
-    meta_tensor = monai.data.MetaTensor(tensor, affine=torch.eye(4), meta={"original_channel_dim": 1})
-    writer.write(meta_tensor, identifier="itk_image_test")
-
-    # Verify file exists
-    saved_path = writer.path / "itk_image_test.nrrd"
     assert saved_path.exists()
 
 

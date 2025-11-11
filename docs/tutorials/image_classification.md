@@ -69,66 +69,66 @@ Save this in `image_classification/experiments/config.yaml`:
 project: .  # Use '.' if running from image_classification folder
 
 trainer:
-    _target_: pytorch_lightning.Trainer
-    accelerator: "auto"  # Use GPU if available, else CPU
-    max_epochs: 10
+  _target_: pytorch_lightning.Trainer
+  accelerator: "auto"  # Use GPU if available, else CPU
+  max_epochs: 10
 
 system:
-    _target_: lighter.System
+  _target_: lighter.System
 
-    model:
-        _target_: project.models.simple_cnn.SimpleCNN
+  model:
+    _target_: project.models.simple_cnn.SimpleCNN
+    num_classes: 10
+
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+
+  optimizer:
+    _target_: torch.optim.Adam
+    params: "$@system::model.parameters()"  # Link to model's learnable parameters
+    lr: 1.0e-3
+
+  metrics:
+    train:
+      - _target_: torchmetrics.Accuracy
+        task: "multiclass"
         num_classes: 10
+    test: "%::train"
 
-    criterion:
-        _target_: torch.nn.CrossEntropyLoss
-
-    optimizer:
-        _target_: torch.optim.Adam
-        params: "$@system#model.parameters()"  # Link to model's learnable parameters
-        lr: 1.0e-3
-
-    metrics:
-        train:
-            - _target_: torchmetrics.Accuracy
-              task: "multiclass"
-              num_classes: 10
-        test: "%#train"
-
-    dataloaders:
-        train:
-            _target_: torch.utils.data.DataLoader
-            batch_size: 32
-            shuffle: True
-            num_workers: 4
-            dataset:
-                _target_: torchvision.datasets.CIFAR10
-                root: cifar10/
-                download: True
-                train: True
-                transform:
-                    _target_: torchvision.transforms.Compose
-                    transforms:
-                        - _target_: torchvision.transforms.ToTensor
-                        - _target_: torchvision.transforms.Normalize
-                          mean: [0.5, 0.5, 0.5]
-                          std: [0.5, 0.5, 0.5]
-        test:
-            _target_: torch.utils.data.DataLoader
-            batch_size: 32
-            num_workers: 4
-            dataset:
-                _target_: torchvision.datasets.CIFAR10
-                root: cifar10/
-                download: True
-                train: False
-                transform:
-                    _target_: torchvision.transforms.Compose
-                    transforms:
-                        - _target_: torchvision.transforms.ToTensor
-                        - _target_: torchvision.transforms.Normalize
-                          mean: [0.5, 0.5, 0.5]
-                          std: [0.5, 0.5, 0.5]
+  dataloaders:
+    train:
+      _target_: torch.utils.data.DataLoader
+      batch_size: 32
+      shuffle: True
+      num_workers: 4
+      dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: cifar10/
+        download: True
+        train: True
+        transform:
+          _target_: torchvision.transforms.Compose
+          transforms:
+            - _target_: torchvision.transforms.ToTensor
+            - _target_: torchvision.transforms.Normalize
+              mean: [0.5, 0.5, 0.5]
+              std: [0.5, 0.5, 0.5]
+    test:
+      _target_: torch.utils.data.DataLoader
+      batch_size: 32
+      num_workers: 4
+      dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: cifar10/
+        download: True
+        train: False
+        transform:
+          _target_: torchvision.transforms.Compose
+          transforms:
+            - _target_: torchvision.transforms.ToTensor
+            - _target_: torchvision.transforms.Normalize
+              mean: [0.5, 0.5, 0.5]
+              std: [0.5, 0.5, 0.5]
 ```
 
 !!! info "Path Configuration"

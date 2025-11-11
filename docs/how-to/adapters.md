@@ -257,7 +257,7 @@ system:
 
     # 4. Reuse the same batch adapter for validation.
     val:
-      batch: "%system#adapters#train#batch"
+      batch: "%system::adapters::train::batch"
       # Criterion and Metrics adapters for 'val' would also be defined here.
 ```
 

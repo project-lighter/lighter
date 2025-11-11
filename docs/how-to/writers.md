@@ -7,23 +7,23 @@ Writers are your data persistence layer—they capture model outputs and save th
 ```yaml
 # Save predictions as images
 trainer:
-    callbacks:
-        - _target_: lighter.callbacks.FileWriter
-          path: "outputs/predictions"
-          writer: "image"  # PNG for 2D, MP4 for 3D
+  callbacks:
+    - _target_: lighter.callbacks.FileWriter
+      path: "outputs/predictions"
+      writer: "image"  # PNG for 2D, MP4 for 3D
 
 # Save metrics to CSV
 trainer:
-    callbacks:
-        - _target_: lighter.callbacks.TableWriter
-          path: "outputs/metrics.csv"
+  callbacks:
+    - _target_: lighter.callbacks.TableWriter
+      path: "outputs/metrics.csv"
 ```
 
 ## Writer Types at a Glance
 
 | Writer | Purpose | Output Format | Best For |
 |--------|---------|---------------|----------|
-| **FileWriter** | Save predictions/tensors | NIfTI, PNG, MP4, NPY | Images, volumes, arrays |
+| **FileWriter** | Save predictions/tensors | PNG, MP4, PT | Images, videos, tensors |
 | **TableWriter** | Save tabular data | CSV | Metrics, statistics, results |
 
 ## Using `FileWriter`
@@ -39,23 +39,20 @@ trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter # Use the FileWriter callback
       path: "outputs/predictions"          # Directory to save output files
-      writer: "itk_nifti"                  # Writer function to use (ITK-NIfTI format)
+      writer: "tensor"                     # Writer function to use
 ```
 
 *   **`_target_: lighter.callbacks.FileWriter`**: Specifies that you want to use the `FileWriter` callback.
 *   **`path: "outputs/predictions"`**: Defines the directory where the output files will be saved. Lighter will create this directory if it doesn't exist.
-*   **`writer: "itk_nifti"`**: Specifies the writer function to be used for saving tensors. In this example, we use `"itk_nifti"`, which saves tensors in the ITK-NIfTI format (commonly used for medical images).
+*   **`writer: "tensor"`**: Specifies the writer function to be used for saving tensors.
 
 **Built-in Writer Functions**:
 
 `FileWriter` has built-in writer functions for different formats:
 
-*   **`"tensor"`**: Raw NumPy `.npy` files (general tensor saving).
-*   **`"image"`**: Images (PNG for 2D, MP4 for 3D animation).
-*   **`"video"`**: Videos (MP4 for 4D tensor time-series).
-*   **`"itk_nrrd"`**: NRRD files (ITK library, medical imaging).
-*   **`"itk_seg_nrrd"`**: NRRD segmentation mask files (ITK).
-*   **`"itk_nifti"`**: NIfTI files (ITK library, medical imaging).
+*   **`"tensor"`**: Raw PyTorch `.pt` files (general tensor saving).
+*   **`"image"`**: PNG images for 2D tensors.
+*   **`"video"`**: MP4 videos for 4D tensor time-series (CTHW format).
 
 **Usage**:
 
@@ -65,32 +62,30 @@ In these stages, per batch, `FileWriter`:
 
 1.  Receives `pred` tensor from `predict_step`, `validation_step`, or `test_step`.
 2.  Applies `LoggingAdapter` transforms (if configured).
-3.  Uses writer function (e.g., `"itk_nifti"`) to save `pred` tensor to file in `path` dir.
+3.  Uses writer function (e.g., `"tensor"`) to save `pred` tensor to file in `path` dir.
 4.  Names file using batch `identifier` (if available) or generates unique name.
 
-**Example: Saving Segmentation Predictions in NIfTI Format**
+**Example: Saving Predictions as Tensors**
 
 ```yaml title="config.yaml"
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      path: "outputs/segmentations"
-      writer: "itk_nifti" # Save as NIfTI files
+      path: "outputs/predictions"
+      writer: "tensor" # Save as .pt files
 
 system:
   # ... (other system configurations) ...
   dataloaders:
     val:
+      _target_: torch.utils.data.DataLoader
       dataset:
-        _target_: monai.datasets.DecathlonDataset
-        task: "Task09_Spleen"
+        _target_: my_project.datasets.MyDataset
         root: "data/"
-        section: "validation"
-        transform: # ... (data transforms) ...
       batch_size: 1
 ```
 
-Example config: `FileWriter` saves segmentation predictions during validation stage as NIfTI files in `outputs/segmentations` dir. Filenames use validation dataset identifiers (e.g., patient IDs).
+Example config: `FileWriter` saves predictions during validation stage as PyTorch tensor files in `outputs/predictions` dir.
 
 ## Extending `FileWriter` with Custom Writers
 

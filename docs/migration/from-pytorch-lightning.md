@@ -62,7 +62,7 @@ system:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()"
+    params: "$@system::model.parameters()"
     lr: 0.001
 
   dataloaders:
@@ -133,7 +133,7 @@ trainer:
 system:
   scheduler:
     _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-    optimizer: "@system#optimizer"
+    optimizer: "@system::optimizer"
     factor: 0.5
     patience: 10
 ```

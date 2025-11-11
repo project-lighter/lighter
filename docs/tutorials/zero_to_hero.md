@@ -55,7 +55,7 @@ system:
     _target_: torch.nn.CrossEntropyLoss
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()"
+    params: "$@system::model.parameters()"
     lr: 0.001
   dataloaders:
     train: ...
@@ -89,7 +89,7 @@ system:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()"
+    params: "$@system::model.parameters()"
     lr: 0.001
 
   dataloaders:
@@ -187,13 +187,13 @@ How does the optimizer get the model's parameters? The `@` reference syntax:
 ```yaml
 optimizer:
   _target_: torch.optim.Adam
-  params: "$@system#model.parameters()"  # ← This!
+  params: "$@system::model.parameters()"  # ← This!
   lr: 0.001
 ```
 
 **Breaking it down:**
 
-- `system#model` - Fetch the model definition from the system section using `#`
+- `system::model` - Fetch the model definition from the system section using `::`
 - `@` - Instantiate that model
 - `.parameters()` - Call its `.parameters()` method using `$` that lets you run Python code
 
@@ -201,13 +201,13 @@ optimizer:
 
 ```yaml
 # Reference the model parameters
-"$@system#model.parameters()"
+"$@system::model.parameters()"
 
 # Reference the optimizer (for schedulers)
-"@system#optimizer"
+"@system::optimizer"
 
 # Reference training dataloader
-"@system#dataloaders#train"
+"@system::dataloaders::train"
 ```
 
 !!! tip "Learn More"
@@ -219,19 +219,19 @@ Want to experiment with different hyperparameters? **Don't edit the YAML.** Over
 
 ```bash
 # Try different learning rates
-lighter fit quick_start.yaml --system#optimizer#lr=0.01
+lighter fit quick_start.yaml --system::optimizer::lr=0.01
 
 # Train longer
-lighter fit quick_start.yaml --trainer#max_epochs=10
+lighter fit quick_start.yaml --trainer::max_epochs=10
 
 # Bigger batch size
-lighter fit quick_start.yaml --system#dataloaders#train#batch_size=128
+lighter fit quick_start.yaml --system::dataloaders::train::batch_size=128
 
 # Combine multiple overrides
 lighter fit quick_start.yaml \
-  --trainer#max_epochs=10 \
-  --system#optimizer#lr=0.001 \
-  --trainer#devices=2
+  --trainer::max_epochs=10 \
+  --system::optimizer::lr=0.001 \
+  --trainer::devices=2
 ```
 
 **This is how you run experiments.** Keep your base config clean, tweak parameters on the fly.
@@ -257,7 +257,7 @@ system:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()"
+    params: "$@system::model.parameters()"
     lr: 0.001
 
   dataloaders:
@@ -317,9 +317,9 @@ You've learned the essential syntax. Here's your cheat sheet:
 | Symbol | Meaning | Example |
 |--------|---------|---------|
 | `_target_` | Which class to instantiate | `_target_: torch.nn.Linear` |
-| `@` | Reference to instantiated object | `"@system#model"` |
-| `$` | Execute Python expression | `"$@system#model.parameters()"` |
-| `#` | Navigate config hierarchy | `system#optimizer#lr` |
+| `@` | Reference to instantiated object | `"@system::model"` |
+| `$` | Execute Python expression | `"$@system::model.parameters()"` |
+| `::` | Navigate config hierarchy | `system::optimizer::lr` |
 | `.` | Access Python attributes | `model.parameters()` |
 
 **The pattern to remember:**
@@ -362,14 +362,14 @@ You're ready for more advanced topics:
 ```bash
 # Add TensorBoard logging
 lighter fit config.yaml \
-  --trainer#logger#_target_=pytorch_lightning.loggers.TensorBoardLogger \
-  --trainer#logger#save_dir=logs
+  --trainer::logger::_target_=pytorch_lightning.loggers.TensorBoardLogger \
+  --trainer::logger::save_dir=logs
 
 # Use multiple GPUs
-lighter fit config.yaml --trainer#devices=2
+lighter fit config.yaml --trainer::devices=2
 
 # Enable mixed precision training
-lighter fit config.yaml --trainer#precision="16-mixed"
+lighter fit config.yaml --trainer::precision="16-mixed"
 ```
 
 **Welcome to config-driven deep learning!** 🎉

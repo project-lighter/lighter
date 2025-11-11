@@ -23,15 +23,15 @@ my_project/
 
 ### Config Reference Errors
 
-**Wrong:** `"$@system#model#parameters()"` - Using `#` for attributes
-**Correct:** `"$@system#model.parameters()"` - Use `.` for Python attributes
+**Wrong:** `"$@system::model::parameters()"` - Using `::` for attributes
+**Correct:** `"$@system::model.parameters()"` - Use `.` for Python attributes
 
 **Wrong:** Circular references
 ```yaml
 model:
-  lr: "@system#optimizer#lr"  # Circular!
+  lr: "@system::optimizer::lr"  # Circular!
 optimizer:
-  lr: "@system#model.lr"      # Circular!
+  lr: "@system::model.lr"      # Circular!
 ```
 
 **Correct:** Use `vars` section
@@ -39,9 +39,9 @@ optimizer:
 vars:
   lr: 0.001
 model:
-  lr: "%vars#lr"
+  lr: "%vars::lr"
 optimizer:
-  lr: "%vars#lr"
+  lr: "%vars::lr"
 ```
 
 ### YAML Syntax Errors
@@ -59,13 +59,13 @@ Common mistakes:
 **Solutions:**
 ```bash
 # Reduce batch size
-lighter fit config.yaml --system#dataloaders#train#batch_size=8
+lighter fit config.yaml --system::dataloaders::train::batch_size=8
 
 # Enable gradient accumulation
-lighter fit config.yaml --trainer#accumulate_grad_batches=4
+lighter fit config.yaml --trainer::accumulate_grad_batches=4
 
 # Use mixed precision
-lighter fit config.yaml --trainer#precision="16-mixed"
+lighter fit config.yaml --trainer::precision="16-mixed"
 ```
 
 For distributed strategies, see [PyTorch Lightning docs](https://lightning.ai/docs/pytorch/stable/advanced/model_parallel.html).
@@ -97,7 +97,7 @@ For profiling and optimization, see [PyTorch Lightning performance docs](https:/
 ### Quick Testing
 ```bash
 # Test with 2 batches only
-lighter fit config.yaml --trainer#fast_dev_run=2
+lighter fit config.yaml --trainer::fast_dev_run=2
 ```
 
 ### Debug Config Values

@@ -36,61 +36,31 @@ The way you train a model often differs from how you need to use it:
 
 **Example:** Medical diagnosis where you need to know prediction confidence
 
-## Using MONAI Inferers in Lighter
+## Configuring Inferers in Lighter
 
-Lighter provides out-of-the-box integration with MONAI's inferers, offering a wide array of pre-built implementations that you can easily incorporate into your projects.
+You can configure any custom inferer within the `system.inferer` section of your `config.yaml` file. The inferer can be any callable that takes the model and input, then returns predictions.
 
 #### Configuration
 
-To use a MONAI inferer, you simply need to configure it within the `system.inferer` section of your `config.yaml` file. Here's an example of how to configure the `SlidingWindowInferer`:
+Here's an example of a basic inferer configuration:
 
 ```yaml title="config.yaml"
 system:
   inferer:
-    _target_: monai.inferers.SlidingWindowInferer  # Specify the inferer class
-    roi_size: [128, 128, 128]                      # Region of interest size for each window
-    sw_batch_size: 4                               # Batch size for processing windows
-    overlap: 0.5                                   # Overlap ratio between windows
+    _target_: my_project.inferers.CustomInferer
+    # Add any arguments your inferer needs
 ```
 
-*   **`_target_`:** This key specifies the fully qualified class name of the inferer you want to use. In this case, it's `monai.inferers.SlidingWindowInferer`.
-*   **Inferer-Specific Arguments:** The remaining keys (`roi_size`, `sw_batch_size`, `overlap`) are arguments specific to the `SlidingWindowInferer`. Consult the MONAI documentation for detailed information about the available inferers and their respective arguments.
-
-#### Commonly Used MONAI Inferers
-
-Here are some of the commonly used MONAI inferers:
-
-*   **`monai.inferers.SlidingWindowInferer`:**  Ideal for handling large images or volumes that don't fit into memory.
-*   **`monai.inferers.SimpleInferer`:** A basic inferer that directly passes the entire input to the model. Suitable when your input data can fit in memory.
-*   **`monai.inferers.EnsembleInferer`:**  Facilitates combining predictions from multiple models.
-*   **`monai.inferers.patch_inferer`:**  Designed for patch-based inference strategies.
-
-#### Example: Using `SlidingWindowInferer` for Validation
-
-```yaml title="config.yaml"
-system:
-  model: #... your model definition...
-
-  inferer:
-    _target_: monai.inferers.SlidingWindowInferer
-    roi_size: [128, 128, 128]
-    sw_batch_size: 8
-    overlap: 0.25
-
-  def validation_step(self, batch, batch_idx):
-    output = super().validation_step(batch, batch_idx)
-    pred = output[Data.PRED]  # Access predictions (processed by the inferer)
-    #... rest of your validation logic...
-```
-
-In this example, the `SlidingWindowInferer` is configured to process inputs during the validation stage. Lighter automatically incorporates this inferer into the `forward` pass of your `System` (defined in `system.py`). When `self.forward(input)` is called within `validation_step`, Lighter checks if an inferer is configured and if the current mode is 'val', 'test', or 'predict'. If so, it utilizes the inferer to process the input and obtain predictions.
+When an inferer is configured, Lighter automatically uses it during the `forward` pass in validation, test, and predict modes.
 
 ## Implementing a Custom Inferer
 
-While MONAI offers a comprehensive collection of inferers, you may encounter situations where you need to implement custom inference logic. This could be due to:
+You can implement custom inference logic to handle:
 
 *   **Advanced Ensembling Strategies:** Implementing ensembling techniques beyond simple averaging.
-*   **Highly Specialized Output Processing:**  Tailoring output processing to your unique research problem.
+*   **Sliding Window Inference:** Processing large images in patches.
+*   **Test-Time Augmentation:** Averaging predictions across augmentations.
+*   **Highly Specialized Output Processing:** Tailoring output processing to your unique research problem.
 
 To implement a custom inferer in Lighter, you'll create a Python class that adheres to a specific structure.
 
@@ -294,32 +264,32 @@ graph TD
 # Model was trained on 128×128×128 patches
 # Now need to process 512×512×200 volumes
 system:
-    inferer:
-        _target_: monai.inferers.SlidingWindowInferer
-        roi_size: [128, 128, 128]  # Must match training patch size!
-        sw_batch_size: 4
-        overlap: 0.5  # 50% overlap for smooth predictions
-        mode: gaussian  # Smooth blending at boundaries
+  inferer:
+    _target_: monai.inferers.SlidingWindowInferer
+    roi_size: [128, 128, 128]  # Must match training patch size!
+    sw_batch_size: 4
+    overlap: 0.5  # 50% overlap for smooth predictions
+    mode: gaussian  # Smooth blending at boundaries
 ```
 
 ### Adding Robustness with TTA
 ```yaml
 # Model trained normally, but test data is noisier
 system:
-    inferer:
-        _target_: my_project.inferers.TTAInferer
-        num_augmentations: 4  # Balance speed vs robustness
-        aggregate: mean  # Average predictions
+  inferer:
+    _target_: my_project.inferers.TTAInferer
+    num_augmentations: 4  # Balance speed vs robustness
+    aggregate: mean  # Average predictions
 ```
 
 ### Uncertainty Quantification with MC Dropout
 ```yaml
 # Model has dropout layers, need confidence intervals
 system:
-    inferer:
-        _target_: my_project.inferers.MCDropoutInferer
-        num_samples: 20  # Multiple forward passes
-        return_std: true  # Return standard deviation as uncertainty
+  inferer:
+    _target_: my_project.inferers.MCDropoutInferer
+    num_samples: 20  # Multiple forward passes
+    return_std: true  # Return standard deviation as uncertainty
 ```
 
 ## Related Guides

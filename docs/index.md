@@ -84,7 +84,7 @@ See how training a model on CIFAR-10 differs between Lighter and PyTorch Lightni
 
         optimizer:
             _target_: torch.optim.Adam
-            params: "$@system#model.parameters()"
+            params: "$@system::model.parameters()"
             lr: 0.001
 
         dataloaders:

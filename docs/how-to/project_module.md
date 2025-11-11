@@ -205,11 +205,11 @@ Use in config:
 project: my_project/
 
 system:
-    model:
-        _target_: project.models.custom_unet.CustomUNet
-        in_channels: 3
-        num_classes: 10
-        features: [64, 128, 256, 512]
+  model:
+    _target_: project.models.custom_unet.CustomUNet
+    in_channels: 3
+    num_classes: 10
+    features: [64, 128, 256, 512]
 ```
 
 ## Best Practices for Project Organization 🏆

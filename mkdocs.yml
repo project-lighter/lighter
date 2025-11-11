@@ -16,8 +16,6 @@ theme:
     - footnotes
     - navigation.tabs
     - navigation.top
-    - content.action.edit
-    - content.action.view
 
   palette:
     # Palette toggle for automatic mode

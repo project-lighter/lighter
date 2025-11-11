@@ -37,7 +37,7 @@ No per-task pipelines. Adapters handle variability, enabling unlimited flexibili
 
 **Achieved by:**
 - Leveraging PyTorch Lightning (not reinventing training loops)
-- Using MONAI's config system (proven, robust)
+- Using Sparkwheel's config system (powerful, flexible)
 - Focusing on core value: config-driven experiments + adapters
 
 ## Integration Philosophy
@@ -50,11 +50,11 @@ No per-task pipelines. Adapters handle variability, enabling unlimited flexibili
 - Gradient accumulation, mixed precision
 - [→ PL Trainer docs](https://lightning.ai/docs/pytorch/stable/common/trainer.html)
 
-**MONAI** - Proven configuration system
+**Sparkwheel** - Powerful configuration system
 - Config parsing and validation
 - Reference resolution
 - Dynamic instantiation
-- [→ MONAI config docs](https://docs.monai.io/en/stable/config_syntax.html)
+- [→ Sparkwheel docs](https://project-lighter.github.io/sparkwheel/)
 
 Lighter adds: adapters + System orchestration.
 

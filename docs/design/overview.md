@@ -12,7 +12,7 @@ Lighter is a configuration-driven deep learning framework that separates experim
 *Figure: Lighter's three-component (bolded) architecture. Config parses YAML definitions, System encapsulates DL components, and Trainer executes training.*
 
 ### 1. Config
-Transforms YAML experiment definitions into Python objects using MONAI's ConfigParser. One config file = one reproducible experiment.
+Transforms YAML experiment definitions into Python objects using Sparkwheel. One config file = one reproducible experiment.
 
 [→ Configuration guide](../how-to/configure.md)
 
@@ -43,7 +43,7 @@ Lighter's goal is to brings reproducibility and structure, while keeping you in 
 | Feature | **Lighter** | **[Ludwig](https://github.com/ludwig-ai/ludwig)** | **[Quadra](https://github.com/orobix/quadra)** | **[GaNDLF](https://github.com/mlcommons/GaNDLF)** |
 |---|---|---|---|---|
 | **Primary Focus** | Config-driven, task-agnostic DL | Config-driven, multi-task DL | Config-driven computer vision | Config-driven medical imaging |
-| **Configuration** | YAML (MONAI) | YAML (Custom) | YAML (Hydra) | YAML (Custom) |
+| **Configuration** | YAML (Sparkwheel) | YAML (Custom) | YAML (Hydra) | YAML (Custom) |
 | **Abstraction** | Medium. Extends PyTorch Lightning, expects standard PyTorch components. | High. Provides pre-built flows for various tasks. | High. Pre-defined structures for computer vision. | High. Pre-defined structures for medical imaging. |
 | **Flexibility** | High. New components are added via project module. | Medium. Adding new components requires code editing. | Low. Adding new components requires code editing. | Low. Adding new components requires code editing. |
 | **Use Case** | Organized experimentation | Production-level applications | Traditional computer vision | Established medical imaging methods |

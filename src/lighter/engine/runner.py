@@ -1,103 +1,274 @@
-from typing import Any
+"""
+Runner module for executing training stages with configuration management.
+Contains the Runner class and CLI entry point.
+"""
 
-import fire
+import argparse
+
 from pytorch_lightning import Trainer, seed_everything
+from sparkwheel import Config, ValidationError
 
-from lighter.engine.config import Config
-from lighter.engine.resolver import Resolver
+from lighter.engine.schema import LighterConfig
 from lighter.system import System
 from lighter.utils.dynamic_imports import import_module_from_path
-from lighter.utils.types.enums import Stage
+from lighter.utils.types.enums import Mode, Stage
 
 
 class Runner:
     """
-    Executes the specified stage using the validated and resolved configurations.
+    Executes training stages using validated and resolved configurations.
+
+    The Runner loads configurations using Sparkwheel, applies CLI overrides,
+    validates against the schema, prunes unused components for the stage,
+    and executes the appropriate PyTorch Lightning trainer method.
     """
 
+    STAGE_MODES = {
+        Stage.FIT: [Mode.TRAIN, Mode.VAL],
+        Stage.VALIDATE: [Mode.VAL],
+        Stage.TEST: [Mode.TEST],
+        Stage.PREDICT: [Mode.PREDICT],
+    }
+
     def __init__(self) -> None:
-        self.config = None
-        self.resolver = None
-        self.system = None
-        self.trainer = None
-        self.args = None
+        """Initialize the runner with empty state."""
+        self.config: Config | None = None
+        self.system: System | None = None
+        self.trainer: Trainer | None = None
 
-    def run(self, stage: str, config: str | dict | None = None, **config_overrides: Any) -> None:
-        """Run the specified stage with the given configuration."""
+    def run(
+        self,
+        stage: Stage,
+        config: str | list[str] | dict,
+        overrides: list[str] | None = None,
+    ) -> None:
+        """
+        Run a training stage with configuration and overrides.
+
+        Args:
+            stage: Stage to run (fit, validate, test, predict)
+            config: Config file path(s) or dict. If string, supports comma-separated paths.
+            overrides: List of CLI override strings in format "key::path=value"
+
+        Raises:
+            ValueError: If config validation fails or required components are missing
+            TypeError: If system or trainer are not the correct type
+        """
         seed_everything()
-        self.config = Config(config, **config_overrides, validate=True)
 
-        # Resolves stage-specific configuration
-        self.resolver = Resolver(self.config)
+        # Handle comma-separated config files
+        if isinstance(config, str) and "," in config:
+            config = config.split(",")
 
-        # Setup stage
-        self._setup_stage(stage)
+        # Load config with CLI overrides and validation (all in one step!)
+        try:
+            self.config = Config.from_cli(
+                config,
+                overrides or [],
+                schema=LighterConfig,
+            )
+        except ValidationError as e:
+            raise ValueError(f"Configuration validation failed:\n{e}") from e
 
-        # Run stage
-        self._run_stage(stage)
+        # Prune unused components for this stage
+        self._prune_for_stage(stage)
 
-    def _run_stage(self, stage: str) -> None:
-        """Execute the specified stage (method) of the trainer."""
-        stage_method = getattr(self.trainer, stage)
-        stage_method(self.system, **self.args)
+        # Setup and run
+        self._setup(stage)
+        self._execute(stage)
 
-    def _setup_stage(self, stage: str) -> None:
-        # Prune the configuration to the stage-specific components
-        stage_config = self.resolver.get_stage_config(stage)
+    def _prune_for_stage(self, stage: Stage) -> None:
+        """
+        Remove unused components using Sparkwheel's delete directive (~).
 
-        # Import project module
-        project_path = stage_config.get("project")
-        if project_path:
-            import_module_from_path("project", project_path)
+        Args:
+            stage: Current stage being executed
+        """
+        if self.config is None:
+            raise ValueError("Config must be loaded before pruning")
 
-        # Initialize system
-        self.system = stage_config.get_parsed_content("system")
+        required = set(self.STAGE_MODES[stage])
+        all_modes = {Mode.TRAIN, Mode.VAL, Mode.TEST, Mode.PREDICT}
+
+        # Build delete directives for unused modes
+        deletes = {}
+        for mode in all_modes - required:
+            deletes[f"~system::dataloaders::{mode}"] = None
+            deletes[f"~system::metrics::{mode}"] = None
+
+        # Remove optimizer/scheduler/criterion for non-training stages
+        if stage != Stage.FIT:
+            deletes["~system::optimizer"] = None
+            deletes["~system::scheduler"] = None
+            if stage != Stage.VALIDATE:
+                deletes["~system::criterion"] = None
+
+        # Keep only args for this stage
+        for s in [Stage.FIT, Stage.VALIDATE, Stage.TEST, Stage.PREDICT]:
+            if s != stage:
+                deletes[f"~args::{s}"] = None
+
+        # Apply deletions
+        self.config.update(deletes)
+
+    def _setup(self, stage: Stage) -> None:
+        """
+        Setup system and trainer from configuration.
+
+        Args:
+            stage: Current stage being executed
+
+        Raises:
+            TypeError: If system or trainer are not the correct type
+        """
+        if self.config is None:
+            raise ValueError("Config must be loaded before setup")
+
+        # Import project module if specified
+        project = self.config.get("project")
+        if project:
+            import_module_from_path("project", project)
+
+        # Resolve system
+        self.system = self.config.resolve("system")
         if not isinstance(self.system, System):
-            raise ValueError("'system' must be an instance of System")
+            raise TypeError(f"system must be System, got {type(self.system)}")
 
-        # Initialize trainer
-        self.trainer = stage_config.get_parsed_content("trainer")
+        # Resolve trainer
+        self.trainer = self.config.resolve("trainer")
         if not isinstance(self.trainer, Trainer):
-            raise ValueError("'trainer' must be an instance of Trainer")
-
-        # Set up arguments for the stage
-        self.args = stage_config.get_parsed_content(f"args#{stage}", default={})
+            raise TypeError(f"trainer must be Trainer, got {type(self.trainer)}")
 
         # Save config to system checkpoint and trainer logger
-        self._save_config()
-
-    def _save_config(self) -> None:
-        """Save config to system checkpoint and trainer logger."""
         if self.system:
             self.system.save_hyperparameters(self.config.get())
         if self.trainer and self.trainer.logger:
             self.trainer.logger.log_hyperparams(self.config.get())
 
+    def _execute(self, stage: Stage) -> None:
+        """
+        Execute the training stage.
 
-def cli():
-    runner = Runner()
+        Args:
+            stage: Stage to execute
 
-    def fit(config: str, **config_overrides: Any) -> None:
-        runner.run(Stage.FIT, config, **config_overrides)
+        Raises:
+            AttributeError: If trainer doesn't have the stage method
+        """
+        if self.config is None or self.trainer is None or self.system is None:
+            raise ValueError("Config, trainer, and system must be set up before execution")
 
-    def validate(config: str, **config_overrides: Any) -> None:
-        runner.run(Stage.VALIDATE, config, **config_overrides)
+        # Get stage-specific arguments
+        args = self.config.resolve(f"args::{stage}", default={})
 
-    def test(config: str, **config_overrides: Any) -> None:
-        runner.run(Stage.TEST, config, **config_overrides)
+        # Execute the stage method
+        stage_method = getattr(self.trainer, str(stage))
+        stage_method(self.system, **args)
 
-    def predict(config: str, **config_overrides: Any) -> None:
-        runner.run(Stage.PREDICT, config, **config_overrides)
 
-    fire.Fire(
-        {
-            "fit": fit,
-            "validate": validate,
-            "test": test,
-            "predict": predict,
-        }
+def cli() -> None:
+    """Entry point for the lighter CLI."""
+    parser = argparse.ArgumentParser(
+        prog="lighter",
+        description="Lighter: YAML-based deep learning framework",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        help="Available commands",
+    )
 
-if __name__ == "__main__":
-    cli()
+    # Fit subcommand
+    fit_parser = subparsers.add_parser(
+        "fit",
+        help="Train a model",
+        description="Train a model using the specified configuration file.",
+        epilog="Examples:\n"
+        "  lighter fit config.yaml\n"
+        "  lighter fit config.yaml system::optimizer::lr=0.001\n"
+        "  lighter fit base.yaml,experiment.yaml trainer::max_epochs=100",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    fit_parser.add_argument(
+        "config",
+        help="Path to config file(s), comma-separated for multiple files",
+    )
+    fit_parser.add_argument(
+        "overrides",
+        nargs="*",
+        default=[],
+        help='Configuration overrides in format "key::path=value"',
+    )
+
+    # Validate subcommand
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Validate a model",
+        description="Validate a model using the specified configuration file.",
+        epilog="Examples:\n"
+        "  lighter validate config.yaml\n"
+        "  lighter validate config.yaml system::model::weights=checkpoint.ckpt",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    validate_parser.add_argument(
+        "config",
+        help="Path to config file(s), comma-separated for multiple files",
+    )
+    validate_parser.add_argument(
+        "overrides",
+        nargs="*",
+        default=[],
+        help='Configuration overrides in format "key::path=value"',
+    )
+
+    # Test subcommand
+    test_parser = subparsers.add_parser(
+        "test",
+        help="Test a model",
+        description="Test a model using the specified configuration file.",
+        epilog="Examples:\n  lighter test config.yaml\n  lighter test config.yaml system::model::weights=checkpoint.ckpt",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    test_parser.add_argument(
+        "config",
+        help="Path to config file(s), comma-separated for multiple files",
+    )
+    test_parser.add_argument(
+        "overrides",
+        nargs="*",
+        default=[],
+        help='Configuration overrides in format "key::path=value"',
+    )
+
+    # Predict subcommand
+    predict_parser = subparsers.add_parser(
+        "predict",
+        help="Run predictions with a model",
+        description="Run predictions using the specified configuration file.",
+        epilog="Examples:\n"
+        "  lighter predict config.yaml\n"
+        "  lighter predict config.yaml system::model::weights=checkpoint.ckpt",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    predict_parser.add_argument(
+        "config",
+        help="Path to config file(s), comma-separated for multiple files",
+    )
+    predict_parser.add_argument(
+        "overrides",
+        nargs="*",
+        default=[],
+        help='Configuration overrides in format "key::path=value"',
+    )
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Execute command
+    try:
+        Runner().run(args.command, args.config, args.overrides)
+    except Exception as e:
+        # Suppress exception chain to avoid duplicate tracebacks
+        raise e from None
