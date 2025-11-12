@@ -952,7 +952,7 @@ requires-dist = [
     { name = "pytorch-lightning", specifier = ">=2.1.3" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=13.7.0" },
-    { name = "sparkwheel", specifier = ">=0.0.2" },
+    { name = "sparkwheel", specifier = ">=0.0.3" },
     { name = "tensorboard", specifier = ">=2.11.2" },
     { name = "torch", specifier = ">=2.1.2" },
     { name = "torchmetrics", specifier = ">=1.2.0" },
@@ -2294,14 +2294,14 @@ wheels = [
 
 [[package]]
 name = "sparkwheel"
-version = "0.0.2"
+version = "0.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/8e/df135fb8407f3dab1c8946ddbcc29dbb2acc6069583bd3ca7ffb71cc4bbe/sparkwheel-0.0.2.tar.gz", hash = "sha256:51bdb68739988cb145621d078ef9cc2aa7a22be916ff57be3cb9d754c3f576ad", size = 18474, upload-time = "2025-11-07T04:22:35.378Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/fa/7e3516cf860c0cb8711a9bf15a638b323b2f59b35df7b520bcb6b1e991f1/sparkwheel-0.0.3.tar.gz", hash = "sha256:f919c45a1df678cf78c1b0d7ab1aa779d696adac1b32cc1c49ffffd00c467368", size = 39487, upload-time = "2025-11-12T01:53:23.372Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/e1/4d10936281fd427d62fa3db3581ae81174a04abecd745324db684df8c69d/sparkwheel-0.0.2-py3-none-any.whl", hash = "sha256:eddcb18964f9d32c6c8cd94469e2ac9ae6dfe1a72d6465cd2ecd823494ab5ba9", size = 21990, upload-time = "2025-11-07T04:22:34.416Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/9c/785a9ad56e15333a6ec3676b90edb61f27cc4eddee5a230483f05fd26247/sparkwheel-0.0.3-py3-none-any.whl", hash = "sha256:dbef8cfe42cb2219c464d51a287297b7d68412095a513cc416f403b25c52d864", size = 49270, upload-time = "2025-11-12T01:53:22.487Z" },
 ]
 
 [[package]]
