@@ -26,6 +26,10 @@ setup: install_uv
 lint:
     uvx tox -e lint
 
+format:
+    uvx ruff format
+    uvx ruff check --fix
+
 types:
     uvx tox -e types
 
