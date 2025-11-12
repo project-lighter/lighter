@@ -143,7 +143,7 @@ args:
 or pass/override it from the command line:
 
 ```bash
-lighter fit experiment.yaml --args::fit::ckpt_path="path/to/checkpoint.ckpt"
+lighter fit experiment.yaml args::fit::ckpt_path="path/to/checkpoint.ckpt"
 ```
 
 The equivalent of this in Python would be:
@@ -263,13 +263,13 @@ trainer:
 To change `max_epochs` in `trainer` from `10` to `20`:
 
 ```bash
-lighter fit config.yaml --trainer::max_epochs=20
+lighter fit config.yaml trainer::max_epochs=20
 ```
 
 To override an element of a list, simply specify its index:
 
 ```bash
-lighter fit config.yaml --trainer::callbacks::1::monitor="val_loss"
+lighter fit config.yaml trainer::callbacks::1::monitor="val_loss"
 ```
 
 ### Merging Configs

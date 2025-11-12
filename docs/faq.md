@@ -54,13 +54,13 @@ See [Troubleshooting Guide](how-to/troubleshooting.md).
 ### How do I resume training?
 
 ```bash
-lighter fit config.yaml --args::fit::ckpt_path="path/to/checkpoint.ckpt"
+lighter fit config.yaml args::fit::ckpt_path="path/to/checkpoint.ckpt"
 ```
 
 ### How do I use multiple GPUs?
 
 ```bash
-lighter fit config.yaml --trainer::devices=2 --trainer::strategy=ddp
+lighter fit config.yaml trainer::devices=2 trainer::strategy=ddp
 ```
 See [PyTorch Lightning distributed docs](https://lightning.ai/docs/pytorch/stable/common/trainer.html#devices).
 
@@ -68,8 +68,8 @@ See [PyTorch Lightning distributed docs](https://lightning.ai/docs/pytorch/stabl
 Check:
 
 - Increase `num_workers` in dataloaders
-- Enable mixed precision (`--trainer::precision="16-mixed"`)
-- Use profiler (`--trainer::profiler="simple"`)
+- Enable mixed precision (`trainer::precision="16-mixed"`)
+- Use profiler (`trainer::profiler="simple"`)
 
 See [PyTorch Lightning performance docs](https://lightning.ai/docs/pytorch/stable/tuning/profiler.html).
 

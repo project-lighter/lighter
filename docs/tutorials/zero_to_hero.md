@@ -219,19 +219,19 @@ Want to experiment with different hyperparameters? **Don't edit the YAML.** Over
 
 ```bash
 # Try different learning rates
-lighter fit quick_start.yaml --system::optimizer::lr=0.01
+lighter fit quick_start.yaml system::optimizer::lr=0.01
 
 # Train longer
-lighter fit quick_start.yaml --trainer::max_epochs=10
+lighter fit quick_start.yaml trainer::max_epochs=10
 
 # Bigger batch size
-lighter fit quick_start.yaml --system::dataloaders::train::batch_size=128
+lighter fit quick_start.yaml system::dataloaders::train::batch_size=128
 
 # Combine multiple overrides
 lighter fit quick_start.yaml \
-  --trainer::max_epochs=10 \
-  --system::optimizer::lr=0.001 \
-  --trainer::devices=2
+  trainer::max_epochs=10 \
+  system::optimizer::lr=0.001 \
+  trainer::devices=2
 ```
 
 **This is how you run experiments.** Keep your base config clean, tweak parameters on the fly.
@@ -362,14 +362,14 @@ You're ready for more advanced topics:
 ```bash
 # Add TensorBoard logging
 lighter fit config.yaml \
-  --trainer::logger::_target_=pytorch_lightning.loggers.TensorBoardLogger \
-  --trainer::logger::save_dir=logs
+  trainer::logger::_target_=pytorch_lightning.loggers.TensorBoardLogger \
+  trainer::logger::save_dir=logs
 
 # Use multiple GPUs
-lighter fit config.yaml --trainer::devices=2
+lighter fit config.yaml trainer::devices=2
 
 # Enable mixed precision training
-lighter fit config.yaml --trainer::precision="16-mixed"
+lighter fit config.yaml trainer::precision="16-mixed"
 ```
 
 **Welcome to config-driven deep learning!** 🎉

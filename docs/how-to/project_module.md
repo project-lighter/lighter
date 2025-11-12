@@ -105,10 +105,10 @@ project: my_project/ # Project root path
 
     ```bash
     # If you run from parent directory
-    cd /path/to/parent && lighter fit /path/to/my_project/experiments/config.yaml --project=/path/to/my_project/
+    cd /path/to/parent && lighter fit /path/to/my_project/experiments/config.yaml project=/path/to/my_project/
 
     # If you run from project directory
-    cd /path/to/parent/my_project && lighter fit experiments/config.yaml --project=.
+    cd /path/to/parent/my_project && lighter fit experiments/config.yaml project=.
     ```
 
     **Tip:** Use absolute paths to avoid confusion, or be mindful of your current working directory.
@@ -240,7 +240,7 @@ my_project/
 lighter fit config.yaml
 
 # With module path override
-lighter fit config.yaml --project=./my_research_project
+lighter fit config.yaml project=./my_research_project
 
 # Multiple configs with custom modules
 lighter fit base.yaml,models/unet.yaml,data/custom.yaml
