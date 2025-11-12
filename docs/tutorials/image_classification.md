@@ -160,13 +160,13 @@ lighter test experiments/config.yaml
 **Quick experiments:**
 ```bash
 # Change epochs from CLI
-lighter fit experiments/config.yaml --trainer#max_epochs=20
+lighter fit experiments/config.yaml trainer::max_epochs=20
 
 # Use GPU if available
-lighter fit experiments/config.yaml --trainer#accelerator=gpu
+lighter fit experiments/config.yaml trainer::accelerator=gpu
 
 # Fast debugging (2 batches only)
-lighter fit experiments/config.yaml --trainer#fast_dev_run=2
+lighter fit experiments/config.yaml trainer::fast_dev_run=2
 ```
 
 **Common issues:**

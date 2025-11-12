@@ -115,7 +115,7 @@ project: my_project/ # Project root path
 
 ### Referencing Your Project Module
 
-With the `project` path specified, Lighter makes your custom modules available under the top-level module name `project`. Reference your project's modules and classes like any other Python module. See `system#model` and `system#dataloaders#train#dataset` in the config below:
+With the `project` path specified, Lighter makes your custom modules available under the top-level module name `project`. Reference your project's modules and classes like any other Python module. See `system::model` and `system::dataloaders::train::dataset` in the config below:
 
 **Example:**
 

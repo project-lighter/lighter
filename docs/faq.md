@@ -37,7 +37,7 @@ optimizer:
 
 Another example is passing model's parameters to the optimizer. To do this, you need to:
 
-1. Get the model definition via `system#model`
+1. Get the model definition via `system::model`
 2. Instantiate it using `@`
 3. Evaluate its `.parameters()` method using `$`
 

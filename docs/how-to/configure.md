@@ -465,7 +465,7 @@ system:
 2. **Use variables**: Define commonly used values in `vars` section
 3. **Document your configs**: Add comments explaining non-obvious choices
 4. **Version control**: Track config changes alongside code
-5. **Validate early**: Test configs with `--trainer#fast_dev_run=true`
+5. **Validate early**: Test configs with `trainer::fast_dev_run=true`
 6. **Use type hints**: When creating custom classes, use type hints for better IDE support
 
 ## Recap and Next Steps

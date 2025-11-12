@@ -211,7 +211,7 @@ optimizer:
 ```
 
 !!! tip "Learn More"
-    For advanced configuration details and the differences between `#`, `@`, `$`, and `%`, see the [Configuration Guide](../how-to/configure.md).
+    For advanced configuration details and the differences between `::`, `@`, `$`, and `%`, see the [Configuration Guide](../how-to/configure.md).
 
 ## Your Superpower: CLI Overrides
 
