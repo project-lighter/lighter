@@ -225,4 +225,4 @@ until_step: 1000       # After step 1000
 
 ## Related Guides
 - [Run Guide](run.md) - Training workflows
-- [Configuration](configure.md) - Advanced config patterns
+- [Configuration](configuration.md) - Advanced config patterns

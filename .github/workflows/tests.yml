@@ -33,25 +33,34 @@ jobs:
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
 
-      - name: Install tox
-        run: uv tool install --python ${{ matrix.python }} --with tox-uv tox
-
-      - name: Setup test suite
-        run: tox run -v --notest --skip-missing-interpreters false -e ${{ matrix.python }}
+      - name: Install dependencies
+        run: uv sync --all-extras --all-groups
 
       # Run all tests on schedule, but only non-slow tests on push
-      - name: Run pytest
+      - name: Run pytest with coverage
         run: |
           if [ "${{ github.event_name }}" == "schedule" ]; then
-            tox -e pytest
+            uv run coverage run -m pytest tests --durations=0
           else
-            tox -e pytest -- -m "not slow"
+            uv run coverage run -m pytest tests --durations=0 -m "not slow"
           fi
-        shell: bash # this wouldn't work on Powershell
+        shell: bash
+
+      - name: Generate coverage report
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
+        run: |
+          uv run coverage xml
+          ls -la coverage.xml
 
       - name: Upload coverage reports to Codecov
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.12' }}
         uses: codecov/codecov-action@v5.4.3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

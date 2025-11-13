@@ -4,7 +4,6 @@ default:
 clean:
     rm -rf .mypy_cache
     rm -rf .pytest_cache
-    rm -rf .tox
     rm -rf .venv
     rm -rf dist
     rm -rf **/__pycache__
@@ -24,24 +23,28 @@ setup: install_uv
     uv run pre-commit install
 
 lint:
-    uvx tox -e lint
+    uv run ruff check
 
 format:
     uvx ruff format
     uvx ruff check --fix
 
-types:
-    uvx tox -e types
+precommit:
+    uv run pre-commit run --all-files
 
-test:
-    uvx tox -e pytest
+types:
+    uv run mypy src
+
+test *args:
+    uv run pytest tests {{args}}
 
 coverage:
-    uvx tox -e coverage
-    uvx coverage-badge -o assets/images/coverage.svg -f
+    uv run coverage run -m pytest tests
+    uv run coverage report
+    uv run coverage xml
 
-docs:
-    uv run --only-group doc mkdocs serve
+docs port="8000":
+    uv run --only-group doc mkdocs serve --dev-addr=localhost:{{port}}
 
 bump part="patch":
     uvx bump-my-version bump {{part}} --verbose

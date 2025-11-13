@@ -22,7 +22,7 @@ system:
         _target_: torch.nn.CrossEntropyLoss
 
     optimizer:
-        _target_: torch.optim.Adam
+        _target_: torch.optim.AdamWTF
         params: "$@system::model.parameters()"
         lr: 0.001
         weight_decay: 0.00001

@@ -37,6 +37,68 @@ Here are some common challenges and how adapters solve them. Don't worry about t
 | **Metrics** 📏 | A metric needs class indices, but the model outputs probabilities. | Use `MetricsAdapter` with `pred_transforms` to apply `torch.argmax` before the metric calculation. |
 | **Logging** 📊 | Logger expects RGB images, but the data is grayscale. | Use `LoggingAdapter` with `input_transforms` to repeat the channel dimension. |
 
+## Execution Order
+
+Understanding when each adapter is called is crucial for debugging and designing your pipeline. Here's the complete data flow during a training step:
+
+```
+Step 1: DataLoader produces batch
+        ↓
+Step 2: BatchAdapter
+        └─→ Extracts: (input, target, identifier)
+        ↓
+Step 3: Model.forward(input) or Inferer
+        └─→ Produces: prediction
+        ↓
+Step 4: CriterionAdapter (train/val modes only)
+        ├─→ Transforms: input, target, pred
+        └─→ Maps to loss function arguments
+        ↓
+Step 5: Loss function computes loss
+        ↓
+Step 6: MetricsAdapter (train/val/test modes)
+        ├─→ Transforms: input, target, pred
+        └─→ Maps to metrics arguments
+        ↓
+Step 7: Metrics compute values
+        ↓
+Step 8: LoggingAdapter
+        ├─→ Transforms: input, target, pred
+        └─→ Prepares for logger/callbacks
+        ↓
+Step 9: Logger and callbacks receive data
+```
+
+### Key Points
+
+- **BatchAdapter** runs first, before the model sees any data
+- **CriterionAdapter** runs only in train and val modes (skipped in test/predict)
+- **MetricsAdapter** runs only in train, val, and test modes (skipped in predict)
+- **LoggingAdapter** runs last, after all computations are done
+- Each mode (train/val/test/predict) can have its own set of adapters
+
+### Practical Implications
+
+1. **BatchAdapter transforms are executed on every batch**: Keep them lightweight, or move expensive operations to your Dataset's `__getitem__`.
+
+2. **CriterionAdapter and MetricsAdapter run after model forward**: You can safely apply post-processing like `argmax` or `sigmoid` here without affecting the model.
+
+3. **LoggingAdapter is for visualization only**: Transforms here don't affect training—use them for detaching tensors, converting to CPU, or formatting for display.
+
+4. **Mode-specific adapters**: You can configure different adapters for train vs val vs test:
+   ```yaml
+   system:
+     adapters:
+       train:
+         batch: ...
+         criterion: ...
+       val:
+         batch: ...  # Can be different from train
+         criterion: ...
+   ```
+
+For a deeper understanding of the complete System data flow, see [System Internals](../design/system.md#system-data-flow).
+
 ## Deep Dive
 
 ### BatchAdapter
@@ -219,7 +281,7 @@ system:
 | **Debugging** | Add a print transform (`$lambda x: print(x.shape) or x`) to inspect tensor shapes at any point in the flow. |
 | **`KeyError` in batch** | Your `input_accessor` or `target_accessor` might be wrong. Use a print transform to inspect the batch keys/indices. |
 | **Wrong argument order** | Double-check the signature of your loss/metric function and use named arguments in `CriterionAdapter` or `MetricsAdapter` for clarity. |
-| **Reusing configs** | Use YAML anchors (`&` and `*`) to define an adapter once and reuse it across `train`, `val`, and `test` stages. |
+| **Reusing configs** | Use raw references (`%`) to reuse adapters: `val: "%system::adapters::train::batch"` creates a new instance with the same config. |
 
 ## Complete Example: Segmentation Pipeline
 

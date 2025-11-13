@@ -224,6 +224,6 @@ You now have a comprehensive understanding of running experiments with Lighter. 
 * Built-in solutions for common issues
 
 ## Related Guides
-- [Configuration Guide](configure.md) - Config syntax and patterns
+- [Configuration Guide](configuration.md) - Config syntax and patterns
 - [Troubleshooting](troubleshooting.md) - Common errors and solutions
 - [Experiment Tracking](experiment_tracking.md) - Logging experiments

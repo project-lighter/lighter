@@ -269,6 +269,6 @@ You're now equipped to build sophisticated custom modules:
 💡 **Remember:** Great research code is modular, tested, and reusable!
 
 ## Related Guides
-- [Configuration](configure.md) - Referencing the project module
+- [Configuration](configuration.md) - Referencing the project module
 - [Adapters](adapters.md) - Custom adapter creation
 - [Metrics](metrics.md) - Custom metric creation

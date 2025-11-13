@@ -78,4 +78,4 @@ Lighter adds: adapters + System orchestration.
 
 - [Architecture Overview](overview.md) - Component details
 - [Adapter Pattern](adapters.md) - Deep dive
-- [Configuration Guide](../how-to/configure.md) - Practical usage
+- [Configuration Guide](../how-to/configuration.md) - Practical usage
