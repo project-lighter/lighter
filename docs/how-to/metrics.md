@@ -31,10 +31,10 @@ class WeightedAccuracy(Metric):
 Use it in your config:
 ```yaml
 system:
-    metrics:
-        val:
-            - _target_: my_project.metrics.WeightedAccuracy
-              class_weights: [1.0, 2.0, 5.0]  # Class 2 is 5x more important
+  metrics:
+    val:
+      - _target_: my_project.metrics.WeightedAccuracy
+        class_weights: [1.0, 2.0, 5.0]  # Class 2 is 5x more important
 ```
 
 ## Core Concepts: The Metric Trinity 🏆
@@ -211,10 +211,10 @@ class DiceScore(Metric):
 Use in config:
 ```yaml
 system:
-    metrics:
-        val:
-            - _target_: my_project.metrics.DiceScore
-              smooth: 1e-6
+  metrics:
+    val:
+      - _target_: my_project.metrics.DiceScore
+        smooth: 1e-6
 ```
 
 ## Key Optimization Tips ⚡

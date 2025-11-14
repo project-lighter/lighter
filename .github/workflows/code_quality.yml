@@ -14,12 +14,12 @@ env:
 
 jobs:
   check:
-    name: tox env ${{ matrix.tox_env }}
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        tox_env:
+        check:
           - format
           - lint
           # - types
@@ -33,5 +33,18 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Run check for tox env "${{ matrix.tox_env }}"
-        run: uvx --with tox-uv -- tox -e ${{ matrix.tox_env }}
+      - name: Install dependencies
+        if: matrix.check == 'types'
+        run: uv sync --all-extras --all-groups
+
+      - name: Run format check
+        if: matrix.check == 'format'
+        run: uvx ruff format --diff
+
+      - name: Run lint check
+        if: matrix.check == 'lint'
+        run: uvx ruff check
+
+      - name: Run type check
+        if: matrix.check == 'types'
+        run: uv run mypy src

@@ -4,7 +4,7 @@ Quick guide for PyTorch Lightning users transitioning to Lighter.
 
 ## Key Difference: Configuration Over Code
 
-Lighter uses YAML configs instead of Python classes for experiment definition.
+Lighter uses YAML configs (powered by [Sparkwheel](https://project-lighter.github.io/sparkwheel/)) instead of Python classes for experiment definition.
 
 ## Conceptual Mapping
 
@@ -62,7 +62,7 @@ system:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@system#model.parameters()"
+    params: "$@system::model.parameters()"
     lr: 0.001
 
   dataloaders:
@@ -79,7 +79,7 @@ lighter fit config.yaml
 
 Only 3 things are Lighter-specific:
 
-1. **YAML Configuration Syntax** - [Configuration Guide](../how-to/configure.md)
+1. **Sparkwheel Configuration Syntax** - [Configuration Guide](../how-to/configuration.md) | [Sparkwheel docs](https://project-lighter.github.io/sparkwheel/)
 2. **Adapters** (Lighter's key feature) - [Adapters Guide](../how-to/adapters.md)
 3. **Project Module** (optional) - [Project Module Guide](../how-to/project_module.md)
 
@@ -133,7 +133,7 @@ trainer:
 system:
   scheduler:
     _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-    optimizer: "@system#optimizer"
+    optimizer: "@system::optimizer"
     factor: 0.5
     patience: 10
 ```
@@ -148,7 +148,7 @@ Lighter might not fit if:
 
 ## Next Steps
 
-1. Start with the [Zero to Hero tutorial](../tutorials/zero_to_hero.md)
-2. Try the [Image Classification Tutorial](../tutorials/image_classification.md)
+1. Start with the [Zero to Hero tutorial](../tutorials/get-started.md)
+2. Try the [Image Classification Tutorial](../tutorials/get-started.md)
 3. Understand [Design Philosophy](../design/philosophy.md)
 4. Learn about [Adapters](../how-to/adapters.md) (Lighter's superpower)

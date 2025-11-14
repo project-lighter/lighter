@@ -10,11 +10,11 @@ import importlib
 
 # List of modules to suppress in Rich traceback for cleaner output
 SUPPRESSED_MODULES = [
-    "fire",
-    "monai.bundle",
+    "lighter.engine",
+    "torch.utils.data.dataloader",
     "pytorch_lightning.trainer",
     "lightning_utilities",
-    "torch.utils.data.dataloader",
+    "sparkwheel",
 ]
 
 
@@ -78,7 +78,7 @@ def _setup_logging():
 
     # Configure Rich traceback.
     suppress = [importlib.import_module(name) for name in SUPPRESSED_MODULES]
-    rich.traceback.install(show_locals=False, width=120, suppress=suppress)
+    rich.traceback.install(show_locals=False, width=127, suppress=suppress)
     # Rich handler for Loguru. Time and level are handled by the formatter.
     rich_handler = rich.logging.RichHandler(markup=True, show_time=False, show_level=False)
     logger.configure(handlers=[{"sink": rich_handler, "format": formatter}])

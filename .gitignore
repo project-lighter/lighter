@@ -143,7 +143,7 @@ tensorboard/
 # Pytorch models
 *.torch
 
-# Our ignores
+# ---- Our ignores ----
 **/.DS_Store
 **/predictions/
 test_dir/
@@ -154,14 +154,21 @@ prototyping*
 .scale_batch_size*
 **/*.txt
 .ruff_cache
+cifar10/
+
+# Paper
+paper/jats/
 
 # Projects folder
 projects/*
 !projects/README.md
 !projects/cifar10
-paper/jats/97ac539929a8dd57be52386ed57ead7463239056.html
-paper/jats/d4b96a150a4e08cca55e4e25613020e9d360b554.png
-paper/jats/overview_all.png
-paper/jats/overview_system.png
-paper/jats/paper.jats
+# !projects/01_simple_classification
+# !projects/02_self_supervised_learning
+# !projects/03_multi_task_learning
+# !projects/04_image_segmentation
+
+# Coding agents
 CLAUDE.md
+GEMINI.md
+AGENTS.md

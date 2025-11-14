@@ -1,68 +1,101 @@
-
-<br/>
 <div align="center">
-<picture>
-  <img align="center" alt="Lighter logo" src="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/lighter.png" width="80%">
-</picture>
+  <img alt="Lighter logo" src="assets/images/lighter.png" width="80%">
 </div>
+<br/><br/>
+<p align="center">
+  <a href="https://github.com/project-lighter/lighter/actions"><img alt="Tests" src="https://github.com/project-lighter/lighter/workflows/Tests/badge.svg"></a>
+  <a href="https://codecov.io/gh/project-lighter/lighter"><img alt="Coverage" src="https://codecov.io/gh/project-lighter/lighter/branch/main/graph/badge.svg"></a>
+  <a href="https://pypi.org/project/lighter/"><img alt="PyPI" src="https://img.shields.io/pypi/v/lighter"></a>
+  <a href="https://github.com/project-lighter/lighter/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="https://project-lighter.github.io/lighter"><img alt="Documentation" src="https://img.shields.io/badge/docs-latest-olive"></a>
+  <a href="https://discord.gg/zJcnp6KrUp"><img alt="Discord" src="https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat"></a>
+</p>
 <br/>
-<br/>
 
-<div align="center">
-
-[![build](https://github.com/project-lighter/lighter/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/project-lighter/lighter/actions/workflows/tests.yml) ![Coverage](./assets/images/coverage.svg) [![GitHub license](https://img.shields.io/github/license/project-lighter/lighter)](https://github.com/project-lighter/lighter/blob/main/LICENSE) [![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat)](https://discord.gg/zJcnp6KrUp) [![JOSS Paper](https://joss.theoj.org/papers/10.21105/joss.08101/status.svg)](https://joss.theoj.org/papers/10.21105/joss.08101)
-
-</div>
-
-<br/>
 <div align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_dark.png" width="85%">
-        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_light.png" width="85%">
-        <img alt="Features" src="https://raw.githubusercontent.com/project-lighter/lighter/main/assets/images/features_light.png" width="85%">
+        <source media="(prefers-color-scheme: dark)" srcset="assets/images/features_dark.png" width="85%">
+        <source media="(prefers-color-scheme: light)" srcset="assets/images/features_light.png" width="85%">
+        <img alt="Features" src="assets/images/features_light.png" width="85%">
     </picture>
 </div>
 <br/>
 
+**Lighter** is a YAML-driven deep learning framework built on PyTorch Lightning. Define your model, data, and training in config files instead of writing boilerplate code.
 
-## 📖 Getting Started
-<div align="center">
-<p style="text-align: center;">
-  📚 <a href="https://project-lighter.github.io/lighter/"> Documentation</a>&nbsp;&nbsp;&nbsp;
-  🎥 <a href="https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q">YouTube Channel</a>&nbsp;&nbsp;&nbsp;
-  👾 <a href="https://discord.gg/zJcnp6KrUp">Discord Server</a>
-</p>
-</div>
+## Quick Start
 
-### Installation
-<pre><code>pip install lighter</code></pre>
+```bash
+pip install lighter
+```
 
-### Development
-To contribute, clone the repository and follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md) to set up your environment and run quality checks.
+Create `config.yaml`:
+```yaml
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 10
 
-## 💡 Projects
-Projects that use `lighter`:
+system:
+  _target_: lighter.System
+  model:
+    _target_: torchvision.models.resnet18
+    num_classes: 10
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+  optimizer:
+    _target_: torch.optim.Adam
+    params: "$@system::model.parameters()"
+    lr: 0.001
+  dataloaders:
+    train:
+      _target_: torch.utils.data.DataLoader
+      batch_size: 32
+      dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: ./data
+        train: true
+        download: true
+        transform:
+          _target_: torchvision.transforms.ToTensor
+```
 
-| Project | Description |
-| --- | --- |
-| [Foundation Models for Quantitative Imaging Biomarker Discovery in Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker) | A foundation model for lesions on CT scans that can be applied to down-stream tasks related to tumor radiomics, nodule classification, etc. |
-| [Vision Foundation Models for Computed Tomography](https://arxiv.org/abs/2501.09001) | A large-scale 3D foundation model for CT scans demonstrating superior performance in segmentation, triage, retrieval, and semantic understanding |
+Run:
+```bash
+lighter fit config.yaml
+```
 
-<br/>
+Override from CLI:
+```bash
+lighter fit config.yaml system::optimizer::lr=0.01
+```
 
-## Cite
+**[→ Full tutorial](https://project-lighter.github.io/lighter/tutorials/get-started/)**
 
-Please cite our paper if you use `lighter` in your research:
+## Documentation
+
+- 📚 [Get Started](https://project-lighter.github.io/lighter/tutorials/get-started/)
+- ⚙️ [Configuration Guide](https://project-lighter.github.io/lighter/how-to/configuration/)
+- 🔌 [Adapters](https://project-lighter.github.io/lighter/how-to/adapters/)
+- 🏗️ [Architecture](https://project-lighter.github.io/lighter/design/overview/)
+
+## Projects Using Lighter
+
+- 🏥 [Foundation Models for Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker)
+- 🧠 [Vision Foundation Models for CT](https://arxiv.org/abs/2501.09001)
+
+## Community
+
+- 💬 [Discord](https://discord.gg/zJcnp6KrUp)
+- 🐛 [GitHub Issues](https://github.com/project-lighter/lighter/issues)
+- 📺 [YouTube](https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q)
+- 🤝 [Contributing](CONTRIBUTING.md)
+
+## Citation
 
 ```bibtex
 @article{lighter,
     doi = {10.21105/joss.08101},
-    url = {https://doi.org/10.21105/joss.08101},
-    year = {2025},
-    publisher = {The Open Journal},
-    volume = {10},
-    number = {111},
-    pages = {8101},
+    year = {2025}, publisher = {The Open Journal}, volume = {10}, number = {111}, pages = {8101},
     author = {Hadzic, Ibrahim and Pai, Suraj and Bressem, Keno and Foldyna, Borek and Aerts, Hugo JWL},
     title = {Lighter: Configuration-Driven Deep Learning},
     journal = {Journal of Open Source Software}

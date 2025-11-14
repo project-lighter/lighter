@@ -2,13 +2,30 @@
 This module provides utilities for dynamic imports, allowing optional imports and importing modules from paths.
 """
 
+import importlib
 import importlib.util
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from loguru import logger
-from monai.utils.module import optional_import
+
+
+def optional_import(module_name: str) -> tuple[object, bool]:
+    """
+    Import a module optionally, returning a tuple of (module, is_available).
+
+    Args:
+        module_name: Name of the module to import.
+
+    Returns:
+        Tuple of (module or None, bool indicating if import succeeded).
+    """
+    try:
+        module = importlib.import_module(module_name)
+        return module, True
+    except ImportError:
+        return None, False
 
 
 @dataclass

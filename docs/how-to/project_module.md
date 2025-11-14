@@ -105,17 +105,17 @@ project: my_project/ # Project root path
 
     ```bash
     # If you run from parent directory
-    cd /path/to/parent && lighter fit /path/to/my_project/experiments/config.yaml --project=/path/to/my_project/
+    cd /path/to/parent && lighter fit /path/to/my_project/experiments/config.yaml project=/path/to/my_project/
 
     # If you run from project directory
-    cd /path/to/parent/my_project && lighter fit experiments/config.yaml --project=.
+    cd /path/to/parent/my_project && lighter fit experiments/config.yaml project=.
     ```
 
     **Tip:** Use absolute paths to avoid confusion, or be mindful of your current working directory.
 
 ### Referencing Your Project Module
 
-With the `project` path specified, Lighter makes your custom modules available under the top-level module name `project`. Reference your project's modules and classes like any other Python module. See `system#model` and `system#dataloaders#train#dataset` in the config below:
+With the `project` path specified, Lighter makes your custom modules available under the top-level module name `project`. Reference your project's modules and classes like any other Python module. See `system::model` and `system::dataloaders::train::dataset` in the config below:
 
 **Example:**
 
@@ -205,11 +205,11 @@ Use in config:
 project: my_project/
 
 system:
-    model:
-        _target_: project.models.custom_unet.CustomUNet
-        in_channels: 3
-        num_classes: 10
-        features: [64, 128, 256, 512]
+  model:
+    _target_: project.models.custom_unet.CustomUNet
+    in_channels: 3
+    num_classes: 10
+    features: [64, 128, 256, 512]
 ```
 
 ## Best Practices for Project Organization 🏆
@@ -240,7 +240,7 @@ my_project/
 lighter fit config.yaml
 
 # With module path override
-lighter fit config.yaml --project=./my_research_project
+lighter fit config.yaml project=./my_research_project
 
 # Multiple configs with custom modules
 lighter fit base.yaml,models/unet.yaml,data/custom.yaml
@@ -269,6 +269,6 @@ You're now equipped to build sophisticated custom modules:
 💡 **Remember:** Great research code is modular, tested, and reusable!
 
 ## Related Guides
-- [Configuration](configure.md) - Referencing the project module
+- [Configuration](configuration.md) - Referencing the project module
 - [Adapters](adapters.md) - Custom adapter creation
 - [Metrics](metrics.md) - Custom metric creation

@@ -162,9 +162,9 @@ system:
   optimizer:
     _target_: torch.optim.Adam
     params:
-      - params: "$[p for n, p in @system#model.named_parameters() if 'backbone' in n]"
+      - params: "$[p for n, p in @system::model.named_parameters() if 'backbone' in n]"
         lr: 0.0001  # Lower LR for pretrained layers
-      - params: "$[p for n, p in @system#model.named_parameters() if 'head' in n]"
+      - params: "$[p for n, p in @system::model.named_parameters() if 'head' in n]"
         lr: 0.001   # Higher LR for new layers
 ```
 
@@ -225,4 +225,4 @@ until_step: 1000       # After step 1000
 
 ## Related Guides
 - [Run Guide](run.md) - Training workflows
-- [Configuration](configure.md) - Advanced config patterns
+- [Configuration](configuration.md) - Advanced config patterns

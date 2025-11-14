@@ -5,6 +5,7 @@ theme:
   font:
     code: Roboto Mono
   name: material
+  custom_dir: docs/overrides
   favicon: assets/images/lighter_favicon.png
   logo: assets/images/lighter_logo.png
   features:
@@ -16,8 +17,6 @@ theme:
     - footnotes
     - navigation.tabs
     - navigation.top
-    - content.action.edit
-    - content.action.view
 
   palette:
     # Palette toggle for automatic mode
@@ -64,28 +63,31 @@ plugins:
 
 nav:
   - Home: index.md
-  - Tutorials:
-      - From Zero to Hero: tutorials/zero_to_hero.md
-      - Image Classification: tutorials/image_classification.md
-  - How-To:
-      - Run: how-to/run.md
-      - Configure: how-to/configure.md
-      - Project Module: how-to/project_module.md
-      - Adapters: how-to/adapters.md
-      - Metrics: how-to/metrics.md
-      - Writers: how-to/writers.md
-      - Freezers: how-to/freezers.md
-      - Inferers: how-to/inferers.md
-      - Troubleshooting: how-to/troubleshooting.md
-      - Experiment Tracking: how-to/experiment_tracking.md
-  - Design:
+  - Get Started: tutorials/get-started.md
+  - How-To Guides:
+      - Essentials:
+          - Run: how-to/run.md
+          - Configuration: how-to/configuration.md
+          - Project Module: how-to/project_module.md
+      - Features:
+          - Adapters: how-to/adapters.md
+          - Metrics: how-to/metrics.md
+          - Writers: how-to/writers.md
+          - Freezers: how-to/freezers.md
+          - Inferers: how-to/inferers.md
+      - Practical:
+          - Configuration Recipes: how-to/recipes.md
+          - Experiment Tracking: how-to/experiment_tracking.md
+          - Troubleshooting: how-to/troubleshooting.md
+  - Design & Architecture:
       - Overview: design/overview.md
+      - System Internals: design/system.md
       - Adapter Pattern: design/adapters.md
       - Philosophy: design/philosophy.md
-  - Migration:
-      - From PyTorch Lightning: migration/from-pytorch-lightning.md
-  - FAQ: faq.md
-  - API Reference: reference/
+  - FAQ:
+      - FAQ: faq.md
+      - Migration from Lightning: migration/from-pytorch-lightning.md
+  - API: reference/
 
 markdown_extensions:
   - pymdownx.highlight:

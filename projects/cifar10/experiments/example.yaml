@@ -15,7 +15,6 @@ trainer:
 
 system:
     _target_: lighter.System
-
     model:
         _target_: "project.models.net.Net"
 
@@ -24,7 +23,7 @@ system:
 
     optimizer:
         _target_: torch.optim.Adam
-        params: "$@system#model.parameters()"
+        params: "$@system::model.parameters()"
         lr: 0.001
         weight_decay: 0.00001
 
@@ -46,8 +45,8 @@ system:
               task: multiclass
               num_classes: 10
               average: macro
-        val: "%#train"
-        test: "%#train"
+        val: "%::train"
+        test: "%::train"
 
     dataloaders:
         train:
@@ -90,8 +89,8 @@ system:
                           std: [0.5, 0.5, 0.5]
                 target_transform: null
 
-        test: "%#val"
-        predict: "%#val"
+        test: "%::val"
+        predict: "%::val"
 
     adapters:
         train:
@@ -99,6 +98,6 @@ system:
                 _target_: lighter.adapters.BatchAdapter
                 input_accessor: 0
                 target_accessor: 1
-        val: "%#train"
-        test: "%#train"
-        predict: "%#train"
+        val: "%::train"
+        test: "%::train"
+        predict: "%::train"
