@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "lighter"
-version = "0.0.4"
+version = "0.0.5"
 description = "YAML-based automated rapid prototyping framework for deep learning experiments"
 authors = [
     { name = "Ibrahim Hadzic", email = "ibrahimhadzic45@gmail.com" },
@@ -146,7 +146,7 @@ select = ["B", "E", "F", "I", "W"]
 ignore = ["E203", "E501", "N813"]
 
 [tool.bumpversion]
-current_version = "0.0.4"
+current_version = "0.0.5"
 commit = true
 tag = true
 
