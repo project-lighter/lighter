@@ -35,7 +35,7 @@ dependencies = [
     "torchmetrics>=1.2.0",
     "tensorboard>=2.11.2",
     "requests>=2.31.0",
-    "sparkwheel>=0.0.3",
+    "sparkwheel>=0.0.5",
     "rich>=13.7.0",
     "torchvision>=0.20.0",
 ]
