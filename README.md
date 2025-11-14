@@ -1,7 +1,7 @@
 <div align="center">
   <img alt="Lighter logo" src="assets/images/lighter.png" width="80%">
 </div>
-
+<br/><br/>
 <p align="center">
   <a href="https://github.com/project-lighter/lighter/actions"><img alt="Tests" src="https://github.com/project-lighter/lighter/workflows/Tests/badge.svg"></a>
   <a href="https://codecov.io/gh/project-lighter/lighter"><img alt="Coverage" src="https://codecov.io/gh/project-lighter/lighter/branch/main/graph/badge.svg"></a>
@@ -10,10 +10,7 @@
   <a href="https://project-lighter.github.io/lighter"><img alt="Documentation" src="https://img.shields.io/badge/docs-latest-olive"></a>
   <a href="https://discord.gg/zJcnp6KrUp"><img alt="Discord" src="https://dcbadge.limes.pink/api/server/https://discord.gg/zJcnp6KrUp?style=flat"></a>
 </p>
-
 <br/>
-
-**Lighter** is a YAML-driven deep learning framework built on PyTorch Lightning. Define your model, data, and training in config files instead of writing boilerplate code.
 
 <div align="center">
     <picture>
@@ -22,8 +19,9 @@
         <img alt="Features" src="assets/images/features_light.png" width="85%">
     </picture>
 </div>
-
 <br/>
+
+**Lighter** is a YAML-driven deep learning framework built on PyTorch Lightning. Define your model, data, and training in config files instead of writing boilerplate code.
 
 ## Quick Start
 
