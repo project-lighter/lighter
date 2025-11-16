@@ -1,18 +1,24 @@
 name: "Check PR title"
+
 on:
   pull_request:
     types: [edited, opened, synchronize, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   pr-title-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: ${{ github.event.pull_request.user.login != 'allcontributors[bot]' }}
     steps:
-      # Echo the user's login
-      - name: Echo user login
-        run: echo ${{ github.event.pull_request.user.login }}
-
-      - uses: naveenk1223/action-pr-title@master
+      - uses: naveenk1223/action-pr-title@v1.0.0
         with:
           # ^                       Start of string
           # [A-Z]                   First character must be an uppercase ASCII letter

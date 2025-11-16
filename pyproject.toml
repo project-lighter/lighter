@@ -54,8 +54,6 @@ dev = [
     { include-group = "quality" },
     { include-group = "types" },
     { include-group = "test" },
-    "ipykernel==6.29.5",
-    "ipywidgets==8.1.5",
     "pre-commit-uv==4.1.4",
 ]
 doc = [
@@ -77,10 +75,9 @@ test = [
     "pytest-html>=3.2.0",
     "pytest-cov>=4.0.0",
     "coverage>=7.0.5",
-    "coverage-badge>=1.1.0",
     "pytest-metadata>=3.1.1",
-    "aiohttp>=3.8.3",
-    "av>=12.0.0",
+    "pytest-github-actions-annotate-failures>=0.2.0",
+    "av>=12.0.0",  # Required for video writing tests
 ]
 
 [tool.mypy]

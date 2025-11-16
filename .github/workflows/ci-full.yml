@@ -1,0 +1,89 @@
+name: CI Full
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-lighter
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run all tests with coverage
+        run: |
+          uv run coverage run -m pytest tests --durations=10 \
+            --junit-xml=test-results.xml \
+            --html=test-report.html --self-contained-html
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## Test Results - Python ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-results.xml ]; then
+            python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('test-results.xml')
+          root = tree.getroot()
+          tests = int(root.get('tests', 0))
+          failures = int(root.get('failures', 0))
+          errors = int(root.get('errors', 0))
+          skipped = int(root.get('skipped', 0))
+          passed = tests - failures - errors - skipped
+          print(f'- ✅ Passed: {passed}')
+          print(f'- ❌ Failed: {failures}')
+          print(f'- ⚠️  Errors: {errors}')
+          print(f'- ⏭️  Skipped: {skipped}')
+          print(f'- **Total: {tests}**')
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python }}
+          retention-days: 7
+          path: |
+            test-results.xml
+            test-report.html
+            .coverage
+
+      - name: Generate coverage report
+        if: matrix.python == '3.12'
+        run: uv run coverage xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python == '3.12'
+        uses: codecov/codecov-action@v5.4.3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
