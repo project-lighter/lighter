@@ -78,7 +78,7 @@ class ArgsConfig:
 
 
 @dataclass
-class LighterConfig:
+class ConfigSchema:
     """Main Lighter configuration schema."""
 
     trainer: dict  # pytorch_lightning.Trainer

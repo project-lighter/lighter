@@ -8,7 +8,7 @@ import argparse
 from pytorch_lightning import Trainer, seed_everything
 from sparkwheel import Config, ValidationError
 
-from lighter.engine.schema import LighterConfig
+from lighter.engine.schema import ConfigSchema
 from lighter.system import System
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types.enums import Mode, Stage
@@ -65,7 +65,7 @@ class Runner:
             self.config = Config.from_cli(
                 config,
                 overrides or [],
-                schema=LighterConfig,
+                schema=ConfigSchema,
             )
         except ValidationError as e:
             raise ValueError(f"Configuration validation failed:\n{e}") from e

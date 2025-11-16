@@ -7,8 +7,8 @@ from lighter.engine.schema import (
     AdapterConfig,
     AdaptersConfig,
     ArgsConfig,
+    ConfigSchema,
     DataloadersConfig,
-    LighterConfig,
     MetricsConfig,
     PredictAdapterConfig,
     SystemConfig,
@@ -190,8 +190,8 @@ class TestArgsConfig:
         assert config.predict["return_predictions"] is True
 
 
-class TestLighterConfig:
-    """Tests for main LighterConfig schema."""
+class TestConfigSchema:
+    """Tests for main ConfigSchema schema."""
 
     def test_minimal_valid_config(self):
         """Test minimal valid configuration with only required fields."""
@@ -199,7 +199,7 @@ class TestLighterConfig:
             "trainer": {"_target_": "pytorch_lightning.Trainer", "max_epochs": 10},
             "system": {"_target_": "lighter.System", "model": {"_target_": "torch.nn.Identity"}},
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("trainer::max_epochs") == 10
         assert config.get("system::model::_target_") == "torch.nn.Identity"
 
@@ -222,7 +222,7 @@ class TestLighterConfig:
             "vars": {"learning_rate": 0.001},
             "args": {"fit": {}, "validate": {}, "test": {}, "predict": {}},
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("project") == "./path/to/project"
         assert config.get("vars::learning_rate") == 0.001
         assert config.get("system::optimizer::lr") == 0.001
@@ -233,7 +233,7 @@ class TestLighterConfig:
             "system": {"_target_": "lighter.System", "model": {"_target_": "torch.nn.Identity"}},
         }
         with pytest.raises(ValidationError) as exc_info:
-            Config.load(config_dict, schema=LighterConfig)
+            Config.load(config_dict, schema=ConfigSchema)
         assert "trainer" in str(exc_info.value).lower()
 
     def test_missing_system_raises_error(self):
@@ -242,7 +242,7 @@ class TestLighterConfig:
             "trainer": {"_target_": "pytorch_lightning.Trainer", "max_epochs": 10},
         }
         with pytest.raises(ValidationError) as exc_info:
-            Config.load(config_dict, schema=LighterConfig)
+            Config.load(config_dict, schema=ConfigSchema)
         assert "system" in str(exc_info.value).lower()
 
     def test_trainer_wrong_type_raises_error(self):
@@ -252,7 +252,7 @@ class TestLighterConfig:
             "system": {"_target_": "lighter.System", "model": {"_target_": "torch.nn.Identity"}},
         }
         with pytest.raises(ValidationError):
-            Config.load(config_dict, schema=LighterConfig)
+            Config.load(config_dict, schema=ConfigSchema)
 
     def test_system_wrong_type_raises_error(self):
         """Test that system with wrong type raises ValidationError."""
@@ -261,7 +261,7 @@ class TestLighterConfig:
             "system": "not a dict",  # Should be SystemConfig/dict
         }
         with pytest.raises(ValidationError):
-            Config.load(config_dict, schema=LighterConfig)
+            Config.load(config_dict, schema=ConfigSchema)
 
     def test_optional_project_field(self):
         """Test that project field is optional."""
@@ -270,7 +270,7 @@ class TestLighterConfig:
             "system": {"_target_": "lighter.System", "model": {"_target_": "torch.nn.Identity"}},
             "project": "./my_project",
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("project") == "./my_project"
 
     def test_optional_vars_field(self):
@@ -280,7 +280,7 @@ class TestLighterConfig:
             "system": {"_target_": "lighter.System", "model": {"_target_": "torch.nn.Identity"}},
             "vars": {"custom_var": 42, "another_var": "value"},
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("vars::custom_var") == 42
         assert config.get("vars::another_var") == "value"
 
@@ -297,7 +297,7 @@ class TestLighterConfig:
                 },
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         train_metrics = config.get("system::metrics::train")
         assert isinstance(train_metrics, list)
         assert len(train_metrics) == 1
@@ -316,7 +316,7 @@ class TestLighterConfig:
                 },
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("system::dataloaders::train::batch_size") == 32
         assert config.get("system::dataloaders::val::batch_size") == 64
 
@@ -334,7 +334,7 @@ class TestLighterConfig:
                 },
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         batch_adapter = config.get("system::adapters::train::batch")
         assert batch_adapter["_target_"] == "lighter.adapters.BatchAdapter"
         assert batch_adapter["input_accessor"] == 0
@@ -351,7 +351,7 @@ class TestLighterConfig:
                 "predict": {"return_predictions": True},
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("args::fit::ckpt_path") == "checkpoint.ckpt"
         assert config.get("args::validate::verbose") is True
         assert config.get("args::test::verbose") is False
@@ -366,7 +366,7 @@ class TestLighterConfig:
         }
         # Sparkwheel validates strictly against the schema
         with pytest.raises(ValidationError, match="extra_field"):
-            Config.load(config_dict, schema=LighterConfig)
+            Config.load(config_dict, schema=ConfigSchema)
 
     def test_config_with_references(self):
         """Test configuration with Sparkwheel references (@, %, $)."""
@@ -381,7 +381,7 @@ class TestLighterConfig:
                 },
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         # Before resolution, this is a reference string
         assert config.get("system::metrics::val") == "%::train"
 
@@ -397,7 +397,7 @@ class TestLighterConfig:
                 "adapters": {},
             },
         }
-        config = Config.load(config_dict, schema=LighterConfig)
+        config = Config.load(config_dict, schema=ConfigSchema)
         assert config.get("system::metrics") == {}
         assert config.get("system::dataloaders") == {}
         assert config.get("system::adapters") == {}
