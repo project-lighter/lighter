@@ -42,7 +42,6 @@ jobs:
             Valid: "Add new feature", "Fix bug in parser"
             Invalid: "add feature", "Adds feature", "Add.", "Fix"
           # Disable type prefixes (we don't use conventional commits format)
-          types: []
           requireScope: false
-          ignoreLabels:
-            - ignore-title-check
+          ignoreLabels: |
+            ignore-title-check
