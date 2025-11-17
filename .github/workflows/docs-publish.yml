@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-lighter
+      - uses: ./.github/actions/setup
         with:
           install-groups: '--only-group doc'
 

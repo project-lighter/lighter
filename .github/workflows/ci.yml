@@ -36,7 +36,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-lighter
+      - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
           install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
@@ -63,7 +63,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-lighter
+      - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
 
@@ -75,25 +75,7 @@ jobs:
 
       - name: Generate test summary
         if: always()
-        run: |
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          if [ -f test-results.xml ]; then
-            python3 -c "
-          import xml.etree.ElementTree as ET
-          tree = ET.parse('test-results.xml')
-          root = tree.getroot()
-          tests = int(root.get('tests', 0))
-          failures = int(root.get('failures', 0))
-          errors = int(root.get('errors', 0))
-          skipped = int(root.get('skipped', 0))
-          passed = tests - failures - errors - skipped
-          print(f'- ✅ Passed: {passed}')
-          print(f'- ❌ Failed: {failures}')
-          print(f'- ⚠️  Errors: {errors}')
-          print(f'- ⏭️  Skipped: {skipped}')
-          print(f'- **Total: {tests}**')
-            " >> $GITHUB_STEP_SUMMARY
-          fi
+        run: python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test results
         if: always()

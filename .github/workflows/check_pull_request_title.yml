@@ -11,6 +11,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  statuses: write
 
 jobs:
   pr-title-check:
@@ -18,24 +19,30 @@ jobs:
     timeout-minutes: 5
     if: ${{ github.event.pull_request.user.login != 'allcontributors[bot]' }}
     steps:
-      - uses: naveenk1223/action-pr-title@v1.0.0
+      - uses: amannn/action-semantic-pull-request@v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Require imperative mood (e.g. "Add feature" not "Adds feature")
           # ^                       Start of string
           # [A-Z]                   First character must be an uppercase ASCII letter
-          # [a-zA-Z]*               Followed by zero or more ASCII letters
-          # (?<![^s]s)              Negative lookbehind: disallow a single 's' at the end of the first word
-          # ( .+)+                  At least one space and one or more characters (requires more words)
+          # [a-z]*                  Followed by zero or more lowercase letters
+          # (?<![^s]s)              Negative lookbehind: disallow single 's' at end of first word
+          # ( .+)+                  At least one space and one or more characters
           # [^.]                    Final character must not be a period
           # $                       End of string
-          regex: "^[A-Z][a-zA-Z]*(?<![^s]s)( .+)+[^.]$"
-          # Valid titles:
-          # - "Do something"
-          # - "Address something"
-          # Invalid title:
-          # - "do something"
-          # - "Do something."
-          # - "Does something"
-          # - "Do"
-          # - "Addresses something"
-          min_length: 10
-          max_length: 72
+          subjectPattern: '^[A-Z][a-z]*(?<![^s]s)( .+)+[^.]$'
+          subjectPatternError: |
+            The PR title must use imperative mood and proper formatting:
+            - Start with uppercase letter (e.g., "Add" not "add")
+            - Use base form of verb (e.g., "Add" not "Adds" or "Adding")
+            - Have multiple words (minimum 10 characters)
+            - Not end with a period
+
+            Valid: "Add new feature", "Fix bug in parser"
+            Invalid: "add feature", "Adds feature", "Add.", "Fix"
+          # Disable type prefixes (we don't use conventional commits format)
+          types: []
+          requireScope: false
+          ignoreLabels:
+            - ignore-title-check

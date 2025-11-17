@@ -17,6 +17,15 @@ theme:
     - footnotes
     - navigation.tabs
     - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.tabs.link
 
   palette:
     # Palette toggle for automatic mode
@@ -52,7 +61,6 @@ plugins:
       - docs/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
-  - section-index
   - mkdocstrings:
       handlers:
         python:
@@ -110,6 +118,7 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter
