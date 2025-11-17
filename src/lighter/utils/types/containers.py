@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field, fields, is_dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 from torchmetrics import Metric, MetricCollection
 
 from lighter.adapters import BatchAdapter, CriterionAdapter, LoggingAdapter, MetricsAdapter
 
+T = TypeVar("T")
 
-def nested(cls):
+
+def nested(cls: type[T]) -> type[T]:
     """
     Decorator to handle nested dataclass creation.
     Example:
@@ -19,13 +21,13 @@ def nested(cls):
     """
     original_init = cls.__init__
 
-    def __init__(self, *args, **kwargs):
-        for f in fields(cls):
+    def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
+        for f in fields(cls):  # type: ignore[arg-type]
             if is_dataclass(f.type) and f.name in kwargs:
-                kwargs[f.name] = f.type(**kwargs[f.name])
+                kwargs[f.name] = f.type(**kwargs[f.name])  # type: ignore[operator]
         original_init(self, *args, **kwargs)
 
-    cls.__init__ = __init__
+    cls.__init__ = __init__  # type: ignore[method-assign]
     return cls
 
 

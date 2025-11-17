@@ -16,9 +16,9 @@ class _TransformsAdapter:
 
     def __init__(
         self,
-        input_transforms: Callable | list[Callable] | None = None,
-        target_transforms: Callable | list[Callable] | None = None,
-        pred_transforms: Callable | list[Callable] | None = None,
+        input_transforms: Callable[..., Any] | list[Callable[..., Any]] | None = None,
+        target_transforms: Callable[..., Any] | list[Callable[..., Any]] | None = None,
+        pred_transforms: Callable[..., Any] | list[Callable[..., Any]] | None = None,
     ):
         self.input_transforms = input_transforms
         self.target_transforms = target_transforms
@@ -36,12 +36,15 @@ class _TransformsAdapter:
         Returns:
             The transformed (input, target, prediction) data.
         """
-        input = self._transform(input, self.input_transforms)
-        target = self._transform(target, self.target_transforms)
-        pred = self._transform(pred, self.pred_transforms)
+        if self.input_transforms is not None:
+            input = self._transform(input, self.input_transforms)
+        if self.target_transforms is not None:
+            target = self._transform(target, self.target_transforms)
+        if self.pred_transforms is not None:
+            pred = self._transform(pred, self.pred_transforms)
         return input, target, pred
 
-    def _transform(self, data: Any, transforms: Callable | list[Callable]) -> Any:
+    def _transform(self, data: Any, transforms: Callable[..., Any] | list[Callable[..., Any]]) -> Any:
         """
         Applies a list of transform functions to the data.
 
@@ -96,7 +99,7 @@ class _ArgumentsAdapter:
         Returns:
             A tuple containing a list of positional arguments and a dictionary of keyword arguments.
         """
-        args = []  # List to store positional arguments
+        args: list[Any] = []  # List to store positional arguments
         kwargs = {}  # Dictionary to store keyword arguments
 
         # Mapping of argument names to their respective values
@@ -131,9 +134,9 @@ class _ArgumentsAndTransformsAdapter(_ArgumentsAdapter, _TransformsAdapter):
         input_argument: int | str | None = None,
         target_argument: int | str | None = None,
         pred_argument: int | str | None = None,
-        input_transforms: list[Callable] | None = None,
-        target_transforms: list[Callable] | None = None,
-        pred_transforms: list[Callable] | None = None,
+        input_transforms: list[Callable[..., Any]] | None = None,
+        target_transforms: list[Callable[..., Any]] | None = None,
+        pred_transforms: list[Callable[..., Any]] | None = None,
     ):
         """
         Initializes the Arguments and Transforms Adapter.
@@ -160,7 +163,7 @@ class _ArgumentsAndTransformsAdapter(_ArgumentsAdapter, _TransformsAdapter):
         _ArgumentsAdapter.__init__(self, input_argument, target_argument, pred_argument)
         _TransformsAdapter.__init__(self, input_transforms, target_transforms, pred_transforms)
 
-    def __call__(self, fn: Callable, input: Any, target: Any, pred: Any) -> Any:
+    def __call__(self, fn: Callable[..., Any], input: Any, target: Any, pred: Any) -> Any:  # type: ignore[override]
         """
         Applies transforms and adapts arguments before calling the provided function.
 
@@ -184,9 +187,9 @@ class _ArgumentsAndTransformsAdapter(_ArgumentsAdapter, _TransformsAdapter):
 class BatchAdapter:
     def __init__(
         self,
-        input_accessor: int | str | Callable,
-        target_accessor: int | str | Callable | None = None,
-        identifier_accessor: int | str | Callable | None = None,
+        input_accessor: int | str | Callable[..., Any],
+        target_accessor: int | str | Callable[..., Any] | None = None,
+        identifier_accessor: int | str | Callable[..., Any] | None = None,
     ):
         """
         Initializes BatchAdapter with accessors for input, target, and identifier.
@@ -216,12 +219,12 @@ class BatchAdapter:
         Raises:
             ValueError: If accessors are invalid for the provided batch structure.
         """
-        input = self._access_value(batch, self.input_accessor)
-        target = self._access_value(batch, self.target_accessor)
-        identifier = self._access_value(batch, self.identifier_accessor)
+        input = self._access_value(batch, self.input_accessor) if self.input_accessor is not None else None
+        target = self._access_value(batch, self.target_accessor) if self.target_accessor is not None else None
+        identifier = self._access_value(batch, self.identifier_accessor) if self.identifier_accessor is not None else None
         return input, target, identifier
 
-    def _access_value(self, data: Any, accessor: int | str | Callable) -> Any:
+    def _access_value(self, data: Any, accessor: int | str | Callable[..., Any]) -> Any:
         """
         Accesses a value from the data using the provided accessor.
 
@@ -236,9 +239,7 @@ class BatchAdapter:
         Raises:
             ValueError: If the accessor type or data structure is invalid.
         """
-        if accessor is None:
-            return None
-        elif isinstance(accessor, int) and isinstance(data, (tuple, list)):
+        if isinstance(accessor, int) and isinstance(data, (tuple, list)):
             return data[accessor]
         elif isinstance(accessor, str) and isinstance(data, dict):
             return data[accessor]
@@ -254,7 +255,7 @@ class CriterionAdapter(_ArgumentsAndTransformsAdapter):
     and forwards them to the specified arguments of a criterion (loss function).
     """
 
-    def __call__(self, criterion: Callable, input: Any, target: Any, pred: Any) -> Any:
+    def __call__(self, criterion: Callable[..., Any], input: Any, target: Any, pred: Any) -> Any:  # type: ignore[override]
         """
         Applies transforms and adapts arguments before calling the provided metric function.
 
@@ -279,7 +280,7 @@ class MetricsAdapter(_ArgumentsAndTransformsAdapter):
     and forwards them to the specified arguments of a metric.
     """
 
-    def __call__(self, metric: Callable, input: Any, target: Any, pred: Any) -> Any:
+    def __call__(self, metric: Callable[..., Any], input: Any, target: Any, pred: Any) -> Any:  # type: ignore[override]
         """
         Applies transforms and adapts arguments before calling the provided metric function.
 
@@ -310,8 +311,8 @@ class LoggingAdapter(_TransformsAdapter):
 
     def __init__(
         self,
-        input_transforms: list[Callable] | None = None,
-        target_transforms: list[Callable] | None = None,
-        pred_transforms: list[Callable] | None = None,
+        input_transforms: list[Callable[..., Any]] | None = None,
+        target_transforms: list[Callable[..., Any]] | None = None,
+        pred_transforms: list[Callable[..., Any]] | None = None,
     ):
         super().__init__(input_transforms, target_transforms, pred_transforms)

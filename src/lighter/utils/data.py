@@ -6,7 +6,7 @@ from torch.utils.data.dataloader import default_collate
 
 
 def collate_replace_corrupted(
-    batch: Any, dataset: torch.utils.data.Dataset, default_collate_fn: Callable | None = None
+    batch: Any, dataset: torch.utils.data.Dataset[Any], default_collate_fn: Callable[..., Any] | None = None
 ) -> Any:
     """
     Collate function to handle corrupted examples in a batch by replacing them with valid ones.
@@ -30,7 +30,7 @@ def collate_replace_corrupted(
     num_corrupted = original_batch_len - filtered_batch_len
     if num_corrupted > 0:
         # Replace a corrupted example with another randomly selected example.
-        batch.extend([dataset[random.randint(0, len(dataset) - 1)] for _ in range(num_corrupted)])
+        batch.extend([dataset[random.randint(0, len(dataset) - 1)] for _ in range(num_corrupted)])  # type: ignore[arg-type]
         # Recursive call to replace the replacements if they are corrupted.
         return collate_replace_corrupted(batch, dataset)
     # Finally, when the whole batch is fine, apply the default collate function.

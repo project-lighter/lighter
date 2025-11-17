@@ -41,7 +41,7 @@ def replace_layer_with_identity(model: Module, layer_name: str) -> Module:
     return replace_layer_with(model, layer_name, Identity())
 
 
-def remove_n_last_layers_sequentially(model: Module(), num_layers=1) -> Sequential:
+def remove_n_last_layers_sequentially(model: Module, num_layers: int = 1) -> Sequential:
     """
     Removes a specified number of layers from the end of a model and returns it as a Sequential model.
 

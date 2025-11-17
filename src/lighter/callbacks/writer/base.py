@@ -30,7 +30,7 @@ class BaseWriter(ABC, Callback):
         writer (str | Callable): Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: str | Path, writer: str | Callable) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable[..., Any]) -> None:
         self.path = Path(path)
 
         # Check if the writer is a string and if it exists in the writers dictionary
@@ -43,11 +43,11 @@ class BaseWriter(ABC, Callback):
             self.writer = writer
 
         # Prediction counter. Used when IDs are not provided. Initialized in `self.setup()` based on the DDP rank.
-        self._pred_counter = None
+        self._pred_counter: int | None = None
 
     @property
     @abstractmethod
-    def writers(self) -> dict[str, Callable]:
+    def writers(self) -> dict[str, Callable[..., Any]]:
         """
         Property to define the default writer functions.
         """
@@ -117,6 +117,8 @@ class BaseWriter(ABC, Callback):
         """
         # If the IDs are not provided, generate global unique IDs based on the prediction count. DDP supported.
         if outputs[Data.IDENTIFIER] is None:
+            if self._pred_counter is None:
+                raise RuntimeError("Writer not set up properly. Call setup() before use.")
             batch_size = len(outputs[Data.PRED])
             world_size = trainer.world_size
             outputs[Data.IDENTIFIER] = list(

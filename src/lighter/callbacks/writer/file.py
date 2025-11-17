@@ -2,7 +2,8 @@
 This module provides the FileWriter class, which writes predictions to files in various formats.
 """
 
-from typing import Callable
+from pathlib import Path
+from typing import Any, Callable
 
 import torch
 import torchvision
@@ -30,7 +31,7 @@ class FileWriter(BaseWriter):
     """
 
     @property
-    def writers(self) -> dict[str, Callable]:
+    def writers(self) -> dict[str, Callable[..., Any]]:
         return {
             "tensor": write_tensor,
             "image": write_image,
@@ -54,7 +55,7 @@ class FileWriter(BaseWriter):
         self.writer(path, tensor)
 
 
-def write_tensor(path, tensor):
+def write_tensor(path: Path, tensor: Tensor) -> None:
     """
     Writes a tensor to a file in .pt format.
 
@@ -65,7 +66,7 @@ def write_tensor(path, tensor):
     torch.save(tensor, path.with_suffix(".pt"))  # nosec B614
 
 
-def write_image(path, tensor):
+def write_image(path: Path, tensor: Tensor) -> None:
     """
     Writes a tensor as an image file in .png format.
 
@@ -78,7 +79,7 @@ def write_image(path, tensor):
     torchvision.io.write_png(tensor, str(path))
 
 
-def write_video(path, tensor):
+def write_video(path: Path, tensor: Tensor) -> None:
     """
     Writes a tensor as a video file in .mp4 format.
 

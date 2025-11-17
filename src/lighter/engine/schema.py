@@ -3,65 +3,65 @@ Defines the schema for configuration validation using Sparkwheel's validation wi
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
 class AdapterConfig:
     """Adapter configuration for a specific mode."""
 
-    batch: Optional[dict] = None
-    criterion: Optional[dict] = None
-    metrics: Optional[dict] = None
-    logging: Optional[dict] = None
+    batch: Optional[dict[str, Any]] = None
+    criterion: Optional[dict[str, Any]] = None
+    metrics: Optional[dict[str, Any]] = None
+    logging: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class PredictAdapterConfig:
     """Adapter configuration for predict mode (no criterion)."""
 
-    batch: Optional[dict] = None
-    logging: Optional[dict] = None
+    batch: Optional[dict[str, Any]] = None
+    logging: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class AdaptersConfig:
     """Adapters configuration for all modes."""
 
-    train: Optional[dict] = None  # Can be AdapterConfig but keep flexible
-    val: Optional[dict] = None
-    test: Optional[dict] = None
-    predict: Optional[dict] = None
+    train: Optional[dict[str, Any] | str] = None  # Can be AdapterConfig but keep flexible
+    val: Optional[dict[str, Any] | str] = None
+    test: Optional[dict[str, Any] | str] = None
+    predict: Optional[dict[str, Any] | str] = None
 
 
 @dataclass
 class MetricsConfig:
     """Metrics configuration for different stages."""
 
-    train: Optional[list | dict] = None
-    val: Optional[list | dict] = None
-    test: Optional[list | dict] = None
+    train: Optional[list[Any] | dict[str, Any] | str] = None
+    val: Optional[list[Any] | dict[str, Any] | str] = None
+    test: Optional[list[Any] | dict[str, Any] | str] = None
 
 
 @dataclass
 class DataloadersConfig:
     """Dataloaders configuration for different stages."""
 
-    train: Optional[dict] = None
-    val: Optional[dict] = None
-    test: Optional[dict] = None
-    predict: Optional[dict] = None
+    train: Optional[dict[str, Any]] = None
+    val: Optional[dict[str, Any]] = None
+    test: Optional[dict[str, Any]] = None
+    predict: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class SystemConfig:
     """System configuration with model, optimizer, scheduler, etc."""
 
-    model: Optional[dict] = None
-    criterion: Optional[dict] = None
-    optimizer: Optional[dict] = None
-    scheduler: Optional[dict] = None
-    inferer: Optional[dict] = None
+    model: Optional[dict[str, Any]] = None
+    criterion: Optional[dict[str, Any]] = None
+    optimizer: Optional[dict[str, Any]] = None
+    scheduler: Optional[dict[str, Any]] = None
+    inferer: Optional[dict[str, Any]] = None
     metrics: Optional[MetricsConfig] = None
     dataloaders: Optional[DataloadersConfig] = None
     adapters: Optional[AdaptersConfig] = None
@@ -71,18 +71,18 @@ class SystemConfig:
 class ArgsConfig:
     """Arguments to pass to Trainer stage methods."""
 
-    fit: Optional[dict] = None
-    validate: Optional[dict] = None
-    test: Optional[dict] = None
-    predict: Optional[dict] = None
+    fit: Optional[dict[str, Any]] = None
+    validate: Optional[dict[str, Any]] = None
+    test: Optional[dict[str, Any]] = None
+    predict: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class ConfigSchema:
     """Main Lighter configuration schema."""
 
-    trainer: dict  # pytorch_lightning.Trainer
+    trainer: dict[str, Any]  # pytorch_lightning.Trainer
     system: SystemConfig  # lighter.System
     project: Optional[str] = None
-    vars: Optional[dict] = None
+    vars: Optional[dict[str, Any]] = None
     args: Optional[ArgsConfig] = None

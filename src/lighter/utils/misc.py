@@ -8,7 +8,7 @@ from typing import Any, Callable
 from torch.optim.optimizer import Optimizer
 
 
-def ensure_list(input: Any) -> list:
+def ensure_list(input: Any) -> list[Any]:
     """
     Ensures that the input is wrapped in a list. If the input is None, returns an empty list.
 
@@ -27,7 +27,7 @@ def ensure_list(input: Any) -> list:
     return [input]
 
 
-def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
+def setattr_dot_notation(obj: Callable[..., Any], attr: str, value: Any) -> None:
     """
     Sets an attribute on an object using dot notation.
 
@@ -46,7 +46,7 @@ def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
         setattr_dot_notation(getattr(obj, obj_name), attr, value)
 
 
-def hasarg(fn: Callable, arg_name: str) -> bool:
+def hasarg(fn: Callable[..., Any], arg_name: str) -> bool:
     """
     Checks if a callable (function, method, or class) has a specific argument.
 
@@ -61,7 +61,7 @@ def hasarg(fn: Callable, arg_name: str) -> bool:
     return arg_name in args
 
 
-def get_name(_callable: Callable, include_module_name: bool = False) -> str:
+def get_name(_callable: Callable[..., Any], include_module_name: bool = False) -> str:
     """
     Retrieves the name of a callable, optionally including the module name.
 

@@ -23,12 +23,12 @@ class TableWriter(BaseWriter):
         writer: Writer function or name of a registered writer.
     """
 
-    def __init__(self, path: str | Path, writer: str | Callable) -> None:
+    def __init__(self, path: str | Path, writer: str | Callable[..., Any]) -> None:
         super().__init__(path, writer)
-        self.csv_records = []
+        self.csv_records: list[dict[str, Any]] = []
 
     @property
-    def writers(self) -> dict[str, Callable]:
+    def writers(self) -> dict[str, Callable[..., Any]]:
         return {
             "tensor": lambda tensor: tensor.item() if tensor.numel() == 1 else tensor.tolist(),
         }
@@ -53,9 +53,9 @@ class TableWriter(BaseWriter):
         """
         # If in distributed data parallel mode, gather records from all processes to rank 0.
         if trainer.world_size > 1:
-            gather_csv_records = [None] * trainer.world_size if trainer.is_global_zero else None
+            gather_csv_records: list[Any] | None = [None] * trainer.world_size if trainer.is_global_zero else None
             torch.distributed.gather_object(self.csv_records, gather_csv_records, dst=0)
-            if trainer.is_global_zero:
+            if trainer.is_global_zero and gather_csv_records is not None:
                 self.csv_records = list(itertools.chain(*gather_csv_records))
 
         # Save the records to a CSV file
