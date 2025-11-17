@@ -41,7 +41,7 @@ system:
         # Patch _setup and _execute to avoid needing real components
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
             # Should not raise ValidationError
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             assert runner.config is not None
 
     def test_config_with_all_optional_fields_validates(self, temp_config_dir):
@@ -97,7 +97,7 @@ args:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             assert runner.config.get("project") == "./path/to/project"
             assert runner.config.get("vars::learning_rate") == 0.001
             assert runner.config.get("system::optimizer::lr") == 0.001
@@ -117,7 +117,7 @@ system:
 
         runner = Runner()
         with pytest.raises(ValueError, match="validation failed"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
 
     def test_missing_system_raises_validation_error(self, temp_config_dir):
         """Test that missing system field raises ValidationError."""
@@ -131,7 +131,7 @@ trainer:
 
         runner = Runner()
         with pytest.raises(ValueError, match="validation failed"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
 
     def test_wrong_type_for_trainer_raises_validation_error(self, temp_config_dir):
         """Test that wrong type for trainer raises ValidationError."""
@@ -152,7 +152,7 @@ system:
 
         runner = Runner()
         with pytest.raises(ValueError, match="validation failed"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
 
     def test_wrong_type_for_system_raises_validation_error(self, temp_config_dir):
         """Test that wrong type for system raises ValidationError."""
@@ -168,7 +168,7 @@ system: "this should be a dict"
 
         runner = Runner()
         with pytest.raises(ValueError, match="validation failed"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
 
     def test_pruning_removes_unused_dataloaders_for_fit_stage(self, temp_config_dir):
         """Test that pruning removes test/predict dataloaders for FIT stage."""
@@ -192,7 +192,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             # After pruning, only train and val should remain
             assert runner.config.get("system::dataloaders::train") is not None
             assert runner.config.get("system::dataloaders::val") is not None
@@ -221,7 +221,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.TEST, str(config_path))
+            runner.run(Stage.TEST, [str(config_path)])
             # After pruning, only test should remain
             assert runner.config.get("system::dataloaders::test") is not None
             assert runner.config.get("system::dataloaders::train") is None
@@ -250,7 +250,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.PREDICT, str(config_path))
+            runner.run(Stage.PREDICT, [str(config_path)])
             # After pruning, only predict should remain
             assert runner.config.get("system::dataloaders::predict") is not None
             assert runner.config.get("system::dataloaders::train") is None
@@ -282,7 +282,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             # FIT keeps train and val metrics
             assert runner.config.get("system::metrics::train") is not None
             assert runner.config.get("system::metrics::val") is not None
@@ -315,7 +315,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.TEST, str(config_path))
+            runner.run(Stage.TEST, [str(config_path)])
             # TEST stage should remove optimizer, scheduler, and criterion
             assert runner.config.get("system::optimizer") is None
             assert runner.config.get("system::scheduler") is None
@@ -345,7 +345,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.VALIDATE, str(config_path))
+            runner.run(Stage.VALIDATE, [str(config_path)])
             # VALIDATE removes optimizer but keeps criterion
             assert runner.config.get("system::optimizer") is None
             assert runner.config.get("system::criterion") is not None
@@ -397,8 +397,8 @@ system:
             assert runner.config.get("system::criterion::_target_") == "torch.nn.MSELoss"
             assert runner.config.get("system::dataloaders::val") is not None
 
-    def test_comma_separated_config_files(self, temp_config_dir):
-        """Test that comma-separated config file paths work."""
+    def test_multiple_config_files(self, temp_config_dir):
+        """Test that multiple config file paths work."""
         base_path = temp_config_dir / "base.yaml"
         base_content = """
 trainer:
@@ -427,9 +427,8 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            # Use comma-separated string
-            config_str = f"{base_path},{override_path}"
-            runner.run(Stage.FIT, config_str)
+            # Use list of config files
+            runner.run(Stage.FIT, [str(base_path), str(override_path)])
             assert runner.config.get("trainer::max_epochs") == 1
 
     def test_cli_overrides_apply(self, temp_config_dir):
@@ -457,7 +456,7 @@ system:
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
             overrides = ["trainer::max_epochs=5", "system::optimizer::lr=0.1"]
-            runner.run(Stage.FIT, str(config_path), overrides)
+            runner.run(Stage.FIT, [str(config_path)] + overrides)
             assert runner.config.get("trainer::max_epochs") == 5
             assert runner.config.get("system::optimizer::lr") == 0.1
 
@@ -491,7 +490,7 @@ args:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             # Fit args should be preserved
             assert runner.config.get("args::fit") is not None
             # Other args should be pruned
@@ -523,10 +522,14 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
-            # Before resolution, references should exist
-            assert runner.config.get("system::metrics::val") == "%::train"
-            assert runner.config.get("system::dataloaders::val") == "%::train"
+            runner.run(Stage.FIT, [str(config_path)])
+            # After update(), raw references (%) are eagerly expanded
+            # They become actual copies of the referenced values
+            assert runner.config.get("system::metrics::val") == [{"_target_": "torchmetrics.MeanSquaredError"}]
+            assert runner.config.get("system::dataloaders::val") == {"batch_size": 32}
+            # Verify they're deep copies (independent objects)
+            assert runner.config.get("system::metrics::val") is not runner.config.get("system::metrics::train")
+            assert runner.config.get("system::dataloaders::val") is not runner.config.get("system::dataloaders::train")
 
     def test_config_with_vars(self, temp_config_dir):
         """Test configuration with vars section."""
@@ -557,7 +560,7 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, str(config_path))
+            runner.run(Stage.FIT, [str(config_path)])
             # Vars should be accessible
             assert runner.config.get("vars::learning_rate") == 0.001
             assert runner.config.get("vars::batch_size") == 32

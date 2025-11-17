@@ -81,11 +81,12 @@ def test_runner_initialization(runner):
 
 def test_runner_applies_overrides(runner, base_config):
     """Test that CLI overrides are applied correctly."""
-    overrides = ["trainer::max_epochs=100"]
+    # Combine config and overrides into single inputs list
+    inputs = [base_config, "trainer::max_epochs=100"]
 
     # Mock the setup and execute to avoid needing real models
     with patch.object(runner, "_setup") as mock_setup, patch.object(runner, "_execute") as mock_execute:
-        runner.run(Stage.FIT, base_config, overrides)
+        runner.run(Stage.FIT, inputs)
 
         # Verify override was applied
         assert runner.config.get("trainer::max_epochs") == 100
@@ -97,8 +98,8 @@ def test_runner_applies_overrides(runner, base_config):
 
 def test_prune_removes_unused_modes(runner, base_config):
     """Test that pruning removes unused dataloaders/metrics for each stage."""
-    # Load config - use deepcopy since Config.load modifies the dict
-    runner.config = Config.load(deepcopy(base_config))
+    # Load config - use deepcopy since Config().update() modifies the dict
+    runner.config = Config().update(deepcopy(base_config))
 
     # Test FIT stage pruning
     runner._prune_for_stage(Stage.FIT)
@@ -116,7 +117,7 @@ def test_prune_removes_unused_modes(runner, base_config):
     assert "test" not in metrics
 
     # Reset config and test TEST stage - use fresh copy
-    runner.config = Config.load(deepcopy(base_config))
+    runner.config = Config().update(deepcopy(base_config))
     runner._prune_for_stage(Stage.TEST)
     system = runner.config.get("system", {})
     dataloaders = system.get("dataloaders", {})
@@ -131,7 +132,7 @@ def test_prune_removes_unused_modes(runner, base_config):
 
 def test_prune_removes_optimizer_for_non_fit(runner, base_config):
     """Test that optimizer/scheduler are removed for non-FIT stages."""
-    runner.config = Config.load(deepcopy(base_config))
+    runner.config = Config().update(deepcopy(base_config))
 
     # Test VALIDATE stage
     runner._prune_for_stage(Stage.VALIDATE)
@@ -142,7 +143,7 @@ def test_prune_removes_optimizer_for_non_fit(runner, base_config):
     assert "scheduler" not in system
 
     # Test TEST stage - use fresh copy
-    runner.config = Config.load(deepcopy(base_config))
+    runner.config = Config().update(deepcopy(base_config))
     runner._prune_for_stage(Stage.TEST)
     system = runner.config.get("system", {})
 
@@ -159,7 +160,7 @@ def test_setup_with_invalid_system(runner, mock_trainer):
         "system": {"_target_": "builtins.dict"},  # This will resolve to dict type, not System
     }
 
-    runner.config = Config.load(bad_config)
+    runner.config = Config().update(bad_config)
 
     # Mock trainer resolution to avoid needing real trainer
     with patch.object(runner.config, "resolve") as mock_resolve:
@@ -177,7 +178,7 @@ def test_setup_with_invalid_trainer(runner, mock_system):
         "system": {"_target_": "lighter.system.System"},
     }
 
-    runner.config = Config.load(bad_config)
+    runner.config = Config().update(bad_config)
 
     # Mock system and trainer resolution
     with patch.object(runner.config, "resolve") as mock_resolve:
@@ -193,7 +194,7 @@ def test_setup_with_project(mock_import, runner, base_config, mock_system, mock_
     config_with_project = base_config.copy()
     config_with_project["project"] = "path/to/project"
 
-    runner.config = Config.load(config_with_project)
+    runner.config = Config().update(config_with_project)
 
     # Mock resolve to return our mocks
     with patch.object(runner.config, "resolve") as mock_resolve:

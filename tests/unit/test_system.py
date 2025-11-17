@@ -15,6 +15,15 @@ from lighter.system import System
 from lighter.utils.types.enums import Data, Mode
 
 
+def mock_trainer_state(trainer, training=False, validating=False, testing=False, predicting=False, sanity_checking=False):
+    """Helper function to mock trainer state for testing."""
+    trainer.training = training
+    trainer.validating = validating
+    trainer.testing = testing
+    trainer.predicting = predicting
+    trainer.sanity_checking = sanity_checking
+
+
 class DummyDataset(Dataset):
     """Dataset returning (input_tensor, target_int)"""
 
@@ -158,20 +167,32 @@ def test_configure_optimizers_without_scheduler(dummy_dataloaders):
 
 
 def test_on_mode_start_and_end_train(simple_system):
-    """Check that _on_mode_start sets the correct mode and _on_mode_end resets it."""
-    simple_system._on_mode_start(Mode.TRAIN)
-    assert simple_system.mode == Mode.TRAIN
-    simple_system._on_mode_end()
-    assert simple_system.mode is None
+    """Check that _get_current_mode returns the correct mode based on trainer state."""
+    # Mock trainer state for training
+    simple_system.trainer.training = True
+    simple_system.trainer.validating = False
+    simple_system.trainer.testing = False
+    simple_system.trainer.predicting = False
+    simple_system.trainer.sanity_checking = False
+    assert simple_system._get_current_mode() == Mode.TRAIN
+
+    # Mock trainer state for validation
+    simple_system.trainer.training = False
+    simple_system.trainer.validating = True
+    assert simple_system._get_current_mode() == Mode.VAL
 
 
 def test_training_step_runs(simple_system):
     """
-    Simulate a training step by calling lightning's hooks:
-    - on_train_start
-    - training_step
+    Simulate a training step by mocking trainer state and calling training_step.
     """
-    simple_system.on_train_start()
+    # Mock trainer state for training
+    simple_system.trainer.training = True
+    simple_system.trainer.validating = False
+    simple_system.trainer.testing = False
+    simple_system.trainer.predicting = False
+    simple_system.trainer.sanity_checking = False
+
     batch = next(iter(simple_system.dataloaders.train))
     output = simple_system.training_step(batch, batch_idx=0)
 
@@ -181,19 +202,13 @@ def test_training_step_runs(simple_system):
     assert Data.METRICS in output, "Metrics should be in output for training mode."
     assert Data.PRED in output, "Prediction tensor must be in the output."
     assert output[Data.PRED] is not None, "Pred must not be None."
-    assert simple_system.mode == Mode.TRAIN
-
-    simple_system.on_train_end()
-    assert simple_system.mode is None
 
 
 def test_validation_step_runs(simple_system):
     """
-    Simulate a validation step by calling:
-    - on_validation_start
-    - validation_step
+    Simulate a validation step by mocking trainer state and calling validation_step.
     """
-    simple_system.on_validation_start()
+    mock_trainer_state(simple_system.trainer, validating=True)
     batch = next(iter(simple_system.dataloaders.val))
     output = simple_system.validation_step(batch, batch_idx=0)
 
@@ -203,17 +218,12 @@ def test_validation_step_runs(simple_system):
     assert Data.METRICS in output, "Metrics should be in output for validation mode."
     assert Data.PRED in output, "Prediction tensor must be in the output."
 
-    simple_system.on_validation_end()
-    assert simple_system.mode is None
-
 
 def test_test_step_runs(simple_system):
     """
-    Simulate a test step by calling:
-    - on_test_start
-    - test_step
+    Simulate a test step by mocking trainer state and calling test_step.
     """
-    simple_system.on_test_start()
+    mock_trainer_state(simple_system.trainer, testing=True)
     batch = next(iter(simple_system.dataloaders.test))
     output = simple_system.test_step(batch, batch_idx=0)
 
@@ -223,15 +233,12 @@ def test_test_step_runs(simple_system):
     assert Data.METRICS in output, "Metrics should be in output for test mode."
     assert Data.PRED in output, "Prediction tensor must be in the output."
 
-    simple_system.on_test_end()
-    assert simple_system.mode is None
-
 
 def test_predict_step_runs(simple_system):
     """
-    Simulate a predict step using the predict_dataloader and check outputs.
+    Simulate a predict step by mocking trainer state and calling predict_step.
     """
-    simple_system.on_predict_start()
+    mock_trainer_state(simple_system.trainer, predicting=True)
     batch = next(iter(simple_system.dataloaders.predict))
     output = simple_system.predict_step(batch, batch_idx=0)
 
@@ -239,9 +246,6 @@ def test_predict_step_runs(simple_system):
     assert Data.PRED in output, "Predict should contain PRED."
     assert output.get(Data.METRICS) is None, "Metrics must be None in predict mode."
     assert output.get(Data.LOSS) is None, "Loss must be None in predict mode."
-
-    simple_system.on_predict_end()
-    assert simple_system.mode is None
 
 
 def test_no_criterion_in_train_raises_error(simple_system):
@@ -251,7 +255,7 @@ def test_no_criterion_in_train_raises_error(simple_system):
     # Explicitly set criterion to None
     simple_system.criterion = None
 
-    simple_system.on_train_start()
+    mock_trainer_state(simple_system.trainer, training=True)
     batch = next(iter(simple_system.dataloaders.train))
     with pytest.raises(ValueError, match="Please specify 'system.criterion'"):
         _ = simple_system.training_step(batch, 0)
@@ -272,7 +276,7 @@ def test_dict_loss_without_total_raises_error(simple_system):
     it should raise ValueError.
     """
     simple_system.criterion = DictLossNoTotal()
-    simple_system.on_train_start()
+    mock_trainer_state(simple_system.trainer, training=True)
 
     batch = next(iter(simple_system.dataloaders.train))
     with pytest.raises(ValueError, match="The loss dictionary must include a 'total' key that combines all sublosses."):
@@ -321,7 +325,7 @@ def test_inferer_called_in_validation(simple_system):
     mock_inferer = MagicMock(return_value=torch.randn(2, 2))
     simple_system.inferer = mock_inferer
 
-    simple_system.on_validation_start()
+    mock_trainer_state(simple_system.trainer, validating=True)
     batch = next(iter(simple_system.dataloaders.val))
     _ = simple_system.validation_step(batch, batch_idx=0)
 
@@ -333,7 +337,7 @@ def test_inferer_called_in_test(simple_system):
     mock_inferer = MagicMock(return_value=torch.randn(2, 2))
     simple_system.inferer = mock_inferer
 
-    simple_system.on_test_start()
+    mock_trainer_state(simple_system.trainer, testing=True)
     batch = next(iter(simple_system.dataloaders.test))
     _ = simple_system.test_step(batch, batch_idx=0)
 
@@ -342,7 +346,7 @@ def test_inferer_called_in_test(simple_system):
 
 def test_loss_logging_single_value(simple_system):
     """Ensure loss logging occurs correctly when it's a single tensor"""
-    simple_system.on_train_start()
+    mock_trainer_state(simple_system.trainer, training=True)
     batch = next(iter(simple_system.dataloaders.train))
     output = simple_system.training_step(batch, batch_idx=0)
 
@@ -359,7 +363,7 @@ def test_loss_logging_dict_values(simple_system):
 
     simple_system.criterion = MultiLoss()
 
-    simple_system.on_train_start()
+    mock_trainer_state(simple_system.trainer, training=True)
     batch = next(iter(simple_system.dataloaders.train))
     output = simple_system.training_step(batch, batch_idx=0)
 
@@ -370,7 +374,7 @@ def test_loss_logging_dict_values(simple_system):
 
 def test_metric_logging(simple_system):
     """Ensure metric logging occurs"""
-    simple_system.on_train_start()
+    mock_trainer_state(simple_system.trainer, training=True)
     batch = next(iter(simple_system.dataloaders.train))
     output = simple_system.training_step(batch, batch_idx=0)
 
@@ -382,9 +386,9 @@ def test_dynamic_mode_hooks():
     """
     Test the dynamic attachment of mode-specific hooks in the System class.
 
-    This test verifies that the appropriate hooks are dynamically attached
+    This test verifies that the appropriate step methods and dataloaders are dynamically attached
     based on the availability of dataloaders for different modes (train, val, test, predict).
-    It checks that the hooks are overridden when a dataloader is provided and remain
+    It checks that the step methods are overridden when a dataloader is provided and remain
     as the default (super) implementation when not provided.
     """
 
@@ -407,26 +411,18 @@ def test_dynamic_mode_hooks():
         inferer=None,
     )
 
-    # Assert that all hooks are overridden
+    # Assert that all step methods and dataloaders are overridden
     assert system.training_step != super(System, system).training_step
     assert system.train_dataloader != super(System, system).train_dataloader
-    assert system.on_train_start != super(System, system).on_train_start
-    assert system.on_train_end != super(System, system).on_train_end
 
     assert system.validation_step != super(System, system).validation_step
     assert system.val_dataloader != super(System, system).val_dataloader
-    assert system.on_validation_start != super(System, system).on_validation_start
-    assert system.on_validation_end != super(System, system).on_validation_end
 
     assert system.test_step != super(System, system).test_step
     assert system.test_dataloader != super(System, system).test_dataloader
-    assert system.on_test_start != super(System, system).on_test_start
-    assert system.on_test_end != super(System, system).on_test_end
 
     assert system.predict_step != super(System, system).predict_step
     assert system.predict_dataloader != super(System, system).predict_dataloader
-    assert system.on_predict_start != super(System, system).on_predict_start
-    assert system.on_predict_end != super(System, system).on_predict_end
 
     # Test case 2: Only train dataloader is provided
     model = SimpleModel()
@@ -442,26 +438,18 @@ def test_dynamic_mode_hooks():
         inferer=None,
     )
 
-    # Assert that only train hooks are overridden, other hooks remain as default
+    # Assert that only train step methods are overridden, other methods remain as default
     assert system.training_step != super(System, system).training_step
     assert system.train_dataloader != super(System, system).train_dataloader
-    assert system.on_train_start != super(System, system).on_train_start
-    assert system.on_train_end != super(System, system).on_train_end
 
     assert system.validation_step == super(System, system).validation_step
     assert system.val_dataloader == super(System, system).val_dataloader
-    assert system.on_validation_start == super(System, system).on_validation_start
-    assert system.on_validation_end == super(System, system).on_validation_end
 
     assert system.test_step == super(System, system).test_step
     assert system.test_dataloader == super(System, system).test_dataloader
-    assert system.on_test_start == super(System, system).on_test_start
-    assert system.on_test_end == super(System, system).on_test_end
 
     assert system.predict_step == super(System, system).predict_step
     assert system.predict_dataloader == super(System, system).predict_dataloader
-    assert system.on_predict_start == super(System, system).on_predict_start
-    assert system.on_predict_end == super(System, system).on_predict_end
 
     # Test case 3: Only val dataloader is provided
     model = SimpleModel()
@@ -477,26 +465,18 @@ def test_dynamic_mode_hooks():
         inferer=None,
     )
 
-    # Assert that only validation hooks are overridden, other hooks remain as default
+    # Assert that only validation step methods are overridden, other methods remain as default
     assert system.training_step == super(System, system).training_step
     assert system.train_dataloader == super(System, system).train_dataloader
-    assert system.on_train_start == super(System, system).on_train_start
-    assert system.on_train_end == super(System, system).on_train_end
 
     assert system.validation_step != super(System, system).validation_step
     assert system.val_dataloader != super(System, system).val_dataloader
-    assert system.on_validation_start != super(System, system).on_validation_start
-    assert system.on_validation_end != super(System, system).on_validation_end
 
     assert system.test_step == super(System, system).test_step
     assert system.test_dataloader == super(System, system).test_dataloader
-    assert system.on_test_start == super(System, system).on_test_start
-    assert system.on_test_end == super(System, system).on_test_end
 
     assert system.predict_step == super(System, system).predict_step
     assert system.predict_dataloader == super(System, system).predict_dataloader
-    assert system.on_predict_start == super(System, system).on_predict_start
-    assert system.on_predict_end == super(System, system).on_predict_end
 
     # Test case 4: Only test dataloader is provided
     model = SimpleModel()
@@ -512,26 +492,18 @@ def test_dynamic_mode_hooks():
         inferer=None,
     )
 
-    # Assert that only test hooks are overridden, other hooks remain as default
+    # Assert that only test step methods are overridden, other methods remain as default
     assert system.training_step == super(System, system).training_step
     assert system.train_dataloader == super(System, system).train_dataloader
-    assert system.on_train_start == super(System, system).on_train_start
-    assert system.on_train_end == super(System, system).on_train_end
 
     assert system.validation_step == super(System, system).validation_step
     assert system.val_dataloader == super(System, system).val_dataloader
-    assert system.on_validation_start == super(System, system).on_validation_start
-    assert system.on_validation_end == super(System, system).on_validation_end
 
     assert system.test_step != super(System, system).test_step
     assert system.test_dataloader != super(System, system).test_dataloader
-    assert system.on_test_start != super(System, system).on_test_start
-    assert system.on_test_end != super(System, system).on_test_end
 
     assert system.predict_step == super(System, system).predict_step
     assert system.predict_dataloader == super(System, system).predict_dataloader
-    assert system.on_predict_start == super(System, system).on_predict_start
-    assert system.on_predict_end == super(System, system).on_predict_end
 
     # Test case 5: Only predict dataloader is provided
     model = SimpleModel()
@@ -547,26 +519,18 @@ def test_dynamic_mode_hooks():
         inferer=None,
     )
 
-    # Assert that only predict hooks are overridden, other hooks remain as default
+    # Assert that only predict step methods are overridden, other methods remain as default
     assert system.training_step == super(System, system).training_step
     assert system.train_dataloader == super(System, system).train_dataloader
-    assert system.on_train_start == super(System, system).on_train_start
-    assert system.on_train_end == super(System, system).on_train_end
 
     assert system.validation_step == super(System, system).validation_step
     assert system.val_dataloader == super(System, system).val_dataloader
-    assert system.on_validation_start == super(System, system).on_validation_start
-    assert system.on_validation_end == super(System, system).on_validation_end
 
     assert system.test_step == super(System, system).test_step
     assert system.test_dataloader == super(System, system).test_dataloader
-    assert system.on_test_start == super(System, system).on_test_start
-    assert system.on_test_end == super(System, system).on_test_end
 
     assert system.predict_step != super(System, system).predict_step
     assert system.predict_dataloader != super(System, system).predict_dataloader
-    assert system.on_predict_start != super(System, system).on_predict_start
-    assert system.on_predict_end != super(System, system).on_predict_end
 
 
 def test_log_stats_without_logger(simple_system):
@@ -586,8 +550,10 @@ def test_log_stats_with_logger(simple_system):
     simple_system.trainer.logger = MagicMock()
     simple_system.log = MagicMock()
 
+    # Mock trainer state for training
+    mock_trainer_state(simple_system.trainer, training=True)
+
     # Test single loss value
-    simple_system.mode = Mode.TRAIN
     simple_system._log_stats(torch.tensor(1.0), None, 0)
     # Twice (on step, on epoch) for the loss, twice for the SGD optimizer (lr, momentum)
     assert simple_system.log.call_count == 4

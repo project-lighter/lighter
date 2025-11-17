@@ -19,7 +19,7 @@ class TestRunnerErrorHandling:
         """Test that non-existent config file raises appropriate error."""
         runner = Runner()
         with pytest.raises(FileNotFoundError):
-            runner.run(Stage.FIT, "nonexistent_config.yaml")
+            runner.run(Stage.FIT, ["nonexistent_config.yaml"])
 
     def test_run_with_invalid_yaml_raises_error(self):
         """Test that invalid YAML raises appropriate error."""
@@ -30,7 +30,7 @@ class TestRunnerErrorHandling:
         try:
             runner = Runner()
             with pytest.raises(yaml.YAMLError):
-                runner.run(Stage.FIT, config_path)
+                runner.run(Stage.FIT, [config_path])
         finally:
             Path(config_path).unlink()
 
@@ -43,7 +43,7 @@ class TestRunnerErrorHandling:
         try:
             runner = Runner()
             with pytest.raises(ValueError, match="validation failed"):
-                runner.run(Stage.FIT, config_path)
+                runner.run(Stage.FIT, [config_path])
         finally:
             Path(config_path).unlink()
 
@@ -83,8 +83,8 @@ class TestRunnerErrorHandling:
         with pytest.raises(ValueError, match="system.*must be set up"):
             runner._execute(Stage.FIT)
 
-    def test_run_with_invalid_override_format_raises_error(self):
-        """Test that invalid override format raises ValueError."""
+    def test_run_with_file_that_doesnt_exist_in_overrides(self):
+        """Test that file paths in overrides list are checked."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("""
 trainer:
@@ -103,14 +103,20 @@ system:
 
         try:
             runner = Runner()
-            # Sparkwheel raises ValueError for invalid override format
-            with pytest.raises(ValueError, match="Invalid override format"):
-                runner.run(Stage.FIT, config_path, ["invalid_override_no_equals"])
+            # File that doesn't exist should raise error
+            with pytest.raises(FileNotFoundError):
+                runner.run(Stage.FIT, [config_path, "nonexistent_file.yaml"])
         finally:
             Path(config_path).unlink()
 
     def test_run_with_invalid_project_path_raises_error(self):
         """Test that invalid project path raises FileNotFoundError."""
+        import sys
+
+        # Clean up any previous project module to ensure test isolation
+        if "project" in sys.modules:
+            del sys.modules["project"]
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("""
 project: /nonexistent/path/to/project
@@ -122,7 +128,13 @@ trainer:
 system:
   _target_: lighter.System
   model:
-    _target_: torch.nn.Identity
+    _target_: torch.nn.Linear
+    in_features: 10
+    out_features: 10
+  optimizer:
+    _target_: torch.optim.SGD
+    params: "$@system::model.parameters()"
+    lr: 0.001
   dataloaders:
     train: {}
     val: {}
@@ -132,9 +144,12 @@ system:
         try:
             runner = Runner()
             with pytest.raises(FileNotFoundError):
-                runner.run(Stage.FIT, config_path)
+                runner.run(Stage.FIT, [config_path])
         finally:
             Path(config_path).unlink()
+            # Clean up project module after test
+            if "project" in sys.modules:
+                del sys.modules["project"]
 
     def test_run_with_conflicting_overrides(self):
         """Test behavior with conflicting CLI overrides (last one wins)."""
@@ -156,12 +171,13 @@ system:
 
         try:
             runner = Runner()
-            overrides = [
+            inputs = [
+                config_path,
                 "trainer::max_epochs=5",
                 "trainer::max_epochs=20",  # Conflicting - should override previous
             ]
             with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-                runner.run(Stage.FIT, config_path, overrides)
+                runner.run(Stage.FIT, inputs)
                 # Last override should win
                 assert runner.config.get("trainer::max_epochs") == 20
         finally:
@@ -204,7 +220,7 @@ system:
         }
 
         runner = Runner()
-        runner.config = Config.load(config_dict)
+        runner.config = Config().update(config_dict)
 
         # Test pruning for VALIDATE stage
         runner._prune_for_stage(Stage.VALIDATE)
@@ -274,7 +290,7 @@ system:
             Path(config_path2).unlink()
 
     def test_run_with_dict_config(self):
-        """Test running with dict config instead of file path."""
+        """Test running with dict config in the list."""
         config_dict = {
             "trainer": {"_target_": "pytorch_lightning.Trainer", "max_epochs": 10},
             "system": {
@@ -286,9 +302,25 @@ system:
 
         runner = Runner()
         with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
-            runner.run(Stage.FIT, config_dict)
+            runner.run(Stage.FIT, [config_dict])
             assert runner.config is not None
             assert runner.config.get("trainer::max_epochs") == 10
+
+    def test_mixed_inputs_dict_and_overrides(self):
+        """Test mixing dict and overrides in inputs list."""
+        config_dict = {
+            "trainer": {"_target_": "pytorch_lightning.Trainer", "max_epochs": 10},
+            "system": {
+                "_target_": "lighter.System",
+                "model": {"_target_": "torch.nn.Identity"},
+                "dataloaders": {"train": {}, "val": {}},
+            },
+        }
+
+        runner = Runner()
+        with patch.object(runner, "_setup"), patch.object(runner, "_execute"):
+            runner.run(Stage.FIT, [config_dict, "trainer::max_epochs=50"])
+            assert runner.config.get("trainer::max_epochs") == 50
 
     def test_stage_modes_mapping(self):
         """Test that STAGE_MODES mapping is correct."""
@@ -355,7 +387,7 @@ system:
         }
 
         runner = Runner()
-        runner.config = Config.load(config_dict)
+        runner.config = Config().update(config_dict)
 
         mock_system = MagicMock(spec=System)
         mock_trainer = MagicMock(spec=Trainer)
@@ -386,7 +418,7 @@ system:
         }
 
         runner = Runner()
-        runner.config = Config.load(config_dict)
+        runner.config = Config().update(config_dict)
 
         mock_system = MagicMock(spec=System)
         mock_trainer = MagicMock(spec=Trainer)

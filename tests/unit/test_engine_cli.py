@@ -49,7 +49,7 @@ system:
             # Verify Runner was instantiated
             mock_runner_class.assert_called_once()
             # Verify run was called with correct arguments
-            mock_runner.run.assert_called_once_with("fit", temp_config_file, [])
+            mock_runner.run.assert_called_once_with("fit", [temp_config_file])
 
     def test_cli_fit_command_with_overrides(self, temp_config_file):
         """Test fit command with CLI overrides."""
@@ -70,8 +70,7 @@ system:
             # Verify run was called with overrides
             mock_runner.run.assert_called_once_with(
                 "fit",
-                temp_config_file,
-                ["trainer::max_epochs=5", "trainer::devices=2"],
+                [temp_config_file, "trainer::max_epochs=5", "trainer::devices=2"],
             )
 
     def test_cli_validate_command(self, temp_config_file):
@@ -84,7 +83,7 @@ system:
 
             cli()
 
-            mock_runner.run.assert_called_once_with("validate", temp_config_file, [])
+            mock_runner.run.assert_called_once_with("validate", [temp_config_file])
 
     def test_cli_validate_command_with_overrides(self, temp_config_file):
         """Test validate command with overrides."""
@@ -103,8 +102,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "validate",
-                temp_config_file,
-                ["system::model::weights=checkpoint.ckpt"],
+                [temp_config_file, "system::model::weights=checkpoint.ckpt"],
             )
 
     def test_cli_test_command(self, temp_config_file):
@@ -117,7 +115,7 @@ system:
 
             cli()
 
-            mock_runner.run.assert_called_once_with("test", temp_config_file, [])
+            mock_runner.run.assert_called_once_with("test", [temp_config_file])
 
     def test_cli_test_command_with_overrides(self, temp_config_file):
         """Test test command with overrides."""
@@ -137,8 +135,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "test",
-                temp_config_file,
-                ["trainer::devices=1", "system::model::dropout=0.5"],
+                [temp_config_file, "trainer::devices=1", "system::model::dropout=0.5"],
             )
 
     def test_cli_predict_command(self, temp_config_file):
@@ -151,7 +148,7 @@ system:
 
             cli()
 
-            mock_runner.run.assert_called_once_with("predict", temp_config_file, [])
+            mock_runner.run.assert_called_once_with("predict", [temp_config_file])
 
     def test_cli_predict_command_with_overrides(self, temp_config_file):
         """Test predict command with overrides."""
@@ -171,8 +168,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "predict",
-                temp_config_file,
-                ["system::model::weights=best.ckpt", "trainer::devices=4"],
+                [temp_config_file, "system::model::weights=best.ckpt", "trainer::devices=4"],
             )
 
     def test_cli_missing_command(self):
@@ -230,16 +226,17 @@ system:
 
             cli()
 
-            # Verify all overrides are passed
+            # Verify all inputs are passed (config file + overrides)
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
             assert args[0] == "fit"
-            assert args[1] == temp_config_file
-            assert len(args[2]) == 4
-            assert "trainer::max_epochs=100" in args[2]
-            assert "trainer::devices=2" in args[2]
-            assert "system::optimizer::lr=0.001" in args[2]
-            assert "system::optimizer::weight_decay=0.0001" in args[2]
+            assert isinstance(args[1], list)
+            assert args[1][0] == temp_config_file  # First item is config file
+            assert len(args[1]) == 5  # 1 config file + 4 overrides
+            assert "trainer::max_epochs=100" in args[1]
+            assert "trainer::devices=2" in args[1]
+            assert "system::optimizer::lr=0.001" in args[1]
+            assert "system::optimizer::weight_decay=0.0001" in args[1]
 
     def test_cli_all_stages_independent(self, temp_config_file):
         """Test that each stage command is independent."""
@@ -255,11 +252,11 @@ system:
                 cli()
 
                 # Verify correct stage is called
-                mock_runner.run.assert_called_once_with(stage, temp_config_file, [])
+                mock_runner.run.assert_called_once_with(stage, [temp_config_file])
 
-    def test_cli_comma_separated_configs_as_single_arg(self):
-        """Test that comma-separated config paths work as a single argument."""
-        test_args = ["lighter", "fit", "config1.yaml,config2.yaml"]
+    def test_cli_multiple_configs_as_separate_args(self):
+        """Test that multiple config paths work as separate arguments."""
+        test_args = ["lighter", "fit", "config1.yaml", "config2.yaml"]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
             mock_runner = MagicMock()
@@ -267,11 +264,10 @@ system:
 
             cli()
 
-            # Runner should receive the comma-separated string as-is
+            # Runner should receive both configs in the inputs list
             mock_runner.run.assert_called_once_with(
                 "fit",
-                "config1.yaml,config2.yaml",
-                [],
+                ["config1.yaml", "config2.yaml"],
             )
 
     def test_cli_override_with_equals_in_value(self, temp_config_file):
@@ -292,7 +288,7 @@ system:
             # Verify override is passed correctly
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "system::model::config=key1=value1" in args[2]
+            assert "system::model::config=key1=value1" in args[1]
 
     def test_cli_override_with_special_characters(self, temp_config_file):
         """Test overrides with special characters."""
@@ -311,10 +307,10 @@ system:
 
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "system::model::name=my-model_v1.0" in args[2]
+            assert "system::model::name=my-model_v1.0" in args[1]
 
     def test_cli_no_overrides(self, temp_config_file):
-        """Test that no overrides results in empty list."""
+        """Test that no overrides results in list with just config file."""
         test_args = ["lighter", "fit", temp_config_file]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -325,4 +321,5 @@ system:
 
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert args[2] == []  # Empty overrides list
+            assert args[0] == "fit"
+            assert args[1] == [temp_config_file]  # Just the config file, no overrides

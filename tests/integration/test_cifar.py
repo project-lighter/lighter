@@ -25,7 +25,7 @@ test_overrides = "./tests/integration/test_overrides.yaml"
     ],
 )
 @pytest.mark.slow
-def test_trainer_stage(stage: Stage, config: str):
+def test_trainer_stage(stage: Stage, config: str) -> None:
     """
     Test the specified stage using the given configuration.
     Args:
@@ -33,5 +33,5 @@ def test_trainer_stage(stage: Stage, config: str):
         config: Path to the configuration file.
     """
     runner = Runner()
-    runner.run(stage, config=f"{config},{test_overrides}")
+    runner.run(stage, [config, test_overrides])
     assert runner.trainer.state.finished, f"Stage {stage} did not finish successfully."
