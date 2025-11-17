@@ -44,13 +44,13 @@ class System(pl.LightningModule):
     def __init__(
         self,
         model: Module,
-        dataloaders: dict[str, DataLoader],
+        dataloaders: dict[str, DataLoader[Any]],
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
-        criterion: Callable | None = None,
+        criterion: Callable[..., Any] | None = None,
         metrics: dict[str, Metric | list[Metric] | dict[str, Metric]] | None = None,
-        adapters: dict[str, Callable] | None = None,
-        inferer: Callable | None = None,
+        adapters: dict[str, Callable[..., Any]] | None = None,
+        inferer: Callable[..., Any] | None = None,
     ) -> None:
         super().__init__()
 
@@ -62,16 +62,15 @@ class System(pl.LightningModule):
 
         #  Containers
         self.dataloaders = DataLoaders(**(dataloaders or {}))
-        self.metrics = Metrics(**(metrics or {}))
-        self.adapters = Adapters(**(adapters or {}))
+        self.metrics = Metrics(**(metrics or {}))  # type: ignore[arg-type]
+        self.adapters = Adapters(**(adapters or {}))  # type: ignore[arg-type]
 
         # Turn metrics container into a ModuleDict to register them properly.
-        self.metrics = PatchedModuleDict(asdict(self.metrics))
+        self.metrics = PatchedModuleDict(asdict(self.metrics))  # type: ignore[assignment]
 
-        self.mode = None
         self._setup_mode_hooks()
 
-    def _step(self, batch: dict, batch_idx: int) -> dict[str, Any] | Any:
+    def _step(self, batch: dict[str, Any], batch_idx: int) -> dict[str, Any] | Any:
         """
         Performs a step in the specified mode, processing the batch and calculating loss and metrics.
 
@@ -93,7 +92,38 @@ class System(pl.LightningModule):
         output = self._prepare_output(identifier, input, target, pred, loss, metrics)
         return output
 
-    def _prepare_batch(self, batch: dict) -> tuple[Any, Any, Any]:
+    def _get_current_mode(self) -> str:
+        """
+        Get the current execution mode from the trainer's state.
+
+        Returns:
+            The current mode (train, val, test, or predict).
+
+        Raises:
+            RuntimeError: If called outside of a trainer context or mode cannot be determined.
+        """
+        if self.trainer is None:
+            raise RuntimeError("System must be attached to a Trainer to determine mode.")
+
+        # During sanity checking, treat it as validation mode
+        if self.trainer.sanity_checking:
+            return Mode.VAL
+
+        if self.trainer.training:
+            return Mode.TRAIN
+        elif self.trainer.validating:
+            return Mode.VAL
+        elif self.trainer.testing:
+            return Mode.TEST
+        elif self.trainer.predicting:
+            return Mode.PREDICT
+        else:
+            raise RuntimeError(
+                "Unable to determine current mode. This method should only be called "
+                "during training, validation, testing, or prediction steps."
+            )
+
+    def _prepare_batch(self, batch: dict[str, Any]) -> tuple[Any, Any, Any]:
         """
         Prepares the batch data.
 
@@ -103,7 +133,8 @@ class System(pl.LightningModule):
         Returns:
             tuple: A tuple containing (input, target, identifier).
         """
-        adapters = getattr(self.adapters, self.mode)
+        mode = self._get_current_mode()
+        adapters = getattr(self.adapters, mode)  # type: ignore[arg-type]
         input, target, identifier = adapters.batch(batch)
         return input, target, identifier
 
@@ -119,14 +150,15 @@ class System(pl.LightningModule):
         """
 
         # Pass `epoch` and/or `step` argument to forward if it accepts them
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if hasarg(self.model.forward, Data.EPOCH):
             kwargs[Data.EPOCH] = self.current_epoch
         if hasarg(self.model.forward, Data.STEP):
             kwargs[Data.STEP] = self.global_step
 
         # Predict. Use inferer if available in val, test, and predict modes.
-        if self.inferer and self.mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
+        mode = self._get_current_mode()
+        if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
             return self.inferer(input, self.model, **kwargs)
         return self.model(input, **kwargs)
 
@@ -145,12 +177,13 @@ class System(pl.LightningModule):
         Raises:
             ValueError: If criterion is not specified in train/val mode or if loss dict is missing 'total' key.
         """
+        mode = self._get_current_mode()
         loss = None
-        if self.mode in [Mode.TRAIN, Mode.VAL]:
+        if mode in [Mode.TRAIN, Mode.VAL]:
             if self.criterion is None:
                 raise ValueError("Please specify 'system.criterion' in the config.")
 
-            adapters = getattr(self.adapters, self.mode)
+            adapters = getattr(self.adapters, mode)
             loss = adapters.criterion(self.criterion, input, target, pred)
 
             if isinstance(loss, dict) and "total" not in loss:
@@ -172,14 +205,15 @@ class System(pl.LightningModule):
         Returns:
             The calculated metrics or None if in predict mode or no metrics specified.
         """
-        if self.mode == Mode.PREDICT or self.metrics[self.mode] is None:
+        mode = self._get_current_mode()
+        if mode == Mode.PREDICT or self.metrics[mode] is None:  # type: ignore[index]
             return None
 
-        adapters = getattr(self.adapters, self.mode)
-        metrics = adapters.metrics(self.metrics[self.mode], input, target, pred)
+        adapters = getattr(self.adapters, mode)  # type: ignore[arg-type]
+        metrics = adapters.metrics(self.metrics[mode], input, target, pred)  # type: ignore[index]
         return metrics
 
-    def _log_stats(self, loss: Tensor | dict[str, Tensor], metrics: MetricCollection, batch_idx: int) -> None:
+    def _log_stats(self, loss: Tensor | dict[str, Tensor] | None, metrics: MetricCollection | None, batch_idx: int) -> None:
         """
         Logs the loss, metrics, and optimizer statistics.
 
@@ -191,26 +225,28 @@ class System(pl.LightningModule):
         if self.trainer.logger is None:
             return
 
+        mode = self._get_current_mode()
+
         # Loss
         if loss is not None:
             if not isinstance(loss, dict):
-                self._log(f"{self.mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
-                self._log(f"{self.mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
+                self._log(f"{mode}/{Data.LOSS}/{Data.STEP}", loss, on_step=True)
+                self._log(f"{mode}/{Data.LOSS}/{Data.EPOCH}", loss, on_epoch=True)
             else:
                 for name, subloss in loss.items():
-                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
-                    self._log(f"{self.mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
+                    self._log(f"{mode}/{Data.LOSS}/{name}/{Data.STEP}", subloss, on_step=True)
+                    self._log(f"{mode}/{Data.LOSS}/{name}/{Data.EPOCH}", subloss, on_epoch=True)
 
         # Metrics
         if metrics is not None:
             for name, metric in metrics.items():
-                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
-                self._log(f"{self.mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
+                self._log(f"{mode}/{Data.METRICS}/{name}/{Data.STEP}", metric, on_step=True)
+                self._log(f"{mode}/{Data.METRICS}/{name}/{Data.EPOCH}", metric, on_epoch=True)
 
         # Optimizer's lr, momentum, beta. Logged in train mode and once per epoch.
-        if self.mode == Mode.TRAIN and batch_idx == 0:
+        if mode == Mode.TRAIN and batch_idx == 0 and self.optimizer is not None:
             for name, optimizer_stat in get_optimizer_stats(self.optimizer).items():
-                self._log(f"{self.mode}/{name}", optimizer_stat, on_epoch=True)
+                self._log(f"{mode}/{name}", optimizer_stat, on_epoch=True)
 
     def _log(self, name: str, value: Any, on_step: bool = False, on_epoch: bool = False) -> None:
         """Log a key, value pair. Syncs across distributed nodes if `on_epoch` is True.
@@ -221,7 +257,8 @@ class System(pl.LightningModule):
             on_step (bool, optional): if True, logs on step.
             on_epoch (bool, optional): if True, logs on epoch with sync_dist=True.
         """
-        batch_size = getattr(self.dataloaders, self.mode).batch_size
+        mode = self._get_current_mode()
+        batch_size = getattr(self.dataloaders, mode).batch_size  # type: ignore[arg-type]
         self.log(name, value, logger=True, batch_size=batch_size, on_step=on_step, on_epoch=on_epoch, sync_dist=on_epoch)
 
     def _prepare_output(
@@ -247,7 +284,8 @@ class System(pl.LightningModule):
         Returns:
             dict: A dictionary containing all the step information.
         """
-        adapters = getattr(self.adapters, self.mode)
+        mode = self._get_current_mode()
+        adapters = getattr(self.adapters, mode)  # type: ignore[arg-type]
         input, target, pred = adapters.logging(input, target, pred)
         return {
             Data.IDENTIFIER: identifier,
@@ -260,7 +298,7 @@ class System(pl.LightningModule):
             Data.EPOCH: self.current_epoch,
         }
 
-    def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:
+    def configure_optimizers(self) -> dict[str, Optimizer | LRScheduler] | None:  # type: ignore[override]
         """
         Configures the optimizers and learning rate schedulers.
 
@@ -282,40 +320,17 @@ class System(pl.LightningModule):
         Sets up the training, validation, testing, and prediction hooks based on defined dataloaders.
         """
         if self.dataloaders.train is not None:
-            self.training_step = self._step
-            self.train_dataloader = lambda: self.dataloaders.train
-            self.on_train_start = lambda: self._on_mode_start(Mode.TRAIN)
-            self.on_train_end = self._on_mode_end
+            self.training_step = self._step  # type: ignore[method-assign]
+            self.train_dataloader = lambda: self.dataloaders.train  # type: ignore[method-assign]
         if self.dataloaders.val is not None:
-            self.validation_step = self._step
-            self.val_dataloader = lambda: self.dataloaders.val
-            self.on_validation_start = lambda: self._on_mode_start(Mode.VAL)
-            self.on_validation_end = self._on_mode_end
+            self.validation_step = self._step  # type: ignore[method-assign]
+            self.val_dataloader = lambda: self.dataloaders.val  # type: ignore[method-assign]
         if self.dataloaders.test is not None:
-            self.test_step = self._step
-            self.test_dataloader = lambda: self.dataloaders.test
-            self.on_test_start = lambda: self._on_mode_start(Mode.TEST)
-            self.on_test_end = self._on_mode_end
+            self.test_step = self._step  # type: ignore[method-assign]
+            self.test_dataloader = lambda: self.dataloaders.test  # type: ignore[method-assign]
         if self.dataloaders.predict is not None:
-            self.predict_step = self._step
-            self.predict_dataloader = lambda: self.dataloaders.predict
-            self.on_predict_start = lambda: self._on_mode_start(Mode.PREDICT)
-            self.on_predict_end = self._on_mode_end
-
-    def _on_mode_start(self, mode: str | None) -> None:
-        """
-        Sets the current mode at the start of a phase.
-
-        Args:
-            mode: The mode to set (train, val, test, or predict).
-        """
-        self.mode = mode
-
-    def _on_mode_end(self) -> None:
-        """
-        Resets the mode at the end of a phase.
-        """
-        self.mode = None
+            self.predict_step = self._step  # type: ignore[method-assign]
+            self.predict_dataloader = lambda: self.dataloaders.predict  # type: ignore[method-assign]
 
     @property
     def learning_rate(self) -> float:
@@ -327,10 +342,14 @@ class System(pl.LightningModule):
 
         Raises:
             ValueError: If there are multiple optimizer parameter groups.
+            RuntimeError: If no optimizer is configured.
         """
+        if self.optimizer is None:
+            raise RuntimeError("No optimizer configured.")
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
-        return self.optimizer.param_groups[0]["lr"]
+        lr: float = self.optimizer.param_groups[0]["lr"]
+        return lr
 
     @learning_rate.setter
     def learning_rate(self, value: float) -> None:
@@ -342,7 +361,10 @@ class System(pl.LightningModule):
 
         Raises:
             ValueError: If there are multiple optimizer parameter groups.
+            RuntimeError: If no optimizer is configured.
         """
+        if self.optimizer is None:
+            raise RuntimeError("No optimizer configured.")
         if len(self.optimizer.param_groups) > 1:
             raise ValueError("The learning rate is not available when there are multiple optimizer parameter groups.")
         self.optimizer.param_groups[0]["lr"] = value
