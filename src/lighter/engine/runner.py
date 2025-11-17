@@ -4,6 +4,7 @@ Contains the Runner class and CLI entry point.
 """
 
 import argparse
+from typing import Any
 
 from pytorch_lightning import Trainer, seed_everything
 from sparkwheel import Config, ValidationError
@@ -39,16 +40,18 @@ class Runner:
     def run(
         self,
         stage: Stage,
-        config: str | list[str] | dict,
-        overrides: list[str] | None = None,
+        inputs: list[Any],
     ) -> None:
         """
-        Run a training stage with configuration and overrides.
+        Run a training stage with configuration inputs.
 
         Args:
             stage: Stage to run (fit, validate, test, predict)
-            config: Config file path(s) or dict. If string, supports comma-separated paths.
-            overrides: List of CLI override strings in format "key::path=value"
+            inputs: List of config file paths, dicts, and/or overrides.
+                   Sparkwheel auto-detects based on content:
+                   - Strings without '=' → file paths
+                   - Strings with '=' → overrides
+                   - Dicts → merged into config
 
         Raises:
             ValueError: If config validation fails or required components are missing
@@ -56,17 +59,13 @@ class Runner:
         """
         seed_everything()
 
-        # Handle comma-separated config files
-        if isinstance(config, str) and "," in config:
-            config = config.split(",")
-
-        # Load config with CLI overrides and validation (all in one step!)
+        # Load config - Sparkwheel auto-detects files vs overrides
         try:
-            self.config = Config.from_cli(
-                config,
-                overrides or [],
-                schema=ConfigSchema,
-            )
+            self.config = Config(schema=ConfigSchema)
+
+            for item in inputs:
+                self.config.update(item)
+
         except ValidationError as e:
             raise ValueError(f"Configuration validation failed:\n{e}") from e
 
@@ -91,7 +90,7 @@ class Runner:
         all_modes = {Mode.TRAIN, Mode.VAL, Mode.TEST, Mode.PREDICT}
 
         # Build delete directives for unused modes
-        deletes = {}
+        deletes: dict[str, None] = {}
         for mode in all_modes - required:
             deletes[f"~system::dataloaders::{mode}"] = None
             deletes[f"~system::metrics::{mode}"] = None
@@ -188,18 +187,13 @@ def cli() -> None:
         epilog="Examples:\n"
         "  lighter fit config.yaml\n"
         "  lighter fit config.yaml system::optimizer::lr=0.001\n"
-        "  lighter fit base.yaml,experiment.yaml trainer::max_epochs=100",
+        "  lighter fit base.yaml experiment.yaml trainer::max_epochs=100",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     fit_parser.add_argument(
-        "config",
-        help="Path to config file(s), comma-separated for multiple files",
-    )
-    fit_parser.add_argument(
-        "overrides",
-        nargs="*",
-        default=[],
-        help='Configuration overrides in format "key::path=value"',
+        "inputs",
+        nargs="+",
+        help="Config files and overrides. Example: config.yaml system::optimizer::lr=0.001",
     )
 
     # Validate subcommand
@@ -213,14 +207,9 @@ def cli() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     validate_parser.add_argument(
-        "config",
-        help="Path to config file(s), comma-separated for multiple files",
-    )
-    validate_parser.add_argument(
-        "overrides",
-        nargs="*",
-        default=[],
-        help='Configuration overrides in format "key::path=value"',
+        "inputs",
+        nargs="+",
+        help="Config files and overrides. Example: config.yaml system::model::weights=checkpoint.ckpt",
     )
 
     # Test subcommand
@@ -232,14 +221,9 @@ def cli() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     test_parser.add_argument(
-        "config",
-        help="Path to config file(s), comma-separated for multiple files",
-    )
-    test_parser.add_argument(
-        "overrides",
-        nargs="*",
-        default=[],
-        help='Configuration overrides in format "key::path=value"',
+        "inputs",
+        nargs="+",
+        help="Config files and overrides. Example: config.yaml system::model::weights=checkpoint.ckpt",
     )
 
     # Predict subcommand
@@ -253,14 +237,9 @@ def cli() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     predict_parser.add_argument(
-        "config",
-        help="Path to config file(s), comma-separated for multiple files",
-    )
-    predict_parser.add_argument(
-        "overrides",
-        nargs="*",
-        default=[],
-        help='Configuration overrides in format "key::path=value"',
+        "inputs",
+        nargs="+",
+        help="Config files and overrides. Example: config.yaml system::model::weights=checkpoint.ckpt",
     )
 
     # Parse arguments
@@ -268,7 +247,7 @@ def cli() -> None:
 
     # Execute command
     try:
-        Runner().run(args.command, args.config, args.overrides)
+        Runner().run(args.command, args.inputs)
     except Exception as e:
         # Suppress exception chain to avoid duplicate tracebacks
         raise e from None
