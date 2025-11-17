@@ -54,12 +54,15 @@ This enables **one config for all stages**.
 
 ## Mode-Specific Behavior
 
+The System determines the current mode by querying PyTorch Lightning's trainer state (e.g., `trainer.training`, `trainer.validating`). This ensures the mode is always in sync with the trainer's internal state.
+
 ### Loss Calculation
 
 Loss is calculated only in **train** and **val** modes:
 
 ```python
-if self.mode in [Mode.TRAIN, Mode.VAL]:
+mode = self._get_current_mode()  # Queries trainer.training, trainer.validating, etc.
+if mode in [Mode.TRAIN, Mode.VAL]:
     loss = adapters.criterion(self.criterion, input, target, pred)
 ```
 
@@ -85,7 +88,8 @@ All sublosses logged automatically; `"total"` used for gradients.
 Metrics calculated in **train**, **val**, and **test** modes (not predict):
 
 ```python
-if self.mode == Mode.PREDICT or self.metrics[self.mode] is None:
+mode = self._get_current_mode()
+if mode == Mode.PREDICT or self.metrics[mode] is None:
     return None
 ```
 
@@ -112,7 +116,8 @@ No configuration needed—works automatically.
 In validation, testing, and prediction modes, an inferer can replace the forward pass:
 
 ```python
-if self.inferer and self.mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
+mode = self._get_current_mode()
+if self.inferer and mode in [Mode.VAL, Mode.TEST, Mode.PREDICT]:
     return self.inferer(input, self.model, **kwargs)
 return self.model(input, **kwargs)
 ```
@@ -175,7 +180,8 @@ class CustomSystem(System):
     def _log_stats(self, loss, metrics, batch_idx):
         super()._log_stats(loss, metrics, batch_idx)
         # Add custom logging
-        if self.mode == Mode.TRAIN:
+        mode = self._get_current_mode()
+        if mode == Mode.TRAIN:
             self.log("custom/my_metric", my_value)
 
     def on_train_epoch_end(self):
