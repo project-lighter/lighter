@@ -5,7 +5,7 @@ from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
 
 from lighter.callbacks.freezer import Freezer
-from lighter.system import System
+from lighter.model import LighterModule
 
 
 class DummyDataset(Dataset):
@@ -48,19 +48,49 @@ class DummyModel(Module):
         return x
 
 
+class DummyLighterModule(LighterModule):
+    """Concrete System implementation for testing."""
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        pred = self(x)
+        loss = self.criterion(pred, y)
+        return {"loss": loss}
+
+    def validation_step(self, batch, batch_idx):
+        return self.training_step(batch, batch_idx)
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        pred = self(x)
+        return {"pred": pred, "target": y}
+
+    def predict_step(self, batch, batch_idx):
+        return self(batch)
+
+    def train_dataloader(self):
+        return DataLoader(DummyDataset(), batch_size=32)
+
+    def val_dataloader(self):
+        return DataLoader(DummyDataset(), batch_size=32)
+
+
 @pytest.fixture
 def dummy_system():
     """
-    Fixture that creates a System instance with a dummy model for testing.
+    Fixture that creates a LighterModule instance with a dummy model for testing.
 
     Returns:
-        System: A configured system with DummyModel, SGD optimizer, and DummyDataset.
+        LighterModule: A configured module with DummyModel, SGD optimizer, and criterion.
     """
     model = DummyModel()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     criterion = torch.nn.BCEWithLogitsLoss()
-    train_dataloader = DataLoader(DummyDataset(), batch_size=32)
-    return System(model=model, criterion=criterion, optimizer=optimizer, dataloaders={"train": train_dataloader})
+    return DummyLighterModule(
+        network=model,
+        criterion=criterion,
+        optimizer=optimizer,
+    )
 
 
 def test_freezer_initialization():
@@ -92,9 +122,9 @@ def test_freezer_functionality(dummy_system):
     freezer = Freezer(names=["layer1.weight", "layer1.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert dummy_system.model.layer2.weight.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert dummy_system.network.layer2.weight.requires_grad
 
 
 def test_freezer_exceed_until_step(dummy_system):
@@ -106,15 +136,15 @@ def test_freezer_exceed_until_step(dummy_system):
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_step=0)
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
     # Test unfreezing after exceeding until_step
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_step=1)
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
 
 def test_freezer_exceed_until_epoch(dummy_system):
@@ -126,15 +156,15 @@ def test_freezer_exceed_until_epoch(dummy_system):
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_epoch=0)
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
     # Test unfreezing after exceeding until_epoch
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_epoch=1)
     trainer = Trainer(callbacks=[freezer], max_epochs=2)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
 
 def test_freezer_set_model_requires_grad(dummy_system):
@@ -146,21 +176,21 @@ def test_freezer_set_model_requires_grad(dummy_system):
         - Method correctly unfreezes specified parameters
     """
     freezer = Freezer(names=["layer1.weight", "layer1.bias"])
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=False)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=True)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=False)
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=True)
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
     # Test with exceptions
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], except_names=["layer1.bias"])
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=False)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=True)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=False)
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=True)
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
 
 def test_freezer_with_exceptions(dummy_system):
@@ -175,23 +205,23 @@ def test_freezer_with_exceptions(dummy_system):
     freezer = Freezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert dummy_system.model.layer2.weight.requires_grad
-    assert dummy_system.model.layer2.bias.requires_grad
-    assert not dummy_system.model.layer3.weight.requires_grad
-    assert not dummy_system.model.layer3.bias.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert dummy_system.network.layer2.weight.requires_grad
+    assert dummy_system.network.layer2.bias.requires_grad
+    assert not dummy_system.network.layer3.weight.requires_grad
+    assert not dummy_system.network.layer3.bias.requires_grad
 
     # Test with except_name_starts_with
     freezer = Freezer(name_starts_with=["layer"], except_name_starts_with=["layer2"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert dummy_system.model.layer2.weight.requires_grad
-    assert dummy_system.model.layer2.bias.requires_grad
-    assert not dummy_system.model.layer3.weight.requires_grad
-    assert not dummy_system.model.layer3.bias.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert dummy_system.network.layer2.weight.requires_grad
+    assert dummy_system.network.layer2.bias.requires_grad
+    assert not dummy_system.network.layer3.weight.requires_grad
+    assert not dummy_system.network.layer3.bias.requires_grad
 
 
 def test_freezer_except_name_starts_with(dummy_system):
@@ -206,12 +236,12 @@ def test_freezer_except_name_starts_with(dummy_system):
     freezer = Freezer(name_starts_with=["layer"], except_name_starts_with=["layer2"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert dummy_system.model.layer2.weight.requires_grad
-    assert dummy_system.model.layer2.bias.requires_grad
-    assert not dummy_system.model.layer3.weight.requires_grad
-    assert not dummy_system.model.layer3.bias.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert dummy_system.network.layer2.weight.requires_grad
+    assert dummy_system.network.layer2.bias.requires_grad
+    assert not dummy_system.network.layer3.weight.requires_grad
+    assert not dummy_system.network.layer3.bias.requires_grad
 
     # Test with both except_names and except_name_starts_with
     freezer = Freezer(
@@ -221,12 +251,12 @@ def test_freezer_except_name_starts_with(dummy_system):
     )
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert not dummy_system.model.layer2.weight.requires_grad
-    assert dummy_system.model.layer2.bias.requires_grad
-    assert dummy_system.model.layer3.weight.requires_grad
-    assert dummy_system.model.layer3.bias.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert not dummy_system.network.layer2.weight.requires_grad
+    assert dummy_system.network.layer2.bias.requires_grad
+    assert dummy_system.network.layer3.weight.requires_grad
+    assert dummy_system.network.layer3.bias.requires_grad
 
 
 def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
@@ -239,31 +269,31 @@ def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
         - Consistent freezing/unfreezing across multiple configurations
     """
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], except_names=["layer1.bias"])
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=False)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
-    freezer._set_model_requires_grad(dummy_system.model, requires_grad=True)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=False)
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
+    freezer._set_model_requires_grad(dummy_system.network, requires_grad=True)
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
     freezer = Freezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert not dummy_system.model.layer1.weight.requires_grad
-    assert not dummy_system.model.layer1.bias.requires_grad
-    assert dummy_system.model.layer2.weight.requires_grad
-    assert dummy_system.model.layer2.bias.requires_grad
-    assert not dummy_system.model.layer3.weight.requires_grad
-    assert not dummy_system.model.layer3.bias.requires_grad
+    assert not dummy_system.network.layer1.weight.requires_grad
+    assert not dummy_system.network.layer1.bias.requires_grad
+    assert dummy_system.network.layer2.weight.requires_grad
+    assert dummy_system.network.layer2.bias.requires_grad
+    assert not dummy_system.network.layer3.weight.requires_grad
+    assert not dummy_system.network.layer3.bias.requires_grad
 
     # Test with until_step and until_epoch
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_step=1)
     trainer = Trainer(callbacks=[freezer], max_epochs=1)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad
 
     freezer = Freezer(names=["layer1.weight", "layer1.bias"], until_epoch=1)
     trainer = Trainer(callbacks=[freezer], max_epochs=2)
     trainer.fit(dummy_system)
-    assert dummy_system.model.layer1.weight.requires_grad
-    assert dummy_system.model.layer1.bias.requires_grad
+    assert dummy_system.network.layer1.weight.requires_grad
+    assert dummy_system.network.layer1.bias.requires_grad

@@ -91,7 +91,7 @@ system:
             "lighter",
             "validate",
             temp_config_file,
-            "system::model::weights=checkpoint.ckpt",
+            "model::model::weights=checkpoint.ckpt",
         ]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -102,7 +102,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "validate",
-                [temp_config_file, "system::model::weights=checkpoint.ckpt"],
+                [temp_config_file, "model::model::weights=checkpoint.ckpt"],
             )
 
     def test_cli_test_command(self, temp_config_file):
@@ -124,7 +124,7 @@ system:
             "test",
             temp_config_file,
             "trainer::devices=1",
-            "system::model::dropout=0.5",
+            "model::model::dropout=0.5",
         ]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -135,7 +135,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "test",
-                [temp_config_file, "trainer::devices=1", "system::model::dropout=0.5"],
+                [temp_config_file, "trainer::devices=1", "model::model::dropout=0.5"],
             )
 
     def test_cli_predict_command(self, temp_config_file):
@@ -156,7 +156,7 @@ system:
             "lighter",
             "predict",
             temp_config_file,
-            "system::model::weights=best.ckpt",
+            "model::model::weights=best.ckpt",
             "trainer::devices=4",
         ]
 
@@ -168,7 +168,7 @@ system:
 
             mock_runner.run.assert_called_once_with(
                 "predict",
-                [temp_config_file, "system::model::weights=best.ckpt", "trainer::devices=4"],
+                [temp_config_file, "model::model::weights=best.ckpt", "trainer::devices=4"],
             )
 
     def test_cli_missing_command(self):
@@ -216,8 +216,8 @@ system:
             temp_config_file,
             "trainer::max_epochs=100",
             "trainer::devices=2",
-            "system::optimizer::lr=0.001",
-            "system::optimizer::weight_decay=0.0001",
+            "model::optimizer::lr=0.001",
+            "model::optimizer::weight_decay=0.0001",
         ]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -235,8 +235,8 @@ system:
             assert len(args[1]) == 5  # 1 config file + 4 overrides
             assert "trainer::max_epochs=100" in args[1]
             assert "trainer::devices=2" in args[1]
-            assert "system::optimizer::lr=0.001" in args[1]
-            assert "system::optimizer::weight_decay=0.0001" in args[1]
+            assert "model::optimizer::lr=0.001" in args[1]
+            assert "model::optimizer::weight_decay=0.0001" in args[1]
 
     def test_cli_all_stages_independent(self, temp_config_file):
         """Test that each stage command is independent."""
@@ -276,7 +276,7 @@ system:
             "lighter",
             "fit",
             temp_config_file,
-            "system::model::config=key1=value1",
+            "model::model::config=key1=value1",
         ]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -288,7 +288,7 @@ system:
             # Verify override is passed correctly
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "system::model::config=key1=value1" in args[1]
+            assert "model::model::config=key1=value1" in args[1]
 
     def test_cli_override_with_special_characters(self, temp_config_file):
         """Test overrides with special characters."""
@@ -296,7 +296,7 @@ system:
             "lighter",
             "fit",
             temp_config_file,
-            "system::model::name=my-model_v1.0",
+            "model::model::name=my-model_v1.0",
         ]
 
         with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
@@ -307,7 +307,7 @@ system:
 
             mock_runner.run.assert_called_once()
             _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "system::model::name=my-model_v1.0" in args[1]
+            assert "model::model::name=my-model_v1.0" in args[1]
 
     def test_cli_no_overrides(self, temp_config_file):
         """Test that no overrides results in list with just config file."""

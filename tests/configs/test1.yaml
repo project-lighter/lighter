@@ -1,12 +1,3 @@
 _requires_: ["$import os"]
 vars:
   some_var: "value"
-args:
-  fit:
-    some_arg: "value"
-  validate:
-    some_arg: "value"
-  predict:
-    some_arg: "value"
-  test:
-    some_arg: "value"
