@@ -33,431 +33,332 @@ pip install lighter
 </div>
 </br>
 
-<!-- Body -->
+**YAML configuration for PyTorch Lightning experiments**
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle }  __From Idea to Experiment in Seconds__
+-   :material-rocket-launch:{ .lg .middle } **Fast Iteration**
 
     ---
 
-    No boilerplate. No training loops. Just define your model, data, and optimizer in YAML and run `lighter fit config.yaml`.
+    Change hyperparameters from CLI without editing code.
 
--   :material-refresh:{ .lg .middle }  __100% Reproducible__
+    ```bash
+    lighter fit config.yaml model::lr=0.01
+    ```
 
-    ---
-
-    Every experiment is a YAML file. Version control configs like code. Share experiments with collaborators. No hidden state.
-
--   :material-tune:{ .lg .middle }  __Hyperparameter Sweeps Made Easy__
+-   :material-refresh:{ .lg .middle } **Reproducible**
 
     ---
 
-    Override any parameter from CLI: `lighter fit config.yaml system::optimizer::lr=0.01`. Run 100 experiments without editing files.
+    One YAML file = one experiment. Version control configs like code.
 
--   :material-puzzle-outline:{ .lg .middle }  __Task-Agnostic Adapters__
-
-    ---
-
-    Classification, segmentation, or self-supervised learning? Adapters handle any data format. One system, unlimited tasks.
-
--   :material-feather:{ .lg .middle }  __~1,000 Lines of Code__
+-   :material-lightning-bolt:{ .lg .middle } **Pure Lightning**
 
     ---
 
-    Read the entire framework in an afternoon. Debug easily. Understand exactly what's happening. No magic.
-
--   :material-lightning-bolt:{ .lg .middle }  __Built on PyTorch Lightning__
-
-    ---
-
-    Multi-GPU, mixed precision, gradient accumulation, profiling—all Lightning features work out of the box.
+    Use any LightningModule. Full PyTorch Lightning power. Zero lock-in.
 
 </div>
 
-## Quick Start: 60 Seconds
+## What is Lighter?
 
-<div class="annotate" markdown>
+Lighter runs PyTorch Lightning experiments from YAML configs instead of hardcoded Python values.
 
-1. **Install Lighter**
+**You write Lightning code. Lighter handles configuration.**
 
-    ```bash
-    pip install lighter
-    ```
+```python title="model.py"
+import pytorch_lightning as pl
 
-2. **Create a config** (`config.yaml`)
+class MyModule(pl.LightningModule):
+    def __init__(self, learning_rate=0.001):
+        super().__init__()
+        self.lr = learning_rate
+        # ... your model code ...
 
-    ```yaml
-    trainer:
-      _target_: pytorch_lightning.Trainer
-      max_epochs: 10
+    def training_step(self, batch, batch_idx):
+        # ... your training logic ...
+        return loss
+```
 
-    system:
-      _target_: lighter.System
-      model:
-        _target_: torchvision.models.resnet18
-        num_classes: 10
-      criterion:
-        _target_: torch.nn.CrossEntropyLoss
-      optimizer:
-        _target_: torch.optim.Adam
-        params: "$@system::model.parameters()"
-        lr: 0.001
-      dataloaders:
-        train: # (1)!
-          _target_: torch.utils.data.DataLoader
-          batch_size: 32
-          dataset:
-            _target_: torchvision.datasets.CIFAR10
-            root: ./data
-            train: true
-            download: true
-            transform:
-              _target_: torchvision.transforms.ToTensor
-    ```
+```yaml title="config.yaml"
+model:
+  _target_: project.model.MyModule  # Auto-discovered with __lighter__.py
+  learning_rate: 0.001
 
-    1. Define your data like any PyTorch component
+trainer:
+  max_epochs: 10
+```
 
-3. **Run training**
+```bash
+# Run it
+lighter fit config.yaml
 
-    ```bash
-    lighter fit config.yaml
-    ```
+# Override from CLI
+lighter fit config.yaml model::learning_rate=0.01
+```
 
-That's it. Automatic training loops, validation, checkpointing, and logging.
+## Two Approaches, Same Power
+
+Choose the approach that fits your workflow:
+
+<div class="grid" markdown>
+
+<div markdown>
+
+### :material-code-braces: LightningModule
+
+**Best for:**
+
+- Existing Lightning projects
+- Custom training logic
+- Full control over everything
+
+**You write:**
+
+- All step methods
+- `configure_optimizers()`
+- Your own logging
+
+**Lighter adds:**
+
+- YAML configuration
+- CLI overrides
+- Experiment tracking
+
+[Learn more →](guides/lightning-module.md)
 
 </div>
 
-!!! tip "Experiment with different hyperparameters"
-    ```bash
-    # Change learning rate without editing files
-    lighter fit config.yaml system::optimizer::lr=0.01
+<div markdown>
 
-    # Train longer
-    lighter fit config.yaml trainer::max_epochs=100
+### :material-auto-fix: LighterModule
 
-    # Use multiple GPUs
-    lighter fit config.yaml trainer::devices=4
-    ```
+**Best for:**
 
+- New projects
+- Standard workflows
+- Less boilerplate
 
-## Lighter vs. PyTorch Lightning
+**You write:**
 
-!!! abstract "Same Power, Different Interface"
-    Lighter uses PyTorch Lightning under the hood. You get all Lightning features (multi-GPU, callbacks, profilers) but define experiments in YAML instead of Python classes.
+- Step implementations only
+- Your model's forward logic
 
-See how training a model on CIFAR-10 differs:
+**Lighter adds:**
 
-=== "Lighter"
-    ```bash title="Terminal"
-    lighter fit config.yaml
+- Automatic `configure_optimizers()`
+- Dual logging (step + epoch)
+- Config-driven everything
+
+[Learn more →](guides/lighter-module.md)
+
+</div>
+
+</div>
+
+!!! tip "You can switch anytime"
+    Both approaches use the same config system. Start with one, switch to the other by changing `_target_`. No code rewrite needed.
+
+## Quick Comparison
+
+=== "LightningModule"
+
+    ```python title="model.py"
+    import pytorch_lightning as pl
+    import torch.nn.functional as F
+
+    class MyModule(pl.LightningModule):
+        def __init__(self, network, learning_rate=0.001):
+            super().__init__()
+            self.network = network
+            self.lr = learning_rate
+
+        def training_step(self, batch, batch_idx):
+            x, y = batch
+            loss = F.cross_entropy(self.network(x), y)
+            self.log("train/loss", loss)
+            return loss
+
+        def configure_optimizers(self):
+            return torch.optim.Adam(self.parameters(), lr=self.lr)
     ```
 
     ```yaml title="config.yaml"
     trainer:
       _target_: pytorch_lightning.Trainer
-      max_epochs: 2
+      max_epochs: 10
 
-    system:
-      _target_: lighter.System
-
-      model:
+    model:
+      _target_: project.model.MyModule  # project.file.Class
+      network:
         _target_: torchvision.models.resnet18
         num_classes: 10
+      learning_rate: 0.001
 
-      criterion:
-        _target_: torch.nn.CrossEntropyLoss
-
-      optimizer:
-        _target_: torch.optim.Adam
-        params: "$@system::model.parameters()"
-        lr: 0.001
-
-      dataloaders:
-        train:
-          _target_: torch.utils.data.DataLoader
-          batch_size: 32
-          shuffle: true
-          dataset:
-            _target_: torchvision.datasets.CIFAR10
-            download: true
-            root: .datasets
-            train: true
-            transform:
-              _target_: torchvision.transforms.Compose
-              transforms:
-                - _target_: torchvision.transforms.ToTensor
-                - _target_: torchvision.transforms.Normalize
-                  mean: [0.5, 0.5, 0.5]
-                  std: [0.5, 0.5, 0.5]
+    data:
+      _target_: lighter.LighterDataModule
+      train_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: 32
+        dataset:
+          _target_: torchvision.datasets.CIFAR10
+          root: ./data
+          train: true
+          download: true
     ```
 
-    **Benefits:**
-
-    - :material-check: Experiment is self-documenting
-    - :material-check: Change hyperparameters from CLI without editing files
-    - :material-check: Version control and compare configs with git diff
-    - :material-check: Share experiments as single files
-
-=== "PyTorch Lightning"
-    ```bash title="Terminal"
-    python cifar10.py
+    ```bash
+    lighter fit config.yaml
     ```
 
-    ```py title="cifar10.py"
-    from pytorch_lightning import Trainer, LightningModule
-    from torch.nn import CrossEntropyLoss
-    from torch.optim import Adam
-    from torch.utils.data import DataLoader
-    from torchvision.models import resnet18
-    from torchvision.datasets import CIFAR10
-    from torchvision.transforms import ToTensor, Normalize, Compose
+=== "LighterModule"
 
+    ```python title="model.py"
+    from lighter import LighterModule
 
-    class Model(LightningModule):
-        def __init__(self):
-            super().__init__()
-            self.model = resnet18(num_classes=10)
-            self.criterion = CrossEntropyLoss()
-
-        def forward(self, x):
-            return self.model(x)
-
+    class MyModel(LighterModule):
         def training_step(self, batch, batch_idx):
             x, y = batch
-            y_hat = self(x)
-            loss = self.criterion(y_hat, y)
-            return loss
+            pred = self(x)
+            loss = self.criterion(pred, y)
 
-        def configure_optimizers(self):
-            return Adam(self.model.parameters(), lr=0.001)
+            if self.train_metrics:
+                self.train_metrics(pred, y)
 
+            return {"loss": loss}
 
-    transform = Compose([
-        ToTensor(),
-        Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
+        def validation_step(self, batch, batch_idx):
+            x, y = batch
+            pred = self(x)
+            loss = self.criterion(pred, y)
 
-    train_dataset = CIFAR10(
-        root=".datasets",
-        train=True,
-        download=True,
-        transform=transform
-    )
+            if self.val_metrics:
+                self.val_metrics(pred, y)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-    model = Model()
-    trainer = Trainer(max_epochs=2)
-    trainer.fit(model, train_loader)
+            return {"loss": loss}
     ```
 
-    **Challenges:**
+    ```yaml title="config.yaml"
+    trainer:
+      _target_: pytorch_lightning.Trainer
+      max_epochs: 10
 
-    - :material-close: Need to edit Python code for hyperparameter changes
-    - :material-close: Harder to compare experiments (code vs config)
-    - :material-close: More boilerplate for each experiment
+    model:
+      _target_: project.model.MyModel  # project.file.Class
+      network:
+        _target_: torchvision.models.resnet18
+        num_classes: 10
+      criterion:
+        _target_: torch.nn.CrossEntropyLoss
+      optimizer:
+        _target_: torch.optim.Adam
+        params: "$@model::network.parameters()"
+        lr: 0.001
+      train_metrics:
+        - _target_: torchmetrics.Accuracy
+          task: multiclass
+          num_classes: 10
+      val_metrics: "%model::train_metrics"
 
----
+    data:
+      _target_: lighter.LighterDataModule
+      train_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: 32
+        dataset:
+          _target_: torchvision.datasets.CIFAR10
+          root: ./data
+          train: true
+          download: true
+    ```
 
-## Who Should Use Lighter?
+    ```bash
+    lighter fit config.yaml
+    ```
 
-<div class="grid" markdown>
+## Why Lighter?
 
-<div markdown>
+### Reproducibility
 
-### :material-check-circle:{ .green } **Perfect For**
+One YAML = one experiment. Version control, share, compare.
 
-- **Researchers** running many experiments with hyperparameter variations
-- **Teams** sharing reproducible experiments and baselines
-- **Engineers** who value configuration over code for ML pipelines
-- **Anyone** tired of writing boilerplate training loops
-
-[Get Started →](tutorials/get-started.md){ .md-button .md-button--primary }
-
-</div>
-
-<div markdown>
-
-### :material-information:{ .blue } **Consider Alternatives If**
-
-- You need highly custom training loops with exotic logic
-- You prefer pure Python workflows without YAML
-- You're doing rapid prototyping where code is faster than config
-- Your project has few experimental variations
-
-[Compare Frameworks →](design/overview.md#framework-comparison){ .md-button }
-
-</div>
-
-</div>
-
----
-
-## Key Features in Depth
-
-### Configuration-Driven Everything
-
-Every component is defined in YAML. Model, optimizer, scheduler, metrics, data—all configurable.
-
-```yaml
-# Differential learning rates? Easy.
-optimizer:
-  _target_: torch.optim.SGD
-  params:
-    - params: "$@system::model.backbone.parameters()"
-      lr: 0.0001  # Low LR for pretrained backbone
-    - params: "$@system::model.head.parameters()"
-      lr: 0.01    # High LR for new head
+```bash
+git diff experiment_v1.yaml experiment_v2.yaml
 ```
 
-[Learn Config Syntax →](how-to/configuration.md)
+See exactly what changed between experiments.
 
-### Task-Agnostic Adapters
+### Fast Iteration
 
-Adapters transform data between pipeline stages. This makes Lighter work for **any** task.
+Override any config value from CLI:
 
-```yaml
-# Dict-based dataset? No problem.
-system:
-  adapters:
-    train:
-      batch:
-        _target_: lighter.adapters.BatchAdapter
-        input_accessor: "image"   # Extract from dict
-        target_accessor: "label"
+```bash
+# Change learning rate
+lighter fit config.yaml model::lr=0.01
+
+# Use more GPUs
+lighter fit config.yaml trainer::devices=4
+
+# Combine multiple changes
+lighter fit config.yaml model::lr=0.01 trainer::max_epochs=100
 ```
 
-Classification, segmentation, detection, self-supervised learning—adapters handle it all.
+### No Lock-In
 
-[Learn About Adapters →](how-to/adapters.md)
+Lighter is a thin layer over PyTorch Lightning:
 
-### Built on Solid Foundations
+- Use **any** LightningModule
+- Use **any** Lightning callback
+- Use **any** Lightning logger
+- Switch back to pure Lightning anytime
 
-- **PyTorch Lightning** - Battle-tested training engine with multi-GPU, profiling, callbacks
-- **[Sparkwheel](https://project-lighter.github.io/sparkwheel/)** - Powerful config system with references, expressions, and validation
-- **~1,000 lines** - Read the entire framework, understand exactly what's happening
+## Installation
 
-[Architecture Deep Dive →](design/overview.md)
+```bash
+pip install lighter
+```
 
----
+## Get Started
 
-## Choose Your Path
+Ready to try it? Pick your path:
 
 <div class="grid cards" markdown>
 
--   :material-school:{ .lg .middle }  __New to Lighter?__
+-   :material-rocket:{ .lg .middle } **Quick Start**
 
     ---
 
-    **Start here:** Follow our comprehensive tutorial from installation to running your first experiments.
+    Get a model training in 10 minutes.
 
-    Time: 15 minutes
+    [:octicons-arrow-right-24: Quick Start](quickstart.md)
 
-    [:octicons-arrow-right-24: Get Started Tutorial](tutorials/get-started.md)
-
--   :material-lightning-bolt:{ .lg .middle }  __PyTorch Lightning User?__
+-   :material-book-open-variant:{ .lg .middle } **Complete Examples**
 
     ---
 
-    **Migration guide:** Translate your existing Lightning code to Lighter configs in minutes.
+    Full, working code you can copy-paste.
 
-    Time: 10 minutes
+    [:octicons-arrow-right-24: Examples](examples/image-classification.md)
 
-    [:octicons-arrow-right-24: Migration Guide](migration/from-pytorch-lightning.md)
-
--   :material-book-open-variant:{ .lg .middle }  __Learn the Syntax__
+-   :material-school:{ .lg .middle } **Guides**
 
     ---
 
-    **Configuration reference:** Master Sparkwheel syntax: `_target_`, references (`@` and `%`), expressions (`$`), and path notation (`::`).
+    Task-focused how-to guides.
 
-    Time: 20 minutes
-
-    [:octicons-arrow-right-24: Configuration Guide](how-to/configuration.md)
-
--   :material-code-braces:{ .lg .middle }  __Ready-to-Use Examples__
-
-    ---
-
-    **Recipes & patterns:** Copy-paste configs for common scenarios and best practices.
-
-    Time: 5 minutes per recipe
-
-    [:octicons-arrow-right-24: View Recipes](how-to/recipes.md)
-
--   :material-puzzle-outline:{ .lg .middle }  __Understand Adapters__
-
-    ---
-
-    **Core concept:** Learn how adapters make Lighter task-agnostic and infinitely flexible.
-
-    Time: 15 minutes
-
-    [:octicons-arrow-right-24: Adapter Pattern](how-to/adapters.md)
-
--   :material-lightbulb:{ .lg .middle }  __Architecture & Philosophy__
-
-    ---
-
-    **Deep dive:** Understand the design decisions and how Lighter works internally.
-
-    Time: 30 minutes
-
-    [:octicons-arrow-right-24: Design Overview](design/overview.md)
+    [:octicons-arrow-right-24: Guides](guides/configuration.md)
 
 </div>
 
----
+## Community
 
-## Community & Support
+- [:fontawesome-brands-discord: Discord](https://discord.gg/zJcnp6KrUp) - Get help, share configs
+- [:fontawesome-brands-github: GitHub](https://github.com/project-lighter/lighter) - Report issues, contribute
+- [:material-file-document: Paper](https://joss.theoj.org/papers/10.21105/joss.08101) - Cite us
 
-<div class="grid" markdown>
+## What Next?
 
-<div markdown>
-
-### :material-account-group: Get Help
-
-[:fontawesome-brands-discord: Discord](https://discord.gg/zJcnp6KrUp) - Chat with the community
-
-[:material-frequently-asked-questions: FAQ](faq.md) - Common questions answered
-
-[:material-bug: GitHub Issues](https://github.com/project-lighter/lighter/issues) - For bugs and features
-
-[:material-book-open-page-variant: Troubleshooting](how-to/troubleshooting.md) - Common problems
-
-</div>
-
-<div markdown>
-
-### :material-star: Contribute
-
-[:fontawesome-brands-github: GitHub](https://github.com/project-lighter/lighter) - Star the repo
-
-[:material-file-document-edit: Documentation](https://github.com/project-lighter/lighter/tree/main/docs) - Improve the docs
-
-[:material-code-tags: Examples](https://github.com/project-lighter/lighter/tree/main/projects) - Share your configs
-
-</div>
-
-</div>
-
-
-## Cite
-
-If you find it useful, please cite our [*Journal of Open Source Software* paper](https://joss.theoj.org/papers/10.21105/joss.08101):
-
-```bibtex
-@article{lighter,
-    doi = {10.21105/joss.08101},
-    url = {https://doi.org/10.21105/joss.08101},
-    year = {2025},
-    publisher = {The Open Journal},
-    volume = {10},
-    number = {111},
-    pages = {8101},
-    author = {Hadzic, Ibrahim and Pai, Suraj and Bressem, Keno and Foldyna, Borek and Aerts, Hugo JWL},
-    title = {Lighter: Configuration-Driven Deep Learning},
-    journal = {Journal of Open Source Software}
-}
-```
+- [**Quick Start** - 10 minutes to running model](quickstart.md)
+- [**Configuration Guide** - Learn the syntax](guides/configuration.md)
+- [**FAQ** - Common questions](faq.md)
