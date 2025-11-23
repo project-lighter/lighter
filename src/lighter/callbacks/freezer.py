@@ -8,7 +8,7 @@ from loguru import logger
 from pytorch_lightning import Callback, Trainer
 from torch.nn import Module
 
-from lighter import System
+from lighter import LighterModule
 from lighter.utils.misc import ensure_list
 
 
@@ -57,101 +57,91 @@ class Freezer(Callback):
 
         self._frozen_state = False
 
-    def on_train_batch_start(self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int) -> None:
+    def on_train_batch_start(self, trainer: Trainer, pl_module: LighterModule, batch: Any, batch_idx: int) -> None:
         """
-        Called at the start of each training batch to potentially freeze parameters.
+        Called at the start of each training batch to freeze or unfreeze model parameters.
 
         Args:
             trainer: The trainer instance.
-            pl_module: The System instance.
+            pl_module: The LighterModule instance.
             batch: The current batch.
             batch_idx: The index of the batch.
-        """
-        self._on_batch_start(trainer, pl_module)
-
-    def on_validation_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def on_test_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def on_predict_batch_start(
-        self, trainer: Trainer, pl_module: System, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
-        self._on_batch_start(trainer, pl_module)
-
-    def _on_batch_start(self, trainer: Trainer, pl_module: System) -> None:
-        """
-        Freezes or unfreezes model parameters based on the current step or epoch.
-
-        Args:
-            trainer: The trainer instance.
-            pl_module: The System instance.
         """
         current_step = trainer.global_step
         current_epoch = trainer.current_epoch
 
-        if self.until_step is not None and current_step >= self.until_step:
+        # Unfreeze if the step or epoch limit has been reached.
+        unfreeze_step = self.until_step is not None and current_step >= self.until_step
+        unfreeze_epoch = self.until_epoch is not None and current_epoch >= self.until_epoch
+        if unfreeze_step or unfreeze_epoch:
             if self._frozen_state:
-                logger.info(f"Reached step {self.until_step} - unfreezing the previously frozen layers.")
-                self._set_model_requires_grad(pl_module, True)
+                logger.info("Unfreezing the model.")
+                self._set_model_requires_grad(pl_module, requires_grad=True)
+                self._frozen_state = False
             return
 
-        if self.until_epoch is not None and current_epoch >= self.until_epoch:
-            if self._frozen_state:
-                logger.info(f"Reached epoch {self.until_epoch} - unfreezing the previously frozen layers.")
-                self._set_model_requires_grad(pl_module, True)
-            return
-
+        # Freeze if not already frozen.
         if not self._frozen_state:
-            self._set_model_requires_grad(pl_module, False)
+            logger.info("Freezing the model.")
+            self._set_model_requires_grad(pl_module, requires_grad=False)
+            self._frozen_state = True
 
-    def _set_model_requires_grad(self, model: Module | System, requires_grad: bool) -> None:
+    def _set_model_requires_grad(self, model: Module | LighterModule, requires_grad: bool) -> None:
         """
-        Sets the requires_grad attribute for model parameters, effectively freezing or unfreezing them.
+        Sets the `requires_grad` attribute for model parameters.
+
+        When freezing (requires_grad=False):
+        - Freeze specified parameters
+        - Keep all others trainable (requires_grad=True)
+        - Respect exception rules
+
+        When unfreezing (requires_grad=True):
+        - Unfreeze specified parameters
+        - Keep all others trainable
 
         Args:
             model: The model whose parameters to modify.
             requires_grad: Whether to allow gradients (unfreeze) or not (freeze).
         """
-        # If the model is a `System`, get the underlying PyTorch model.
-        if isinstance(model, System):
-            model = model.model
+        # If the model is a `LighterModule`, get the underlying PyTorch network.
+        if isinstance(model, LighterModule):
+            model = model.network
 
         frozen_layers = []
-        # Freeze the specified parameters.
+        unfrozen_layers = []
+
         for name, param in model.named_parameters():
-            # Leave the excluded-from-freezing parameters trainable.
-            if self.except_names and name in self.except_names:
+            # Check if the parameter should be excluded from freezing.
+            is_excepted = (self.except_names and name in self.except_names) or (
+                self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with)
+            )
+            if is_excepted:
+                # Exceptions are always trainable
                 param.requires_grad = True
+                if not requires_grad:  # Only log when we're in freezing mode
+                    unfrozen_layers.append(name)
                 continue
-            if self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with):
+
+            # Check if the parameter should be frozen/unfrozen.
+            is_to_freeze = (self.names and name in self.names) or (
+                self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with)
+            )
+            if is_to_freeze:
+                param.requires_grad = requires_grad
+                if not requires_grad:
+                    frozen_layers.append(name)
+                else:
+                    unfrozen_layers.append(name)
+            else:
+                # Not specified and not excepted - keep trainable
                 param.requires_grad = True
-                continue
 
-            # Freeze/unfreeze the specified parameters, based on the `requires_grad` argument.
-            if self.names and name in self.names:
-                param.requires_grad = requires_grad
-                frozen_layers.append(name)
-                continue
-            if self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with):
-                param.requires_grad = requires_grad
-                frozen_layers.append(name)
-                continue
-
-            # Otherwise, leave the parameter trainable.
-            param.requires_grad = True
-
-        self._frozen_state = not requires_grad
-        # Log only when freezing the parameters.
-        if self._frozen_state:
+        # Log the frozen/unfrozen layers.
+        if frozen_layers:
             logger.info(
-                f"Setting requires_grad={requires_grad} the following layers"
+                f"Froze layers: {frozen_layers}"
                 + (f" until step {self.until_step}" if self.until_step is not None else "")
                 + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
-                + f": {frozen_layers}"
             )
+        if unfrozen_layers and requires_grad:  # Only log unfrozen when explicitly unfreezing
+            logger.info(f"Unfroze layers: {unfrozen_layers}")
