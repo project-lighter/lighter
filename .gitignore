@@ -168,6 +168,8 @@ projects/*
 # !projects/03_multi_task_learning
 # !projects/04_image_segmentation
 
+**/outputs/
+
 # Coding agents
 CLAUDE.md
 GEMINI.md

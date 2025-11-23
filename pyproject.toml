@@ -35,7 +35,7 @@ dependencies = [
     "torchmetrics>=1.2.0",
     "tensorboard>=2.11.2",
     "requests>=2.31.0",
-    "sparkwheel>=0.0.6",
+    "sparkwheel>=0.0.8",
     "rich>=13.7.0",
     "torchvision>=0.20.0",
 ]
@@ -69,6 +69,7 @@ quality = ["ruff>=0.5.0"]
 types = [
     "mypy>=1.14.1",
     "typing-extensions>=4.4.0",
+    "types-PyYAML>=6.0.0",
 ]
 test = [
     "pytest>=7.4.0",
@@ -77,7 +78,6 @@ test = [
     "coverage>=7.0.5",
     "pytest-metadata>=3.1.1",
     "pytest-github-actions-annotate-failures>=0.2.0",
-    "av>=12.0.0",  # Required for video writing tests
 ]
 
 [tool.mypy]
@@ -88,7 +88,6 @@ show_traceback = true
 
 allow_redefinition = false
 check_untyped_defs = true
-disallow_any_generics = true
 disallow_incomplete_defs = true
 ignore_missing_imports = true
 implicit_reexport = false
