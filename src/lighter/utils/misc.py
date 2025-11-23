@@ -8,7 +8,7 @@ from typing import Any, Callable
 from torch.optim.optimizer import Optimizer
 
 
-def ensure_list(input: Any) -> list[Any]:
+def ensure_list(input: Any) -> list:
     """
     Ensures that the input is wrapped in a list. If the input is None, returns an empty list.
 
@@ -27,7 +27,7 @@ def ensure_list(input: Any) -> list[Any]:
     return [input]
 
 
-def setattr_dot_notation(obj: Callable[..., Any], attr: str, value: Any) -> None:
+def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
     """
     Sets an attribute on an object using dot notation.
 
@@ -46,7 +46,7 @@ def setattr_dot_notation(obj: Callable[..., Any], attr: str, value: Any) -> None
         setattr_dot_notation(getattr(obj, obj_name), attr, value)
 
 
-def hasarg(fn: Callable[..., Any], arg_name: str) -> bool:
+def hasarg(fn: Callable, arg_name: str) -> bool:
     """
     Checks if a callable (function, method, or class) has a specific argument.
 
@@ -61,7 +61,7 @@ def hasarg(fn: Callable[..., Any], arg_name: str) -> bool:
     return arg_name in args
 
 
-def get_name(_callable: Callable[..., Any], include_module_name: bool = False) -> str:
+def get_name(_callable: Callable, include_module_name: bool = False) -> str:
     """
     Retrieves the name of a callable, optionally including the module name.
 
@@ -85,9 +85,9 @@ def get_name(_callable: Callable[..., Any], include_module_name: bool = False) -
 
 def get_optimizer_stats(optimizer: Optimizer) -> dict[str, float]:
     """
-    Extract learning rates and momentum values from a PyTorch optimizer.
+    Extract hyperparameters from a PyTorch optimizer.
 
-    Collects learning rate and momentum/beta values from each parameter group
+    Collects learning rate and other key hyperparameters from each parameter group
     in the optimizer and returns them in a dictionary. Keys are formatted to show
     the optimizer type and group number (if multiple groups exist).
 
@@ -95,29 +95,37 @@ def get_optimizer_stats(optimizer: Optimizer) -> dict[str, float]:
         optimizer: The PyTorch optimizer to extract values from.
 
     Returns:
-        dict[str, float]: dictionary containing:
-            - Learning rates: "optimizer/{name}/lr[/group{N}]"
-            - Momentum values: "optimizer/{name}/momentum[/group{N}]"
+        dict[str, float]: dictionary containing optimizer hyperparameters:
+            - Learning rate: "optimizer/{name}/lr[/group{N}]"
+            - Momentum: "optimizer/{name}/momentum[/group{N}]" (SGD, RMSprop)
+            - Beta1: "optimizer/{name}/beta1[/group{N}]" (Adam variants)
+            - Beta2: "optimizer/{name}/beta2[/group{N}]" (Adam variants)
+            - Weight decay: "optimizer/{name}/weight_decay[/group{N}]"
 
             Where [/group{N}] is only added for optimizers with multiple groups.
     """
     stats_dict = {}
     for group_idx, group in enumerate(optimizer.param_groups):
-        lr_key = f"optimizer/{optimizer.__class__.__name__}/lr"
-        momentum_key = f"optimizer/{optimizer.__class__.__name__}/momentum"
+        base_key = f"optimizer/{optimizer.__class__.__name__}"
 
-        # Add group index to the key if there are multiple parameter groups
-        if len(optimizer.param_groups) > 1:
-            lr_key += f"/group{group_idx + 1}"
-            momentum_key += f"/group{group_idx + 1}"
+        # Add group index suffix if there are multiple parameter groups
+        suffix = f"/group{group_idx + 1}" if len(optimizer.param_groups) > 1 else ""
 
-        # Extracting learning rate
-        stats_dict[lr_key] = group["lr"]
+        # Always extract learning rate (present in all optimizers)
+        stats_dict[f"{base_key}/lr{suffix}"] = group["lr"]
 
-        # Extracting momentum or betas[0] if available
+        # Extract momentum (SGD, RMSprop)
         if "momentum" in group:
-            stats_dict[momentum_key] = group["momentum"]
+            stats_dict[f"{base_key}/momentum{suffix}"] = group["momentum"]
+
+        # Extract betas (Adam, AdamW, NAdam, RAdam, etc.)
         if "betas" in group:
-            stats_dict[momentum_key] = group["betas"][0]
+            stats_dict[f"{base_key}/beta1{suffix}"] = group["betas"][0]
+            if len(group["betas"]) > 1:
+                stats_dict[f"{base_key}/beta2{suffix}"] = group["betas"][1]
+
+        # Extract weight decay if non-zero
+        if "weight_decay" in group and group["weight_decay"] != 0:
+            stats_dict[f"{base_key}/weight_decay{suffix}"] = group["weight_decay"]
 
     return stats_dict
