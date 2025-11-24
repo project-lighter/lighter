@@ -153,33 +153,68 @@ No manual implementation needed!
 
 ### 3. Automatic Logging
 
-LighterModule logs everything you return:
+**LighterModule automatically logs:**
+
+1. **Loss values** - Dual logging (step + epoch)
+2. **Metrics** - Dual logging (step + epoch)
+3. **Optimizer stats** - Learning rate, momentum, betas, weight decay (epoch only)
+
+#### Loss Logging
+
+Return loss from your step methods:
+
+```python
+def training_step(self, batch, batch_idx):
+    loss = self.criterion(pred, y)
+    return {"loss": loss}
+```
+
+**Automatically logged as:**
+- `train/loss/step` - Per-step values
+- `train/loss/epoch` - Epoch average
+
+**Multi-component loss:**
 
 ```python
 def training_step(self, batch, batch_idx):
     return {
-        "loss": loss,           # Logged as train/loss
-        "accuracy": acc,        # Logged as train/accuracy
-        "custom_metric": val    # Logged as train/custom_metric
+        "loss": {
+            "total": total_loss,      # Required key
+            "ce": ce_loss,            # Optional component
+            "reg": reg_loss           # Optional component
+        }
     }
 ```
 
-**Dual logging**: Logged both per-step and per-epoch automatically.
+**Logged as:**
+- `train/loss/total/step`, `train/loss/total/epoch`
+- `train/loss/ce/step`, `train/loss/ce/epoch`
+- `train/loss/reg/step`, `train/loss/reg/epoch`
 
-### 4. Metric Updates
+#### Metrics Logging
 
-Metrics update automatically if you provide them:
+Call metrics in your step methods:
 
 ```python
-if self.train_metrics:
-    self.train_metrics(pred, y)  # Updates all metrics
+def training_step(self, batch, batch_idx):
+    if self.train_metrics:
+        self.train_metrics(pred, y)
+    return {"loss": loss}
 ```
 
-Results logged as:
+**Automatically logged as:**
+- `train/metrics/Accuracy/step` - Per-step values
+- `train/metrics/Accuracy/epoch` - Epoch average
+- `train/metrics/F1Score/step`, `train/metrics/F1Score/epoch`
 
-- `train/Accuracy`
-- `train/F1Score`
-- etc.
+#### Optimizer Stats Logging
+
+Automatically logged at the start of each training epoch:
+- `train/optimizer/Adam/lr/epoch`
+- `train/optimizer/Adam/beta1/epoch`
+- `train/optimizer/Adam/beta2/epoch`
+
+See [Automatic Optimizer Stats Logging](#automatic-optimizer-stats-logging) for details.
 
 ## What LighterModule Provides
 
@@ -587,6 +622,31 @@ def configure_optimizers(self):
         }
     }
 ```
+
+## Automatic Optimizer Stats Logging
+
+**LighterModule automatically logs optimizer statistics** including learning rate, momentum, betas, and weight decay at the start of each training epoch. You do **not** need to add `LearningRateMonitor` callback.
+
+Logged stats (per parameter group):
+- **Learning rate**: `train/optimizer/{OptimizerName}/lr/epoch`
+- **Momentum**: `train/optimizer/{OptimizerName}/momentum/epoch` (SGD, RMSprop)
+- **Beta1/Beta2**: `train/optimizer/{OptimizerName}/beta1/epoch`, `beta2/epoch` (Adam variants)
+- **Weight decay**: `train/optimizer/{OptimizerName}/weight_decay/epoch` (if non-zero)
+
+For multiple parameter groups (e.g., differential learning rates):
+- `train/optimizer/{OptimizerName}/lr/group1/epoch`
+- `train/optimizer/{OptimizerName}/lr/group2/epoch`
+
+**Example logged metrics:**
+
+```
+train/optimizer/Adam/lr/epoch: 0.001
+train/optimizer/Adam/beta1/epoch: 0.9
+train/optimizer/Adam/beta2/epoch: 0.999
+```
+
+!!! note "No LearningRateMonitor needed"
+    The PyTorch Lightning `LearningRateMonitor` callback is redundant with LighterModule since optimizer stats are already logged automatically.
 
 ## Working with Metrics
 

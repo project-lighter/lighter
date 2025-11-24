@@ -30,6 +30,109 @@ model = torch.nn.Linear(in_features=784, out_features=10)
 
 Works with **any** Python class - PyTorch, third-party libraries, or your own code.
 
+**Using `_args_` for positional arguments:**
+
+When you need to pass positional arguments instead of keyword arguments:
+
+```yaml
+model:
+  _target_: torch.nn.Sequential
+  _args_:
+    - _target_: torch.nn.Linear
+      in_features: 784
+      out_features: 128
+    - _target_: torch.nn.ReLU
+```
+
+**Equivalent Python:**
+```python
+model = torch.nn.Sequential(
+    torch.nn.Linear(in_features=784, out_features=128),
+    torch.nn.ReLU()
+)
+```
+
+The `_args_` list contains positional arguments passed to the target class. Each item can have its own `_target_` for nested instantiation.
+
+**Using `_mode_` to control instantiation:**
+
+Control how `_target_` instantiates objects:
+
+```yaml
+model:
+  # Factory function that returns a model
+  _target_: project.model_factory.create_model
+  _mode_: callable  # Returns a partial function
+  model_name: resnet50
+  num_classes: 10
+```
+
+**Available modes:**
+
+- `"default"` (default): Normal instantiation - `Component(*args, **kwargs)`
+- `"callable"`: Returns a partial function - `functools.partial(Component, *args, **kwargs)`
+- `"debug"`: Runs in debugger - `pdb.runcall(Component, *args, **kwargs)`
+
+**When to use `callable` mode:**
+
+Use `_mode_: callable` when you need a factory function or lazy instantiation:
+
+```yaml
+data:
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    collate_fn:
+      _target_: project.collate.custom_collate
+      _mode_: callable  # DataLoader needs the function, not the result
+      padding_value: 0
+```
+
+**Equivalent Python:**
+```python
+from functools import partial
+
+collate_fn = partial(custom_collate, padding_value=0)
+dataloader = DataLoader(..., collate_fn=collate_fn)
+```
+
+**When to use `debug` mode:**
+
+Use `_mode_: debug` to debug instantiation issues by entering the debugger when the component is created:
+
+```yaml
+model:
+  network:
+    _target_: project.model.ComplexModel
+    _mode_: debug  # Will enter pdb when instantiating
+    num_layers: 12
+    hidden_size: 768
+```
+
+This is equivalent to:
+```python
+import pdb
+network = pdb.runcall(ComplexModel, num_layers=12, hidden_size=768)
+```
+
+Useful when you need to step through the `__init__` method to diagnose instantiation errors.
+
+**Using `_disabled_` to skip instantiation:**
+
+Temporarily disable a component without removing it from config:
+
+```yaml
+trainer:
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val_loss
+      patience: 3
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      _disabled_: true  # Skip this callback (returns None)
+      save_top_k: 3
+```
+
+Useful for debugging or temporarily disabling features without deleting config.
+
 ### 2. `@`: Resolved References (Lazy)
 
 Reference values that are **resolved lazily** when needed:
@@ -459,6 +562,9 @@ data:
 | Symbol | Use | Example |
 |--------|-----|---------|
 | `_target_` | Instantiate class | `_target_: torch.nn.Linear` |
+| `_args_` | Positional arguments | `_args_: [arg1, arg2]` |
+| `_mode_` | Instantiation mode | `_mode_: callable` |
+| `_disabled_` | Skip instantiation | `_disabled_: true` |
 | `@` | Resolved reference | `@model::optimizer` |
 | `%` | Raw reference | `%model::train_metrics` |
 | `$` | Python expression | `$0.001 * 2` |
