@@ -138,7 +138,8 @@ def test_system_initialization(simple_system):
 
 
 def test_prepare_metrics(simple_model):
-    """Test _prepare_metrics handles different input types."""
+    """Test _prepare_metrics validates input types correctly."""
+    from torchmetrics import Metric
 
     # Test with None
     system = SimpleLighterModule(network=simple_model)
@@ -147,17 +148,22 @@ def test_prepare_metrics(simple_model):
     # Test with single Metric
     metric = Accuracy(task="multiclass", num_classes=2)
     system = SimpleLighterModule(network=simple_model, train_metrics=metric)
-    assert isinstance(system.train_metrics, MetricCollection)
-
-    # Test with list of Metrics
-    metrics = [Accuracy(task="multiclass", num_classes=2)]
-    system = SimpleLighterModule(network=simple_model, train_metrics=metrics)
-    assert isinstance(system.train_metrics, MetricCollection)
+    assert isinstance(system.train_metrics, Metric)
+    assert system.train_metrics is metric  # Should be unchanged
 
     # Test with MetricCollection
     metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
     system = SimpleLighterModule(network=simple_model, train_metrics=metrics)
     assert isinstance(system.train_metrics, MetricCollection)
+    assert system.train_metrics is metrics  # Should be unchanged
+
+    # Test with list raises TypeError
+    with pytest.raises(TypeError, match="metrics must be Metric or MetricCollection"):
+        SimpleLighterModule(network=simple_model, train_metrics=[Accuracy(task="multiclass", num_classes=2)])
+
+    # Test with dict raises TypeError
+    with pytest.raises(TypeError, match="metrics must be Metric or MetricCollection"):
+        SimpleLighterModule(network=simple_model, train_metrics={"acc": Accuracy(task="multiclass", num_classes=2)})
 
 
 def test_configure_optimizers(simple_system):

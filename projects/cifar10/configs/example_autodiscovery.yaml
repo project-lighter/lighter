@@ -30,24 +30,26 @@ model:
         lr: 0.001
         weight_decay: 0.00001
 
-    # Flat naming for metrics (no nested structure)
+    # Metrics using MetricCollection with auto-naming from list
     train_metrics:
-        - _target_: torchmetrics.Accuracy
-          task: multiclass
-          num_classes: 10
-          average: macro
-        - _target_: torchmetrics.F1Score
-          task: multiclass
-          num_classes: 10
-          average: macro
-        - _target_: torchmetrics.Precision
-          task: multiclass
-          num_classes: 10
-          average: macro
-        - _target_: torchmetrics.Recall
-          task: multiclass
-          num_classes: 10
-          average: macro
+        _target_: torchmetrics.MetricCollection
+        metrics:
+            - _target_: torchmetrics.Accuracy
+              task: multiclass
+              num_classes: 10
+              average: macro
+            - _target_: torchmetrics.F1Score
+              task: multiclass
+              num_classes: 10
+              average: macro
+            - _target_: torchmetrics.Precision
+              task: multiclass
+              num_classes: 10
+              average: macro
+            - _target_: torchmetrics.Recall
+              task: multiclass
+              num_classes: 10
+              average: macro
     val_metrics: "%::train_metrics"
     test_metrics: "%::train_metrics"
 

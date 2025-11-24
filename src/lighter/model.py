@@ -84,9 +84,9 @@ class LighterModule(pl.LightningModule):
         criterion: Callable | None = None,
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
-        train_metrics: Metric | list[Metric] | MetricCollection | None = None,
-        val_metrics: Metric | list[Metric] | MetricCollection | None = None,
-        test_metrics: Metric | list[Metric] | MetricCollection | None = None,
+        train_metrics: Metric | MetricCollection | None = None,
+        val_metrics: Metric | MetricCollection | None = None,
+        test_metrics: Metric | MetricCollection | None = None,
     ) -> None:
         super().__init__()
 
@@ -101,15 +101,29 @@ class LighterModule(pl.LightningModule):
         self.val_metrics = self._prepare_metrics(val_metrics)
         self.test_metrics = self._prepare_metrics(test_metrics)
 
-    def _prepare_metrics(self, metrics: Metric | list[Metric] | MetricCollection | None) -> MetricCollection | None:
-        """Convert metrics to MetricCollection for proper registration."""
+    def _prepare_metrics(self, metrics: Metric | MetricCollection | None) -> Metric | MetricCollection | None:
+        """Validate metrics - must be Metric or MetricCollection."""
         if metrics is None:
             return None
-        if isinstance(metrics, MetricCollection):
+
+        if isinstance(metrics, (Metric, MetricCollection)):
             return metrics
-        if isinstance(metrics, list):
-            return MetricCollection(metrics)
-        return MetricCollection([metrics])
+
+        raise TypeError(
+            f"metrics must be Metric or MetricCollection, got {type(metrics).__name__}.\n\n"
+            f"Single metric:\n"
+            f"  train_metrics:\n"
+            f"    _target_: torchmetrics.Accuracy\n"
+            f"    task: multiclass\n\n"
+            f"Multiple metrics:\n"
+            f"  train_metrics:\n"
+            f"    _target_: torchmetrics.MetricCollection\n"
+            f"    metrics:\n"
+            f"      - _target_: torchmetrics.Accuracy\n"
+            f"        task: multiclass\n"
+            f"      - _target_: torchmetrics.F1Score\n"
+            f"        task: multiclass"
+        )
 
     # ============================================================================
     # Step Methods - Override as Needed
@@ -320,15 +334,23 @@ class LighterModule(pl.LightningModule):
         Log metrics with dual pattern (step + epoch).
 
         User already called metrics in their step method.
+        Handles both single Metric and MetricCollection.
         """
         metrics = getattr(self, f"{self.mode}_metrics", None)
         if metrics is None:
             return
 
-        for name, metric in metrics.items():
-            name = f"{self.mode}/metrics/{name}"
-            self._log(name, metric, on_step=True)
-            self._log(name, metric, on_epoch=True, sync_dist=True)
+        if isinstance(metrics, MetricCollection):
+            # MetricCollection - iterate over named metrics
+            for name, metric in metrics.items():
+                name = f"{self.mode}/metrics/{name}"
+                self._log(name, metric, on_step=True)
+                self._log(name, metric, on_epoch=True, sync_dist=True)
+        else:
+            # Single Metric - use class name (consistent with MetricCollection auto-naming)
+            name = f"{self.mode}/metrics/{metrics.__class__.__name__}"
+            self._log(name, metrics, on_step=True)
+            self._log(name, metrics, on_epoch=True, sync_dist=True)
 
     def _log_optimizer_stats(self, batch_idx: int) -> None:
         """
