@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from sparkwheel.utils.exceptions import ConfigKeyError
 
 from lighter.engine.runner import Runner
 from lighter.utils.types.enums import Stage
@@ -14,9 +15,9 @@ class TestRunnerErrorHandling:
     """Test class for Runner error handling scenarios."""
 
     def test_run_without_config_raises_error(self):
-        """Test that calling run without config_paths raises ValueError."""
+        """Test that calling run without config_paths raises ConfigKeyError."""
         runner = Runner()
-        with pytest.raises((ValueError, KeyError)):  # Could be ValueError or ConfigKeyError
+        with pytest.raises(ConfigKeyError):  # Sparkwheel raises ConfigKeyError for missing keys
             runner.run(Stage.FIT, [])
 
     def test_run_with_nonexistent_config_raises_error(self):
@@ -26,15 +27,15 @@ class TestRunnerErrorHandling:
             runner.run(Stage.FIT, ["/nonexistent/path/config.yaml"])
 
     def test_run_with_empty_config_raises_validation_error(self):
-        """Test that empty config raises validation error."""
+        """Test that empty config raises ConfigKeyError."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("")  # Empty config
             config_path = f.name
 
         try:
             runner = Runner()
-            # Empty config should raise error (ValidationError or ConfigKeyError)
-            with pytest.raises((ValueError, KeyError)):
+            # Empty config should raise ConfigKeyError when trying to resolve 'model'
+            with pytest.raises(ConfigKeyError):
                 runner.run(Stage.FIT, [config_path])
         finally:
             Path(config_path).unlink()
