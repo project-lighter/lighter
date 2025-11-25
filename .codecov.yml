@@ -1,0 +1,49 @@
+# Codecov Configuration
+# Documentation: https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  precision: 2  # Number of decimal places (0-5)
+  round: down   # How to round coverage (down/up/nearest)
+  range: 70..100  # Color coding range (red at 70%, green at 100%)
+
+  status:
+    # Project coverage: overall repository coverage
+    project:
+      default:
+        target: 90%           # Minimum coverage threshold
+        threshold: null       # No threshold - only fail if below target
+        base: auto            # Compare against base branch
+        informational: false  # Fail the check if below target
+
+    # Patch coverage: coverage on changed lines only
+    patch:
+      default:
+        target: 80%           # New code should have at least 80% coverage
+        threshold: 0%         # No wiggle room for patch coverage
+        base: auto
+        informational: false  # Fail if new code doesn't meet target
+
+# Pull request comment configuration
+comment:
+  layout: "diff, flags, files, footer"  # What to show in PR comments
+  behavior: default                      # Comment on all PRs
+  require_changes: false                 # Comment even if coverage unchanged
+  require_base: false                    # Comment even without base report
+  require_head: true                     # Only comment if head report exists
+
+# Paths to ignore in coverage reports
+ignore:
+  - "tests/*"           # Test files
+  - "tests/**/*"        # All test subdirectories
+  - "docs/*"            # Documentation
+  - "site/*"            # Built documentation site
+  - "htmlcov/*"         # Coverage HTML reports
+  - ".venv/*"           # Virtual environment
+  - ".tox/*"            # Tox environments
+  - "**/__pycache__/*"  # Python cache
+  - "**/conftest.py"    # Pytest configuration
+  - "update_tests.py"   # Utility scripts
+
+# GitHub Checks configuration
+github_checks:
+  annotations: true  # Show coverage annotations on changed files
