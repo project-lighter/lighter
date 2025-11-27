@@ -44,6 +44,8 @@ data:
             patch.object(runner, "_resolve_model"),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             # Should not raise error - just verify config loads
@@ -107,6 +109,8 @@ args:
             patch.object(runner, "_resolve_model", side_effect=capture_system),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             runner.run(Stage.FIT, [str(config_path)])
@@ -165,6 +169,8 @@ data:
             patch.object(runner, "_resolve_model", side_effect=capture_system),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             runner.run(Stage.FIT, [str(base_path), str(override_path)])
@@ -211,6 +217,8 @@ system:
             patch.object(runner, "_resolve_model", side_effect=capture_system),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             overrides = ["trainer::max_epochs=5", "model::optimizer::lr=0.1"]
@@ -254,6 +262,8 @@ data:
             patch.object(runner, "_resolve_model", side_effect=capture_system),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             runner.run(Stage.FIT, [str(config_path)])
@@ -310,6 +320,8 @@ data:
             patch.object(runner, "_resolve_model", side_effect=capture_system),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
+            patch.object(runner, "_save_config"),
+            patch.object(runner, "_save_hyperparameters"),
             patch.object(runner, "_execute"),
         ):
             runner.run(Stage.FIT, [str(config_path)])
