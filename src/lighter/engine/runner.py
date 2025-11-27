@@ -4,8 +4,6 @@ Contains the Runner class and CLI entry point.
 """
 
 import argparse
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,33 +18,6 @@ from lighter.utils.types.enums import Stage
 # ============================================================================
 # Helper Classes - Each Does One Thing
 # ============================================================================
-
-
-@dataclass
-class OutputDir:
-    """Creates and manages output directory."""
-
-    path: Path
-
-    @classmethod
-    def create_timestamped(cls, base: Path = Path("outputs")) -> "OutputDir":
-        """Create timestamped output directory (current default behavior)."""
-        timestamp = datetime.now()
-        path = base / timestamp.strftime("%Y-%m-%d") / timestamp.strftime("%H-%M-%S")
-        path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Output directory: {path}")
-        return cls(path)
-
-    def save_config(self, config: Config) -> None:
-        """Save config YAML to output directory."""
-        config_file = self.path / "config.yaml"
-        with open(config_file, "w") as f:
-            yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False)
-        logger.info(f"Saved config to: {config_file}")
-
-    def as_trainer_default_root_dir(self) -> str:
-        """Return path formatted for trainer.default_root_dir."""
-        return str(self.path)
 
 
 class ProjectImporter:
@@ -90,18 +61,18 @@ class ConfigLoader:
         except ValidationError as e:
             raise ValueError(f"Configuration loading failed:\n{e}") from e
 
-    @staticmethod
-    def set_default_root_dir(config: Config, output_dir: OutputDir) -> None:
-        """Set trainer.default_root_dir if not already specified by user."""
-        if config.get("trainer::default_root_dir") is None:
-            config.update({"trainer::default_root_dir": output_dir.as_trainer_default_root_dir()})
-
 
 class Runner:
     """
-    Executes training stages using validated and resolved configurations.
+    Orchestrates training stage execution by coordinating helper classes.
 
-    Simplified in v3.1: delegates to helper classes for specific tasks.
+    Runner delegates responsibilities to specialized helper classes:
+    - ProjectImporter: Auto-discovers and imports user project modules via __lighter__.py marker
+    - ConfigLoader: Loads and validates configurations using Sparkwheel
+    - OutputDir: Manages timestamped output directories
+
+    Runner focuses on resolving and validating components (model, trainer, datamodule)
+    and executing the requested training stage.
     """
 
     def run(
@@ -113,10 +84,18 @@ class Runner:
         """
         Run a training stage with configuration inputs.
 
+        Orchestrates the complete training workflow:
+        1. Loads configuration via ConfigLoader (delegates to Sparkwheel for auto-detection)
+        2. Auto-discovers and imports project modules via ProjectImporter
+        3. Resolves and validates model, trainer, and datamodule components
+        4. Saves configuration YAML to trainer's log directory
+        5. Saves hyperparameters to model checkpoint and logger
+        6. Executes the requested training stage
+
         Args:
             stage: Stage to run (fit, validate, test, predict)
             inputs: List of config file paths, dicts, and/or overrides.
-                   Sparkwheel auto-detects based on content:
+                   Passed to ConfigLoader.load() which delegates to Sparkwheel for auto-detection:
                    - Strings without '=' → file paths
                    - Strings with '=' → overrides
                    - Dicts → merged into config
@@ -132,24 +111,22 @@ class Runner:
         # 1. Load configuration
         config = ConfigLoader.load(inputs)
 
-        # 2. Setup output directory
-        output_dir = OutputDir.create_timestamped()
-        ConfigLoader.set_default_root_dir(config, output_dir)
-        output_dir.save_config(config)
-
-        # 3. Auto-discover and import project
+        # 2. Auto-discover and import project
         ProjectImporter.auto_discover_and_import()
 
-        # 4. Resolve components
+        # 3. Resolve components
         model = self._resolve_model(config)
         trainer = self._resolve_trainer(config)
         datamodule = self._resolve_datamodule(config, model)
 
-        # 5. Save hyperparameters
+        # 4. Save configuration to trainer's log directory
+        self._save_config(config, trainer)
+
+        # 5. Save hyperparameters to checkpoint and logger
         self._save_hyperparameters(model, trainer, config)
 
         # 6. Execute stage
-        self._execute(stage, config, model, trainer, datamodule, **stage_kwargs)
+        self._execute(stage, model, trainer, datamodule, **stage_kwargs)
 
     def _resolve_model(self, config: Config) -> LightningModule:
         """Resolve and validate model from config."""
@@ -213,16 +190,40 @@ class Runner:
 
         return datamodule
 
+    def _save_config(self, config: Config, trainer: Trainer) -> None:
+        """
+        Save configuration YAML to trainer's log directory.
+
+        Args:
+            config: Configuration object to save
+            trainer: Trainer (uses trainer.log_dir to determine save location)
+        """
+        if trainer.log_dir:
+            config_file = Path(trainer.log_dir) / "config.yaml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file, "w") as f:
+                yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False)
+            logger.info(f"Saved config to: {config_file}")
+
     def _save_hyperparameters(self, model: LightningModule, trainer: Trainer, config: Config) -> None:
-        """Save config to model checkpoint and trainer logger."""
+        """
+        Save hyperparameters to model checkpoint and logger.
+
+        Args:
+            model: Model to save hyperparameters to
+            trainer: Trainer with optional logger
+            config: Configuration object
+        """
+        # Save to model checkpoint (for model.hparams access)
         model.save_hyperparameters(config.get())
+
+        # Save to logger (for experiment tracking)
         if trainer.logger:
             trainer.logger.log_hyperparams(config.get())
 
     def _execute(
         self,
         stage: Stage,
-        config: Config,
         model: LightningModule,
         trainer: Trainer,
         datamodule: LightningDataModule | None,
@@ -233,13 +234,13 @@ class Runner:
 
         Args:
             stage: Stage to execute (fit, validate, test, predict)
-            config: Configuration object
             model: Resolved model
             trainer: Resolved trainer
             datamodule: Resolved datamodule (None if model defines its own dataloaders)
             **stage_kwargs: Additional keyword arguments from CLI (e.g., ckpt_path, verbose)
         """
         # Execute the stage method with CLI kwargs
+        # Note: argparse subparsers ensure only valid parameters for each stage are passed
         stage_method = getattr(trainer, str(stage))
         if datamodule is not None:
             stage_method(model, datamodule=datamodule, **stage_kwargs)
@@ -262,6 +263,27 @@ def cli() -> None:
         help="Available commands",
     )
 
+    # Common arguments shared by all stages
+    def add_common_args(stage_parser):
+        """Add common arguments to a stage subparser."""
+        stage_parser.add_argument(
+            "inputs",
+            nargs="+",
+            help="Config files and overrides. Example: config.yaml model::optimizer::lr=0.001",
+        )
+        stage_parser.add_argument(
+            "--ckpt_path",
+            type=str,
+            default=None,
+            help='Path to checkpoint. Can be "last", "best", or a file path.',
+        )
+        stage_parser.add_argument(
+            "--weights_only",
+            action="store_true",
+            default=None,
+            help="Load only weights from checkpoint (security option).",
+        )
+
     # Fit subcommand
     fit_parser = subparsers.add_parser(
         "fit",
@@ -274,23 +296,7 @@ def cli() -> None:
         "  lighter fit base.yaml experiment.yaml --ckpt_path last trainer::max_epochs=100",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    fit_parser.add_argument(
-        "inputs",
-        nargs="+",
-        help="Config files and overrides. Example: config.yaml model::optimizer::lr=0.001",
-    )
-    fit_parser.add_argument(
-        "--ckpt_path",
-        type=str,
-        default=None,
-        help='Path to checkpoint to resume training from. Can be "last", "best", or a file path.',
-    )
-    fit_parser.add_argument(
-        "--weights_only",
-        type=bool,
-        default=None,
-        help="Load only weights from checkpoint (security option, restricts to tensors/primitives).",
-    )
+    add_common_args(fit_parser)
 
     # Validate subcommand
     validate_parser = subparsers.add_parser(
@@ -303,28 +309,12 @@ def cli() -> None:
         "  lighter validate config.yaml --ckpt_path checkpoint.ckpt --verbose",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    validate_parser.add_argument(
-        "inputs",
-        nargs="+",
-        help="Config files and overrides. Example: config.yaml model::network::weights=checkpoint.ckpt",
-    )
-    validate_parser.add_argument(
-        "--ckpt_path",
-        type=str,
-        default=None,
-        help='Path to checkpoint for validation. Can be "last", "best", or a file path.',
-    )
+    add_common_args(validate_parser)
     validate_parser.add_argument(
         "--verbose",
-        type=bool,
+        action="store_true",
         default=None,
         help="Print validation results (default: True).",
-    )
-    validate_parser.add_argument(
-        "--weights_only",
-        type=bool,
-        default=None,
-        help="Load only weights from checkpoint (security option).",
     )
 
     # Test subcommand
@@ -338,28 +328,12 @@ def cli() -> None:
         "  lighter test config.yaml --ckpt_path checkpoint.ckpt --verbose",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    test_parser.add_argument(
-        "inputs",
-        nargs="+",
-        help="Config files and overrides. Example: config.yaml model::network::weights=checkpoint.ckpt",
-    )
-    test_parser.add_argument(
-        "--ckpt_path",
-        type=str,
-        default=None,
-        help='Path to checkpoint for testing. Can be "last", "best", or a file path.',
-    )
+    add_common_args(test_parser)
     test_parser.add_argument(
         "--verbose",
-        type=bool,
+        action="store_true",
         default=None,
         help="Print test results (default: True).",
-    )
-    test_parser.add_argument(
-        "--weights_only",
-        type=bool,
-        default=None,
-        help="Load only weights from checkpoint (security option).",
     )
 
     # Predict subcommand
@@ -373,28 +347,12 @@ def cli() -> None:
         "  lighter predict config.yaml --ckpt_path checkpoint.ckpt --return_predictions",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    predict_parser.add_argument(
-        "inputs",
-        nargs="+",
-        help="Config files and overrides. Example: config.yaml model::network::weights=checkpoint.ckpt",
-    )
-    predict_parser.add_argument(
-        "--ckpt_path",
-        type=str,
-        default=None,
-        help='Path to checkpoint for predictions. Can be "last", "best", or a file path.',
-    )
+    add_common_args(predict_parser)
     predict_parser.add_argument(
         "--return_predictions",
-        type=bool,
+        action="store_true",
         default=None,
         help="Whether to return predictions (default: True except with process-spawning accelerators).",
-    )
-    predict_parser.add_argument(
-        "--weights_only",
-        type=bool,
-        default=None,
-        help="Load only weights from checkpoint (security option).",
     )
 
     # Parse arguments
