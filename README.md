@@ -50,6 +50,8 @@ pip install lighter
 
 ```python
 # model.py
+import torch
+import torch.nn.functional as F
 import pytorch_lightning as pl
 
 class MyModel(pl.LightningModule):

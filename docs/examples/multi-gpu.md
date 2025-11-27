@@ -459,14 +459,14 @@ Only rank 0 saves checkpoints automatically.
 
 ## Testing Locally
 
-Test DDP on single machine:
+Test DDP on single machine with multiple physical GPUs:
 
 ```bash
-# Simulate 2 GPUs on 1 GPU
+# Run DDP on 2 physical GPUs
 lighter fit config.yaml trainer::devices=2 trainer::strategy=ddp
 ```
 
-Each "GPU" gets half the VRAM.
+**Important:** `devices=k` selects `k` physical GPUs per node (equivalent to `list(range(k))`). No GPU virtualization or simulation is performed. You must have at least as many physical GPUs as specified (e.g., at least 2 physical GPUs for the example above).
 
 ## Common Issues
 
@@ -627,19 +627,16 @@ Run on each node:
 
 ```bash
 # Node 0
-lighter fit config.yaml \
+MASTER_ADDR=node0_address MASTER_PORT=12345 \
+  lighter fit config.yaml \
   trainer::num_nodes=2 \
-  trainer::devices=4 \
-  MASTER_ADDR=node0_address \
-  MASTER_PORT=12345
+  trainer::devices=4
 
 # Node 1
-lighter fit config.yaml \
+MASTER_ADDR=node0_address MASTER_PORT=12345 NODE_RANK=1 \
+  lighter fit config.yaml \
   trainer::num_nodes=2 \
-  trainer::devices=4 \
-  MASTER_ADDR=node0_address \
-  MASTER_PORT=12345 \
-  NODE_RANK=1
+  trainer::devices=4
 ```
 
 Requires:

@@ -1,4 +1,4 @@
-"""CIFAR10 Model implementation using the redesigned Lighter v3.0 LighterModule class."""
+"""CIFAR10 Model implementation using LighterModule class."""
 
 from lighter import LighterModule
 

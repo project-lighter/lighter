@@ -44,7 +44,7 @@ pip install lighter
     Change hyperparameters from CLI without editing code.
 
     ```bash
-    lighter fit config.yaml model::lr=0.01
+    lighter fit config.yaml model::learning_rate=0.01
     ```
 
 -   :material-refresh:{ .lg .middle } **Reproducible**
@@ -165,8 +165,9 @@ Choose the approach that fits your workflow:
 === "LightningModule"
 
     ```python title="model.py"
-    import pytorch_lightning as pl
+    import torch
     import torch.nn.functional as F
+    import pytorch_lightning as pl
 
     class MyModule(pl.LightningModule):
         def __init__(self, network, learning_rate=0.001):
@@ -295,13 +296,13 @@ Override any config value from CLI:
 
 ```bash
 # Change learning rate
-lighter fit config.yaml model::lr=0.01
+lighter fit config.yaml model::learning_rate=0.01
 
 # Use more GPUs
 lighter fit config.yaml trainer::devices=4
 
 # Combine multiple changes
-lighter fit config.yaml model::lr=0.01 trainer::max_epochs=100
+lighter fit config.yaml model::learning_rate=0.01 trainer::max_epochs=100
 ```
 
 ### No Lock-In
