@@ -174,3 +174,7 @@ projects/*
 CLAUDE.md
 GEMINI.md
 AGENTS.md
+
+# Test artifacts
+/config.yaml
+projects/*/config.yaml

@@ -11,7 +11,7 @@ coverage:
     project:
       default:
         target: 90%           # Minimum coverage threshold
-        threshold: null       # No threshold - only fail if below target
+        threshold: null       # No additional threshold; fail check if below target
         base: auto            # Compare against base branch
         informational: false  # Fail the check if below target
 
@@ -35,7 +35,7 @@ comment:
 ignore:
   - "tests/*"           # Test files
   - "tests/**/*"        # All test subdirectories
-  - "docs/*"            # Documentation
+  - "docs/**/*"         # Documentation
   - "site/*"            # Built documentation site
   - "htmlcov/*"         # Coverage HTML reports
   - ".venv/*"           # Virtual environment
