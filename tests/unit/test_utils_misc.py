@@ -1,10 +1,9 @@
 """Unit tests for utility functions in lighter/utils/misc.py"""
 
-import pytest
 import torch
 from torch.optim import SGD, Adam
 
-from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, hasarg, setattr_dot_notation
+from lighter.utils.misc import ensure_list, get_name, get_optimizer_stats, hasarg
 
 
 def test_ensure_list_with_list():
@@ -28,45 +27,6 @@ def test_ensure_list_with_single_value():
     """Test ensure_list wraps single value."""
     assert ensure_list(42) == [42]
     assert ensure_list("string") == ["string"]
-
-
-def test_setattr_dot_notation_single_level():
-    """Test setting a single-level attribute."""
-
-    class SimpleClass:
-        def __init__(self):
-            self.attr = None
-
-    obj = SimpleClass()
-    setattr_dot_notation(obj, "attr", 42)
-    assert obj.attr == 42
-
-
-def test_setattr_dot_notation_nested():
-    """Test setting a nested attribute."""
-
-    class NestedClass:
-        def __init__(self):
-            self.level1 = SimpleLevel1()
-
-    class SimpleLevel1:
-        def __init__(self):
-            self.attr = None
-
-    obj = NestedClass()
-    setattr_dot_notation(obj, "level1.attr", 99)
-    assert obj.level1.attr == 99
-
-
-def test_setattr_dot_notation_nonexistent_attribute():
-    """Test that setting a non-existent attribute raises AttributeError."""
-
-    class SimpleClass:
-        pass
-
-    obj = SimpleClass()
-    with pytest.raises(AttributeError, match="has no attribute"):
-        setattr_dot_notation(obj, "nonexistent", 42)
 
 
 def test_hasarg_with_function():

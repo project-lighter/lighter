@@ -27,25 +27,6 @@ def ensure_list(input: Any) -> list:
     return [input]
 
 
-def setattr_dot_notation(obj: Callable, attr: str, value: Any) -> None:
-    """
-    Sets an attribute on an object using dot notation.
-
-    Args:
-        obj: The object on which to set the attribute.
-        attr: The attribute name, which can use dot notation for nested attributes.
-        value: The value to set the attribute to.
-    """
-    if "." not in attr:
-        if not hasattr(obj, attr):
-            raise AttributeError(f"`{get_name(obj, True)}` has no attribute `{attr}`.")
-        setattr(obj, attr, value)
-    # Solve recursively if the attribute is defined in dot-notation
-    else:
-        obj_name, attr = attr.split(".", maxsplit=1)
-        setattr_dot_notation(getattr(obj, obj_name), attr, value)
-
-
 def hasarg(fn: Callable, arg_name: str) -> bool:
     """
     Checks if a callable (function, method, or class) has a specific argument.

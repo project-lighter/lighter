@@ -1,4 +1,4 @@
-"""Unit tests for the redesigned LighterModule class."""
+"""Unit tests for the LighterModule class."""
 
 from unittest.mock import MagicMock
 

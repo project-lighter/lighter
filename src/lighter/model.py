@@ -1,6 +1,4 @@
 """
-Lighter v3.0 LighterModule - Redesigned for user control with automatic logging.
-
 This module provides the core LighterModule class that extends PyTorch Lightning's LightningModule.
 Users implement abstract step methods while the framework handles automatic dual logging.
 """
