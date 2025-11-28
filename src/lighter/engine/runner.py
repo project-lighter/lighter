@@ -69,7 +69,6 @@ class Runner:
     Runner delegates responsibilities to specialized helper classes:
     - ProjectImporter: Auto-discovers and imports user project modules via __lighter__.py marker
     - ConfigLoader: Loads and validates configurations using Sparkwheel
-    - OutputDir: Manages timestamped output directories
 
     Runner focuses on resolving and validating components (model, trainer, datamodule)
     and executing the requested training stage.
@@ -88,9 +87,8 @@ class Runner:
         1. Loads configuration via ConfigLoader (delegates to Sparkwheel for auto-detection)
         2. Auto-discovers and imports project modules via ProjectImporter
         3. Resolves and validates model, trainer, and datamodule components
-        4. Saves configuration YAML to trainer's log directory
-        5. Saves hyperparameters to model checkpoint and logger
-        6. Executes the requested training stage
+        4. Saves configuration (to log directory, logger, and model hyperparameters)
+        5. Executes the requested training stage
 
         Args:
             stage: Stage to run (fit, validate, test, predict)
@@ -119,13 +117,10 @@ class Runner:
         trainer = self._resolve_trainer(config)
         datamodule = self._resolve_datamodule(config, model)
 
-        # 4. Save configuration to trainer's log directory
-        self._save_config(config, trainer)
+        # 4. Save configuration to trainer's log directory, logger, and model hparams for checkpoint access
+        self._save_config(config, trainer, model)
 
-        # 5. Save hyperparameters to checkpoint and logger
-        self._save_hyperparameters(model, trainer, config)
-
-        # 6. Execute stage
+        # 5. Execute stage
         self._execute(stage, model, trainer, datamodule, **stage_kwargs)
 
     def _resolve_model(self, config: Config) -> LightningModule:
@@ -190,36 +185,38 @@ class Runner:
 
         return datamodule
 
-    def _save_config(self, config: Config, trainer: Trainer) -> None:
+    def _save_config(self, config: Config, trainer: Trainer, model: LightningModule) -> None:
         """
-        Save configuration YAML to trainer's log directory.
+        Save configuration to multiple destinations.
+
+        Saves the configuration to:
+        - Model (for checkpoint access via model.hparams)
+        - Logger (for experiment tracking via log_hyperparams)
+        - Log directory (as config.yaml file)
 
         Args:
             config: Configuration object to save
-            trainer: Trainer (uses trainer.log_dir to determine save location)
+            trainer: Trainer (uses trainer.logger and trainer.log_dir)
+            model: Model to save hyperparameters to
         """
+
+        # Save to model checkpoint (for model.hparams access)
+        model.save_hyperparameters({"config": config.get()})
+
+        # If no logger, skip other saves
+        if not trainer.logger:
+            return
+
+        # Save to logger (for experiment tracking)
+        trainer.logger.log_hyperparams(config.get())
+
+        # Save as config.yaml to log directory if it exists
         if trainer.log_dir:
             config_file = Path(trainer.log_dir) / "config.yaml"
             config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(config_file, "w") as f:
-                yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False)
+                yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False, indent=4)
             logger.info(f"Saved config to: {config_file}")
-
-    def _save_hyperparameters(self, model: LightningModule, trainer: Trainer, config: Config) -> None:
-        """
-        Save hyperparameters to model checkpoint and logger.
-
-        Args:
-            model: Model to save hyperparameters to
-            trainer: Trainer with optional logger
-            config: Configuration object
-        """
-        # Save to model checkpoint (for model.hparams access)
-        model.save_hyperparameters(config.get())
-
-        # Save to logger (for experiment tracking)
-        if trainer.logger:
-            trainer.logger.log_hyperparams(config.get())
 
     def _execute(
         self,
