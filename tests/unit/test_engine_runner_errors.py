@@ -59,7 +59,6 @@ class TestRunnerErrorHandling:
                 patch.object(runner, "_resolve_trainer"),
                 patch.object(runner, "_resolve_datamodule"),
                 patch.object(runner, "_save_config"),
-                patch.object(runner, "_save_hyperparameters"),
                 patch.object(runner, "_execute"),
             ):
                 runner.run(Stage.FIT, [config_path1, config_path2])
