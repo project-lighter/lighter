@@ -106,6 +106,6 @@ def import_module_from_path(module_name: str, module_path: Path) -> None:
     if spec.loader is None:
         raise ModuleNotFoundError(f"Could not find loader for module '{module_name}' at '{module_path}'.")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     sys.modules[module_name] = module
+    spec.loader.exec_module(module)
     logger.info(f"Imported {module_path.parent} as module '{module_name}'.")
