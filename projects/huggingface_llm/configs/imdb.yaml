@@ -1,0 +1,80 @@
+# HuggingFace LLM Text Classification
+#
+# Dataset: IMDB sentiment classification
+# Model: DistilBERT
+#
+# Requirements:
+#   cd projects/huggingface_llm
+#   uv sync
+#
+# Run:
+#   uv run lighter fit configs/imdb.yaml
+#
+# Or from repo root:
+#   lighter fit projects/huggingface_llm/configs/imdb.yaml
+
+vars:
+    num_classes: 2
+    pretrained_model: distilbert-base-uncased
+    batch_size: 16
+    lr: 2.0e-5
+
+trainer:
+    _target_: pytorch_lightning.Trainer
+    max_epochs: 3
+    accelerator: auto
+    # Limit batches for a quick test run
+    limit_train_batches: 10
+    limit_val_batches: 5
+
+    callbacks:
+        - _target_: lighter.callbacks.CsvWriter
+          path: predictions.csv
+          keys: ["prediction"]
+
+model:
+    _target_: project.models.TextClassificationModel
+
+    network:
+        _target_: transformers.AutoModelForSequenceClassification.from_pretrained
+        pretrained_model_name_or_path: "%vars::pretrained_model"
+        num_labels: "%vars::num_classes"
+
+    optimizer:
+        _target_: torch.optim.AdamW
+        params: "$@model::network.parameters()"
+        lr: "%vars::lr"
+
+    train_metrics:
+        _target_: torchmetrics.MetricCollection
+        metrics:
+            - _target_: torchmetrics.Accuracy
+              task: multiclass
+              num_classes: "%vars::num_classes"
+
+    val_metrics: "%model::train_metrics"
+
+data:
+    _target_: lighter.LighterDataModule
+
+    train_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: "%vars::batch_size"
+        shuffle: true
+        dataset:
+            _target_: project.dataset.TextClassificationDataset
+            dataset_name: imdb
+            split: train
+            tokenizer_name: "%vars::pretrained_model"
+
+    val_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: "%vars::batch_size"
+        shuffle: false
+        dataset:
+            _target_: project.dataset.TextClassificationDataset
+            dataset_name: imdb
+            split: test
+            tokenizer_name: "%vars::pretrained_model"
+
+    predict_dataloader: "%data::val_dataloader"
