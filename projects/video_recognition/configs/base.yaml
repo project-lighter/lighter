@@ -1,0 +1,59 @@
+# Base configuration for Video Action Recognition
+#
+# Shared settings across all video models. Merge with model-specific config:
+#   cd projects/video_recognition && uv sync
+#   lighter fit configs/base.yaml,configs/r3d.yaml
+#   lighter fit configs/base.yaml,configs/transformer.yaml
+#   lighter predict configs/base.yaml,configs/r3d.yaml  # saves .mp4 files
+#
+# Features demonstrated:
+#   - Config composition (base + model configs)
+#   - FileWriter callback for saving video clips as .mp4
+#   - CsvWriter for classification results
+#   - Video handling (5D tensors: B, C, T, H, W)
+
+vars:
+  num_classes: 101  # UCF101
+  frames_per_clip: 16
+  frame_rate: 15
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  accelerator: auto
+  log_every_n_steps: 10
+  fast_dev_run: true
+
+  callbacks:
+    # Save classification results to CSV
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [prediction, confidence, ground_truth]
+
+    # Save video clips as MP4 files
+    - _target_: lighter.callbacks.FileWriter
+      directory: ./video_outputs
+      value_key: video
+      writer_fn:
+        _target_: project.writers.write_video_mp4
+        _mode_: callable
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    pin_memory: true
+    shuffle: true
+    collate_fn:
+      _target_: project.dataset.video_collate_fn
+      _mode_: callable
+
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    num_workers: 0  # 0 for macOS compatibility
+    pin_memory: true
+    shuffle: false
+    collate_fn:
+      _target_: project.dataset.video_collate_fn
+      _mode_: callable
