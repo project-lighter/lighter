@@ -13,10 +13,10 @@ trainer:
           writer_fn: tensor
 
 model:
-    _target_: project.model.CIFAR10Model
+    _target_: project.models.model.CIFAR10Model
 
     network:
-        _target_: project.models.net.Net
+        _target_: project.networks.net.Net
 
     criterion:
         _target_: torch.nn.CrossEntropyLoss

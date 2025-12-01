@@ -154,7 +154,18 @@ prototyping*
 .scale_batch_size*
 **/*.txt
 .ruff_cache
-cifar10/
+
+# Projects folder - ignore by default, track specific examples
+projects/*/
+!projects/README.md
+!projects/cifar10/
+!projects/huggingface_llm/
+!projects/medical_segmentation/
+!projects/self_supervised/
+!projects/video_recognition/
+!projects/eeg/
+!projects/vision_language/
+!projects/efficient_finetuning/
 
 # Paper
 paper/jats/
