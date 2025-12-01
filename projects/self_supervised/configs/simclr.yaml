@@ -1,0 +1,89 @@
+# Self-Supervised Learning with SimCLR using Lightly
+#
+# This example uses the lightly library (https://github.com/lightly-ai/lightly)
+# for state-of-the-art self-supervised learning methods.
+#
+# Dataset: CIFAR10 (50k training images, 10k test images)
+# Method: SimCLR - Contrastive learning with augmented views
+#
+# Requirements:
+#   pip install lightly
+#
+# Run:
+#   lighter fit projects/self_supervised/configs/simclr.yaml
+
+vars:
+  batch_size: 256
+  temperature: 0.5
+  input_size: 32
+  projection_dim: 128
+  hidden_dim: 2048
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 100
+  accelerator: auto
+  log_every_n_steps: 10
+
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/loss
+      mode: min
+      save_top_k: 1
+      filename: simclr-{epoch}-{val/loss:.4f}
+
+  fast_dev_run: true
+
+model:
+  _target_: project.models.model.SimCLRModel
+  temperature: "%vars::temperature"
+
+  network:
+    _target_: project.networks.encoder.create_simclr_model
+    backbone: resnet18
+    projection_dim: "%vars::projection_dim"
+    hidden_dim: "%vars::hidden_dim"
+    pretrained: false
+
+  optimizer:
+    _target_: torch.optim.SGD
+    params: $@model::network.parameters()
+    lr: 0.06
+    momentum: 0.9
+    weight_decay: 0.0005
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    optimizer: "@model::optimizer"
+    T_max: 100
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    pin_memory: true
+    shuffle: true
+    drop_last: true
+    dataset:
+      _target_: project.dataset.get_cifar10_ssl_dataset
+      root: ./.datasets/
+      train: true
+      input_size: "%vars::input_size"
+      download: true
+
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility
+    pin_memory: true
+    shuffle: false
+    drop_last: true
+    dataset:
+      _target_: project.dataset.get_cifar10_ssl_dataset
+      root: ./.datasets/
+      train: false
+      input_size: "%vars::input_size"
+      download: true
