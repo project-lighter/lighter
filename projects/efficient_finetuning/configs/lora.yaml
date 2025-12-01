@@ -1,0 +1,212 @@
+# Efficient Fine-tuning with LoRA (Low-Rank Adaptation)
+#
+# This example showcases:
+# - Parameter-efficient fine-tuning (PEFT)
+# - LoRA: Low-Rank Adaptation of pretrained models
+# - Freezer callback for freezing base model
+# - Dramatically reduced trainable parameters (~1% of full model)
+# - Dynamic rank configuration with $ expressions
+# - _disabled_ for conditional adapter enable/disable
+#
+# LoRA Benefits:
+# - 10-100x fewer trainable parameters
+# - Reduced memory footprint
+# - Faster training
+# - Can store multiple task-specific adapters
+# - Merge adapters into base model for inference
+#
+# Run: lighter fit projects/efficient_finetuning/configs/lora.yaml
+#
+# Compare with full fine-tuning by setting freeze_backbone: false
+# and not using LoRA wrapper
+
+vars:
+  # Task configuration
+  num_classes: 100  # CIFAR100
+  image_size: 224
+  batch_size: 32
+
+  # LoRA configuration
+  lora_rank: 8            # Low rank = fewer params (typically 4-64)
+  lora_alpha: 16          # Scaling factor (typically 2*rank)
+  lora_dropout: 0.1       # Dropout for regularization
+
+  # Computed scaling: alpha/rank
+  # lora_scaling: "$%vars::lora_alpha / %vars::lora_rank"
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 20
+  accelerator: auto
+  log_every_n_steps: 10
+
+  callbacks:
+    # Freeze backbone initially (LoRA wrapper handles this, but explicit is clearer)
+    - _target_: lighter.callbacks.Freezer
+      names:
+        - backbone
+      # Optionally unfreeze after some epochs for continued training
+      # until_epoch: 10
+
+    # Save predictions
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [prediction, confidence, ground_truth]
+
+    # Early stopping
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val/MulticlassAccuracy_epoch
+      mode: max
+      patience: 5
+
+    # Best model checkpoint
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/MulticlassAccuracy_epoch
+      mode: max
+      save_top_k: 1
+      filename: lora-{epoch}-{val/MulticlassAccuracy_epoch:.4f}
+
+  # Quick test - remove for full training
+  fast_dev_run: true
+
+model:
+  _target_: project.models.model.LoRAClassificationModel
+
+  # LoRA-wrapped model
+  network:
+    _target_: project.networks.lora.LoRAWrapper
+    lora_rank: "%vars::lora_rank"
+    lora_alpha: "%vars::lora_alpha"
+    lora_dropout: "%vars::lora_dropout"
+    freeze_base: true
+
+    # Target specific modules for LoRA (None = all Linear layers)
+    # For ResNet: target fc layers
+    # For ViT: target attention projections
+    target_modules: null  # Apply to all Linear layers
+
+    # Base model to adapt
+    base_model:
+      _target_: project.networks.network.ImageClassifier
+      backbone: resnet50
+      num_classes: "%vars::num_classes"
+      pretrained: true
+      freeze_backbone: false  # LoRAWrapper handles freezing
+
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+    label_smoothing: 0.1
+
+  # Only LoRA parameters will be trainable
+  optimizer:
+    _target_: torch.optim.AdamW
+    params: "$[p for p in @model::network.parameters() if p.requires_grad]"
+    lr: 0.001  # Can use higher LR for LoRA
+    weight_decay: 0.01
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    optimizer: "@model::optimizer"
+    T_max: 20
+
+  # Metrics
+  train_metrics:
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.classification.MulticlassAccuracy
+        num_classes: "%vars::num_classes"
+        average: macro
+      - _target_: torchmetrics.classification.MulticlassF1Score
+        num_classes: "%vars::num_classes"
+        average: macro
+
+  val_metrics: "%model::train_metrics"
+  test_metrics: "%model::train_metrics"
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    pin_memory: true
+    shuffle: true
+    dataset:
+      _target_: project.dataset.CIFAR100Dataset
+      root: ./.datasets/
+      train: true
+      download: true
+      transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.RandomHorizontalFlip
+          - _target_: torchvision.transforms.RandomRotation
+            degrees: 15
+          - _target_: torchvision.transforms.ToTensor
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility
+    pin_memory: true
+    shuffle: false
+    dataset:
+      _target_: project.dataset.CIFAR100Dataset
+      root: ./.datasets/
+      train: false
+      download: true
+      transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.ToTensor
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+
+  test_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility
+    shuffle: false
+    dataset:
+      _target_: project.dataset.CIFAR100Dataset
+      root: ./.datasets/
+      train: false
+      download: true
+      transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.ToTensor
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+
+  predict_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 16
+    num_workers: 0  # 0 for macOS compatibility
+    shuffle: false
+    dataset:
+      _target_: project.dataset.CIFAR100Dataset
+      root: ./.datasets/
+      train: false
+      download: true
+      transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.ToTensor
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
