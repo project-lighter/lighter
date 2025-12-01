@@ -118,7 +118,7 @@ Useful when you need to step through the `__init__` method to diagnose instantia
 
 **Using `_disabled_` to skip instantiation:**
 
-Temporarily disable a component without removing it from config:
+Skip instantiation of a component without removing it from config:
 
 ```yaml
 trainer:
@@ -127,11 +127,25 @@ trainer:
       monitor: val_loss
       patience: 3
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      _disabled_: true  # Skip this callback (returns None)
+      _disabled_: true  # This callback is removed from the list
       save_top_k: 3
+
+system:
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    _disabled_: true  # Disable while debugging optimizer issues
+    optimizer: "@system::optimizer"
+    T_max: 100
 ```
 
-Useful for debugging or temporarily disabling features without deleting config.
+When `_disabled_: true`:
+
+- **Inline in lists/dicts**: Disabled components are **removed** from the parent structure
+- **Direct resolution or `@` references**: Returns `None`
+
+The config is preserved—re-enable by setting `_disabled_: false` or removing the key.
+
+For complete details (string values, expressions, use cases), see the [Sparkwheel documentation](https://project-lighter.github.io/sparkwheel/user-guide/instantiation/#_disabled_-skip-instantiation).
 
 ### 2. `@`: Resolved References (Lazy)
 
@@ -564,7 +578,7 @@ data:
 | `_target_` | Instantiate class | `_target_: torch.nn.Linear` |
 | `_args_` | Positional arguments | `_args_: [arg1, arg2]` |
 | `_mode_` | Instantiation mode | `_mode_: callable` |
-| `_disabled_` | Skip instantiation | `_disabled_: true` |
+| `_disabled_` | Skip instantiation (removed from parent) | `_disabled_: true` |
 | `@` | Resolved reference | `@model::optimizer` |
 | `%` | Raw reference | `%model::train_metrics` |
 | `$` | Python expression | `$0.001 * 2` |

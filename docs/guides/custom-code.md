@@ -500,14 +500,16 @@ model:
 **`configs/large_batch.yaml`**:
 
 ```yaml
-# Merge with base config
-_includes_:
-  - base.yaml
-
-# Override just batch size
+# Override just batch size (compose with base.yaml via CLI)
 data:
   train_dataloader:
     batch_size: 128
+```
+
+Run by composing configs:
+
+```bash
+lighter fit configs/base.yaml configs/large_batch.yaml
 ```
 
 ## Organizing Larger Projects

@@ -96,11 +96,7 @@ data:
 **`experiments/resnet18.yaml`** - Specific experiment:
 
 ```yaml
-# Inherit from base
-_includes_:
-  - base.yaml
-
-# Experiment-specific settings
+# Experiment-specific settings (merged with base.yaml via CLI)
 model:
   _target_: src.models.ImageClassifier
   learning_rate: 0.001
@@ -117,11 +113,22 @@ data:
       train: true
 ```
 
-Run:
+Run with both configs - they merge in order:
 
 ```bash
-lighter fit experiments/resnet18.yaml
+lighter fit experiments/base.yaml experiments/resnet18.yaml
 ```
+
+Or override specific values from CLI:
+
+```bash
+lighter fit experiments/base.yaml experiments/resnet18.yaml trainer::max_epochs=50
+```
+
+!!! info "How config composition works"
+    Each config file (and CLI override) is applied sequentially via Sparkwheel's `.update()` method.
+    Dictionaries merge recursively, lists extend by default. Use `=key:` to replace instead of merge,
+    or `~key:` to delete. See the [Sparkwheel docs](https://project-lighter.github.io/sparkwheel/) for details.
 
 ### Use Variables for Reusability
 
@@ -195,11 +202,14 @@ data:
 **`experiments/my_experiment.yaml`**:
 
 ```yaml
-_includes_:
-  - data/cifar10.yaml
-
 model:
   # ... model config ...
+```
+
+Run with both configs:
+
+```bash
+lighter fit experiments/data/cifar10.yaml experiments/my_experiment.yaml
 ```
 
 ## Module Design

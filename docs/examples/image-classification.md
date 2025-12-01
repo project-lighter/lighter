@@ -291,7 +291,7 @@ class CIFAR10Model(LighterModule):
 
 ### Step 2: Create the Config
 
-`configs/resnet18_lighter.yaml`:
+`configs/resnet18.yaml`:
 
 ```yaml
 # CIFAR-10 with LighterModule
@@ -327,7 +327,7 @@ trainer:
   logger:
     _target_: pytorch_lightning.loggers.TensorBoardLogger
     save_dir: logs
-    name: cifar10_resnet18_lighter
+    name: cifar10_resnet18
 
 model:
   _target_: project.models.CIFAR10Model
@@ -412,7 +412,7 @@ data:
 ### Step 3: Run Training
 
 ```bash
-lighter fit configs/resnet18_lighter.yaml
+lighter fit configs/resnet18.yaml
 ```
 
 Same results, less code!
@@ -421,43 +421,19 @@ Same results, less code!
 
 ### Try Different Architectures
 
-**ResNet-50** (`configs/resnet50.yaml`):
-
-```yaml
-_includes_:
-  - resnet18.yaml
-
-model:
-  network:
-    _target_: torchvision.models.resnet50
-    num_classes: "%vars::num_classes"
-
-# Adjust for larger model
-vars:
-  batch_size: 64  # Reduce if OOM
-  base_lr: 0.0005  # Lower LR for bigger model
-```
-
-Run:
+Override the network directly from CLI:
 
 ```bash
-lighter fit configs/resnet50.yaml
-```
+# ResNet-50
+lighter fit configs/resnet18.yaml \
+  model::network::_target_=torchvision.models.resnet50 \
+  vars::batch_size=64 \
+  vars::base_lr=0.0005
 
-**EfficientNet** (`configs/efficientnet.yaml`):
-
-```yaml
-_includes_:
-  - resnet18.yaml
-
-model:
-  network:
-    _target_: torchvision.models.efficientnet_b0
-    num_classes: "%vars::num_classes"
-
-vars:
-  batch_size: 64
-  base_lr: 0.001
+# EfficientNet
+lighter fit configs/resnet18.yaml \
+  model::network::_target_=torchvision.models.efficientnet_b0 \
+  vars::batch_size=64
 ```
 
 ### Hyperparameter Tuning
@@ -518,22 +494,19 @@ Use pretrained ImageNet weights:
 `configs/pretrained.yaml`:
 
 ```yaml
-_includes_:
-  - resnet18.yaml
-
 model:
   network:
     weights: IMAGENET1K_V2  # Pretrained weights
 
-  # Lower LR for finetuning
+# Lower LR for finetuning
 vars:
   base_lr: 0.0001
 ```
 
-Run:
+Run by composing with base config:
 
 ```bash
-lighter fit configs/pretrained.yaml
+lighter fit configs/resnet18.yaml configs/pretrained.yaml
 ```
 
 **Expected:** ~94-95% accuracy (better than training from scratch).
