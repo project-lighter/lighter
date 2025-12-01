@@ -1,0 +1,181 @@
+# Vision-Language (CLIP-style) Training with Lighter
+#
+# This example showcases:
+# - Dual-encoder architecture (image + text encoders)
+# - Contrastive learning between vision and language
+# - Freezer callback for frozen text encoder (transfer learning)
+# - Learnable temperature parameter
+# - Custom collate function for multi-modal batches
+# - Image-to-text and text-to-image retrieval metrics
+#
+# Applications:
+# - Zero-shot image classification
+# - Image-text retrieval
+# - Visual search
+# - Multi-modal embeddings
+#
+# Run: lighter fit projects/vision_language/configs/clip.yaml
+
+vars:
+  embed_dim: 512
+  batch_size: 64
+  image_size: 224
+  max_text_length: 77
+  vocab_size: 30522  # BERT tokenizer vocab size
+  temperature: 0.07
+  # Dataset path - download Flickr8k from https://www.kaggle.com/datasets/adityajn105/flickr8k
+  # For Flickr30k, use: .datasets/flickr30k and change dataset class below
+  data_root: .datasets/flickr8k
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 50
+  accelerator: auto
+  log_every_n_steps: 10
+  gradient_clip_val: 1.0  # Important for CLIP training stability
+
+  callbacks:
+    # Freeze image encoder backbone for first 5 epochs
+    # This helps when using pretrained vision encoder
+    - _target_: lighter.callbacks.Freezer
+      names:
+        - image_encoder.backbone
+      until_epoch: 5
+
+    # Early stopping on retrieval accuracy
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val/i2t_accuracy
+      mode: max
+      patience: 10
+
+    # Save best model
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/i2t_accuracy
+      mode: max
+      save_top_k: 1
+      filename: clip-{epoch}-{val/i2t_accuracy:.4f}
+
+  # Quick test - remove for full training
+  fast_dev_run: true
+
+model:
+  _target_: project.models.model.CLIPLighterModel
+
+  network:
+    _target_: project.networks.clip_model.CLIPModel
+    embed_dim: "%vars::embed_dim"
+    temperature: "%vars::temperature"
+    learnable_temperature: true
+
+    image_encoder:
+      _target_: project.networks.clip_model.ImageEncoder
+      backbone: resnet50
+      embed_dim: "%vars::embed_dim"
+      pretrained: true
+
+    text_encoder:
+      _target_: project.networks.clip_model.TextEncoder
+      vocab_size: "%vars::vocab_size"
+      embed_dim: "%vars::embed_dim"
+      num_heads: 8
+      num_layers: 4
+      max_length: "%vars::max_text_length"
+
+  # No criterion - loss computed in step
+
+  # Different learning rates for different components
+  optimizer:
+    _target_: torch.optim.AdamW
+    params:
+      # Image encoder (pretrained) - lower learning rate
+      - params: "$[p for n, p in @model::network.named_parameters() if 'image_encoder' in n]"
+        lr: 0.00001
+      # Text encoder - higher learning rate
+      - params: "$[p for n, p in @model::network.named_parameters() if 'text_encoder' in n]"
+        lr: 0.0001
+      # Temperature parameter
+      - params: "$[p for n, p in @model::network.named_parameters() if 'log_temperature' in n]"
+        lr: 0.001
+    weight_decay: 0.01
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+    optimizer: "@model::optimizer"
+    T_0: 10
+    T_mult: 2
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    pin_memory: true
+    shuffle: true
+    drop_last: true  # Important for contrastive learning
+    collate_fn:
+      _target_: project.dataset.collate_fn
+      _mode_: callable
+    dataset:
+      # Use Flickr8kDataset (easier to obtain) or Flickr30kDataset
+      _target_: project.dataset.Flickr8kDataset
+      root: "%vars::data_root"
+      split: train
+      max_length: "%vars::max_text_length"
+      image_transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.RandomResizedCrop
+            size: "%vars::image_size"
+            scale: [0.8, 1.0]
+          - _target_: torchvision.transforms.RandomHorizontalFlip
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: 0  # 0 for macOS compatibility
+    pin_memory: true
+    shuffle: false
+    drop_last: true
+    collate_fn:
+      _target_: project.dataset.collate_fn
+      _mode_: callable
+    dataset:
+      _target_: project.dataset.Flickr8kDataset
+      root: "%vars::data_root"
+      split: val
+      max_length: "%vars::max_text_length"
+      image_transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+
+  predict_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 16
+    num_workers: 0  # 0 for macOS compatibility
+    shuffle: false
+    collate_fn:
+      _target_: project.dataset.collate_fn
+      _mode_: callable
+    dataset:
+      _target_: project.dataset.Flickr8kDataset
+      root: "%vars::data_root"
+      split: test
+      max_length: "%vars::max_text_length"
+      image_transform:
+        _target_: torchvision.transforms.Compose
+        transforms:
+          - _target_: torchvision.transforms.Resize
+            size: ["%vars::image_size", "%vars::image_size"]
+          - _target_: torchvision.transforms.Normalize
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
