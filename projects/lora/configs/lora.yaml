@@ -1,24 +1,21 @@
-# Efficient Fine-tuning with LoRA (Low-Rank Adaptation)
+# LoRA (Low-Rank Adaptation)
 #
-# This example showcases:
-# - Parameter-efficient fine-tuning (PEFT)
-# - LoRA: Low-Rank Adaptation of pretrained models
-# - Freezer callback for freezing base model
-# - Dramatically reduced trainable parameters (~1% of full model)
-# - Dynamic rank configuration with $ expressions
-# - _disabled_ for conditional adapter enable/disable
+# Parameter-efficient fine-tuning using HuggingFace PEFT.
 #
-# LoRA Benefits:
+# LoRA adds small trainable low-rank matrices to frozen pretrained weights,
+# reducing trainable parameters by 10-100x while maintaining performance.
+#
+# Benefits:
 # - 10-100x fewer trainable parameters
 # - Reduced memory footprint
 # - Faster training
-# - Can store multiple task-specific adapters
+# - Store multiple task-specific adapters
 # - Merge adapters into base model for inference
 #
-# Run: lighter fit projects/efficient_finetuning/configs/lora.yaml
+# Requirements:
+#   pip install peft
 #
-# Compare with full fine-tuning by setting freeze_backbone: false
-# and not using LoRA wrapper
+# Run: lighter fit projects/lora/configs/lora.yaml
 
 vars:
   # Task configuration
@@ -31,8 +28,7 @@ vars:
   lora_alpha: 16          # Scaling factor (typically 2*rank)
   lora_dropout: 0.1       # Dropout for regularization
 
-  # Computed scaling: alpha/rank
-  # lora_scaling: "$%vars::lora_alpha / %vars::lora_rank"
+  num_workers: 4
 
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -41,13 +37,6 @@ trainer:
   log_every_n_steps: 10
 
   callbacks:
-    # Freeze backbone initially (LoRA wrapper handles this, but explicit is clearer)
-    - _target_: lighter.callbacks.Freezer
-      names:
-        - backbone
-      # Optionally unfreeze after some epochs for continued training
-      # until_epoch: 10
-
     # Save predictions
     - _target_: lighter.callbacks.CsvWriter
       path: predictions.csv
@@ -55,35 +44,34 @@ trainer:
 
     # Early stopping
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/MulticlassAccuracy_epoch
+      monitor: val/metrics/MulticlassAccuracy/epoch
       mode: max
       patience: 5
 
     # Best model checkpoint
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val/MulticlassAccuracy_epoch
+      monitor: val/metrics/MulticlassAccuracy/epoch
       mode: max
       save_top_k: 1
-      filename: lora-{epoch}-{val/MulticlassAccuracy_epoch:.4f}
+      filename: lora-{epoch}-{val_accuracy:.4f}
 
-  # Quick test - remove for full training
-  fast_dev_run: true
+  # For quick testing, uncomment:
+  # fast_dev_run: true
 
 model:
   _target_: project.models.model.LoRAClassificationModel
 
-  # LoRA-wrapped model
+  # LoRA-wrapped model using HuggingFace PEFT
   network:
     _target_: project.networks.lora.LoRAWrapper
     lora_rank: "%vars::lora_rank"
     lora_alpha: "%vars::lora_alpha"
     lora_dropout: "%vars::lora_dropout"
-    freeze_base: true
 
-    # Target specific modules for LoRA (None = all Linear layers)
-    # For ResNet: target fc layers
-    # For ViT: target attention projections
-    target_modules: null  # Apply to all Linear layers
+    # Target specific modules for LoRA
+    # For ImageClassifier: target the Linear in classifier Sequential (index 2)
+    # For ViT: target attention projections ["query", "value"]
+    target_modules: ["classifier.2"]
 
     # Base model to adapt
     base_model:
@@ -91,7 +79,7 @@ model:
       backbone: resnet50
       num_classes: "%vars::num_classes"
       pretrained: true
-      freeze_backbone: false  # LoRAWrapper handles freezing
+      freeze_backbone: false  # LoRA handles freezing
 
   criterion:
     _target_: torch.nn.CrossEntropyLoss
@@ -129,7 +117,7 @@ data:
   train_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     dataset:
@@ -153,7 +141,7 @@ data:
   val_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     dataset:
@@ -174,7 +162,7 @@ data:
   test_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     shuffle: false
     dataset:
       _target_: project.dataset.CIFAR100Dataset
@@ -194,7 +182,7 @@ data:
   predict_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: 16
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     shuffle: false
     dataset:
       _target_: project.dataset.CIFAR100Dataset
