@@ -7,14 +7,8 @@ Uses torchvision video datasets:
 
 import torch
 from torch.utils.data import Dataset
-from torchvision.datasets import UCF101, Kinetics
-
-__all__ = [
-    "UCF101",
-    "Kinetics",
-    "VideoClipDataset",
-    "video_collate_fn",
-]
+from torchvision.datasets import UCF101 as UCF101
+from torchvision.datasets import Kinetics as Kinetics
 
 
 class VideoClipDataset(Dataset):

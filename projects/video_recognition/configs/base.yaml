@@ -16,12 +16,14 @@ vars:
   num_classes: 101  # UCF101
   frames_per_clip: 16
   frame_rate: 15
+  num_workers: 4
 
 trainer:
   _target_: pytorch_lightning.Trainer
   accelerator: auto
   log_every_n_steps: 10
-  fast_dev_run: true
+  # For quick testing, uncomment:
+  # fast_dev_run: true
 
   callbacks:
     # Save classification results to CSV
@@ -42,7 +44,7 @@ data:
 
   train_dataloader:
     _target_: torch.utils.data.DataLoader
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     collate_fn:
@@ -51,7 +53,7 @@ data:
 
   val_dataloader:
     _target_: torch.utils.data.DataLoader
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     collate_fn:
