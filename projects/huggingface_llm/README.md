@@ -17,22 +17,17 @@ DistilBERT sentiment classification on IMDB reviews.
 - **`vars::` section** - reusable config values
 - **CsvWriter callback** - prediction logging
 
-## Requirements
-
-```bash
-pip install transformers datasets
-```
-
 ## Usage
 
 ```bash
+pip install lighter transformers datasets
 cd projects/huggingface_llm
 
-# Quick test (limited batches)
-uv run --project ../.. lighter fit configs/imdb.yaml
+# Train
+lighter fit configs/imdb.yaml
 
-# Full training
-lighter fit configs/imdb.yaml trainer::limit_train_batches=null trainer::limit_val_batches=null
+# Quick test
+lighter fit configs/imdb.yaml trainer::fast_dev_run=true
 
 # Different model
 lighter fit configs/imdb.yaml vars::pretrained_model=bert-base-uncased

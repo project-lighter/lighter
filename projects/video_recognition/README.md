@@ -27,28 +27,23 @@ unzip UCF101TrainTestSplits-RecognitionTask.zip -d .datasets/
 - **`_mode_: callable`** - custom collate and writer functions
 - **`%` raw references** - shared dataloader settings
 
-## Requirements
-
-```bash
-pip install pytorchvideo av
-```
-
 ## Usage
 
 ```bash
+pip install lighter pytorchvideo av
 cd projects/video_recognition
 
 # macOS Apple Silicon: enable MPS fallback
 export PYTORCH_ENABLE_MPS_FALLBACK=1
 
 # R3D (3D CNN)
-uv run --project ../.. lighter fit configs/base.yaml configs/r3d.yaml
+lighter fit configs/base.yaml configs/r3d.yaml
 
 # ViViT (Transformer)
 lighter fit configs/base.yaml configs/transformer.yaml
 
-# Full training
-lighter fit configs/base.yaml configs/r3d.yaml trainer::fast_dev_run=false
+# Quick test
+lighter fit configs/base.yaml configs/r3d.yaml trainer::fast_dev_run=true
 ```
 
 ## References

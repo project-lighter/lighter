@@ -25,25 +25,20 @@ Default: **EEGNeX** (state-of-the-art). Alternatives: EEGNet, EEGConformer (from
 - **`%` raw references** - shared config values via `vars::`
 - **MetricCollection** - MAE, RMSE tracking
 
-## Requirements
-
-```bash
-pip install eegdash braindecode mne
-```
-
 ## Usage
 
 ```bash
+pip install lighter braindecode eegdash mne
 cd projects/eeg
 
 # Challenge 1
-uv run --project ../.. lighter fit configs/challenge1.yaml
+lighter fit configs/challenge1.yaml
 
 # Challenge 2
 lighter fit configs/challenge2.yaml
 
-# Full training
-lighter fit configs/challenge1.yaml trainer::fast_dev_run=false
+# Quick test
+lighter fit configs/challenge1.yaml trainer::fast_dev_run=true
 ```
 
 ## Submission

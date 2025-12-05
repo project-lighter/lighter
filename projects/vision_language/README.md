@@ -28,22 +28,17 @@ Learn joint embeddings for images and text for retrieval and zero-shot classific
 - **`_mode_: callable`** for custom collate function
 - **`$` expressions** for parameter group filtering
 
-## Requirements
-
-```bash
-pip install transformers
-```
-
 ## Usage
 
 ```bash
+pip install lighter transformers
 cd projects/vision_language
 
-# Quick test
-uv run --project ../.. lighter fit configs/clip.yaml
+# Train
+lighter fit configs/clip.yaml
 
-# Full training
-lighter fit configs/clip.yaml trainer::fast_dev_run=false
+# Quick test
+lighter fit configs/clip.yaml trainer::fast_dev_run=true
 ```
 
 ## References

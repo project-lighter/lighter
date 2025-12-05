@@ -17,19 +17,19 @@ Reference example - simple CNN for CIFAR-10 classification.
 - **MetricCollection** - Accuracy, F1, Precision, Recall
 - **FileWriter callback** - saves predictions as tensors
 
-## Requirements
-
-No extra dependencies.
-
 ## Usage
 
 ```bash
+pip install lighter
 cd projects/cifar10
 
-# Quick test
-uv run --project ../.. lighter fit configs/example.yaml
+# Train
+lighter fit configs/example.yaml
 
-# Full training
+# Quick test
+lighter fit configs/example.yaml trainer::fast_dev_run=true
+
+# Longer training
 lighter fit configs/example.yaml trainer::max_epochs=50
 ```
 

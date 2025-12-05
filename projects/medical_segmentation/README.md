@@ -20,22 +20,17 @@
 - **FileWriter callback** - saves segmentation masks as .seg.nrrd
 - **`_mode_: callable`** - for custom writer function
 
-## Requirements
-
-```bash
-pip install monai
-```
-
 ## Usage
 
 ```bash
+pip install lighter monai itk
 cd projects/medical_segmentation
 
-# Quick test
-uv run --project ../.. lighter fit configs/spleen.yaml
+# Train
+lighter fit configs/spleen.yaml
 
-# Full training
-lighter fit configs/spleen.yaml trainer::fast_dev_run=false
+# Quick test
+lighter fit configs/spleen.yaml trainer::fast_dev_run=true
 
 # Multi-GPU (recommended for 3D)
 lighter fit configs/spleen.yaml trainer::devices=2 trainer::strategy=ddp
