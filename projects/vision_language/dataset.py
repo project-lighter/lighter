@@ -12,13 +12,6 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-__all__ = [
-    "Flickr30kDataset",
-    "Flickr8kDataset",
-    "COCOCaptionsDataset",
-    "collate_fn",
-]
-
 
 class Flickr30kDataset(Dataset):
     """Flickr30k dataset for vision-language training.

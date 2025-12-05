@@ -23,6 +23,7 @@ vars:
   max_text_length: 77
   vocab_size: 30522  # BERT tokenizer vocab size
   temperature: 0.07
+  num_workers: 4
   # Dataset path - download Flickr8k from https://www.kaggle.com/datasets/adityajn105/flickr8k
   # For Flickr30k, use: .datasets/flickr30k and change dataset class below
   data_root: .datasets/flickr8k
@@ -55,8 +56,8 @@ trainer:
       save_top_k: 1
       filename: clip-{epoch}-{val/i2t_accuracy:.4f}
 
-  # Quick test - remove for full training
-  fast_dev_run: true
+  # For quick testing, uncomment:
+  # fast_dev_run: true
 
 model:
   _target_: project.models.model.CLIPLighterModel
@@ -110,7 +111,7 @@ data:
   train_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     drop_last: true  # Important for contrastive learning
@@ -137,7 +138,7 @@ data:
   val_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     drop_last: true
@@ -161,7 +162,7 @@ data:
   predict_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: 16
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     shuffle: false
     collate_fn:
       _target_: project.dataset.collate_fn
