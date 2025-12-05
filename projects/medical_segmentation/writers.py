@@ -1,23 +1,33 @@
 """Custom writer functions for medical imaging outputs."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
 import torch
 
 
-def write_nrrd(path: Path, tensor: torch.Tensor, *, suffix: str = ".seg.nrrd") -> None:
+def write_nrrd(
+    path: Path,
+    tensor: torch.Tensor,
+    *,
+    suffix: str = ".seg.nrrd",
+    affine: np.ndarray | None = None,
+    spatial_shape: Sequence[int] | None = None,
+) -> None:
     """Write a 3D segmentation tensor to NRRD format.
 
-    Uses nibabel for NIfTI/NRRD I/O which is standard in medical imaging.
+    Uses MONAI's ITKWriter for robust I/O with proper orientation handling.
     NRRD (Nearly Raw Raster Data) is commonly used for medical segmentation masks.
 
     Args:
         path: Output path (suffix will be replaced).
-        tensor: 3D tensor (D, H, W) containing segmentation labels.
+        tensor: 3D tensor (D, H, W) or (C, D, H, W) containing segmentation labels.
         suffix: File suffix (default: .seg.nrrd for segmentation convention).
+        affine: 4x4 affine matrix for spatial orientation. If None, uses identity.
+        spatial_shape: Original spatial shape for resampling. If None, uses tensor shape.
     """
-    import nibabel as nib
-    import numpy as np
+    from monai.data.image_writer import ITKWriter
 
     path = path.with_suffix(suffix)
 
@@ -27,14 +37,18 @@ def write_nrrd(path: Path, tensor: torch.Tensor, *, suffix: str = ".seg.nrrd") -
     else:
         data = np.asarray(tensor)
 
-    # Remove batch/channel dims if present: (B, C, D, H, W) -> (D, H, W)
-    while data.ndim > 3:
+    # Remove batch dim if present: (B, C, D, H, W) -> (C, D, H, W) or (D, H, W)
+    if data.ndim == 5:
         data = data[0]
 
-    # Create NIfTI image (NRRD is handled by nibabel via nrrd backend)
-    # Use identity affine - in practice, you'd want to preserve the original affine
-    affine = np.eye(4)
-    nifti_img = nib.Nifti1Image(data.astype(np.int16), affine)
+    # Determine channel_dim: if 4D assume first dim is channel, else no channel
+    channel_dim = 0 if data.ndim == 4 else None
 
-    # Save - nibabel determines format from suffix
-    nib.save(nifti_img, str(path))
+    # Use identity affine if not provided
+    if affine is None:
+        affine = np.eye(4)
+
+    writer = ITKWriter(output_dtype=np.int16)
+    writer.set_data_array(data, channel_dim=channel_dim)
+    writer.set_metadata({"affine": affine, "spatial_shape": spatial_shape or data.shape[-3:]})
+    writer.write(str(path))

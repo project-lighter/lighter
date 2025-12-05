@@ -13,16 +13,19 @@
 #   - Custom writer function for medical imaging formats
 #   - MONAI integration with sliding window inference
 #
+# Install:
+#   pip install lighter monai itk
+#
 # Run:
-#   cd projects/medical_segmentation && uv sync
-#   lighter fit configs/spleen.yaml
-#   lighter predict configs/spleen.yaml  # saves .seg.nrrd files
+#   lighter fit projects/medical_segmentation/configs/spleen.yaml
+#   lighter predict projects/medical_segmentation/configs/spleen.yaml  # saves .seg.nrrd files
 
 vars:
   num_classes: 2  # Background + Spleen
   roi_size: [96, 96, 96]
   batch_size: 2
   sw_batch_size: 4
+  num_workers: 4
 
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -51,7 +54,8 @@ trainer:
         _target_: project.writers.write_nrrd
         _mode_: callable
 
-  fast_dev_run: true
+  # For quick testing, uncomment:
+  # fast_dev_run: true
 
 model:
   _target_: project.models.model.SegmentationModel
@@ -95,7 +99,7 @@ data:
   train_dataloader:
     _target_: monai.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     dataset:
@@ -105,14 +109,56 @@ data:
       section: training
       download: true
       transform:
-        _target_: project.dataset.get_spleen_train_transforms
-        spatial_size: "%vars::roi_size"
-        num_samples: 4
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.RandCropByPosNegLabeld
+            keys: [image, label]
+            label_key: label
+            spatial_size: "%vars::roi_size"
+            pos: 1
+            neg: 1
+            num_samples: 4
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 0
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 1
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 2
+          - _target_: monai.transforms.RandRotate90d
+            keys: [image, label]
+            prob: 0.5
+            max_k: 3
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
 
   val_dataloader:
     _target_: monai.data.DataLoader
     batch_size: 1  # Full volume for validation
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     dataset:
@@ -122,12 +168,33 @@ data:
       section: validation
       download: true
       transform:
-        _target_: project.dataset.get_spleen_val_transforms
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
 
   test_dataloader:
     _target_: monai.data.DataLoader
     batch_size: 1
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     shuffle: false
     dataset:
       _target_: monai.apps.DecathlonDataset
@@ -136,4 +203,25 @@ data:
       section: validation
       download: true
       transform:
-        _target_: project.dataset.get_spleen_val_transforms
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
