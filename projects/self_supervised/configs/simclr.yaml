@@ -6,8 +6,8 @@
 # Dataset: CIFAR10 (50k training images, 10k test images)
 # Method: SimCLR - Contrastive learning with augmented views
 #
-# Requirements:
-#   pip install lightly
+# Install:
+#   pip install lighter lightly
 #
 # Run:
 #   lighter fit projects/self_supervised/configs/simclr.yaml
@@ -18,6 +18,7 @@ vars:
   input_size: 32
   projection_dim: 128
   hidden_dim: 2048
+  num_workers: 4
 
 trainer:
   _target_: pytorch_lightning.Trainer
@@ -32,7 +33,8 @@ trainer:
       save_top_k: 1
       filename: simclr-{epoch}-{val/loss:.4f}
 
-  fast_dev_run: true
+  # For quick testing, uncomment:
+  # fast_dev_run: true
 
 model:
   _target_: project.models.model.SimCLRModel
@@ -63,27 +65,35 @@ data:
   train_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     drop_last: true
     dataset:
-      _target_: project.dataset.get_cifar10_ssl_dataset
-      root: ./.datasets/
-      train: true
-      input_size: "%vars::input_size"
-      download: true
+      _target_: lightly.data.LightlyDataset.from_torch_dataset
+      dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: ./.datasets/
+        train: true
+        download: true
+      transform:
+        _target_: lightly.transforms.SimCLRTransform
+        input_size: "%vars::input_size"
 
   val_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     drop_last: true
     dataset:
-      _target_: project.dataset.get_cifar10_ssl_dataset
-      root: ./.datasets/
-      train: false
-      input_size: "%vars::input_size"
-      download: true
+      _target_: lightly.data.LightlyDataset.from_torch_dataset
+      dataset:
+        _target_: torchvision.datasets.CIFAR10
+        root: ./.datasets/
+        train: false
+        download: true
+      transform:
+        _target_: lightly.transforms.SimCLRTransform
+        input_size: "%vars::input_size"
