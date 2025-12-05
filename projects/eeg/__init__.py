@@ -15,6 +15,6 @@ References:
 - Paper: https://arxiv.org/abs/2506.19141
 """
 
-from . import data, models, networks
-
-__all__ = ["data", "models", "networks"]
+from . import data as data
+from . import models as models
+from . import networks as networks

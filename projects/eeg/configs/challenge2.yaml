@@ -19,6 +19,7 @@ vars:
   n_times: 200  # 2 seconds at 100 Hz (after cropping from 4s windows)
   sfreq: 100
   batch_size: 128
+  num_workers: 4
   data_dir: .datasets/eeg2025
   releases:
     - R5
@@ -89,7 +90,7 @@ data:
   train_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility (spawn + dynamic imports issue)
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: true
     dataset:
@@ -104,7 +105,7 @@ data:
   val_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
     dataset:
@@ -119,7 +120,7 @@ data:
   test_dataloader:
     _target_: torch.utils.data.DataLoader
     batch_size: "%vars::batch_size"
-    num_workers: 0  # 0 for macOS compatibility
+    num_workers: "%vars::num_workers"
     shuffle: false
     dataset:
       _target_: project.data.HBNDatasetChallenge2
