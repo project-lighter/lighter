@@ -116,18 +116,7 @@ def test_get_optimizer_stats_multiple_groups():
 
 
 def test_get_optimizer_stats_with_betas():
-    """
-    Test the get_optimizer_stats function with optimizers that use betas instead of momentum.
-
-    Tests:
-        - Optimizer with betas parameter (e.g., Adam)
-        - Multiple parameter groups with different betas values
-
-    Verifies:
-        - Correct extraction of learning rate and beta values
-        - Proper handling of multiple parameter groups
-        - Correct formatting of stat names
-    """
+    """Test get_optimizer_stats with Adam optimizer (uses betas instead of momentum)."""
     model = torch.nn.Linear(10, 1)
     optimizer = Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
     stats = get_optimizer_stats(optimizer)

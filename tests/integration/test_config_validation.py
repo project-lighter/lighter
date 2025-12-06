@@ -187,31 +187,31 @@ data:
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 10
-  devices: 1
 
-system:
-  _target_: lighter.System
-  model:
+model:
+  _target_: lighter.LighterModule
+  network:
     _target_: torch.nn.Identity
   optimizer:
     _target_: torch.optim.Adam
     lr: 0.001
+
+data:
+  _target_: lighter.LighterDataModule
   train_dataloader: {}
-  val_dataloader: {}
 """
         config_path.write_text(config_content)
 
         runner = Runner()
-        # Capture config to verify values
         captured_config = None
 
-        def capture_system(config):
+        def capture_config(config):
             nonlocal captured_config
             captured_config = config
             return MagicMock()
 
         with (
-            patch.object(runner, "_resolve_model", side_effect=capture_system),
+            patch.object(runner, "_resolve_model", side_effect=capture_config),
             patch.object(runner, "_resolve_trainer"),
             patch.object(runner, "_resolve_datamodule"),
             patch.object(runner, "_save_config"),
@@ -267,11 +267,11 @@ data:
             train_metrics = captured_config.get("model::train_metrics")
             val_metrics_ref = captured_config.get("model::val_metrics")
 
-            # val_metrics should be a reference string or the expanded value
-            # depending on Sparkwheel version behavior
+            # train_metrics should be the list of metric configs
             assert train_metrics == [{"_target_": "torchmetrics.MeanSquaredError"}]
-            # The reference either stays as string or gets expanded
-            assert val_metrics_ref == "%::train_metrics" or val_metrics_ref == train_metrics
+            # val_metrics uses a raw reference (%::) which Sparkwheel normalizes to absolute path
+            # The reference stays as a string until instantiation time
+            assert val_metrics_ref == "%model::train_metrics"
 
     def test_config_with_vars(self, temp_config_dir):
         """Test configuration with vars section."""

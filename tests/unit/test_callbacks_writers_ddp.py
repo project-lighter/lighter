@@ -284,8 +284,6 @@ class TestDistributedEdgeCases:
         # Create another rank with data
         temp_path_rank1 = tmp_path / "predictions.tmp_rank1.csv"
         with open(temp_path_rank1, "w", newline="") as f:
-            import csv
-
             csv_writer = csv.writer(f)
             csv_writer.writerow(["pred"])
             csv_writer.writerow([1])

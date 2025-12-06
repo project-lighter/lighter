@@ -466,9 +466,6 @@ class TestCsvWriter:
 
         assert len(df) == 3
         assert list(df.columns) == ["pred", "target"]
-        # Use pytest.approx for float comparison
-        import pytest
-
         assert df["pred"].tolist() == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
         assert df["target"].tolist() == [0, 1, 0]
 

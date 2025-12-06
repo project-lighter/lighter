@@ -1,86 +1,209 @@
+"""Tests for dynamic_imports module."""
+
+import pickle
 import sys
+from io import BytesIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lighter.utils.dynamic_imports import import_module_from_path
+from lighter.utils.dynamic_imports import (
+    _DynamicModuleFinder,
+    _HybridPickler,
+    _ModuleRegistry,
+    import_module_from_path,
+)
 
 
-def test_import_module_from_path_nonexistent():
-    """
-    Test importing a module from a nonexistent path raises FileNotFoundError.
+class TestImportModuleFromPath:
+    """Tests for import_module_from_path function."""
 
-    This test verifies that attempting to import a module from a path that
-    doesn't exist results in a FileNotFoundError being raised.
+    def test_nonexistent_path_raises_error(self):
+        """Importing from a path without __init__.py raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="No __init__.py"):
+            import_module_from_path("nonexistent", "/path/that/does/not/exist")
 
-    Raises:
-        FileNotFoundError: Expected to be raised when path doesn't exist
-    """
-    with pytest.raises(FileNotFoundError):
-        import_module_from_path("non_existent_module", "non_existent_path")
+    def test_already_imported_returns_existing(self):
+        """If module is already in sys.modules, return it without reimporting."""
+        mock_module = MagicMock()
+        module_name = "test_already_imported_module"
+
+        with patch.dict(sys.modules, {module_name: mock_module}):
+            result = import_module_from_path(module_name, "/any/path")
+            assert result is mock_module
+
+    def test_successful_import(self, tmp_path):
+        """Successfully import a real package from filesystem."""
+        # Create a real package
+        pkg_dir = tmp_path / "test_real_pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("VALUE = 42")
+
+        module_name = "test_real_pkg_import"
+        try:
+            result = import_module_from_path(module_name, pkg_dir)
+
+            assert result is not None
+            assert result.VALUE == 42
+            assert module_name in sys.modules
+        finally:
+            # Cleanup
+            sys.modules.pop(module_name, None)
+
+    def test_import_with_submodule(self, tmp_path):
+        """Import a package and verify submodules can be imported."""
+        # Create package with submodule
+        pkg_dir = tmp_path / "test_pkg_with_sub"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "submod.py").write_text("SUBVALUE = 123")
+
+        module_name = "test_pkg_with_sub_import"
+        try:
+            import_module_from_path(module_name, pkg_dir)
+
+            # Import submodule using standard import
+            import importlib
+
+            submod = importlib.import_module(f"{module_name}.submod")
+            assert submod.SUBVALUE == 123
+        finally:
+            # Cleanup
+            sys.modules.pop(module_name, None)
+            sys.modules.pop(f"{module_name}.submod", None)
 
 
-def test_import_module_from_path_already_imported():
-    """
-    Test importing an already imported module returns the existing module.
+class TestModuleRegistry:
+    """Tests for _ModuleRegistry."""
 
-    This test verifies that when attempting to import a module that's already
-    in sys.modules, the function returns the existing module instead of
-    reloading it.
+    def test_register_and_find_exact_match(self):
+        """Registry returns exact match for registered module."""
+        registry = _ModuleRegistry()
+        test_path = Path("/test/path")
+        registry.register("mymodule", test_path)
 
-    Setup:
-        - Creates a mock module
-        - Adds mock module to sys.modules
-    """
-    mock_module = MagicMock()
-    with patch.dict(sys.modules, {"already_imported_module": mock_module}):
-        result = import_module_from_path("already_imported_module", "some_path")
-        assert result is mock_module
-        assert sys.modules["already_imported_module"] is mock_module
+        result = registry.find_root("mymodule")
+        assert result == ("mymodule", test_path)
+
+    def test_find_submodule_returns_root(self):
+        """Registry returns root module for submodule queries."""
+        registry = _ModuleRegistry()
+        test_path = Path("/test/path")
+        registry.register("mymodule", test_path)
+
+        result = registry.find_root("mymodule.sub.deep")
+        assert result == ("mymodule", test_path)
+
+    def test_find_unregistered_returns_none(self):
+        """Registry returns None for unregistered modules."""
+        registry = _ModuleRegistry()
+        assert registry.find_root("unregistered") is None
 
 
-def test_import_module_from_path_with_init():
-    """
-    Test successful module import from a valid path with __init__.py.
+class TestDynamicModuleFinder:
+    """Tests for _DynamicModuleFinder."""
 
-    This test verifies the complete module import process:
-    1. Path resolution and validation
-    2. Module spec creation
-    3. Module creation from spec
-    4. Module execution
-    5. Module registration in sys.modules
-    6. Module registration with cloudpickle for pickle-by-value serialization
+    def test_unregistered_module_returns_none(self):
+        """Finder returns None for modules not in registry."""
+        finder = _DynamicModuleFinder()
+        # Use a unique name that won't be registered
+        result = finder.find_spec("completely_unknown_module_xyz", None, None)
+        assert result is None
 
-    Setup:
-        - Patches Path for file validation
-        - Patches spec creation and module creation utilities
-        - Patches cloudpickle.register_pickle_by_value
-        - Creates mock spec and module objects
+    def test_missing_file_returns_none(self, tmp_path):
+        """Finder returns None when submodule file doesn't exist."""
+        from lighter.utils.dynamic_imports import _registry
 
-    The test verifies all steps in the import process are called correctly
-    and the module is properly registered in sys.modules.
-    """
-    mock_spec = MagicMock()
-    mock_module = MagicMock()
+        # Create package without the submodule we'll look for
+        pkg_dir = tmp_path / "finder_test_pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
 
-    with (
-        patch("lighter.utils.dynamic_imports.Path") as mock_path,
-        patch("lighter.utils.dynamic_imports.importlib.util.spec_from_file_location") as mock_spec_from_file,
-        patch("lighter.utils.dynamic_imports.importlib.util.module_from_spec") as mock_module_from_spec,
-        patch("lighter.utils.dynamic_imports.cloudpickle.register_pickle_by_value") as mock_register,
-    ):
-        # Setup mocks
-        mock_path.return_value.resolve.return_value.__truediv__.return_value.is_file.return_value = True
-        mock_spec_from_file.return_value = mock_spec
-        mock_module_from_spec.return_value = mock_module
+        module_name = "finder_test_pkg_missing"
+        _registry.register(module_name, pkg_dir)
 
-        # Execute function
-        import_module_from_path("valid_module", "valid_path")
+        try:
+            finder = _DynamicModuleFinder()
+            result = finder.find_spec(f"{module_name}.nonexistent", None, None)
+            assert result is None
+        finally:
+            # Registry doesn't have unregister, but module names are unique per test
+            pass
 
-        # Verify mock interactions
-        mock_path.assert_called_once()
-        mock_spec_from_file.assert_called_once()
-        mock_module_from_spec.assert_called_once_with(mock_spec)
-        mock_spec.loader.exec_module.assert_called_once_with(mock_module)
-        mock_register.assert_called_once_with(mock_module)
-        assert sys.modules["valid_module"] is mock_module
+    def test_finds_root_package(self, tmp_path):
+        """Finder creates spec for root package __init__.py."""
+        from lighter.utils.dynamic_imports import _registry
+
+        pkg_dir = tmp_path / "finder_root_pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("# root")
+
+        module_name = "finder_root_pkg_test"
+        _registry.register(module_name, pkg_dir)
+
+        finder = _DynamicModuleFinder()
+        result = finder.find_spec(module_name, None, None)
+
+        assert result is not None
+        assert result.name == module_name
+        assert "__init__.py" in result.origin
+
+    def test_finds_submodule(self, tmp_path):
+        """Finder creates spec for submodule .py file."""
+        from lighter.utils.dynamic_imports import _registry
+
+        pkg_dir = tmp_path / "finder_sub_pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "child.py").write_text("X = 1")
+
+        module_name = "finder_sub_pkg_test"
+        _registry.register(module_name, pkg_dir)
+
+        finder = _DynamicModuleFinder()
+        result = finder.find_spec(f"{module_name}.child", None, None)
+
+        assert result is not None
+        assert result.name == f"{module_name}.child"
+        assert "child.py" in result.origin
+
+
+class TestHybridPickler:
+    """Tests for _HybridPickler."""
+
+    def test_pickles_basic_types(self):
+        """HybridPickler can pickle and unpickle basic Python types."""
+        buffer = BytesIO()
+        pickler = _HybridPickler(buffer)
+
+        data = {"key": [1, 2, 3], "nested": {"a": "b"}}
+        pickler.dump(data)
+
+        buffer.seek(0)
+        result = pickle.load(buffer)
+        assert result == data
+
+    def test_pickles_lambda(self):
+        """HybridPickler can pickle lambdas (via cloudpickle)."""
+        buffer = BytesIO()
+        pickler = _HybridPickler(buffer)
+
+        fn = lambda x: x * 2  # noqa: E731
+        pickler.dump(fn)
+
+        buffer.seek(0)
+        result = pickle.load(buffer)
+        assert result(5) == 10
+
+    def test_reducer_override_handles_functions(self):
+        """reducer_override returns valid reduction for functions."""
+        buffer = BytesIO()
+        pickler = _HybridPickler(buffer)
+
+        fn = lambda x: x + 1  # noqa: E731
+        result = pickler.reducer_override(fn)
+
+        # Should return a reduction tuple (callable, args) or similar
+        # NotImplemented means "use default pickling"
+        assert result is not NotImplemented

@@ -277,19 +277,14 @@ def test_validate_and_log_dict_loss(simple_system, mock_trainer):
 
 
 def test_validate_and_log_none_loss(simple_system, mock_trainer):
-    """Test _log_outputs handles None loss gracefully."""
+    """Test _log_outputs handles None loss gracefully (doesn't crash)."""
     simple_system.trainer = mock_trainer
     mock_trainer.training = True
     simple_system.log = MagicMock()
 
-    # Output with no loss key or loss=None
     output = {"loss": None}
     simple_system._log_outputs(output, batch_idx=0)
-
-    # log should not be called for loss when it's None
-    # (may be called for other things, but not for loss)
-    # We're testing that it doesn't crash
-    assert True  # If we reach here, test passes
+    # Test passes if no exception is raised
 
 
 def test_validate_and_log_dict_loss_without_total(simple_model, mock_trainer):
