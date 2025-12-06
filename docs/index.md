@@ -352,6 +352,23 @@ Ready to try it? Pick your path:
 
 </div>
 
+## Example Projects
+
+Ready-to-run projects demonstrating Lighter across domains:
+
+| Project | Domain | Features |
+|---------|--------|----------|
+| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic setup, MetricCollection, FileWriter |
+| [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Braindecode integration, regression |
+| [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Sentiment Classification | Transformers, datasets, model-computed loss |
+| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Fine-Tuning | PEFT/LoRA, parameter filtering |
+| [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | MONAI, 3D volumes, sliding window |
+| [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | SSL Computer Vision | SimCLR, lightly library |
+| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video | 3D CNNs, PytorchVideo |
+| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style dual encoders |
+
+Each project includes a README with setup instructions and demonstrates different Lighter features.
+
 ## Community
 
 - [:fontawesome-brands-discord: Discord](https://discord.gg/zJcnp6KrUp) - Get help, share configs
