@@ -38,6 +38,7 @@ dependencies = [
     "sparkwheel>=0.0.8",
     "rich>=13.7.0",
     "torchvision>=0.20.0",
+    "cloudpickle>=3.0.0",
 ]
 
 [project.urls]

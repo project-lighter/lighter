@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS, import_module_from_path
+from lighter.utils.dynamic_imports import import_module_from_path
 
 
 def test_import_module_from_path_nonexistent():
@@ -20,40 +20,6 @@ def test_import_module_from_path_nonexistent():
         import_module_from_path("non_existent_module", "non_existent_path")
 
 
-def test_optional_imports_nonexistent():
-    """
-    Test accessing a nonexistent module from OPTIONAL_IMPORTS raises ImportError.
-
-    This test verifies that attempting to access a module that isn't defined
-    in the OPTIONAL_IMPORTS dictionary raises an ImportError.
-
-    Raises:
-        ImportError: Expected to be raised when accessing undefined module
-    """
-    with pytest.raises(ImportError):
-        _ = OPTIONAL_IMPORTS["non_existent_module"]
-
-
-def test_optional_imports_available():
-    """
-    Test successful retrieval of an available optional import.
-
-    This test verifies that when a module exists in OPTIONAL_IMPORTS, it:
-    1. Returns the correct mock module
-    2. Calls optional_import with the correct module name
-    3. Only calls optional_import once
-
-    Setup:
-        - Creates a mock module
-        - Patches optional_import to return the mock module
-    """
-    mock_module = MagicMock()
-    with patch("lighter.utils.dynamic_imports.optional_import", return_value=(mock_module, True)) as mock_import:
-        module = OPTIONAL_IMPORTS["existent_module"]
-        assert module is mock_module
-        mock_import.assert_called_once_with("existent_module")
-
-
 def test_import_module_from_path_already_imported():
     """
     Test importing an already imported module returns the existing module.
@@ -68,7 +34,8 @@ def test_import_module_from_path_already_imported():
     """
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"already_imported_module": mock_module}):
-        import_module_from_path("already_imported_module", "some_path")
+        result = import_module_from_path("already_imported_module", "some_path")
+        assert result is mock_module
         assert sys.modules["already_imported_module"] is mock_module
 
 
@@ -82,10 +49,12 @@ def test_import_module_from_path_with_init():
     3. Module creation from spec
     4. Module execution
     5. Module registration in sys.modules
+    6. Module registration with cloudpickle for pickle-by-value serialization
 
     Setup:
         - Patches Path for file validation
         - Patches spec creation and module creation utilities
+        - Patches cloudpickle.register_pickle_by_value
         - Creates mock spec and module objects
 
     The test verifies all steps in the import process are called correctly
@@ -98,6 +67,7 @@ def test_import_module_from_path_with_init():
         patch("lighter.utils.dynamic_imports.Path") as mock_path,
         patch("lighter.utils.dynamic_imports.importlib.util.spec_from_file_location") as mock_spec_from_file,
         patch("lighter.utils.dynamic_imports.importlib.util.module_from_spec") as mock_module_from_spec,
+        patch("lighter.utils.dynamic_imports.cloudpickle.register_pickle_by_value") as mock_register,
     ):
         # Setup mocks
         mock_path.return_value.resolve.return_value.__truediv__.return_value.is_file.return_value = True
@@ -112,47 +82,5 @@ def test_import_module_from_path_with_init():
         mock_spec_from_file.assert_called_once()
         mock_module_from_spec.assert_called_once_with(mock_spec)
         mock_spec.loader.exec_module.assert_called_once_with(mock_module)
+        mock_register.assert_called_once_with(mock_module)
         assert sys.modules["valid_module"] is mock_module
-
-
-def test_optional_import_success():
-    """
-    Tests that an available module is imported successfully
-    and is stored in the 'imports' dictionary.
-    """
-    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
-
-    # "sys" is a built-in module, guaranteed to be there.
-    mod = OPTIONAL_IMPORTS["sys"]
-    import sys
-
-    assert mod is sys  # We expect the returned object to be Python's 'sys' module
-    assert "sys" in OPTIONAL_IMPORTS.imports  # The module name should now be in the 'imports' dictionary
-
-
-def test_optional_import_already_imported():
-    """
-    Tests that requesting the same module a second time
-    does not re-import it but just returns the stored instance.
-    """
-    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
-
-    # First call forces import.
-    mod1 = OPTIONAL_IMPORTS["sys"]
-    # Second call should simply return from 'imports' dictionary.
-    mod2 = OPTIONAL_IMPORTS["sys"]
-
-    assert mod1 is mod2  # Should be the same object reference (from the dictionary)
-
-
-def test_optional_import_failure():
-    """
-    Tests that attempting to import a non-existent module
-    raises an ImportError.
-    """
-    from lighter.utils.dynamic_imports import OPTIONAL_IMPORTS
-
-    with pytest.raises(ImportError) as exc_info:
-        OPTIONAL_IMPORTS["this_module_does_not_exist_12345"]
-
-    assert "this_module_does_not_exist_12345" in str(exc_info.value)
