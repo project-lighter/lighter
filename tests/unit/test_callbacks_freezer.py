@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import torch
 from pytorch_lightning import Trainer
@@ -6,6 +8,12 @@ from torch.utils.data import DataLoader, Dataset
 
 from lighter.callbacks.freezer import Freezer
 from lighter.model import LighterModule
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m|\x1b\]8;[^\\]*\\|\x1b\\")
+    return ansi_escape.sub("", text)
 
 
 class DummyDataset(Dataset):
@@ -245,9 +253,9 @@ def test_freezer_logs_excepted_layers(dummy_system, capsys):
     # Directly call _set_model_requires_grad to test logging
     freezer._set_model_requires_grad(dummy_system, requires_grad=False)
 
-    # Loguru logs to stderr by default
+    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
     captured = capsys.readouterr()
-    output = captured.out + captured.err
+    output = strip_ansi(captured.out + captured.err)
     assert "(excepted from freeze)" in output
     assert "layer2.weight" in output
     assert "layer2.bias" in output
@@ -262,8 +270,8 @@ def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
     capsys.readouterr()  # Clear previous output
     freezer._set_model_requires_grad(dummy_system, requires_grad=True)
 
-    # Loguru logs to stderr by default
+    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
     captured = capsys.readouterr()
-    output = captured.out + captured.err
+    output = strip_ansi(captured.out + captured.err)
     assert "Unfroze layers" in output
     assert "(excepted from freeze)" not in output
