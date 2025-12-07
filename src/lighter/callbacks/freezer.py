@@ -5,10 +5,8 @@ This module provides the Freezer callback, which allows freezing model parameter
 from typing import Any
 
 from loguru import logger
-from pytorch_lightning import Callback, Trainer
-from torch.nn import Module
+from pytorch_lightning import Callback, LightningModule, Trainer
 
-from lighter import LighterModule
 from lighter.utils.misc import ensure_list
 
 
@@ -57,13 +55,13 @@ class Freezer(Callback):
 
         self._frozen_state = False
 
-    def on_train_batch_start(self, trainer: Trainer, pl_module: LighterModule, batch: Any, batch_idx: int) -> None:
+    def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int) -> None:
         """
         Called at the start of each training batch to freeze or unfreeze model parameters.
 
         Args:
             trainer: The trainer instance.
-            pl_module: The LighterModule instance.
+            pl_module: The LightningModule instance.
             batch: The current batch.
             batch_idx: The index of the batch.
         """
@@ -86,7 +84,7 @@ class Freezer(Callback):
             self._set_model_requires_grad(pl_module, requires_grad=False)
             self._frozen_state = True
 
-    def _set_model_requires_grad(self, model: Module | LighterModule, requires_grad: bool) -> None:
+    def _set_model_requires_grad(self, model: LightningModule, requires_grad: bool) -> None:
         """
         Sets the `requires_grad` attribute for model parameters.
 
@@ -103,7 +101,10 @@ class Freezer(Callback):
             model: The model whose parameters to modify.
             requires_grad: Whether to allow gradients (unfreeze) or not (freeze).
         """
-        # If the model is a `LighterModule`, get the underlying PyTorch network.
+        # If the model is a `LighterModule`, get the underlying network so users
+        # can specify layer names without the "network." prefix.
+        from lighter import LighterModule
+
         if isinstance(model, LighterModule):
             model = model.network
 

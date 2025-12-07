@@ -110,7 +110,25 @@ def write_text(path: Path, value: Any, *, suffix: str = ".txt", encoding: str = 
 
 
 class FileWriter(BaseWriter):
-    """Persist a prediction value per sample to disk."""
+    """
+    Persist a prediction value per sample to disk.
+
+    Args:
+        directory: Directory to save prediction files.
+        value_key: Key in the prediction outputs dict containing values to save.
+        writer_fn: Writer function name (e.g., "tensor", "image_2d", "text") or callable.
+        name_key: Optional key for custom file names. If None, uses sequential numbering.
+
+    Example:
+        ```yaml
+        trainer:
+          callbacks:
+            - _target_: lighter.callbacks.FileWriter
+              directory: predictions/
+              value_key: pred
+              writer_fn: tensor
+        ```
+    """
 
     def __init__(
         self,
@@ -157,7 +175,7 @@ class FileWriter(BaseWriter):
 
         values = self._to_sequence(outputs, self.value_key)
         if not values:
-            logger.debug("FileWriter value key '%s' yielded no samples; skipping batch", self.value_key)
+            logger.debug("FileWriter value key '{}' yielded no samples; skipping batch", self.value_key)
             return
 
         if self.name_key is not None:

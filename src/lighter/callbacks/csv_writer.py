@@ -27,6 +27,15 @@ class CsvWriter(BaseWriter):
         keys (list[str]): A list of keys to be included in the CSV file.
                           These keys must be present in the `outputs` dictionary
                           from the prediction step.
+
+    Example:
+        ```yaml
+        trainer:
+          callbacks:
+            - _target_: lighter.callbacks.CsvWriter
+              path: predictions.csv
+              keys: [id, pred, target]
+        ```
     """
 
     def __init__(self, path: str | Path, keys: list[str]) -> None:
@@ -135,6 +144,8 @@ class CsvWriter(BaseWriter):
         if trainer.is_global_zero:
             # Read all temporary files into pandas DataFrames and concatenate them
             dfs = [pd.read_csv(path) for path in all_temp_paths if path is not None]
+            if not dfs:
+                return
             df = pd.concat(dfs, ignore_index=True)
 
             # Save the final CSV file
