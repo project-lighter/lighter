@@ -105,13 +105,12 @@ class Freezer(Callback):
         # can specify layer names without the "network." prefix.
         from lighter import LighterModule
 
-        if isinstance(model, LighterModule):
-            model = model.network
+        target = model.network if isinstance(model, LighterModule) else model
 
         frozen_layers = []
         unfrozen_layers = []
 
-        for name, param in model.named_parameters():
+        for name, param in target.named_parameters():
             # Check if the parameter should be excluded from freezing.
             is_excepted = (self.except_names and name in self.except_names) or (
                 self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with)
