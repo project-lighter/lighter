@@ -143,5 +143,6 @@ class Freezer(Callback):
                 + (f" until step {self.until_step}" if self.until_step is not None else "")
                 + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
             )
-        if unfrozen_layers and requires_grad:  # Only log unfrozen when explicitly unfreezing
-            logger.info(f"Unfroze layers: {unfrozen_layers}")
+        if unfrozen_layers:
+            suffix = " (excepted from freeze)" if not requires_grad else ""
+            logger.info(f"Unfroze layers: {unfrozen_layers}{suffix}")

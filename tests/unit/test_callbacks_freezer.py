@@ -236,3 +236,32 @@ def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
     trainer.fit(dummy_system)
     assert dummy_system.network.layer1.weight.requires_grad
     assert dummy_system.network.layer1.bias.requires_grad
+
+
+def test_freezer_logs_excepted_layers(dummy_system, capsys):
+    """Test that excepted layers are logged with the correct suffix during freeze."""
+    freezer = Freezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
+
+    # Directly call _set_model_requires_grad to test logging
+    freezer._set_model_requires_grad(dummy_system, requires_grad=False)
+
+    # Capture stdout where loguru logs (check capsys for loguru output)
+    captured = capsys.readouterr()
+    assert "(excepted from freeze)" in captured.out
+    assert "layer2.weight" in captured.out
+    assert "layer2.bias" in captured.out
+
+
+def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
+    """Test that unfrozen layers are logged without suffix when explicitly unfreezing."""
+    freezer = Freezer(names=["layer1.weight", "layer1.bias"])
+
+    # First freeze, then unfreeze
+    freezer._set_model_requires_grad(dummy_system, requires_grad=False)
+    capsys.readouterr()  # Clear previous output
+    freezer._set_model_requires_grad(dummy_system, requires_grad=True)
+
+    # Capture stdout where loguru logs
+    captured = capsys.readouterr()
+    assert "Unfroze layers" in captured.out
+    assert "(excepted from freeze)" not in captured.out
