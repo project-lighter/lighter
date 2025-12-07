@@ -245,11 +245,12 @@ def test_freezer_logs_excepted_layers(dummy_system, capsys):
     # Directly call _set_model_requires_grad to test logging
     freezer._set_model_requires_grad(dummy_system, requires_grad=False)
 
-    # Capture stdout where loguru logs (check capsys for loguru output)
+    # Loguru logs to stderr by default
     captured = capsys.readouterr()
-    assert "(excepted from freeze)" in captured.out
-    assert "layer2.weight" in captured.out
-    assert "layer2.bias" in captured.out
+    output = captured.out + captured.err
+    assert "(excepted from freeze)" in output
+    assert "layer2.weight" in output
+    assert "layer2.bias" in output
 
 
 def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
@@ -261,7 +262,8 @@ def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
     capsys.readouterr()  # Clear previous output
     freezer._set_model_requires_grad(dummy_system, requires_grad=True)
 
-    # Capture stdout where loguru logs
+    # Loguru logs to stderr by default
     captured = capsys.readouterr()
-    assert "Unfroze layers" in captured.out
-    assert "(excepted from freeze)" not in captured.out
+    output = captured.out + captured.err
+    assert "Unfroze layers" in output
+    assert "(excepted from freeze)" not in output
