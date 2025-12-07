@@ -181,6 +181,8 @@ def test_execute_calls_stage_method(runner, mock_model, mock_trainer, mock_datam
 
 def test_auto_discover_project_with_marker(runner, tmp_path, monkeypatch):
     """Test that ProjectImporter finds __lighter__.py marker file."""
+    import sys
+
     from lighter.engine.runner import ProjectImporter
 
     # Create a project directory with marker file and __init__.py
@@ -194,11 +196,17 @@ def test_auto_discover_project_with_marker(runner, tmp_path, monkeypatch):
     # Change working directory to project
     monkeypatch.chdir(project_dir)
 
+    # Clean up any previous "project" module to avoid conflicts
+    sys.modules.pop("project", None)
+
     # Test auto-discovery
     importer = ProjectImporter()
     found = importer.auto_discover_and_import()
 
     assert found is True
+
+    # Cleanup
+    sys.modules.pop("project", None)
 
 
 def test_auto_discover_project_without_marker(runner, tmp_path, monkeypatch):

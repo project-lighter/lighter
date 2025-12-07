@@ -525,3 +525,30 @@ def test_batch_end_hooks_accept_tensor(simple_system, mock_trainer):
     simple_system.on_train_batch_end(tensor_output, batch, batch_idx=0)
     # Should have called log
     assert simple_system.log.call_count > 0
+
+
+def test_mode_property_without_trainer(simple_model):
+    """Test that mode property raises RuntimeError when trainer is not attached."""
+    system = SimpleLighterModule(network=simple_model)
+
+    # Accessing mode without trainer should raise RuntimeError
+    # (either from Lightning's trainer property or our own check)
+    with pytest.raises(RuntimeError):
+        _ = system.mode
+
+
+def test_log_metrics_with_single_metric(simple_model, mock_trainer):
+    """Test that _log_metrics handles single Metric (not MetricCollection)."""
+    # Create system with single metric (not MetricCollection)
+    single_metric = Accuracy(task="multiclass", num_classes=2)
+    system = SimpleLighterModule(network=simple_model, train_metrics=single_metric)
+    system.trainer = mock_trainer
+    mock_trainer_state(mock_trainer, training=True)
+    system.log = MagicMock()
+    system._log = MagicMock()
+
+    # Call _log_metrics - it gets metrics from self.train_metrics
+    system._log_metrics()
+
+    # Should log on_step and on_epoch (2 calls for single metric)
+    assert system._log.call_count == 2

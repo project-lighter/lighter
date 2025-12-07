@@ -65,3 +65,43 @@ class TestRunnerErrorHandling:
         finally:
             Path(config_path1).unlink()
             Path(config_path2).unlink()
+
+    def test_resolve_datamodule_missing_data_and_no_dataloaders(self):
+        """Test that missing data config raises error when model has no dataloaders."""
+        from unittest.mock import MagicMock
+
+        from pytorch_lightning import LightningModule
+        from sparkwheel import Config
+
+        runner = Runner()
+
+        # Create a model without dataloader methods
+        mock_model = MagicMock(spec=LightningModule)
+        # Remove dataloader methods from spec
+        del mock_model.train_dataloader
+        del mock_model.val_dataloader
+        del mock_model.test_dataloader
+        del mock_model.predict_dataloader
+
+        # Create config without data key
+        config = Config().update({"trainer": {"_target_": "pytorch_lightning.Trainer"}})
+
+        with pytest.raises(ValueError, match="Missing required 'data:' config key"):
+            runner._resolve_datamodule(config, mock_model)
+
+    def test_resolve_datamodule_invalid_type(self):
+        """Test that invalid datamodule type raises TypeError."""
+        from unittest.mock import MagicMock
+
+        from pytorch_lightning import LightningModule
+        from sparkwheel import Config
+
+        runner = Runner()
+
+        mock_model = MagicMock(spec=LightningModule)
+
+        # Create config with data key that resolves to wrong type
+        config = Config().update({"data": {"_target_": "builtins.dict"}})
+
+        with pytest.raises(TypeError, match="data must be LightningDataModule"):
+            runner._resolve_datamodule(config, mock_model)

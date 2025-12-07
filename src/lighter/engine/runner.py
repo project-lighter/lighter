@@ -36,7 +36,7 @@ class ProjectImporter:
             return False
 
         import_module_from_path("project", cwd)
-        logger.info(f"Auto-discovered project at {cwd} (imported as 'project')")
+        logger.info(f"Imported 'project' module from '{cwd}'")
         return True
 
 

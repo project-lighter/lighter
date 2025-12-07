@@ -127,7 +127,7 @@ class CsvWriter(BaseWriter):
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterModule) -> None:
         """
-        At the end of the prediction epoch, it saves the temporary file it to the final destination.
+        At the end of the prediction epoch, it saves the temporary file to the final destination.
         """
         if self._csv_file is None:
             return

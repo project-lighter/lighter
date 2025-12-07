@@ -28,7 +28,6 @@ from types import ModuleType
 from typing import IO, Any, cast
 
 import cloudpickle
-from loguru import logger
 
 __all__ = ["import_module_from_path"]
 
@@ -41,6 +40,10 @@ class _ModuleRegistry:
 
     def register(self, name: str, path: Path) -> None:
         self._modules[name] = path
+
+    def get(self, name: str) -> Path | None:
+        """Get the registered path for a module name."""
+        return self._modules.get(name)
 
     def find_root(self, fullname: str) -> tuple[str, Path] | None:
         """Find the registered root module for an import name (e.g., 'project.sub' -> 'project')."""
@@ -162,16 +165,22 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
     Raises:
         FileNotFoundError: If module_path doesn't contain __init__.py.
         ModuleNotFoundError: If the module cannot be loaded.
+        ValueError: If module_name was already imported from a different path.
 
     Example:
         >>> import_module_from_path("project", "/path/to/project")
         >>> from project.models import MyModel  # Works in DataLoader workers!
     """
+    module_path = Path(module_path).resolve()
+
+    # Check if already imported
     if module_name in sys.modules:
-        logger.warning(f"Module '{module_name}' already imported, skipping.")
+        existing_path = _registry.get(module_name)
+        if existing_path is not None and existing_path != module_path:
+            raise ValueError(f"Module '{module_name}' was already imported from '{existing_path}'.")
+        # Same path - return cached module (normal Python behavior)
         return sys.modules[module_name]
 
-    module_path = Path(module_path).resolve()
     init_file = module_path / "__init__.py"
 
     if not init_file.is_file():
@@ -188,5 +197,4 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
     spec.loader.exec_module(module)
     cloudpickle.register_pickle_by_value(module)
 
-    logger.info(f"Imported '{module_path}' as module '{module_name}'.")
     return module
