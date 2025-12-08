@@ -573,16 +573,30 @@ class TestCsvWriter:
         temp_file = tmp_path / "results.tmp_rank0.csv"
         assert not temp_file.exists()
 
-    def test_write_empty_batch(self, tmp_path, mock_trainer, mock_system):
-        """Test write handles empty batch gracefully."""
+    def test_write_empty_outputs_raises(self, tmp_path, mock_trainer, mock_system):
+        """Test write raises KeyError when outputs is empty."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
         writer.setup(mock_trainer, mock_system, Stage.PREDICT)
 
-        # Empty outputs - no sequences
+        # Empty outputs - none of the configured keys are present
         outputs = {}
 
-        # Should return without error
-        writer.write(outputs, None, 0, 0)
+        with pytest.raises(KeyError, match="none of the configured keys"):
+            writer.write(outputs, None, 0, 0)
+
+    def test_write_no_configured_keys_present_raises(self, tmp_path, mock_trainer, mock_system):
+        """Test write raises KeyError when outputs has keys but none match configured keys."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # Outputs has keys, but none of them match the configured keys
+        outputs = {"other_key": [1, 2, 3], "another_key": [4, 5, 6]}
+
+        with pytest.raises(KeyError, match="none of the configured keys.*pred.*target.*were found") as exc_info:
+            writer.write(outputs, None, 0, 0)
+
+        # Verify error message includes available keys
+        assert "other_key" in str(exc_info.value) or "another_key" in str(exc_info.value)
 
     def test_write_non_sequence_values(self, tmp_path, mock_trainer, mock_system):
         """Test write with non-sequence values (single sample)."""

@@ -93,6 +93,15 @@ class CsvWriter(BaseWriter):
         if self._csv_writer is None:
             return
 
+        # Validate that at least one configured key is present in outputs
+        present_keys = [key for key in self.keys if key in outputs]
+        if not present_keys:
+            missing_keys = self.keys
+            raise KeyError(
+                f"CsvWriter: none of the configured keys {missing_keys} were found in outputs. "
+                f"Available keys in outputs: {list(outputs.keys())}"
+            )
+
         # Determine the number of samples in the batch.
         num_samples = 0
         for key in self.keys:
@@ -105,9 +114,6 @@ class CsvWriter(BaseWriter):
                     # If it's not a sequence type we handle, assume it's a single sample
                     if num_samples == 0:
                         num_samples = 1
-
-        if num_samples == 0:
-            return
 
         # Validate that all list-like or tensor outputs have the same length
         for key in self.keys:

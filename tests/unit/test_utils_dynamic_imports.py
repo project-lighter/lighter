@@ -238,6 +238,50 @@ class TestHybridPickler:
         # NotImplemented means "use default pickling"
         assert result is not NotImplemented
 
+    def test_reducer_override_defers_multiprocessing_objects(self):
+        """reducer_override returns NotImplemented for multiprocessing internals.
+
+        Multiprocessing objects (Queue, Pipe connections, etc.) have special reducers
+        in ForkingPickler._extra_reducers that must be preserved. HybridPickler's
+        reducer_override should return NotImplemented for these objects, allowing
+        the standard ForkingPickler dispatch to handle them correctly.
+        """
+        import multiprocessing
+        from multiprocessing.connection import Connection
+
+        buffer = BytesIO()
+        pickler = _HybridPickler(buffer)
+
+        # Create a Pipe which gives us Connection objects - these are in _extra_reducers
+        recv_conn, send_conn = multiprocessing.Pipe(duplex=False)
+
+        try:
+            # Verify Connection type is in _extra_reducers
+            from multiprocessing.reduction import ForkingPickler
+
+            extra_reducers = getattr(ForkingPickler, "_extra_reducers", {})
+            assert Connection in extra_reducers, "Connection should be in _extra_reducers"
+
+            # reducer_override should return NotImplemented for Connection objects
+            result = pickler.reducer_override(recv_conn)
+            assert result is NotImplemented, "Should defer to ForkingPickler for Connection"
+
+            result = pickler.reducer_override(send_conn)
+            assert result is NotImplemented, "Should defer to ForkingPickler for Connection"
+
+            # Verify the object can still be pickled using HybridPickler
+            # (dispatch_table includes ForkingPickler's reducers)
+            buffer = BytesIO()
+            pickler = _HybridPickler(buffer)
+            pickler.dump(send_conn)
+
+            # Verify serialization produced data
+            assert buffer.tell() > 0, "Should have written pickle data"
+
+        finally:
+            recv_conn.close()
+            send_conn.close()
+
 
 class TestImportModuleFromPathErrors:
     """Tests for error cases in import_module_from_path."""
@@ -281,3 +325,78 @@ class TestImportModuleFromPathErrors:
 
         # Verify registry was not updated (find_root returns None for unregistered)
         assert _registry.find_root(module_name) is None
+
+    def test_module_runtime_error_cleans_up_state(self, tmp_path):
+        """Test that runtime error during module execution cleans up sys.modules and registry.
+
+        This test triggers a module load failure via a runtime exception (not syntax error)
+        to verify the except block at lines 199-202 in dynamic_imports.py properly removes
+        the module from sys.modules and does not register it in _registry.
+        """
+        from lighter.utils.dynamic_imports import _registry
+
+        # Create a package that raises an error during execution
+        pkg_dir = tmp_path / "runtime_error_pkg"
+        pkg_dir.mkdir()
+        init_content = """
+# This module raises an error during import
+VALUE = 1
+raise RuntimeError("Intentional failure during module load")
+"""
+        (pkg_dir / "__init__.py").write_text(init_content)
+
+        module_name = "test_runtime_error_module_cleanup"
+
+        # Capture initial state
+        initial_modules = set(sys.modules.keys())
+        assert module_name not in sys.modules, "Module should not exist before test"
+        assert _registry.find_root(module_name) is None, "Module should not be in registry before test"
+
+        # Attempt import - should fail with RuntimeError
+        with pytest.raises(RuntimeError, match="Intentional failure"):
+            import_module_from_path(module_name, pkg_dir)
+
+        # Verify cleanup: module should NOT be in sys.modules after failure
+        assert module_name not in sys.modules, "Failed module must be removed from sys.modules"
+
+        # Verify no new modules were left behind (check module and potential submodules)
+        current_modules = set(sys.modules.keys())
+        new_modules = current_modules - initial_modules
+        assert not any(m.startswith(module_name) for m in new_modules), (
+            f"No modules starting with '{module_name}' should remain, but found: "
+            f"{[m for m in new_modules if m.startswith(module_name)]}"
+        )
+
+        # Verify registry was not updated
+        assert _registry.find_root(module_name) is None, "Failed module must not be registered in _registry"
+
+    def test_module_import_error_cleans_up_state(self, tmp_path):
+        """Test that ImportError during module execution cleans up sys.modules and registry.
+
+        This test triggers a failure via a missing import to verify cleanup works for
+        ImportError exceptions as well.
+        """
+        from lighter.utils.dynamic_imports import _registry
+
+        # Create a package that fails due to missing import
+        pkg_dir = tmp_path / "import_error_pkg"
+        pkg_dir.mkdir()
+        init_content = """
+# This module fails to import a nonexistent module
+from nonexistent_module_xyz_12345 import something
+"""
+        (pkg_dir / "__init__.py").write_text(init_content)
+
+        module_name = "test_import_error_module_cleanup"
+
+        # Verify preconditions
+        assert module_name not in sys.modules
+        assert _registry.find_root(module_name) is None
+
+        # Attempt import - should fail with ModuleNotFoundError
+        with pytest.raises(ModuleNotFoundError):
+            import_module_from_path(module_name, pkg_dir)
+
+        # Verify cleanup
+        assert module_name not in sys.modules, "Failed module must be removed from sys.modules"
+        assert _registry.find_root(module_name) is None, "Failed module must not be registered in _registry"
