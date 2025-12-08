@@ -45,6 +45,13 @@ class CsvWriter(BaseWriter):
         self._csv_writer: Any = None  # csv.writer type is not easily annotated
         self._csv_file: TextIOWrapper | None = None
 
+    def _close_file(self) -> None:
+        """Close the CSV file if it's open and reset related state."""
+        if self._csv_file is not None and not self._csv_file.closed:
+            self._csv_file.close()
+        self._csv_file = None
+        self._csv_writer = None
+
     def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
         super().setup(trainer, pl_module, stage)
         if stage != Stage.PREDICT:
@@ -133,7 +140,7 @@ class CsvWriter(BaseWriter):
             return
 
         # Close the temporary file
-        self._csv_file.close()
+        self._close_file()
 
         all_temp_paths: list[Path | None] = [None] * trainer.world_size
         if dist.is_initialized():
@@ -156,7 +163,14 @@ class CsvWriter(BaseWriter):
                 if path is not None:
                     path.unlink()
 
-        # Reset temporary resources
-        self._csv_file = None
-        self._csv_writer = None
+        # Reset temporary path
         self._temp_path = None
+
+    def on_exception(self, trainer: Trainer, pl_module: LighterModule, exception: BaseException) -> None:
+        """Close the file on errors to prevent file handle leaks."""
+        self._close_file()
+
+    def teardown(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
+        """Guarantee cleanup when stage is PREDICT."""
+        if stage == Stage.PREDICT:
+            self._close_file()

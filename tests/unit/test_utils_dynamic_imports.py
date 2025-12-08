@@ -257,3 +257,27 @@ class TestImportModuleFromPathErrors:
         with patch.object(importlib.util, "spec_from_file_location", return_value=None):
             with pytest.raises(ModuleNotFoundError, match="Could not load"):
                 import_module_from_path(module_name, pkg_dir)
+
+    def test_module_load_failure_cleans_up_state(self, tmp_path):
+        """Test that module load failure cleans up sys.modules and registry."""
+        from lighter.utils.dynamic_imports import _registry
+
+        # Create a package with a syntax error in __init__.py
+        pkg_dir = tmp_path / "broken_pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("def broken(\n")  # Syntax error
+
+        module_name = "test_broken_module_cleanup"
+
+        # Verify module is not in sys.modules before
+        assert module_name not in sys.modules
+
+        # Attempt import - should fail with SyntaxError
+        with pytest.raises(SyntaxError):
+            import_module_from_path(module_name, pkg_dir)
+
+        # Verify cleanup: module should NOT be in sys.modules after failure
+        assert module_name not in sys.modules
+
+        # Verify registry was not updated (find_root returns None for unregistered)
+        assert _registry.find_root(module_name) is None
