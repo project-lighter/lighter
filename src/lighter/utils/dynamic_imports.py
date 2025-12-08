@@ -186,15 +186,19 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
     if not init_file.is_file():
         raise FileNotFoundError(f"No __init__.py in '{module_path}'.")
 
-    _registry.register(module_name, module_path)
-
     spec = importlib.util.spec_from_file_location(module_name, str(init_file))
     if spec is None or spec.loader is None:
         raise ModuleNotFoundError(f"Could not load '{module_name}' from '{module_path}'.")
 
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    cloudpickle.register_pickle_by_value(module)
+    try:
+        spec.loader.exec_module(module)
+        cloudpickle.register_pickle_by_value(module)
+        _registry.register(module_name, module_path)
+    except Exception:
+        # Clean up on failure so retry sees a clean state
+        sys.modules.pop(module_name, None)
+        raise
 
     return module
