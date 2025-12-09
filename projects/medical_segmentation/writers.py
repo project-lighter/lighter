@@ -39,7 +39,13 @@ def write_nrrd(
 
     # Remove batch dim if present: (B, C, D, H, W) -> (C, D, H, W) or (D, H, W)
     if data.ndim == 5:
+        if data.shape[0] != 1:
+            raise ValueError(f"Expected batch size 1, got {data.shape[0]}. Use batch_size=1 for prediction.")
         data = data[0]
+
+    # Validate final shape is 3D or 4D
+    if data.ndim not in (3, 4):
+        raise ValueError(f"Expected 3D (D,H,W) or 4D (C,D,H,W) data after removing batch, got shape {data.shape}")
 
     # Determine channel_dim: if 4D assume first dim is channel, else no channel
     channel_dim = 0 if data.ndim == 4 else None

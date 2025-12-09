@@ -17,6 +17,8 @@ class Flickr30kDataset(Dataset):
     """Flickr30k dataset for vision-language training.
 
     Flickr30k contains 31,000 images with 5 captions each.
+    Note: Split filtering requires split manifest files (not included).
+    Currently loads all data regardless of split parameter.
 
     Download:
     1. Request access: https://shannon.cs.illinois.edu/DenotationGraph/
@@ -25,7 +27,6 @@ class Flickr30kDataset(Dataset):
 
     Args:
         root: Root directory containing images and captions.
-        split: Dataset split ('train', 'val', 'test').
         tokenizer: HuggingFace tokenizer for text encoding.
         max_length: Maximum text sequence length.
         image_transform: Transform for images.
@@ -34,13 +35,11 @@ class Flickr30kDataset(Dataset):
     def __init__(
         self,
         root: str,
-        split: str = "train",
         tokenizer=None,
         max_length: int = 77,
         image_transform: Callable | None = None,
     ) -> None:
         self.root = Path(root)
-        self.split = split
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.image_transform = image_transform
@@ -131,7 +130,8 @@ class Flickr8kDataset(Dataset):
 
     Args:
         root: Root directory containing images and captions.
-        split: Dataset split ('train', 'val', 'test').
+        split: Dataset split ('train', 'val', 'test'). If split files exist,
+            only images from that split are loaded. Otherwise loads all images.
         tokenizer: HuggingFace tokenizer for text encoding.
         max_length: Maximum text sequence length.
         image_transform: Transform for images.
@@ -170,6 +170,16 @@ class Flickr8kDataset(Dataset):
                 f"  {self.root}/captions.txt      (caption file)"
             )
 
+    def _load_split_images(self) -> set[str] | None:
+        """Load image names for the current split, if split file exists."""
+        if self.split not in self.SPLITS:
+            return None
+        split_file = self.root / self.SPLITS[self.split]
+        if not split_file.exists():
+            return None
+        with open(split_file) as f:
+            return {line.strip() for line in f if line.strip()}
+
     def _load_data(self) -> list[dict]:
         """Load image-caption pairs."""
         caption_file = self.root / "captions.txt"
@@ -180,6 +190,9 @@ class Flickr8kDataset(Dataset):
             caption_file = self.root / "Flickr8k.token.txt"
         if not image_dir.exists():
             image_dir = self.root / "Flickr8k_Dataset"
+
+        # Load split filter if available
+        valid_images = self._load_split_images()
 
         data = []
         if caption_file.exists():
@@ -209,6 +222,10 @@ class Flickr8kDataset(Dataset):
                             caption = parts[1]
                         else:
                             continue
+
+                    # Filter by split if split file exists
+                    if valid_images is not None and image_name not in valid_images:
+                        continue
 
                     image_path = image_dir / image_name
                     if image_path.exists():
