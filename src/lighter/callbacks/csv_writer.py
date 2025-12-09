@@ -53,9 +53,9 @@ class CsvWriter(BaseWriter):
         self._csv_writer = None
 
     def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
-        super().setup(trainer, pl_module, stage)
         if stage != Stage.PREDICT:
             return
+        super().setup(trainer, pl_module, stage)
 
         # Create a temporary file for writing predictions
         self._temp_path = self.path.with_suffix(f".tmp_rank{trainer.global_rank}{self.path.suffix}")

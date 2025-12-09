@@ -282,6 +282,37 @@ class TestHybridPickler:
             recv_conn.close()
             send_conn.close()
 
+    def test_multiprocessing_objects_work_through_subprocess(self):
+        """Verify multiprocessing objects can be passed through actual child processes.
+
+        This test ensures that the ForkingPickler._extra_reducers handling remains intact
+        by actually passing a multiprocessing Queue through a spawn-started child process.
+        The Queue uses Connection objects internally which are in _extra_reducers.
+        """
+        import multiprocessing
+
+        # Use spawn context to match PyTorch DataLoader behavior
+        ctx = multiprocessing.get_context("spawn")
+        queue = ctx.Queue()
+
+        # Define worker function outside to avoid pickling issues
+        def worker(q):
+            q.put("success")
+
+        # Start a child process that uses the queue
+        process = ctx.Process(target=worker, args=(queue,))
+        process.start()
+        process.join(timeout=10)
+
+        # Verify the queue worked correctly through the subprocess
+        assert not queue.empty(), "Queue should have received data from child process"
+        result = queue.get(timeout=1)
+        assert result == "success", "Should receive correct data from child process"
+
+        # Cleanup
+        queue.close()
+        queue.join_thread()
+
 
 class TestImportModuleFromPathErrors:
     """Tests for error cases in import_module_from_path."""
