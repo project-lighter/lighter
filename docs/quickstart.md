@@ -365,7 +365,7 @@ val_metrics: "%model::train_metrics"  # New instance with same config
 
 ### See Complete Examples
 
-[Image Classification](examples/image-classification.md) - Full CIFAR-10 example with all the bells and whistles
+[Example Projects](examples/index.md) - Complete examples across various domains (image classification, medical imaging, NLP, and more)
 
 ### Organize Your Project
 

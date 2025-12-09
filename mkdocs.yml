@@ -79,9 +79,7 @@ nav:
       - LighterModule: guides/lighter-module.md
       - Training: guides/training.md
       - Best Practices: guides/best-practices.md
-  - Examples:
-      - Image Classification: examples/image-classification.md
-      - Multi-GPU Training: examples/multi-gpu.md
+  - Examples: examples/index.md
   - Reference:
       - CLI: reference/cli.md
       - API: reference/

@@ -527,7 +527,7 @@ def __init__(self, ...):
 
 - [Configuration Guide](../guides/configuration.md) - Learn config syntax
 - [Training Guide](../guides/training.md) - Training workflows
-- [Examples](../examples/image-classification.md) - Complete examples
+- [Example Projects](../examples/index.md) - Complete examples
 
 ## Quick Reference
 

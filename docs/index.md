@@ -340,7 +340,7 @@ Ready to try it? Pick your path:
 
     Full, working code you can copy-paste.
 
-    [:octicons-arrow-right-24: Examples](examples/image-classification.md)
+    [:octicons-arrow-right-24: Examples](examples/index.md)
 
 -   :material-school:{ .lg .middle } **Guides**
 
