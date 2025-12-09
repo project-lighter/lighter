@@ -807,7 +807,7 @@ lighter fit configs/baseline.yaml
 
 - [Training Guide](training.md) - Run experiments, save outputs
 - [Best Practices](best-practices.md) - Production patterns
-- [Complete Example](../examples/image-classification.md) - Full CIFAR-10 with all features
+- [Example Projects](../examples/index.md) - Complete working examples
 
 ## Quick Reference
 

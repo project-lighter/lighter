@@ -1,0 +1,94 @@
+# Video Transformer (ViViT) for Video Action Recognition
+#
+# Tubelet embedding + Transformer encoder for video classification.
+# Requires more memory than R3D - uses smaller batch size and gradient accumulation.
+#
+# Run: lighter fit configs/base.yaml configs/transformer.yaml
+
+vars:
+  height: 224  # Larger spatial size for ViT
+  width: 224
+  batch_size: 2  # Transformers need more memory
+
+trainer:
+  max_epochs: 100
+  accumulate_grad_batches: 8  # Effective batch size = 16
+
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val/MulticlassAccuracy_epoch
+      mode: max
+      patience: 10
+
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/MulticlassAccuracy_epoch
+      mode: max
+      save_top_k: 1
+      filename: transformer-{epoch}-{val/MulticlassAccuracy_epoch:.4f}
+
+model:
+  _target_: project.models.model.VideoClassificationModel
+
+  network:
+    _target_: project.networks.video_models.VideoTransformer
+    num_classes: "%vars::num_classes"
+    img_size: "%vars::height"
+    num_frames: "%vars::frames_per_clip"
+    patch_size: [2, 16, 16]
+    embed_dim: 384
+    num_heads: 6
+    num_layers: 6
+    in_channels: 3
+
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+    label_smoothing: 0.1
+
+  optimizer:
+    _target_: torch.optim.AdamW
+    params: $@model::network.parameters()
+    lr: 0.00005  # Lower LR for transformers
+    weight_decay: 0.1
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+    optimizer: "@model::optimizer"
+    T_0: 10
+    T_mult: 2
+
+  train_metrics:
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.classification.MulticlassAccuracy
+        num_classes: "%vars::num_classes"
+        top_k: 1
+
+  val_metrics: "%model::train_metrics"
+  test_metrics: "%model::train_metrics"
+
+data:
+  train_dataloader:
+    batch_size: "%vars::batch_size"
+    dataset:
+      _target_: project.dataset.VideoClipDataset
+      size: ["%vars::height", "%vars::width"]
+      dataset:
+        _target_: torchvision.datasets.UCF101
+        root: ./.datasets/UCF-101
+        annotation_path: ./.datasets/ucfTrainTestlist
+        frames_per_clip: "%vars::frames_per_clip"
+        frame_rate: "%vars::frame_rate"
+        train: true
+
+  val_dataloader:
+    batch_size: "%vars::batch_size"
+    dataset:
+      _target_: project.dataset.VideoClipDataset
+      size: ["%vars::height", "%vars::width"]
+      dataset:
+        _target_: torchvision.datasets.UCF101
+        root: ./.datasets/UCF-101
+        annotation_path: ./.datasets/ucfTrainTestlist
+        frames_per_clip: "%vars::frames_per_clip"
+        frame_rate: "%vars::frame_rate"
+        train: false

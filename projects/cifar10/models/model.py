@@ -19,8 +19,6 @@ class CIFAR10Model(LighterModule):
         pred = self(x)
 
         # Compute loss using criterion from config
-        if self.criterion is None:
-            raise RuntimeError("criterion is required for training but was not set in config")
         loss = self.criterion(pred, y)
 
         # Update metrics (user calls them explicitly)
@@ -34,8 +32,6 @@ class CIFAR10Model(LighterModule):
         """Validation step with user-defined logic."""
         x, y = batch
         pred = self(x)
-        if self.criterion is None:
-            raise RuntimeError("criterion is required for validation but was not set in config")
         loss = self.criterion(pred, y)
 
         if self.val_metrics is not None:

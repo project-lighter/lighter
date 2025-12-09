@@ -974,7 +974,7 @@ Before production:
 ## Next Steps
 
 - [Training Guide](training.md) - Run experiments
-- [Examples](../examples/image-classification.md) - Complete working code
+- [Example Projects](../examples/index.md) - Complete working code
 - [FAQ](../faq.md) - Common questions
 
 ## Quick Reference

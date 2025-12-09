@@ -1,0 +1,143 @@
+# EEG 2025 Challenge 1: Cross-Task Transfer Learning
+#
+# Predict response time from Contrast Change Detection (CCD) EEG data.
+# This is a regression task using the HBN-EEG dataset.
+#
+# Challenge: https://eeg2025.github.io/
+# Starter Kit: https://github.com/eeg2025/startkit
+#
+# Requirements:
+#   pip install eegdash braindecode mne torch torchmetrics pytorch-lightning
+#
+# Run:
+#   lighter fit projects/eeg/configs/challenge1.yaml
+#   lighter fit projects/eeg/configs/challenge1.yaml trainer::fast_dev_run=false
+
+vars:
+  n_chans: 129
+  n_outputs: 1
+  n_times: 200  # 2 seconds at 100 Hz
+  sfreq: 100
+  batch_size: 128
+  num_workers: 4
+  data_dir: .datasets/eeg2025
+  release: R5
+  mini: true  # Set to false for full dataset
+  seed: 2025
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 100
+  accelerator: auto
+  log_every_n_steps: 10
+
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val/loss/epoch
+      mode: min
+      patience: 10
+      min_delta: 0.0001
+
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/loss/epoch
+      mode: min
+      save_top_k: 3
+      filename: challenge1-{epoch}-{val/loss/epoch:.4f}
+
+
+model:
+  _target_: project.models.eeg_model.EEGRegressionModel
+
+  # EEGNeX - recommended for EEG 2025 Challenge
+  network:
+    _target_: braindecode.models.EEGNeX
+    n_chans: "%vars::n_chans"
+    n_outputs: "%vars::n_outputs"
+    n_times: "%vars::n_times"
+    sfreq: "%vars::sfreq"
+    drop_prob: 0.5
+
+  # Alternative: EEGNet (uncomment below)
+  # network:
+  #   _target_: braindecode.models.EEGNetv4
+  #   n_chans: "%vars::n_chans"
+  #   n_outputs: "%vars::n_outputs"
+  #   n_times: "%vars::n_times"
+  #   drop_prob: 0.5
+
+  # Alternative: EEGConformer (uncomment below)
+  # network:
+  #   _target_: braindecode.models.EEGConformer
+  #   n_chans: "%vars::n_chans"
+  #   n_outputs: "%vars::n_outputs"
+  #   n_times: "%vars::n_times"
+  #   drop_prob: 0.5
+
+  # MSE Loss for regression
+  criterion:
+    _target_: torch.nn.MSELoss
+
+  optimizer:
+    _target_: torch.optim.AdamW
+    params: $@model::network.parameters()
+    lr: 0.001
+    weight_decay: 0.00001
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    optimizer: "@model::optimizer"
+    T_max: 100
+
+  train_metrics:
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.regression.MeanAbsoluteError
+      - _target_: torchmetrics.regression.MeanSquaredError
+        squared: false  # This gives RMSE
+
+  val_metrics: "%model::train_metrics"
+  test_metrics: "%model::train_metrics"
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: "%vars::num_workers"
+    pin_memory: true
+    shuffle: true
+    dataset:
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
+      data_dir: "%vars::data_dir"
+      release: "%vars::release"
+      mini: "%vars::mini"
+      split: train
+      seed: "%vars::seed"
+
+  val_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: "%vars::num_workers"
+    pin_memory: true
+    shuffle: false
+    dataset:
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
+      data_dir: "%vars::data_dir"
+      release: "%vars::release"
+      mini: "%vars::mini"
+      split: val
+      seed: "%vars::seed"
+
+  test_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: "%vars::num_workers"
+    shuffle: false
+    dataset:
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
+      data_dir: "%vars::data_dir"
+      release: "%vars::release"
+      mini: "%vars::mini"
+      split: test
+      seed: "%vars::seed"

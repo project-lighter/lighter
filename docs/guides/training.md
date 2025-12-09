@@ -994,7 +994,7 @@ trainer:
 ## Next Steps
 
 - [Best Practices](best-practices.md) - Production patterns
-- [Examples](../examples/image-classification.md) - Complete working examples
+- [Example Projects](../examples/index.md) - Complete working examples
 - [CLI Reference](../reference/cli.md) - Full command documentation
 
 ## Quick Reference

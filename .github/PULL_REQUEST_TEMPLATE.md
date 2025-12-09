@@ -1,16 +1,16 @@
 ## Description
 
-<!-- Add a more detailed description of the changes if needed. -->
+<!-- Briefly describe what this PR does and why. -->
 
 ## Related Issue
 
-<!-- If your PR refers to a related issue, link it here. -->
+<!-- Link any related issues: Fixes #123, Closes #456 -->
 
 ## Type of Change
 
 <!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->
 
-- [ ] 📚 Examples / docs / tutorials / dependencies update
+- [ ] 📚 Documentation / examples / dependencies update
 - [ ] 🔧 Bug fix (non-breaking change which fixes an issue)
 - [ ] 🥂 Improvement (non-breaking change which improves an existing feature)
 - [ ] 🚀 New feature (non-breaking change which adds functionality)
@@ -21,8 +21,9 @@
 
 <!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->
 
-- [ ] I've read the [`CODE_OF_CONDUCT.md`](https://github.com/lighter/lighter/blob/master/CODE_OF_CONDUCT.md) document.
-- [ ] I've read the [`CONTRIBUTING.md`](https://github.com/lighter/lighter/blob/master/CONTRIBUTING.md) guide.
-- [ ] I've updated the code style using `make codestyle`.
-- [ ] I've written tests for all new methods and classes that I created.
-- [ ] I've written the docstring in Google format for all the methods and classes that I used.
+- [ ] I've read the [`CONTRIBUTING.md`](https://github.com/project-lighter/lighter/blob/main/CONTRIBUTING.md) guide
+- [ ] Code passes linting: `just lint`
+- [ ] Code passes type checking: `just types`
+- [ ] All tests pass with coverage: `just coverage`
+- [ ] I've added tests for new functionality
+- [ ] I've updated documentation if needed

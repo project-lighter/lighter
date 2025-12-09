@@ -13,8 +13,6 @@ a hybrid pickler that inherits from ForkingPickler but also includes cloudpickle
 dispatch table.
 """
 
-from __future__ import annotations
-
 import importlib.abc
 import importlib.machinery
 import importlib.util

@@ -1,0 +1,227 @@
+# Medical Image Segmentation with MONAI
+#
+# 3D Spleen CT Segmentation using the Medical Segmentation Decathlon dataset.
+# Uses MONAI (https://github.com/Project-MONAI/MONAI) for medical imaging.
+#
+# Dataset: Task09_Spleen from Medical Segmentation Decathlon
+#   - 41 training CT scans
+#   - 20 validation CT scans
+#   - Auto-downloaded on first run (~1.5 GB)
+#
+# Features demonstrated:
+#   - FileWriter callback for saving segmentation masks as .seg.nrrd
+#   - Custom writer function for medical imaging formats
+#   - MONAI integration with sliding window inference
+#
+# Install:
+#   pip install lighter monai itk
+#
+# Run:
+#   lighter fit projects/medical_segmentation/configs/spleen.yaml
+#   lighter predict projects/medical_segmentation/configs/spleen.yaml  # saves .seg.nrrd files
+
+vars:
+  num_classes: 2  # Background + Spleen
+  roi_size: [96, 96, 96]
+  batch_size: 2
+  sw_batch_size: 4
+  num_workers: 4
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 100
+  accelerator: auto
+  log_every_n_steps: 5
+  precision: 16-mixed  # Use mixed precision for 3D volumes
+
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.EarlyStopping
+      monitor: val/MulticlassJaccardIndex_epoch
+      mode: max
+      patience: 20
+
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      monitor: val/MulticlassJaccardIndex_epoch
+      mode: max
+      save_top_k: 1
+      filename: spleen-{epoch}-{val/MulticlassJaccardIndex_epoch:.4f}
+
+    # FileWriter saves segmentation masks as .seg.nrrd files
+    - _target_: lighter.callbacks.FileWriter
+      directory: ./predictions
+      value_key: pred
+      writer_fn:
+        _target_: project.writers.write_nrrd
+        _mode_: callable
+
+  # For quick testing, uncomment:
+  # fast_dev_run: true
+
+model:
+  _target_: project.models.model.SegmentationModel
+  sw_batch_size: "%vars::sw_batch_size"
+  roi_size: "%vars::roi_size"
+
+  network:
+    _target_: monai.networks.nets.UNet
+    spatial_dims: 3
+    in_channels: 1
+    out_channels: "%vars::num_classes"
+    channels: [16, 32, 64, 128, 256]
+    strides: [2, 2, 2, 2]
+    num_res_units: 2
+    dropout: 0.2
+
+  optimizer:
+    _target_: torch.optim.AdamW
+    params: $@model::network.parameters()
+    lr: 0.0001
+    weight_decay: 0.00001
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    optimizer: "@model::optimizer"
+    T_max: 100
+
+  train_metrics:
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.classification.MulticlassJaccardIndex
+        num_classes: "%vars::num_classes"
+        average: macro
+
+  val_metrics: "%model::train_metrics"
+  test_metrics: "%model::train_metrics"
+
+data:
+  _target_: lighter.LighterDataModule
+
+  train_dataloader:
+    _target_: monai.data.DataLoader
+    batch_size: "%vars::batch_size"
+    num_workers: "%vars::num_workers"
+    pin_memory: true
+    shuffle: true
+    dataset:
+      _target_: monai.apps.DecathlonDataset
+      root_dir: ./.datasets/
+      task: Task09_Spleen
+      section: training
+      download: true
+      transform:
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.RandCropByPosNegLabeld
+            keys: [image, label]
+            label_key: label
+            spatial_size: "%vars::roi_size"
+            pos: 1
+            neg: 1
+            num_samples: 4
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 0
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 1
+          - _target_: monai.transforms.RandFlipd
+            keys: [image, label]
+            prob: 0.5
+            spatial_axis: 2
+          - _target_: monai.transforms.RandRotate90d
+            keys: [image, label]
+            prob: 0.5
+            max_k: 3
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
+
+  val_dataloader:
+    _target_: monai.data.DataLoader
+    batch_size: 1  # Full volume for validation
+    num_workers: "%vars::num_workers"
+    pin_memory: true
+    shuffle: false
+    dataset:
+      _target_: monai.apps.DecathlonDataset
+      root_dir: ./.datasets/
+      task: Task09_Spleen
+      section: validation
+      download: true
+      transform:
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
+
+  test_dataloader:
+    _target_: monai.data.DataLoader
+    batch_size: 1
+    num_workers: "%vars::num_workers"
+    shuffle: false
+    dataset:
+      _target_: monai.apps.DecathlonDataset
+      root_dir: ./.datasets/
+      task: Task09_Spleen
+      section: validation
+      download: true
+      transform:
+        _target_: monai.transforms.Compose
+        transforms:
+          - _target_: monai.transforms.LoadImaged
+            keys: [image, label]
+          - _target_: monai.transforms.EnsureChannelFirstd
+            keys: [image, label]
+          - _target_: monai.transforms.Orientationd
+            keys: [image, label]
+            axcodes: RAS
+          - _target_: monai.transforms.Spacingd
+            keys: [image, label]
+            pixdim: [1.5, 1.5, 2.0]
+            mode: [bilinear, nearest]
+          - _target_: monai.transforms.ScaleIntensityRanged
+            keys: [image]
+            a_min: -57
+            a_max: 164
+            b_min: 0.0
+            b_max: 1.0
+            clip: true
+          - _target_: monai.transforms.EnsureTyped
+            keys: [image, label]
