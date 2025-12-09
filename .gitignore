@@ -145,28 +145,21 @@ tensorboard/
 
 # ---- Our ignores ----
 **/.DS_Store
-**/predictions/
-test_dir/
-checkpoints/
-prototyping*
-.aider*
 *.code-workspace
 .scale_batch_size*
 **/*.txt
 .ruff_cache
 
-# Paper
-paper/jats/
-
-
 # Coding agents
 CLAUDE.md
 GEMINI.md
 AGENTS.md
-
 **/.claude/
 
+# Outputs, logs, dataset files
 **/lightning_logs/
 **/outputs/
 **/.datasets/
 **/*.zip
+**/predictions/
+checkpoints/
