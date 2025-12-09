@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  quality:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - format
+          - lint
+          - types
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          python-version: "3.12"
+          install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
+
+      - name: Run format check
+        if: matrix.check == 'format'
+        run: uvx ruff format --diff
+
+      - name: Run lint check
+        if: matrix.check == 'lint'
+        run: uvx ruff check
+
+      - name: Run type check
+        if: matrix.check == 'types'
+        run: uv run mypy src
+
+  tests:
+    name: Tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          python-version: "3.12"
+
+      - name: Run pytest with coverage
+        run: |
+          uv run coverage run -m pytest tests --durations=10 -m "not slow" \
+            --junit-xml=test-results.xml \
+            --html=test-report.html --self-contained-html
+
+      - name: Generate test summary
+        if: always()
+        run: python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py312
+          retention-days: 7
+          path: |
+            test-results.xml
+            test-report.html
+            .coverage
+
+      - name: Generate coverage report
+        run: uv run coverage xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.4.3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

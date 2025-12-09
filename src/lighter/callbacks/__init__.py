@@ -1,5 +1,5 @@
+from .csv_writer import CsvWriter
+from .file_writer import FileWriter
 from .freezer import Freezer
-from .writer.file import FileWriter
-from .writer.table import TableWriter
 
-__all__ = ["Freezer", "FileWriter", "TableWriter"]
+__all__ = ["CsvWriter", "FileWriter", "Freezer"]

@@ -17,6 +17,15 @@ theme:
     - footnotes
     - navigation.tabs
     - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.tabs.link
 
   palette:
     # Palette toggle for automatic mode
@@ -52,42 +61,31 @@ plugins:
       - docs/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
-  - section-index
   - mkdocstrings:
       handlers:
         python:
           paths: [src]
           options:
-            # Removed the default filter that excludes private members (that is, members whose names start with a single underscore).
+            # Removed the default filter that excludes private members
             filters: null
 
 nav:
   - Home: index.md
-  - Get Started: tutorials/get-started.md
-  - How-To Guides:
-      - Essentials:
-          - Run: how-to/run.md
-          - Configuration: how-to/configuration.md
-          - Project Module: how-to/project_module.md
-      - Features:
-          - Adapters: how-to/adapters.md
-          - Metrics: how-to/metrics.md
-          - Writers: how-to/writers.md
-          - Freezers: how-to/freezers.md
-          - Inferers: how-to/inferers.md
-      - Practical:
-          - Configuration Recipes: how-to/recipes.md
-          - Experiment Tracking: how-to/experiment_tracking.md
-          - Troubleshooting: how-to/troubleshooting.md
-  - Design & Architecture:
-      - Overview: design/overview.md
-      - System Internals: design/system.md
-      - Adapter Pattern: design/adapters.md
-      - Philosophy: design/philosophy.md
-  - FAQ:
-      - FAQ: faq.md
-      - Migration from Lightning: migration/from-pytorch-lightning.md
-  - API: reference/
+  - Quick Start: quickstart.md
+  - Guides:
+      - Configuration: guides/configuration.md
+      - Custom Code: guides/custom-code.md
+      - Your LightningModule: guides/lightning-module.md
+      - LighterModule: guides/lighter-module.md
+      - Training: guides/training.md
+      - Best Practices: guides/best-practices.md
+  - Examples:
+      - Image Classification: examples/image-classification.md
+      - Multi-GPU Training: examples/multi-gpu.md
+  - Reference:
+      - CLI: reference/cli.md
+      - API: reference/
+  - FAQ: faq.md
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -110,6 +108,7 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter

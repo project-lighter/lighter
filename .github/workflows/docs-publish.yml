@@ -1,24 +1,30 @@
 name: Docs Publish
+
 on:
   push:
     branches:
       - main
+
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          install-groups: '--only-group doc'
+
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Install dependencies
-        run: uv sync --only-group doc
 
       - name: Deploy docs
         run: uv run --only-group doc mkdocs gh-deploy --force

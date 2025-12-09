@@ -1,250 +1,270 @@
+---
+title: FAQ
+---
+
 # Frequently Asked Questions
 
-## General
+Quick answers to common questions.
 
-**What is Lighter?**
+## What is Lighter?
 
-A configuration-driven deep learning framework built on PyTorch Lightning. Define experiments in YAML instead of writing training code. [Get Started →](tutorials/get-started.md)
+Lighter is a YAML configuration layer for PyTorch Lightning experiments.
 
-**How does Lighter compare to PyTorch Lightning?**
+**You write:** Standard PyTorch Lightning code (LightningModule, datasets, etc.)
 
-Lighter extends Lightning's `LightningModule` but uses YAML configs instead of Python classes. You get all Lightning features (multi-GPU, callbacks, loggers) plus config-driven simplicity. [Migration Guide →](migration/from-pytorch-lightning.md)
+**Lighter provides:** YAML configs, CLI overrides, experiment tracking
 
-**When should I use Lighter?**
+**Result:** Reproducible experiments without hardcoded hyperparameters.
 
-Use Lighter when:
+## Do I need to rewrite my LightningModule?
 
-- Running many experiments with different hyperparameters
-- Reproducibility and experiment tracking are priorities
-- You prefer configuration over code
-- You want PyTorch's flexibility with structure
-
-Don't use Lighter when:
-
-- You need ultra-custom training loops
-- Rapid architecture prototyping (code first, config later)
-- You prefer code-only workflows
-
-**Is Lighter only for medical imaging?**
-
-No. Lighter is task-agnostic and works for any deep learning task: classification, detection, segmentation, NLP, self-supervised learning, etc. [See examples →](how-to/recipes.md)
-
-**What's the performance overhead?**
-
-Minimal (<1%). Config resolution happens once at startup. Training speed is identical to PyTorch Lightning.
-
-## Configuration
-
-**What's the difference between `@`, `%`, and `$`?**
-
-Lighter uses [Sparkwheel](https://project-lighter.github.io/sparkwheel/) for configuration:
-
-| Symbol | Purpose | Example |
-|--------|---------|---------|
-| `@` | Resolved reference (instantiated object) | `"@system::optimizer"` |
-| `%` | Raw reference (unprocessed YAML) | `"%system::metrics::train"` |
-| `$` | Evaluate Python expression | `"$0.001 * 2"` |
-
-- `@` gets the final instantiated object after processing
-- `%` copies raw YAML config (creates new instance when used with `_target_`)
-- `$` evaluates Python code in expressions
-
-[Complete syntax guide →](how-to/configuration.md) | [Sparkwheel docs →](https://project-lighter.github.io/sparkwheel/)
-
-**How do I pass model parameters to the optimizer?**
+No! Use it directly:
 
 ```yaml
-optimizer:
-  _target_: torch.optim.Adam
-  params: "$@system::model.parameters()"
-  lr: 0.001
+model:
+  _target_: my_project.MyLightningModule  # Your existing code
+  learning_rate: 0.001
 ```
 
-The `$` evaluates Python, `@` gets the resolved model instance, `.parameters()` calls the method.
+No changes to your Python code required.
 
-**Can I use Python code in configs?**
+## When should I use LighterModule vs my own LightningModule?
 
-Yes. Use `$` prefix for expressions:
+**Use LightningModule when:**
+
+- Migrating existing projects
+- Need custom training logic
+- Want full control
+- Team knows Lightning well
+
+**Use LighterModule when:**
+
+- Starting new projects
+- Want less boilerplate
+- Standard workflows (classification, segmentation, etc.)
+- Config-driven everything
+
+Both are equally supported and give you YAML configs + CLI overrides.
+
+## How do I use my custom models and datasets?
+
+Three steps:
+
+1. Add `__lighter__.py` to your project root (can be empty)
+2. Ensure all directories have `__init__.py`
+3. Reference as `project.module.ClassName` in config
 
 ```yaml
-optimizer:
-  lr: "$0.001 * 2"  # Evaluates to 0.002
+model:
+  network:
+    _target_: my_project.models.CustomNet
+    num_classes: 10
 ```
 
-[Advanced configuration →](how-to/configuration.md#advanced-features)
+[Full guide →](guides/custom-code.md)
 
-**How do I add callbacks without replacing existing ones?**
+## How do I override config from CLI?
 
-By default, configs merge automatically. Later configs add to earlier ones:
-
-```yaml
-# base.yaml
-trainer:
-  callbacks:
-    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-
-# experiment.yaml (merges automatically)
-trainer:
-  callbacks:
-    - _target_: pytorch_lightning.callbacks.EarlyStopping
-# Result: Both ModelCheckpoint AND EarlyStopping
-
-# To replace instead of merge, use =
-trainer:
-  =callbacks:
-    - _target_: pytorch_lightning.callbacks.EarlyStopping
-# Result: Only EarlyStopping
-```
-
-**How do I remove specific items from lists or dicts?**
-
-Use `~` with path notation or batch syntax:
-
-```yaml
-# Delete entire key
-trainer:
-  ~callbacks: null
-
-# Delete single list item by index
-trainer:
-  ~callbacks::1: null  # Removes item at index 1
-
-# Delete multiple list items (batch syntax - recommended)
-trainer:
-  ~callbacks: [1, 3]  # Removes items at indices 1 and 3
-
-# Delete dict keys (batch syntax)
-system:
-  ~dataloaders: ["train", "test"]  # Removes train and test loaders
-
-# Delete nested dict key (path notation)
-system:
-  ~model::pretrained: null
-```
-
-!!! tip
-    For multiple list items, use batch syntax `~key: [indices]` to avoid index shifting issues when doing sequential deletions.
-
-[Merging guide →](how-to/configuration.md#advanced-merging-and)
-
-## Training
-
-**How do I resume training?**
+Use `::` to navigate config paths:
 
 ```bash
-lighter fit config.yaml args::fit::ckpt_path="checkpoint.ckpt"
+# Single override
+lighter fit config.yaml model::optimizer::lr=0.01
+
+# Multiple overrides
+lighter fit config.yaml \
+  model::optimizer::lr=0.01 \
+  trainer::max_epochs=100 \
+  data::train_dataloader::batch_size=64
 ```
 
-**How do I use multiple GPUs?**
+No file editing needed!
+
+## What's the difference between `@` and `%`?
+
+- **`@`** = Resolved reference (gets the instantiated Python object)
+- **`%`** = Raw reference (copies the YAML config to create new instance)
+
+**Critical:** Always use `%` for metrics:
+
+```yaml
+# ❌ WRONG - Shared instance pollutes metrics
+val_metrics: "@model::train_metrics"
+
+# ✅ CORRECT - New instance for validation
+val_metrics: "%model::train_metrics"
+```
+
+Use `@` for everything else (optimizer, scheduler, network):
+
+```yaml
+# ✅ CORRECT - Pass actual object
+optimizer:
+  params: "$@model::network.parameters()"
+```
+
+## Can I use multiple GPUs?
+
+Yes! Same as PyTorch Lightning:
+
+```yaml
+trainer:
+  devices: 4  # Use 4 GPUs
+  strategy: ddp  # Distributed Data Parallel
+```
+
+Or use all available GPUs:
+
+```yaml
+trainer:
+  devices: -1  # All GPUs
+  strategy: ddp
+```
+
+[Multi-GPU guide →](guides/training.md#multi-gpu-training)
+
+## How do I debug config errors?
+
+### 1. Start Simple
+
+Run one batch to catch errors fast:
 
 ```bash
-lighter fit config.yaml trainer::devices=2 trainer::strategy=ddp
+lighter fit config.yaml trainer::fast_dev_run=true
 ```
 
-[Multi-GPU recipes →](how-to/recipes.md#multi-gpu-ddp)
+### 2. Check Common Issues
 
-**How do I freeze layers?**
+**Import errors** - Check:
+
+- `__lighter__.py` exists in project root
+- All directories have `__init__.py`
+- Running `lighter` from directory with `__lighter__.py`
+
+**Attribute errors** - Using `::` for Python methods?
+
+```yaml
+# ❌ WRONG
+params: "$@model::network::parameters()"
+
+# ✅ CORRECT
+params: "$@model::network.parameters()"
+```
+
+Remember: `::` for config, `.` for Python.
+
+### 3. Validate Config Syntax
+
+Use quotes for expressions:
+
+```yaml
+# ❌ WRONG
+lr: $0.001 * 2
+
+# ✅ CORRECT
+lr: "$0.001 * 2"
+```
+
+[Full troubleshooting →](guides/training.md#debugging)
+
+## How do I save predictions?
+
+Use Writers:
 
 ```yaml
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.Freezer
-      modules: ["backbone.layer1", "backbone.layer2"]
+    - _target_: lighter.callbacks.CSVWriter
+      write_interval: batch
 ```
 
-[Freezers guide →](how-to/freezers.md)
+In your module:
 
-**Can I use custom training loops?**
+```python
+def predict_step(self, batch, batch_idx):
+    x = batch
+    pred = self(x)
 
-Lighter uses Lightning's standard loop. For exotic training logic:
+    return {
+        "prediction": pred.argmax(dim=1),
+        "probability": pred.max(dim=1).values,
+    }
+```
 
-1. Extend System class and override methods
-2. Use Lightning directly
+Results saved to `predictions.csv`.
 
-Most customizations achievable through callbacks or System extension. [System internals →](design/system.md)
+[Writers guide →](guides/training.md#saving-predictions)
 
-## Design
+## Can I merge multiple configs?
 
-**Why adapters instead of custom LightningModule?**
+Yes! Separate comma-separated paths:
 
-Adapters separate data transformation from model logic, making both reusable. Configure transforms in YAML, reuse models across tasks. [Adapter pattern →](how-to/adapters.md)
+```bash
+lighter fit base.yaml,experiment.yaml
+```
 
-**What's the difference between stages and modes?**
+Later files override earlier ones. Use this for:
 
-- **Stages**: CLI commands (fit, validate, test, predict)
-- **Modes**: Internal execution contexts (train, val, test, predict)
+- Base config + experiment-specific overrides
+- Shared settings + dataset configs
+- Default values + hyperparameter sweeps
 
-Example: `lighter fit` executes train + val modes. [Architecture →](design/overview.md#understanding-stages-and-modes)
+[Config merging →](guides/training.md#merging-configs)
 
-**How does config pruning work?**
+## How does Lighter compare to Hydra?
 
-Lighter automatically removes unused components based on stage. `lighter test` removes train/val dataloaders, optimizer, and scheduler. One config works for all stages. [Pruning details →](design/overview.md#automatic-configuration-pruning)
+Similar concept, different focus:
 
-## Troubleshooting
+**Hydra:**
 
-**Training is slow?**
+- General-purpose Python app configuration
+- Works with any codebase
+- Manual integration
 
-Check:
+**Lighter:**
 
-- Increase `num_workers` in dataloaders
-- Enable mixed precision: `trainer::precision="16-mixed"`
-- Profile: `trainer::profiler="simple"`
+- Specialized for PyTorch Lightning
+- Built-in CLI commands (`fit`, `test`, `predict`)
+- Automatic object instantiation
+- Zero-config experiment tracking
 
-[Performance recipes →](how-to/recipes.md#performance-optimization)
+If you're doing deep learning with Lightning, Lighter is simpler. If you need general Python app config, use Hydra.
 
-**Loss is NaN?**
+## Where can I get help?
 
-Common causes:
+- **Discord**: [discord.gg/zJcnp6KrUp](https://discord.gg/zJcnp6KrUp) - Community support
+- **GitHub**: [github.com/project-lighter/lighter](https://github.com/project-lighter/lighter) - Issues and discussions
+- **Docs**: You're here! Check the guides.
 
-1. Learning rate too high → reduce by 10x
-2. Gradient explosion → `trainer::gradient_clip_val=1.0`
-3. Wrong loss function → verify for your task
-4. Bad data → check for inf/nan in inputs
+## How do I cite Lighter?
 
-[Full troubleshooting guide →](how-to/troubleshooting.md)
+```bibtex
+@article{lighter2024,
+  title={Lighter: A lightweight deep learning framework for rapid experimentation},
+  author={...},
+  journal={Journal of Open Source Software},
+  year={2024},
+  doi={10.21105/joss.08101}
+}
+```
 
-**ModuleNotFoundError: No module named 'project'?**
+[Paper →](https://joss.theoj.org/papers/10.21105/joss.08101)
 
-Ensure:
+## Can I contribute?
 
-1. Project path set: `project: ./path`
-2. All directories have `__init__.py`
+Yes! Lighter is open source:
 
-[Project module guide →](how-to/project_module.md)
+- **Report bugs**: [GitHub Issues](https://github.com/project-lighter/lighter/issues)
+- **Request features**: [GitHub Discussions](https://github.com/project-lighter/lighter/discussions)
+- **Contribute code**: Submit PRs
 
-## Comparisons
+See [CONTRIBUTING.md](https://github.com/project-lighter/lighter/blob/main/CONTRIBUTING.md) for guidelines.
 
-**Lighter vs Hydra?**
+## More Questions?
 
-- **Hydra**: General config framework for any Python app
-- **Lighter**: Deep learning-specific with built-in training pipeline
+Check out:
 
-Use Lighter for DL experiments with automatic training loops.
-
-**Lighter vs Ludwig?**
-
-- **Ludwig**: High-level, declarative ML with pre-built flows
-- **Lighter**: Mid-level, requires standard PyTorch components
-
-Use Ludwig for no-code ML. Use Lighter when you write custom PyTorch but want config-driven experiments.
-
-**Can I migrate from Lightning to Lighter?**
-
-Yes. Main steps:
-
-1. Convert LightningModule to YAML config
-2. Move training_step logic to adapters (if needed)
-3. Configure dataloaders in YAML
-
-[Complete migration guide →](migration/from-pytorch-lightning.md)
-
-## Getting Help
-
-| Need | Resource |
-|------|----------|
-| Getting started | [Tutorials](tutorials/get-started.md) |
-| Configuration help | [Configuration Guide](how-to/configuration.md) |
-| Common errors | [Troubleshooting](how-to/troubleshooting.md) |
-| Examples | [Recipes](how-to/recipes.md) |
-| Community | [Discord](https://discord.gg/zJcnp6KrUp) |
-| Bug reports | [GitHub Issues](https://github.com/project-lighter/lighter/issues) |
+- [Quick Start](quickstart.md) - Get started in 10 minutes
+- [Configuration Guide](guides/configuration.md) - Master the syntax
+- [Training Guide](guides/training.md) - Run experiments
+- [Best Practices](guides/best-practices.md) - Production patterns

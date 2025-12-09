@@ -159,16 +159,15 @@ cifar10/
 # Paper
 paper/jats/
 
-# Projects folder
-projects/*
-!projects/README.md
-!projects/cifar10
-# !projects/01_simple_classification
-# !projects/02_self_supervised_learning
-# !projects/03_multi_task_learning
-# !projects/04_image_segmentation
 
 # Coding agents
 CLAUDE.md
 GEMINI.md
 AGENTS.md
+
+**/.claude/
+
+**/lightning_logs/
+**/outputs/
+**/.datasets/
+**/*.zip

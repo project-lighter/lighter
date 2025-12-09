@@ -7,9 +7,9 @@ from lighter.utils.logging import _setup_logging
 
 
 def test_setup_logging():
-    """Test basic logging setup."""
+    """Test basic logging setup completes without error."""
     _setup_logging()
-    assert True  # Just ensure no exceptions are raised
+    # Test passes if no exception is raised
 
 
 def test_warnings_handler():
