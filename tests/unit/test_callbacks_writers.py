@@ -466,9 +466,6 @@ class TestCsvWriter:
 
         assert len(df) == 3
         assert list(df.columns) == ["pred", "target"]
-        # Use pytest.approx for float comparison
-        import pytest
-
         assert df["pred"].tolist() == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
         assert df["target"].tolist() == [0, 1, 0]
 
@@ -576,16 +573,30 @@ class TestCsvWriter:
         temp_file = tmp_path / "results.tmp_rank0.csv"
         assert not temp_file.exists()
 
-    def test_write_empty_batch(self, tmp_path, mock_trainer, mock_system):
-        """Test write handles empty batch gracefully."""
+    def test_write_empty_outputs_raises(self, tmp_path, mock_trainer, mock_system):
+        """Test write raises KeyError when outputs is empty."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
         writer.setup(mock_trainer, mock_system, Stage.PREDICT)
 
-        # Empty outputs - no sequences
+        # Empty outputs - none of the configured keys are present
         outputs = {}
 
-        # Should return without error
-        writer.write(outputs, None, 0, 0)
+        with pytest.raises(KeyError, match="none of the configured keys"):
+            writer.write(outputs, None, 0, 0)
+
+    def test_write_no_configured_keys_present_raises(self, tmp_path, mock_trainer, mock_system):
+        """Test write raises KeyError when outputs has keys but none match configured keys."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # Outputs has keys, but none of them match the configured keys
+        outputs = {"other_key": [1, 2, 3], "another_key": [4, 5, 6]}
+
+        with pytest.raises(KeyError, match="none of the configured keys.*pred.*target.*were found") as exc_info:
+            writer.write(outputs, None, 0, 0)
+
+        # Verify error message includes available keys
+        assert "other_key" in str(exc_info.value) or "another_key" in str(exc_info.value)
 
     def test_write_non_sequence_values(self, tmp_path, mock_trainer, mock_system):
         """Test write with non-sequence values (single sample)."""
@@ -624,6 +635,101 @@ class TestCsvWriter:
 
         # Call epoch end without setup - should return without error
         writer.on_predict_epoch_end(mock_trainer, mock_system)
+
+    def test_close_file_closes_open_file(self, tmp_path, mock_trainer, mock_system):
+        """Test _close_file closes the file handle and resets state."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # File should be open after setup
+        assert writer._csv_file is not None
+        assert not writer._csv_file.closed
+        assert writer._csv_writer is not None
+
+        # Call _close_file
+        writer._close_file()
+
+        # File handle should be None and writer reset
+        assert writer._csv_file is None
+        assert writer._csv_writer is None
+
+    def test_close_file_handles_none_file(self, tmp_path):
+        """Test _close_file handles case when file is already None."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+
+        # File is None by default
+        assert writer._csv_file is None
+
+        # Should not raise
+        writer._close_file()
+
+        # Still None
+        assert writer._csv_file is None
+
+    def test_close_file_handles_already_closed_file(self, tmp_path, mock_trainer, mock_system):
+        """Test _close_file handles already closed file."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # Manually close the file
+        writer._csv_file.close()
+        assert writer._csv_file.closed
+
+        # Should not raise when calling _close_file on closed file
+        writer._close_file()
+
+        assert writer._csv_file is None
+        assert writer._csv_writer is None
+
+    def test_on_exception_closes_file(self, tmp_path, mock_trainer, mock_system):
+        """Test on_exception closes file to prevent handle leaks."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # File should be open
+        assert writer._csv_file is not None
+        assert not writer._csv_file.closed
+
+        # Simulate an exception occurring
+        writer.on_exception(mock_trainer, mock_system, RuntimeError("Test error"))
+
+        # File should be closed and state reset
+        assert writer._csv_file is None
+        assert writer._csv_writer is None
+
+    def test_teardown_closes_file_on_predict_stage(self, tmp_path, mock_trainer, mock_system):
+        """Test teardown closes file when stage is PREDICT."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # File should be open
+        assert writer._csv_file is not None
+
+        # Call teardown with PREDICT stage
+        writer.teardown(mock_trainer, mock_system, Stage.PREDICT)
+
+        # File should be closed
+        assert writer._csv_file is None
+        assert writer._csv_writer is None
+
+    def test_teardown_does_not_close_on_other_stages(self, tmp_path, mock_trainer, mock_system):
+        """Test teardown does not close file for non-PREDICT stages."""
+        writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
+        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+
+        # Store reference to check if still open
+        csv_file = writer._csv_file
+        assert csv_file is not None
+
+        # Call teardown with FIT stage - should not close the file
+        writer.teardown(mock_trainer, mock_system, Stage.FIT)
+
+        # File should still be open (same reference)
+        assert writer._csv_file is csv_file
+        assert not writer._csv_file.closed
+
+        # Clean up
+        writer._close_file()
 
 
 # =============================================================================

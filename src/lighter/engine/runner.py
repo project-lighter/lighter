@@ -36,7 +36,7 @@ class ProjectImporter:
             return False
 
         import_module_from_path("project", cwd)
-        logger.info(f"Auto-discovered project at {cwd} (imported as 'project')")
+        logger.info(f"Imported 'project' module from '{cwd}'")
         return True
 
 
@@ -236,8 +236,6 @@ class Runner:
             datamodule: Resolved datamodule (None if model defines its own dataloaders)
             **stage_kwargs: Additional keyword arguments from CLI (e.g., ckpt_path, verbose)
         """
-        # Execute the stage method with CLI kwargs
-        # Note: argparse subparsers ensure only valid parameters for each stage are passed
         stage_method = getattr(trainer, str(stage))
         if datamodule is not None:
             stage_method(model, datamodule=datamodule, **stage_kwargs)
@@ -278,7 +276,7 @@ def cli() -> None:
             "--weights_only",
             action="store_true",
             default=None,
-            help="Load only weights from checkpoint (security option).",
+            help="Restrict checkpoint loading to state_dicts of torch.Tensor (safer for untrusted sources).",
         )
 
     # Fit subcommand

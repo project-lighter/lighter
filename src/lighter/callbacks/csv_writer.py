@@ -27,6 +27,15 @@ class CsvWriter(BaseWriter):
         keys (list[str]): A list of keys to be included in the CSV file.
                           These keys must be present in the `outputs` dictionary
                           from the prediction step.
+
+    Example:
+        ```yaml
+        trainer:
+          callbacks:
+            - _target_: lighter.callbacks.CsvWriter
+              path: predictions.csv
+              keys: [id, pred, target]
+        ```
     """
 
     def __init__(self, path: str | Path, keys: list[str]) -> None:
@@ -36,10 +45,17 @@ class CsvWriter(BaseWriter):
         self._csv_writer: Any = None  # csv.writer type is not easily annotated
         self._csv_file: TextIOWrapper | None = None
 
+    def _close_file(self) -> None:
+        """Close the CSV file if it's open and reset related state."""
+        if self._csv_file is not None and not self._csv_file.closed:
+            self._csv_file.close()
+        self._csv_file = None
+        self._csv_writer = None
+
     def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
-        super().setup(trainer, pl_module, stage)
         if stage != Stage.PREDICT:
             return
+        super().setup(trainer, pl_module, stage)
 
         # Create a temporary file for writing predictions
         self._temp_path = self.path.with_suffix(f".tmp_rank{trainer.global_rank}{self.path.suffix}")
@@ -77,6 +93,15 @@ class CsvWriter(BaseWriter):
         if self._csv_writer is None:
             return
 
+        # Validate that at least one configured key is present in outputs
+        present_keys = [key for key in self.keys if key in outputs]
+        if not present_keys:
+            missing_keys = self.keys
+            raise KeyError(
+                f"CsvWriter: none of the configured keys {missing_keys} were found in outputs. "
+                f"Available keys in outputs: {list(outputs.keys())}"
+            )
+
         # Determine the number of samples in the batch.
         num_samples = 0
         for key in self.keys:
@@ -89,9 +114,6 @@ class CsvWriter(BaseWriter):
                     # If it's not a sequence type we handle, assume it's a single sample
                     if num_samples == 0:
                         num_samples = 1
-
-        if num_samples == 0:
-            return
 
         # Validate that all list-like or tensor outputs have the same length
         for key in self.keys:
@@ -118,13 +140,13 @@ class CsvWriter(BaseWriter):
 
     def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterModule) -> None:
         """
-        At the end of the prediction epoch, it saves the temporary file it to the final destination.
+        At the end of the prediction epoch, it saves the temporary file to the final destination.
         """
         if self._csv_file is None:
             return
 
         # Close the temporary file
-        self._csv_file.close()
+        self._close_file()
 
         all_temp_paths: list[Path | None] = [None] * trainer.world_size
         if dist.is_initialized():
@@ -135,6 +157,8 @@ class CsvWriter(BaseWriter):
         if trainer.is_global_zero:
             # Read all temporary files into pandas DataFrames and concatenate them
             dfs = [pd.read_csv(path) for path in all_temp_paths if path is not None]
+            if not dfs:
+                return
             df = pd.concat(dfs, ignore_index=True)
 
             # Save the final CSV file
@@ -145,7 +169,14 @@ class CsvWriter(BaseWriter):
                 if path is not None:
                     path.unlink()
 
-        # Reset temporary resources
-        self._csv_file = None
-        self._csv_writer = None
+        # Reset temporary path
         self._temp_path = None
+
+    def on_exception(self, trainer: Trainer, pl_module: LighterModule, exception: BaseException) -> None:
+        """Close the file on errors to prevent file handle leaks."""
+        self._close_file()
+
+    def teardown(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
+        """Guarantee cleanup when stage is PREDICT."""
+        if stage == Stage.PREDICT:
+            self._close_file()

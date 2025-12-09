@@ -277,19 +277,14 @@ def test_validate_and_log_dict_loss(simple_system, mock_trainer):
 
 
 def test_validate_and_log_none_loss(simple_system, mock_trainer):
-    """Test _log_outputs handles None loss gracefully."""
+    """Test _log_outputs handles None loss gracefully (doesn't crash)."""
     simple_system.trainer = mock_trainer
     mock_trainer.training = True
     simple_system.log = MagicMock()
 
-    # Output with no loss key or loss=None
     output = {"loss": None}
     simple_system._log_outputs(output, batch_idx=0)
-
-    # log should not be called for loss when it's None
-    # (may be called for other things, but not for loss)
-    # We're testing that it doesn't crash
-    assert True  # If we reach here, test passes
+    # Test passes if no exception is raised
 
 
 def test_validate_and_log_dict_loss_without_total(simple_model, mock_trainer):
@@ -530,3 +525,30 @@ def test_batch_end_hooks_accept_tensor(simple_system, mock_trainer):
     simple_system.on_train_batch_end(tensor_output, batch, batch_idx=0)
     # Should have called log
     assert simple_system.log.call_count > 0
+
+
+def test_mode_property_without_trainer(simple_model):
+    """Test that mode property raises RuntimeError when trainer is not attached."""
+    system = SimpleLighterModule(network=simple_model)
+
+    # Accessing mode without trainer should raise RuntimeError
+    # (either from Lightning's trainer property or our own check)
+    with pytest.raises(RuntimeError):
+        _ = system.mode
+
+
+def test_log_metrics_with_single_metric(simple_model, mock_trainer):
+    """Test that _log_metrics handles single Metric (not MetricCollection)."""
+    # Create system with single metric (not MetricCollection)
+    single_metric = Accuracy(task="multiclass", num_classes=2)
+    system = SimpleLighterModule(network=simple_model, train_metrics=single_metric)
+    system.trainer = mock_trainer
+    mock_trainer_state(mock_trainer, training=True)
+    system.log = MagicMock()
+    system._log = MagicMock()
+
+    # Call _log_metrics - it gets metrics from self.train_metrics
+    system._log_metrics()
+
+    # Should log on_step and on_epoch (2 calls for single metric)
+    assert system._log.call_count == 2

@@ -22,15 +22,10 @@ trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 10
 
-system:
-  _target_: lighter.System
-  model:
+model:
+  _target_: lighter.LighterModule
+  network:
     _target_: torch.nn.Identity
-  dataloaders:
-    train: {}
-    val: {}
-    test: {}
-    predict: {}
 """)
             config_path = f.name
         yield config_path
