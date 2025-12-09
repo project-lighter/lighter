@@ -1,14 +1,7 @@
-"""Video datasets for action recognition.
-
-Uses torchvision video datasets:
-- UCF101: 101 action classes, 13k videos
-- Kinetics: 400/600/700 action classes
-"""
+"""Video datasets for action recognition."""
 
 import torch
 from torch.utils.data import Dataset
-from torchvision.datasets import UCF101 as UCF101
-from torchvision.datasets import Kinetics as Kinetics
 
 
 class VideoClipDataset(Dataset):

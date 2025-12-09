@@ -46,7 +46,7 @@ trainer:
 
 
 model:
-  _target_: project.models.EEGRegressionModel
+  _target_: project.models.eeg_model.EEGRegressionModel
 
   # EEGNeX - recommended for EEG 2025 Challenge
   network:
@@ -108,7 +108,7 @@ data:
     pin_memory: true
     shuffle: true
     dataset:
-      _target_: project.data.HBNDatasetChallenge1
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
       data_dir: "%vars::data_dir"
       release: "%vars::release"
       mini: "%vars::mini"
@@ -122,7 +122,7 @@ data:
     pin_memory: true
     shuffle: false
     dataset:
-      _target_: project.data.HBNDatasetChallenge1
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
       data_dir: "%vars::data_dir"
       release: "%vars::release"
       mini: "%vars::mini"
@@ -135,7 +135,7 @@ data:
     num_workers: "%vars::num_workers"
     shuffle: false
     dataset:
-      _target_: project.data.HBNDatasetChallenge1
+      _target_: project.data.hbn_dataset.HBNDatasetChallenge1
       data_dir: "%vars::data_dir"
       release: "%vars::release"
       mini: "%vars::mini"

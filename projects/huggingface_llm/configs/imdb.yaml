@@ -30,7 +30,7 @@ trainer:
           keys: ["prediction"]
 
 model:
-    _target_: project.models.TextClassificationModel
+    _target_: project.models.model.TextClassificationModel
 
     network:
         _target_: transformers.AutoModelForSequenceClassification.from_pretrained

@@ -44,12 +44,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import check_random_state
 from torch.utils.data import Dataset
 
-__all__ = [
-    "HBNDatasetChallenge1",
-    "HBNDatasetChallenge2",
-    "get_train_val_test_split",
-]
-
 # Subjects to exclude (corrupted/incomplete data)
 EXCLUDED_SUBJECTS = [
     "NDARWV769JM7",

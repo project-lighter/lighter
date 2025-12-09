@@ -17,7 +17,7 @@ Lighter includes example projects demonstrating real-world applications across v
 | [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | 3D medical image segmentation | monai, itk |
 | [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | Self-Supervised Learning | SimCLR contrastive learning | lightly |
 | [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video Understanding | Video classification with SlowFast | pytorchvideo, av |
-| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | BLIP-2 image captioning | transformers |
+| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style image-text contrastive learning | transformers |
 
 ## Running an Example
 

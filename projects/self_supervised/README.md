@@ -69,7 +69,7 @@ vars:
   projection_dim: 128  # Output dimension of projection head
 
 model:
-  _target_: project.models.SimCLRModel
+  _target_: project.models.model.SimCLRModel
   temperature: "%vars::temperature"
   # No criterion - loss is computed internally
 
