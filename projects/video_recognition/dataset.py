@@ -63,14 +63,12 @@ def video_collate_fn(batch: list) -> tuple[torch.Tensor, torch.Tensor]:
     # Find max temporal dimension
     max_t = max(v.shape[1] for v in videos)
 
-    # Pad videos to same length
+    # Pad videos shorter than max_t (no truncation needed since max_t is the max of all lengths)
     padded_videos = []
     for v in videos:
         if v.shape[1] < max_t:
             pad_size = max_t - v.shape[1]
             v = torch.nn.functional.pad(v, (0, 0, 0, 0, 0, pad_size))
-        elif v.shape[1] > max_t:
-            v = v[:, :max_t]
         padded_videos.append(v)
 
     return torch.stack(padded_videos), torch.tensor(labels)

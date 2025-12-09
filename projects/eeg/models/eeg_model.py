@@ -138,12 +138,11 @@ class EEGWindowAggregator:
     This class aggregates window-level predictions to subject/recording level.
 
     Aggregation strategies:
-    - mean: Average of all window predictions
+    - mean: Average of all window predictions (default)
     - median: Median of all window predictions
-    - weighted: Weighted average based on confidence
 
     Args:
-        strategy: Aggregation strategy ('mean', 'median', 'weighted')
+        strategy: Aggregation strategy ('mean', 'median')
     """
 
     def __init__(self, strategy: str = "mean") -> None:

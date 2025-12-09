@@ -141,7 +141,7 @@ data:
     num_workers: "%vars::num_workers"
     pin_memory: true
     shuffle: false
-    drop_last: true
+    drop_last: false
     collate_fn:
       _target_: project.dataset.collate_fn
       _mode_: callable

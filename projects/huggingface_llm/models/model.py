@@ -46,7 +46,4 @@ class TextClassificationModel(LighterModule):
             attention_mask=batch["attention_mask"],
         )
         preds = outputs.logits.argmax(dim=-1)
-        return {
-            "prediction": preds.tolist(),
-            "input_ids": batch["input_ids"],
-        }
+        return {"prediction": preds.tolist()}

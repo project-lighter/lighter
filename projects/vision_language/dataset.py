@@ -51,11 +51,11 @@ class Flickr30kDataset(Dataset):
         if len(self.data) == 0:
             raise FileNotFoundError(
                 f"No data found for Flickr30k dataset at '{self.root}'.\n\n"
-                "Please download the dataset:\n"
-                "1. Request access: https://shannon.cs.illinois.edu/DenotationGraph/\n"
-                "2. Extract images to: {self.root}/flickr30k-images/\n"
-                "3. Download captions to: {self.root}/results_20130124.token\n\n"
-                "Or use Flickr8kDataset for a smaller, easier-to-obtain alternative."
+                f"Please download the dataset:\n"
+                f"1. Request access: https://shannon.cs.illinois.edu/DenotationGraph/\n"
+                f"2. Extract images to: {self.root}/flickr30k-images/\n"
+                f"3. Download captions to: {self.root}/results_20130124.token\n\n"
+                f"Or use Flickr8kDataset for a smaller, easier-to-obtain alternative."
             )
 
     def _load_captions(self) -> list[dict]:

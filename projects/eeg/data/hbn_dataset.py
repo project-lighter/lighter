@@ -92,6 +92,10 @@ class HBNDatasetChallenge1(Dataset):
         test_frac: float = 0.1,
     ) -> None:
         super().__init__()
+        if valid_frac + test_frac <= 0:
+            raise ValueError("valid_frac + test_frac must be > 0")
+        if valid_frac + test_frac >= 1.0:
+            raise ValueError("valid_frac + test_frac must be < 1.0")
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.split = split
@@ -224,6 +228,10 @@ class HBNDatasetChallenge2(Dataset):
         test_frac: float = 0.1,
     ) -> None:
         super().__init__()
+        if valid_frac + test_frac <= 0:
+            raise ValueError("valid_frac + test_frac must be > 0")
+        if valid_frac + test_frac >= 1.0:
+            raise ValueError("valid_frac + test_frac must be < 1.0")
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.split = split
@@ -360,7 +368,15 @@ def get_train_val_test_split(
 
     Returns:
         Tuple of (train_subjects, val_subjects, test_subjects).
+
+    Raises:
+        ValueError: If valid_frac + test_frac is not in (0, 1).
     """
+    if valid_frac + test_frac <= 0:
+        raise ValueError("valid_frac + test_frac must be > 0")
+    if valid_frac + test_frac >= 1.0:
+        raise ValueError("valid_frac + test_frac must be < 1.0")
+
     # Remove excluded subjects
     subjects = [s for s in subjects if s not in EXCLUDED_SUBJECTS]
 

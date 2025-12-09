@@ -62,14 +62,15 @@ class VideoClassificationModel(LighterModule):
         probs = torch.softmax(logits, dim=1)
         pred = logits.argmax(dim=1)
 
-        # Get top-5 predictions
-        top5_probs, top5_indices = probs.topk(5, dim=1)
+        # Get top-k predictions (up to 5, or fewer if model has fewer classes)
+        k = min(5, probs.shape[1])
+        topk_probs, topk_indices = probs.topk(k, dim=1)
 
         result = {
             "prediction": pred.tolist(),
             "confidence": probs.max(dim=1).values.tolist(),
-            "top5_classes": top5_indices.tolist(),
-            "top5_probs": top5_probs.tolist(),
+            "top5_classes": topk_indices.tolist(),
+            "top5_probs": topk_probs.tolist(),
             "video": video,  # Include video tensor for FileWriter
         }
 
