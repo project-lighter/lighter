@@ -126,3 +126,12 @@ def test_stage_argument_error_names_installed_lightning_signature(tmp_path):
     config = recipe(tmp_path)
     with pytest.raises(TypeError, match="Trainer.predict.*installed Lightning.*unknown_native_argument"):
         Runner().run("predict", [config], unknown_native_argument=True)
+
+
+def test_unknown_reserved_stage_name_fails_before_construction(tmp_path):
+    config = recipe(tmp_path)
+    config["args"]["predcit"] = {"return_predictions": False}
+    with patch("lighter.engine.runner.ProjectImporter.auto_discover_and_import") as importer:
+        with pytest.raises(ValueError, match="Unknown stage names.*predcit"):
+            Runner().run("predict", [config])
+    importer.assert_not_called()

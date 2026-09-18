@@ -11,10 +11,11 @@ from typing import Any
 
 import yaml
 from loguru import logger
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
+from pytorch_lightning import Callback, LightningDataModule, LightningModule, Trainer, seed_everything
 from sparkwheel import Config, ValidationError
 
 from lighter.engine.construction import resolve_managed_model
+from lighter.engine.records import RunRecorder, atomic_write, describe
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types.enums import Stage
 
@@ -85,6 +86,27 @@ class _ResolutionView:
         return self.scope.resolve(path)
 
 
+def _publish_source(source: dict[str, Any], trainer: Trainer) -> None:
+    if not trainer.logger:
+        return
+    trainer.logger.log_hyperparams(source)
+    if trainer.log_dir:
+        path = Path(trainer.log_dir) / "config.yaml"
+        atomic_write(path, yaml.safe_dump(source, default_flow_style=False, sort_keys=False, indent=4, allow_unicode=True))
+        logger.info(f"Saved config to: {path}")
+
+
+class _SourceSnapshot(Callback):
+    """Publish legacy logger source snapshots only after native rank setup."""
+
+    def __init__(self, source: dict[str, Any]):
+        self.source = source
+
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if trainer.is_global_zero:
+            _publish_source(self.source, trainer)
+
+
 class Runner:
     """
     Orchestrates training stage execution by coordinating helper classes.
@@ -96,6 +118,9 @@ class Runner:
     Runner focuses on resolving and validating components (model, trainer, datamodule)
     and executing the requested training stage.
     """
+
+    def __init__(self) -> None:
+        self.last_run_path: Path | None = None
 
     def run(
         self,
@@ -131,6 +156,7 @@ class Runner:
             ValueError: If config validation fails or required components are missing
             TypeError: If model or trainer are not the correct type
         """
+        self.last_run_path = None
         stage = Stage(stage)
 
         # Load static intent, then seed before project imports or object construction.
@@ -164,10 +190,32 @@ class Runner:
             binding.finalize(resolution.scope.materialized_components())
 
         # 4. Save configuration to trainer's log directory, logger, and model hparams for checkpoint access
-        self._save_config(config, trainer, model)
-
-        # 5. Execute stage
-        return self._execute(stage, model, trainer, datamodule, **stage_kwargs)
+        self._save_config(config, trainer, model, publish=False)
+        source = describe(config.get())
+        record_options = config.get("run", {})
+        recorder = None
+        if record_options is not False:
+            if not isinstance(record_options, dict):
+                raise TypeError("run must be false or a mapping of experiment record options")
+            options = resolution.resolve("run") if "run" in config.get() else {}
+            recorder = RunRecorder(
+                source=config.get(), stage=str(stage), seed=seed, requested_args=stage_kwargs, inputs=inputs, options=options
+            )
+            recorder.prepare(trainer)
+        observers: list[Callback] = ([recorder] if recorder is not None else []) + [_SourceSnapshot(source)]
+        # Lightning 2.5 initializes this public attribute through its connector.
+        callbacks: list[Callback] = trainer.callbacks  # type: ignore[attr-defined]
+        callbacks.extend(observers)
+        try:
+            return self._execute(stage, model, trainer, datamodule, **stage_kwargs)
+        finally:
+            path = recorder.path if recorder is not None else None
+            self.last_run_path = path if path is not None and path.is_file() else None
+            # Reused native Trainers must not accumulate old attempt observers.
+            current_callbacks: list[Callback] = trainer.callbacks  # type: ignore[attr-defined]
+            current_callbacks[:] = [
+                callback for callback in current_callbacks if all(callback is not observer for observer in observers)
+            ]
 
     @staticmethod
     def _validate_stage_args(config: Config, stage: Stage, overrides: dict[str, Any]) -> None:
@@ -175,6 +223,9 @@ class Runner:
         arguments = config.get("args", {})
         if not isinstance(arguments, dict):
             raise TypeError("args must be a mapping of stage names to native Trainer arguments")
+        unknown_stages = set(arguments) - {item.value for item in Stage}
+        if unknown_stages:
+            raise ValueError(f"Unknown stage names under args: {sorted(str(name) for name in unknown_stages)}")
         selected = arguments.get(str(stage), {})
         if not isinstance(selected, dict) or any(not isinstance(key, str) for key in selected):
             raise TypeError(f"args::{stage} must be a mapping with string argument names")
@@ -231,7 +282,7 @@ class Runner:
 
         return datamodule
 
-    def _save_config(self, config: Config, trainer: Trainer, model: LightningModule) -> None:
+    def _save_config(self, config: Config, trainer: Trainer, model: LightningModule, *, publish: bool = True) -> None:
         """
         Save configuration to multiple destinations.
 
@@ -246,23 +297,12 @@ class Runner:
             model: Model to save hyperparameters to
         """
 
-        # Save to model checkpoint (for model.hparams access)
-        model.save_hyperparameters({"config": config.get()})
-
-        # If no logger, skip other saves
-        if not trainer.logger:
-            return
-
-        # Save to logger (for experiment tracking)
-        trainer.logger.log_hyperparams(config.get())
-
-        # Save as config.yaml to log directory if it exists
-        if trainer.log_dir:
-            config_file = Path(trainer.log_dir) / "config.yaml"
-            config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_file, "w") as f:
-                yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False, indent=4)
-            logger.info(f"Saved config to: {config_file}")
+        # Native save_hyperparameters deep-copies inputs. Runtime objects and
+        # generators belong to their scientific owners, not checkpoint metadata.
+        source = describe(config.get())
+        model.save_hyperparameters({"config": source})
+        if publish:
+            _publish_source(source, trainer)
 
     def _execute(
         self,
@@ -296,9 +336,14 @@ class Runner:
 
 def cli() -> None:
     """Entry point for the lighter CLI."""
+    from lighter.engine.inspection import inspection_cli
+
+    if inspection_cli(sys.argv[1:]):
+        return
     parser = argparse.ArgumentParser(
         prog="lighter",
         description="Lighter: YAML-based deep learning framework",
+        epilog="Inspect source: lighter inspect CONFIG [--json]. Read records: lighter runs {list,show,diff} --help.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

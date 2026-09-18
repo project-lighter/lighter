@@ -163,3 +163,6 @@ AGENTS.md
 **/*.zip
 **/predictions/
 checkpoints/
+
+# Local experiment records
+lighter_runs/
