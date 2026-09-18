@@ -33,6 +33,25 @@ Use your existing PyTorch Lightning code with Lighter's configuration system.
 
 ## Basic Example
 
+Use this project layout. Create empty `__lighter__.py` and `__init__.py` files;
+Lighter discovers this directory as the `project` package when run from it.
+
+```text
+my_project/
+├── __lighter__.py
+├── __init__.py
+├── model.py
+├── dataset.py
+└── config.yaml
+```
+
+Copy the complete `dataset.py` helper from
+[Hold Out Validation Data](custom-code.md#hold-out-validation-data) into this
+folder. It is also available as `projects/cifar10/dataset.py` in the Lighter
+repository. The train and validation datasets below use disjoint subsets of the
+official training population, with a shared split seed and fraction. The
+official test population remains reserved for final evaluation.
+
 ### Your Existing Module
 
 `model.py`:
@@ -102,7 +121,7 @@ trainer:
   accelerator: auto
 
 model:
-  _target_: model.ImageClassifier  # Your module!
+  _target_: project.model.ImageClassifier  # Your module!
   num_classes: 10
   learning_rate: 0.001
 
@@ -113,9 +132,11 @@ data:
     batch_size: 32
     shuffle: true
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: true
+      split: train
+      split_seed: 42
+      validation_fraction: 0.1
       download: true
       transform:
         _target_: torchvision.transforms.ToTensor
@@ -124,16 +145,24 @@ data:
     _target_: torch.utils.data.DataLoader
     batch_size: 32
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: false
+      split: val
+      split_seed: 42
+      validation_fraction: 0.1
       transform:
         _target_: torchvision.transforms.ToTensor
 ```
 
+`LighterDataModule` receives eagerly constructed datasets and loaders. Use a
+native `LightningDataModule` when shared preparation belongs in `prepare_data()`
+or dataset construction depends on the stage in `setup(stage)`.
+
 ### Run
 
 ```bash
+cd my_project
+
 # Run with default config
 lighter fit config.yaml
 
@@ -150,6 +179,10 @@ lighter fit config.yaml \
 **That's it!** Your existing Lightning code works unchanged.
 
 ## Advanced Examples
+
+Save each named Python file in the same project package; targets use the
+`project.<file>.<class>` import route. These are alternative patterns, not files
+required by the basic classifier example.
 
 ### Example 1: Complex Network Architecture
 
@@ -198,7 +231,7 @@ class FlexibleClassifier(pl.LightningModule):
 
 ```yaml
 model:
-  _target_: models.FlexibleClassifier
+  _target_: project.models.FlexibleClassifier
   learning_rate: 0.001
 
   network:
@@ -222,7 +255,7 @@ network:
 
 # Try your custom network
 network:
-  _target_: my_project.networks.CustomNet
+  _target_: project.networks.CustomNet
   num_classes: 10
   hidden_dim: 512
 ```
@@ -283,17 +316,17 @@ class GAN(pl.LightningModule):
 
 ```yaml
 model:
-  _target_: gan.GAN
+  _target_: project.gan.GAN
   lr_g: 0.0002
   lr_d: 0.0002
 
   generator:
-    _target_: gan.Generator
+    _target_: project.gan.Generator
     latent_dim: 100
     img_shape: [3, 32, 32]
 
   discriminator:
-    _target_: gan.Discriminator
+    _target_: project.gan.Discriminator
     img_shape: [3, 32, 32]
 ```
 
@@ -460,7 +493,7 @@ You can pass **any** data structure through config:
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   layer_sizes: [64, 128, 256, 512]
 ```
 
@@ -477,7 +510,7 @@ def __init__(self, layer_sizes):
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   config:
     hidden_dim: 256
     num_layers: 4
@@ -495,12 +528,12 @@ def __init__(self, config):
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   encoder:
-    _target_: models.Encoder
+    _target_: project.models.Encoder
     hidden_dim: 256
   decoder:
-    _target_: models.Decoder
+    _target_: project.models.Decoder
     hidden_dim: 256
 ```
 
@@ -537,7 +570,7 @@ trainer:
       logging_interval: epoch
 
     # Custom callback
-    - _target_: my_project.callbacks.MyCustomCallback
+    - _target_: project.callbacks.MyCustomCallback
       some_param: 42
 ```
 
@@ -675,11 +708,11 @@ def test_step(self, batch, batch_idx):
 
 Already have a Lightning project? Add Lighter in 3 steps:
 
-### Step 1: Add `__lighter__.py`
+### Step 1: Mark the Project Package
 
 ```bash
 cd my_lightning_project
-touch __lighter__.py
+touch __lighter__.py __init__.py
 ```
 
 ### Step 2: Create Config
@@ -692,11 +725,11 @@ trainer:
   # Copy your Trainer args from your Python script
 
 model:
-  _target_: my_project.models.MyLightningModule
+  _target_: project.models.MyLightningModule
   # Copy your module's __init__ args
 
 data:
-  _target_: my_project.data.MyDataModule
+  _target_: project.data.MyDataModule
   # Or use LighterDataModule
 ```
 
@@ -765,7 +798,7 @@ class MyModule(pl.LightningModule):
 ```yaml
 # Reference it in config
 model:
-  _target_: my_project.models.MyModule
+  _target_: project.models.MyModule
   learning_rate: 0.001
   network:
     _target_: torchvision.models.resnet18

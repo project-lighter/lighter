@@ -57,16 +57,9 @@ This file tells Lighter where your project root is. It can be empty:
 # This file can be empty - it just marks your project root
 ```
 
-Or use it for project-level imports:
-
-```python
-# __lighter__.py
-import warnings
-
-warnings.filterwarnings("ignore", category=UserWarning)
-
-# Any imports here run before config loading
-```
+The marker is not executed. Put project-level imports in `__init__.py` instead;
+Lighter imports that package after seeding and before constructing configured
+objects. Keep downloads and other data preparation out of import-time code.
 
 ### The `__init__.py` Files
 
@@ -324,6 +317,57 @@ class MyCIFAR10Module(pl.LightningModule):
         }
 ```
 
+### Hold Out Validation Data
+
+Save the following as **`dataset.py`** beside `model.py`, `__init__.py`, and the
+empty `__lighter__.py` marker. It is the same ordinary dataset helper used in
+`projects/cifar10/dataset.py` in the Lighter repository:
+
+```python
+"""Explicit CIFAR10 research splits; the official test set stays held out."""
+
+from collections.abc import Callable
+from typing import cast
+
+import torch
+from torch.utils.data import Dataset, Subset
+from torchvision.datasets import CIFAR10
+
+
+def cifar10_split(
+    root: str,
+    split: str,
+    transform: Callable | None = None,
+    target_transform: Callable | None = None,
+    download: bool = True,
+    validation_fraction: float = 0.1,
+    split_seed: int = 42,
+) -> Dataset:
+    if split not in {"train", "val", "test"}:
+        raise ValueError("split must be train, val or test")
+    dataset = CIFAR10(
+        root=root, train=split != "test", transform=transform, target_transform=target_transform, download=download
+    )
+    if split == "test":
+        return cast(Dataset, dataset)
+    count = int(len(dataset) * validation_fraction)
+    if not 0 < count < len(dataset):
+        raise ValueError("validation_fraction must give nonempty training and validation populations")
+    indices = torch.randperm(len(dataset), generator=torch.Generator().manual_seed(split_seed)).tolist()
+    return Subset(dataset, indices[count:] if split == "train" else indices[:count])
+```
+
+Training and validation partition the official **training** population using the
+same `split_seed` and `validation_fraction`. Only `split: test` selects the
+official test population; reserve it for final evaluation. The separate dataset
+instances also let validation avoid random training augmentation.
+
+`LighterDataModule` is a thin wrapper around eagerly constructed loaders: these
+YAML dataset calls happen before Lightning's data hooks. For shared downloads,
+use a native `LightningDataModule.prepare_data()`; for stage-sensitive dataset
+construction, use its `setup(stage)` hook. Ordinary dataset helpers do not add
+any Lighter-specific lifecycle protocol.
+
 ### Step 2: Create Config
 
 **`configs/custom.yaml`**:
@@ -357,9 +401,11 @@ data:
     shuffle: true
     num_workers: 4
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: true
+      split: train
+      split_seed: 42
+      validation_fraction: 0.1
       download: true
       transform:
         _target_: torchvision.transforms.Compose
@@ -378,9 +424,11 @@ data:
     batch_size: 128
     num_workers: 4
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: false
+      split: val
+      split_seed: 42
+      validation_fraction: 0.1
       download: true
       transform:
         _target_: torchvision.transforms.Compose
@@ -696,16 +744,20 @@ cifar10/
 ├── __lighter__.py
 ├── __init__.py
 ├── model.py
-├── data.py
+├── dataset.py             # Helper from Hold Out Validation Data above
 ├── configs/
 │   ├── baseline.yaml
 │   └── augmented.yaml
 └── README.md
 ```
 
+Copy the complete `dataset.py` from [Hold Out Validation Data](#hold-out-validation-data)
+into this folder and create empty `__lighter__.py` and `__init__.py` files.
+
 **model.py**:
 
 ```python
+import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import torch.nn.functional as F
@@ -778,9 +830,11 @@ data:
     batch_size: 64
     shuffle: true
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: true
+      split: train
+      split_seed: 42
+      validation_fraction: 0.1
       download: true
       transform:
         _target_: torchvision.transforms.ToTensor
@@ -789,9 +843,11 @@ data:
     _target_: torch.utils.data.DataLoader
     batch_size: 64
     dataset:
-      _target_: torchvision.datasets.CIFAR10
+      _target_: project.dataset.cifar10_split
       root: ./data
-      train: false
+      split: val
+      split_seed: 42
+      validation_fraction: 0.1
       transform:
         _target_: torchvision.transforms.ToTensor
 ```
