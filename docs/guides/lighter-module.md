@@ -187,6 +187,18 @@ def training_step(self, batch, batch_idx):
 - `train/loss/step` - Per-step values
 - `train/loss/epoch` - Epoch average
 
+The automatic training loss is the value returned by your `training_step`, before
+Lightning divides its optimization closure loss for gradient accumulation. Changing
+`accumulate_grad_batches` therefore does not rescale the reported scientific loss.
+Lighter keeps a detached observation internally and leaves the returned tensor and
+parameter updates unchanged. This also applies to manual optimization: return the
+scientific quantity you want measured, independently of any division you apply to
+`manual_backward`. A step returning `None` contributes no automatic loss.
+
+This corrects earlier accumulation runs where a loss of 4 could be reported as 2
+or 1. Existing historical logs are not rewritten. Metric weighting remains native
+Lightning behavior; this correction does not change optimization weighting.
+
 **Multi-component loss:**
 
 ```python

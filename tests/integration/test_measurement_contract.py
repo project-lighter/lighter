@@ -1,9 +1,11 @@
 """Real-Trainer contracts for automatic measurements, with native controls."""
 
+from functools import wraps
+
 import pytest
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import Callback, EarlyStopping, GradientAccumulationScheduler
 from pytorch_lightning.loggers import CSVLogger
 from torch import nn
 from torch.utils.data import DataLoader
@@ -103,3 +105,159 @@ def test_automatic_metric_can_monitor_early_stopping_without_logger(tmp_path, ex
     assert monitor.best_score.item() == pytest.approx(5)
     assert trainer.global_step == 2
     assert trainer.callback_metrics["train/loss/epoch"].item() == pytest.approx(2)
+
+
+class EpochLosses(Callback):
+    def __init__(self):
+        self.values = []
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        self.values.append(trainer.callback_metrics["train/loss/epoch"].item())
+
+
+class ScientificStep:
+    """Same arithmetic and manual optimization in the Lighter/native controls."""
+
+    def _science(self, batch, batch_idx):
+        if batch_idx in self.skip_batches:
+            return None
+        if self.loss_kind == "constant":
+            loss = self.network.weight.sum() * 0 + 4
+        elif self.loss_kind == "values":
+            loss = self.network.weight.sum() * 0 + batch.mean()
+        else:
+            loss = (self.network(batch.reshape(-1, 1)) - 1).square().mean()
+        if not self.automatic_optimization:
+            optimizer = self.optimizers()
+            if batch_idx % self.manual_accumulation == 0:
+                optimizer.zero_grad()
+            self.manual_backward(loss / self.manual_accumulation)
+            if (batch_idx + 1) % self.manual_accumulation == 0 or batch_idx + 1 == self.trainer.num_training_batches:
+                optimizer.step()
+        return {"loss": loss} if self.dictionary else loss
+
+    def _init_science(self, manual, factor, dictionary, loss_kind, skip_batches):
+        self.automatic_optimization = not manual
+        self.manual_accumulation = factor
+        self.dictionary = dictionary
+        self.loss_kind = loss_kind
+        self.skip_batches = skip_batches
+        nn.init.constant_(self.network.weight, 0.25)
+
+
+class ScientificLighterModule(ScientificStep, LighterModule):
+    def __init__(self, manual=False, factor=1, dictionary=True, loss_kind="constant", skip_batches=()):
+        network = nn.Linear(1, 1, bias=False)
+        super().__init__(network=network, optimizer=torch.optim.SGD(network.parameters(), lr=0.001))
+        self._init_science(manual, factor, dictionary, loss_kind, skip_batches)
+
+    def training_step(self, batch, batch_idx):
+        return self._science(batch, batch_idx)
+
+
+class ScientificNativeModule(ScientificStep, pl.LightningModule):
+    def __init__(self, manual=False, factor=1, dictionary=True, loss_kind="constant", skip_batches=()):
+        super().__init__()
+        self.network = nn.Linear(1, 1, bias=False)
+        self._init_science(manual, factor, dictionary, loss_kind, skip_batches)
+
+    def training_step(self, batch, batch_idx):
+        output = self._science(batch, batch_idx)
+        if output is not None:
+            loss = output["loss"] if isinstance(output, dict) else output
+            self.log("train/loss/epoch", loss, on_step=False, on_epoch=True, logger=False)
+        return output
+
+    def configure_optimizers(self):
+        return torch.optim.SGD(self.parameters(), lr=0.001)
+
+
+@pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("factor", [1, 2, 4])
+@pytest.mark.parametrize("dictionary", [False, True])
+def test_scientific_loss_is_independent_of_accumulation(tmp_path, manual, factor, dictionary):
+    # Five batches deliberately leave partial accumulation windows for factors 2/4.
+    for model_type in [ScientificNativeModule, ScientificLighterModule]:
+        model = model_type(manual=manual, factor=factor, dictionary=dictionary)
+        recorder = EpochLosses()
+        trainer = _trainer(tmp_path, max_epochs=1, callbacks=[recorder], accumulate_grad_batches=1 if manual else factor)
+        trainer.fit(model, _loader(range(1, 11)))
+        assert recorder.values == pytest.approx([4])
+        assert trainer.callback_metrics["train/loss/epoch"].item() == pytest.approx(4)
+        if isinstance(model, LighterModule):
+            assert trainer.callback_metrics["train/loss/step"].item() == pytest.approx(4)
+
+
+def test_scientific_loss_with_changing_accumulation(tmp_path):
+    for model_type in [ScientificNativeModule, ScientificLighterModule]:
+        recorder = EpochLosses()
+        trainer = _trainer(
+            tmp_path,
+            max_epochs=3,
+            callbacks=[GradientAccumulationScheduler(scheduling={0: 1, 1: 2, 2: 4}), recorder],
+        )
+        trainer.fit(model_type(), _loader(range(1, 11)))
+        assert recorder.values == pytest.approx([4, 4, 4])
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_skipped_steps_do_not_reuse_previous_loss(tmp_path, manual):
+    for model_type in [ScientificNativeModule, ScientificLighterModule]:
+        model = model_type(manual=manual, loss_kind="values", skip_batches=(1, 3, 4))
+        recorder = EpochLosses()
+        trainer = _trainer(tmp_path, max_epochs=1, callbacks=[recorder])
+        trainer.fit(model, _loader([2, 2, 50, 50, 6, 6, 50, 50, 50, 50]))
+        assert recorder.values == pytest.approx([4])
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_loss_observation_preserves_native_parameter_updates(tmp_path, manual):
+    parameters = []
+    for model_type in [ScientificNativeModule, ScientificLighterModule]:
+        model = model_type(manual=manual, factor=2, loss_kind="quadratic")
+        trainer = _trainer(tmp_path, max_epochs=1, accumulate_grad_batches=1 if manual else 2)
+        trainer.fit(model, _loader(range(1, 11)))
+        parameters.append(model.network.weight.detach().clone())
+    assert not torch.equal(parameters[0], torch.full_like(parameters[0], 0.25))
+    torch.testing.assert_close(parameters[1], parameters[0], rtol=0, atol=0)
+
+
+class OuterSkippedModule(ScientificLighterModule):
+    def training_step(self, batch, batch_idx):
+        output = super().training_step(batch, batch_idx)
+        return None if batch_idx == 1 else output
+
+
+def test_outer_training_step_owns_the_observed_loss(tmp_path):
+    recorder = EpochLosses()
+    trainer = _trainer(tmp_path, max_epochs=1, callbacks=[recorder])
+    trainer.fit(OuterSkippedModule(loss_kind="values"), _loader([2, 2, 50, 50, 6, 6]))
+    assert recorder.values == pytest.approx([4])
+
+
+class SharedScientificStep:
+    def training_step(self, batch, batch_idx):
+        return self._science(batch, batch_idx)
+
+
+class MixinLossModule(SharedScientificStep, ScientificLighterModule):
+    pass
+
+
+class InheritedMixinLossModule(MixinLossModule):
+    pass
+
+
+class DecoratedLossModule(ScientificLighterModule):
+    @wraps(ScientificLighterModule.training_step)
+    def training_step(self, batch, batch_idx):
+        output = super().training_step(batch, batch_idx)
+        return {"loss": output["loss"] + 3}
+
+
+@pytest.mark.parametrize("model_type,expected", [(InheritedMixinLossModule, 4), (DecoratedLossModule, 7)])
+def test_effective_inherited_or_decorated_step_owns_loss(tmp_path, model_type, expected):
+    recorder = EpochLosses()
+    trainer = _trainer(tmp_path, max_epochs=1, callbacks=[recorder], accumulate_grad_batches=4)
+    trainer.fit(model_type(), _loader(range(1, 11)))
+    assert recorder.values == pytest.approx([expected])

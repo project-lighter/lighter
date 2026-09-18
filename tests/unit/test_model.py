@@ -557,3 +557,32 @@ def test_log_metrics_with_single_metric(simple_model, mock_trainer):
 
     # Should log on_step and on_epoch (2 calls for single metric)
     assert system._log.call_count == 2
+
+
+def test_training_step_observation_preserves_signature_and_return_identity():
+    import inspect
+
+    from pytorch_lightning.utilities.model_helpers import is_overridden
+
+    class ObservedModule(LighterModule):
+        def training_step(self, batch, batch_idx):
+            return batch
+
+    system = ObservedModule(network=nn.Linear(1, 1))
+    loss = torch.tensor(4.0, requires_grad=True)
+    output = {"loss": loss, "pred": torch.tensor([7.0])}
+    assert list(inspect.signature(system.training_step).parameters) == ["batch", "batch_idx"]
+    assert is_overridden("training_step", system)
+    assert system.training_step(output, 0) is output
+    assert output["loss"] is loss
+    assert loss.requires_grad
+
+    # Callback outputs stay native; Lighter's logging observes the original loss.
+    native_outputs = {"loss": torch.tensor(2.0), "pred": output["pred"]}
+    system._log_outputs = MagicMock()
+    system.on_train_batch_end(native_outputs, None, 0)
+    logged_outputs = system._log_outputs.call_args.args[0]
+    assert logged_outputs["loss"].item() == 4
+    assert not logged_outputs["loss"].requires_grad
+    assert native_outputs["loss"].item() == 2
+    assert logged_outputs["pred"] is native_outputs["pred"]

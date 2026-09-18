@@ -4,6 +4,7 @@ Users implement abstract step methods while the framework handles automatic dual
 """
 
 from collections.abc import Callable
+from functools import wraps
 from typing import Any
 
 import pytorch_lightning as pl
@@ -76,6 +77,37 @@ class LighterModule(pl.LightningModule):
                 return pred
     """
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        training_step = cls.training_step
+        if training_step is LighterModule.training_step:
+            return
+        if getattr(training_step, "_lighter_loss_observer", None) is training_step:
+            return
+
+        @wraps(training_step)
+        def observe_training_step(self: "LighterModule", *args: Any, **kwargs: Any) -> Any:
+            # Capture before Lightning normalizes the optimization closure loss.
+            # An outer override calling super() owns its final returned loss.
+            self._training_step_observed = False
+            self._training_step_loss = None
+            output = training_step(self, *args, **kwargs)
+            loss = output.get("loss") if isinstance(output, dict) else output
+            if isinstance(loss, torch.Tensor):
+                loss = loss.detach().clone()
+            elif isinstance(loss, dict):
+                loss = {
+                    key: value.detach().clone() if isinstance(value, torch.Tensor) else value for key, value in loss.items()
+                }
+            self._training_step_loss = loss
+            self._training_step_observed = True
+            return output
+
+        # An identity marker survives ordinary inheritance. A new decorator using
+        # wraps() may copy it, but must still observe its own final return value.
+        observe_training_step.__dict__["_lighter_loss_observer"] = observe_training_step
+        cls.training_step = observe_training_step  # type: ignore[method-assign]
+
     def __init__(
         self,
         network: Module,
@@ -87,6 +119,10 @@ class LighterModule(pl.LightningModule):
         test_metrics: Metric | MetricCollection | None = None,
     ) -> None:
         super().__init__()
+
+        # A detached observation, never an input to optimization.
+        self._training_step_loss: torch.Tensor | dict[str, Any] | None = None
+        self._training_step_observed = False
 
         # Core components
         self.network = network
@@ -226,7 +262,13 @@ class LighterModule(pl.LightningModule):
         self._log_outputs(outputs, batch_idx)
 
     def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int) -> None:
-        """Framework hook - automatically logs training outputs."""
+        """Log the scientific loss observed before closure normalization."""
+        if self._training_step_observed:
+            # Preserve the native outputs seen by callbacks and the caller.
+            outputs = {} if outputs is None else dict(self._normalize_output(outputs))
+            outputs["loss"] = self._training_step_loss
+            self._training_step_loss = None
+            self._training_step_observed = False
         self._on_batch_end(outputs, batch_idx)
 
     def on_validation_batch_end(
