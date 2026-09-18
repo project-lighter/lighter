@@ -204,18 +204,24 @@ Lightning behavior; this correction does not change optimization weighting.
 ```python
 def training_step(self, batch, batch_idx):
     return {
-        "loss": {
-            "total": total_loss,      # Required key
-            "ce": ce_loss,            # Optional component
-            "reg": reg_loss           # Optional component
-        }
+        "loss": total_loss,          # Scalar optimization loss
+        "loss_terms": {              # Optional observations
+            "ce": ce_loss,
+            "reg": reg_loss,
+        },
     }
 ```
 
 **Logged as:**
-- `train/loss/total/step`, `train/loss/total/epoch`
+- `train/loss/step`, `train/loss/epoch` (the optimization loss)
 - `train/loss/ce/step`, `train/loss/ce/epoch`
 - `train/loss/reg/step`, `train/loss/reg/epoch`
+
+The outer training `loss` must remain a single-element tensor under automatic
+optimization. A nested dictionary under `loss` previously passed Lighter's helper
+but failed inside Lightning; Lighter now reports this contract before optimization.
+Move named observations to optional `loss_terms`. Manual optimization retains native
+freedom to return a dictionary without a loss or return `None`.
 
 #### Metrics Logging
 
@@ -327,6 +333,17 @@ def predict_step(self, batch, batch_idx):
     """Optional."""
     return predictions
 ```
+
+Validation and test steps may also return `None` after explicit `self.log` calls;
+automatic configured metrics are still collected. Omitting these step methods
+leaves the stage absent according to native Lightning detection. A training-only
+model with `LighterDataModule(train_dataloader=...)` therefore runs without a
+validation stage.
+
+Missing LighterDataModule constructor loaders now behave as absent native hooks.
+An explicit call to an absent loader raises Lightning's configuration error instead
+of returning `None`. Subclasses that implement their own loader hooks retain those
+hooks; use a native/custom DataModule for setup-dependent loader construction.
 
 ## Complete Examples
 
@@ -641,12 +658,23 @@ scheduler:
 
 ```yaml
 scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  optimizer: "@model::optimizer"
-  mode: min
-  factor: 0.5
-  patience: 10
+  scheduler:
+    _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+    optimizer: "@model::optimizer"
+    mode: min
+    factor: 0.5
+    patience: 10
+  monitor: val/loss/epoch
+  interval: epoch
+  frequency: 1
+  strict: true
 ```
+
+Lighter passes this native scheduler dictionary through, including `monitor`,
+`interval`, `frequency`, and `strict`. A bare plateau scheduler has no monitored
+quantity and remains invalid in Lightning; wrap it as above or provide a native
+`configure_optimizers()` implementation. Native Trainer may add its own derived
+scheduler metadata during setup.
 
 ### Warmup
 

@@ -1,7 +1,11 @@
 """Tests for LighterDataModule."""
 
+import pickle
+
 import pytest
 import torch
+from pytorch_lightning.utilities.exceptions import MisconfigurationException
+from pytorch_lightning.utilities.model_helpers import is_overridden
 from torch.utils.data import DataLoader, TensorDataset
 
 from lighter import LighterDataModule
@@ -46,18 +50,19 @@ class TestLighterDataModule:
         datamodule = LighterDataModule(train_dataloader=train_dataloader)
 
         assert datamodule.train_dataloader() is train_dataloader
-        assert datamodule.val_dataloader() is None
-        assert datamodule.test_dataloader() is None
-        assert datamodule.predict_dataloader() is None
+        for name in ("val_dataloader", "test_dataloader", "predict_dataloader"):
+            assert not is_overridden(name, datamodule)
+            with pytest.raises(MisconfigurationException, match=name):
+                getattr(datamodule, name)()
 
     def test_initialization_no_dataloaders(self):
         """Test initialization with no dataloaders."""
         datamodule = LighterDataModule()
 
-        assert datamodule.train_dataloader() is None
-        assert datamodule.val_dataloader() is None
-        assert datamodule.test_dataloader() is None
-        assert datamodule.predict_dataloader() is None
+        for name in ("train_dataloader", "val_dataloader", "test_dataloader", "predict_dataloader"):
+            assert not is_overridden(name, datamodule)
+            with pytest.raises(MisconfigurationException, match=name):
+                getattr(datamodule, name)()
 
     def test_is_lightning_datamodule(self):
         """Test that LighterDataModule is a LightningDataModule."""
@@ -84,3 +89,11 @@ class TestLighterDataModule:
         assert len(batch) == 2  # x, y
         assert batch[0].shape[0] == 32  # batch size
         assert batch[0].shape[1] == 10  # input dim
+
+
+def test_absent_loader_hooks_preserve_native_identity_after_pickle():
+    datamodule = pickle.loads(pickle.dumps(LighterDataModule()))
+    for name in ("train_dataloader", "val_dataloader", "test_dataloader", "predict_dataloader"):
+        assert not is_overridden(name, datamodule)
+        with pytest.raises(MisconfigurationException, match=name):
+            getattr(datamodule, name)()

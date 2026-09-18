@@ -116,11 +116,10 @@ def test_system_requires_step_implementation(simple_model):
     with pytest.raises(NotImplementedError, match="must implement training_step"):
         system.training_step(batch, batch_idx=0)
 
-    with pytest.raises(NotImplementedError, match="must implement validation_step"):
-        system.validation_step(batch, batch_idx=0)
+    from pytorch_lightning.utilities.model_helpers import is_overridden
 
-    with pytest.raises(NotImplementedError, match="must implement test_step"):
-        system.test_step(batch, batch_idx=0)
+    assert not is_overridden("validation_step", system)
+    assert not is_overridden("test_step", system)
 
     with pytest.raises(NotImplementedError, match="must implement predict_step"):
         system.predict_step(batch, batch_idx=0)

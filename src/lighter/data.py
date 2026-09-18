@@ -5,6 +5,8 @@ This module provides LighterDataModule, a helper class that wraps PyTorch datalo
 so they can be configured in YAML without requiring a custom LightningDataModule.
 """
 
+from functools import partial
+
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
@@ -92,6 +94,13 @@ class LighterDataModule(LightningDataModule):
         self._val_dataloader = val_dataloader
         self._test_dataloader = test_dataloader
         self._predict_dataloader = predict_dataloader
+
+        # Use native absence semantics without masking a subclass's own hooks.
+        # Explicitly requesting an absent stage retains Lightning's diagnostic.
+        for name in ("train_dataloader", "val_dataloader", "test_dataloader", "predict_dataloader"):
+            if getattr(self, f"_{name}") is None and getattr(type(self), name) is getattr(LighterDataModule, name):
+                native_hook = getattr(LightningDataModule, name)
+                setattr(self, name, partial(native_hook, self))
 
     def train_dataloader(self) -> DataLoader | None:
         """Return the training dataloader."""

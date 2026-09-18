@@ -36,7 +36,7 @@ class LighterModule(pl.LightningModule):
         network: Neural network model
         criterion: Loss function (optional, user can compute loss manually in step)
         optimizer: Optimizer (required for training)
-        scheduler: Learning rate scheduler (optional)
+        scheduler: Learning rate scheduler or native scheduler dictionary (optional)
         train_metrics: Training metrics (optional, user calls them in step)
         val_metrics: Validation metrics (optional)
         test_metrics: Test metrics (optional)
@@ -96,21 +96,35 @@ class LighterModule(pl.LightningModule):
 
         @wraps(training_step)
         def observe_training_step(self: "LighterModule", *args: Any, **kwargs: Any) -> Any:
+            if self._training_step_active:
+                return training_step(self, *args, **kwargs)
             # Capture before Lightning normalizes the optimization closure loss.
             # An outer override calling super() owns its final returned loss.
             self._training_step_observed = False
             self._training_step_loss = None
-            output = training_step(self, *args, **kwargs)
-            loss = output.get("loss") if isinstance(output, dict) else output
-            if isinstance(loss, torch.Tensor):
-                loss = loss.detach().clone()
-            elif isinstance(loss, dict):
-                loss = {
-                    key: value.detach().clone() if isinstance(value, torch.Tensor) else value for key, value in loss.items()
-                }
-            self._training_step_loss = loss
-            self._training_step_observed = True
-            return output
+            self._training_step_active = True
+            try:
+                output = training_step(self, *args, **kwargs)
+                loss = output.get("loss") if isinstance(output, dict) else output
+                if self.automatic_optimization and output is not None:
+                    if not isinstance(loss, torch.Tensor) or loss.numel() != 1:
+                        raise TypeError(
+                            "training_step loss must be a single-element Tensor for automatic optimization. "
+                            "Return the tensor directly or {'loss': total, 'loss_terms': {'name': term}}. "
+                            "Return None to skip the step; do not nest a dictionary under 'loss'."
+                        )
+                if isinstance(loss, torch.Tensor):
+                    loss = loss.detach().clone()
+                elif isinstance(loss, dict):
+                    loss = {
+                        key: value.detach().clone() if isinstance(value, torch.Tensor) else value
+                        for key, value in loss.items()
+                    }
+                self._training_step_loss = loss
+                self._training_step_observed = True
+                return output
+            finally:
+                self._training_step_active = False
 
         # An identity marker survives ordinary inheritance. A new decorator using
         # wraps() may copy it, but must still observe its own final return value.
@@ -153,7 +167,7 @@ class LighterModule(pl.LightningModule):
         network: Module,
         criterion: Callable | None = None,
         optimizer: Optimizer | None = None,
-        scheduler: LRScheduler | None = None,
+        scheduler: LRScheduler | dict[str, Any] | None = None,
         train_metrics: Metric | MetricCollection | None = None,
         val_metrics: Metric | MetricCollection | None = None,
         test_metrics: Metric | MetricCollection | None = None,
@@ -163,6 +177,7 @@ class LighterModule(pl.LightningModule):
         # A detached observation, never an input to optimization.
         self._training_step_loss: torch.Tensor | dict[str, Any] | None = None
         self._training_step_observed = False
+        self._training_step_active = False
 
         # Core components
         self.network = network
@@ -261,38 +276,10 @@ class LighterModule(pl.LightningModule):
             f"See https://project-lighter.github.io/lighter/guides/lighter-module/"
         )
 
-    def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor | dict[str, Any]:
-        """
-        Define validation logic.
-
-        Similar to training_step but typically without gradients.
-        Call self.val_metrics(pred, target) if configured.
-
-        Returns:
-            Either:
-                - Tensor: The loss value
-                - Dict with 'loss' key
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement validation_step() to use validation. "
-            f"See https://project-lighter.github.io/lighter/guides/lighter-module/"
-        )
-
-    def test_step(self, batch: Any, batch_idx: int) -> torch.Tensor | dict[str, Any]:
-        """
-        Define test logic.
-
-        Loss is optional. Call self.test_metrics(pred, target) if configured.
-
-        Returns:
-            Either:
-                - Tensor: The loss value (optional in test mode)
-                - Dict with optional 'loss' key. Can include pred, target, etc.
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement test_step() to use trainer.test(). "
-            f"See https://project-lighter.github.io/lighter/guides/lighter-module/"
-        )
+    # Preserve native absence detection: optional evaluation stages are present
+    # only when a user provides a step, not because Lighter declares a stub.
+    validation_step = pl.LightningModule.validation_step
+    test_step = pl.LightningModule.test_step
 
     def predict_step(self, batch: Any, batch_idx: int) -> Any:
         """
@@ -364,24 +351,28 @@ class LighterModule(pl.LightningModule):
         self._evaluation_dataloader_indices["test"] = dataloader_idx
         self._on_batch_end(outputs, batch_idx)
 
-    def _normalize_output(self, output: torch.Tensor | dict[str, Any]) -> dict[str, Any]:
+    def _normalize_output(self, output: torch.Tensor | dict[str, Any] | None) -> dict[str, Any]:
         """
         Normalize step output to dict format.
 
         Args:
             output: Either:
                 - torch.Tensor: Loss value (normalized to {"loss": tensor})
-                - dict: Must contain outputs. Can include:
-                    - "loss": torch.Tensor or dict with "total" key
+                - None: No returned observations (explicit self.log still works)
+                - dict: Can include:
+                    - "loss": torch.Tensor, or evaluation-only dict with "total" key
+                    - "loss_terms": Optional named scalar observations
                     - "pred", "target", "input": Additional data for callbacks
 
         Returns:
             Dict with normalized structure
 
         Raises:
-            TypeError: If output is neither Tensor nor dict
+            TypeError: If output is not Tensor, dict, or None
             ValueError: If loss dict is missing 'total' key
         """
+        if output is None:
+            return {}
         if isinstance(output, torch.Tensor):
             return {"loss": output}
         elif isinstance(output, dict):
@@ -396,7 +387,7 @@ class LighterModule(pl.LightningModule):
             return output
         else:
             raise TypeError(
-                f"Step method must return torch.Tensor or dict. "
+                f"Step method must return torch.Tensor or dict, or None. "
                 f"Got {type(output).__name__} instead. "
                 f"Examples:\n"
                 f"  - return loss  # Simple tensor\n"
@@ -415,6 +406,11 @@ class LighterModule(pl.LightningModule):
             batch_idx: Current batch index
         """
         self._log_loss(outputs.get("loss"))
+        if "loss_terms" in outputs:
+            terms = outputs["loss_terms"]
+            if not isinstance(terms, dict):
+                raise TypeError("Optional loss_terms must be a dictionary of named scalar values.")
+            self._log_loss(terms)
         self._log_metrics()
         self._log_optimizer_stats(batch_idx)
 
