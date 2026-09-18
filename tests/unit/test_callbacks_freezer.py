@@ -2,6 +2,7 @@ import re
 
 import pytest
 import torch
+from loguru import logger
 from pytorch_lightning import Trainer
 from torch.nn import Module
 from torch.utils.data import DataLoader, Dataset
@@ -249,32 +250,39 @@ def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
     assert dummy_system.network.layer1.bias.requires_grad
 
 
-def test_freezer_logs_only_owned_layers(dummy_system, capsys):
+@pytest.fixture
+def log_messages():
+    """Observe an explicit sink without replacing the application logging policy."""
+    messages = []
+    sink_id = logger.add(messages.append, format="{message}")
+    try:
+        yield messages
+    finally:
+        logger.remove(sink_id)
+
+
+def test_freezer_logs_only_owned_layers(dummy_system, log_messages):
     """The log describes changes; exceptions remain untouched."""
     freezer = Freezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
 
     # Directly call _set_model_requires_grad to test logging
     freezer._set_model_requires_grad(dummy_system, requires_grad=False)
 
-    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
-    captured = capsys.readouterr()
-    output = strip_ansi(captured.out + captured.err)
+    output = "".join(log_messages)
     assert "Froze parameters" in output
     assert "layer2.weight" not in output
     assert "layer2.bias" not in output
 
 
-def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
+def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, log_messages):
     """Test that unfrozen layers are logged without suffix when explicitly unfreezing."""
     freezer = Freezer(names=["layer1.weight", "layer1.bias"])
 
     # First freeze, then unfreeze
     freezer._set_model_requires_grad(dummy_system, requires_grad=False)
-    capsys.readouterr()  # Clear previous output
+    log_messages.clear()
     freezer._set_model_requires_grad(dummy_system, requires_grad=True)
 
-    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
-    captured = capsys.readouterr()
-    output = strip_ansi(captured.out + captured.err)
+    output = "".join(log_messages)
     assert "Restored gradient" in output
     assert "(excepted from freeze)" not in output
