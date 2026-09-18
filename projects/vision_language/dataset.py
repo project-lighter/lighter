@@ -6,19 +6,26 @@ Real datasets for vision-language learning:
 - Flickr8k: 8k images with 5 captions each (smaller, easier to obtain)
 """
 
+import csv
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict, cast
 
 import torch
 from torch.utils.data import Dataset
+
+
+class Caption(TypedDict):
+    image_path: Path
+    caption: str
 
 
 class Flickr30kDataset(Dataset):
     """Flickr30k dataset for vision-language training.
 
     Flickr30k contains 31,000 images with 5 captions each.
-    Note: Split filtering requires split manifest files (not included).
-    Currently loads all data regardless of split parameter.
+    This loader reads the supplied corpus. Provide a separately partitioned root
+    for each population; it does not invent a training/validation split.
 
     Download:
     1. Request access: https://shannon.cs.illinois.edu/DenotationGraph/
@@ -35,11 +42,13 @@ class Flickr30kDataset(Dataset):
     def __init__(
         self,
         root: str,
-        tokenizer=None,
+        tokenizer: Callable[..., dict[str, torch.Tensor]] | None = None,
         max_length: int = 77,
         image_transform: Callable | None = None,
     ) -> None:
         self.root = Path(root)
+        if not callable(tokenizer):
+            raise ValueError("A callable tokenizer is required; configure a tokenizer matching the text encoder vocabulary")
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.image_transform = image_transform
@@ -57,12 +66,12 @@ class Flickr30kDataset(Dataset):
                 f"Or use Flickr8kDataset for a smaller, easier-to-obtain alternative."
             )
 
-    def _load_captions(self) -> list[dict]:
+    def _load_captions(self) -> list[Caption]:
         """Load image-caption pairs."""
         caption_file = self.root / "results_20130124.token"
         image_dir = self.root / "flickr30k-images"
 
-        data = []
+        data: list[Caption] = []
         if caption_file.exists():
             with open(caption_file) as f:
                 for line in f:
@@ -87,20 +96,15 @@ class Flickr30kDataset(Dataset):
             image = self.image_transform(image)
 
         # Tokenize text
-        if self.tokenizer:
-            encoding = self.tokenizer(
-                item["caption"],
-                max_length=self.max_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-            )
-            input_ids = encoding["input_ids"].squeeze(0)
-            attention_mask = encoding["attention_mask"].squeeze(0)
-        else:
-            # Dummy tokenization for testing
-            input_ids = torch.zeros(self.max_length, dtype=torch.long)
-            attention_mask = torch.ones(self.max_length, dtype=torch.long)
+        encoding = self.tokenizer(
+            item["caption"],
+            max_length=self.max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        input_ids = encoding["input_ids"].squeeze(0)
+        attention_mask = encoding["attention_mask"].squeeze(0)
 
         return {
             "image": image,
@@ -111,12 +115,9 @@ class Flickr30kDataset(Dataset):
 
     def _load_image(self, path: Path) -> torch.Tensor:
         """Load image from file."""
-        try:
-            from torchvision.io import read_image
+        from torchvision.io import read_image
 
-            return read_image(str(path)).float() / 255.0
-        except Exception:
-            return torch.zeros(3, 224, 224)
+        return cast(torch.Tensor, read_image(str(path))).float() / 255.0
 
 
 class Flickr8kDataset(Dataset):
@@ -130,8 +131,8 @@ class Flickr8kDataset(Dataset):
 
     Args:
         root: Root directory containing images and captions.
-        split: Dataset split ('train', 'val', 'test'). If split files exist,
-            only images from that split are loaded. Otherwise loads all images.
+        split: Dataset split ('train', 'val', 'test'). A corresponding split
+            manifest is required; available manifests must be disjoint.
         tokenizer: HuggingFace tokenizer for text encoding.
         max_length: Maximum text sequence length.
         image_transform: Transform for images.
@@ -148,12 +149,14 @@ class Flickr8kDataset(Dataset):
         self,
         root: str,
         split: str = "train",
-        tokenizer=None,
+        tokenizer: Callable[..., dict[str, torch.Tensor]] | None = None,
         max_length: int = 77,
         image_transform: Callable | None = None,
     ) -> None:
         self.root = Path(root)
         self.split = split
+        if not callable(tokenizer):
+            raise ValueError("A callable tokenizer is required; configure a tokenizer matching the text encoder vocabulary")
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.image_transform = image_transform
@@ -170,67 +173,56 @@ class Flickr8kDataset(Dataset):
                 f"  {self.root}/captions.txt      (caption file)"
             )
 
-    def _load_split_images(self) -> set[str] | None:
-        """Load image names for the current split, if split file exists."""
+    def _load_split_images(self) -> set[str]:
+        """Require an explicit, nonempty, disjoint image-level split manifest."""
         if self.split not in self.SPLITS:
-            return None
+            raise ValueError(f"Unknown Flickr8k split {self.split!r}; choose train, val or test")
         split_file = self.root / self.SPLITS[self.split]
-        if not split_file.exists():
-            return None
-        with open(split_file) as f:
-            return {line.strip() for line in f if line.strip()}
+        if not split_file.is_file():
+            raise FileNotFoundError(f"Required split manifest is missing: {split_file}; provide image names, one per line")
+        images = {line.strip() for line in split_file.read_text(encoding="utf-8").splitlines() if line.strip()}
+        if not images:
+            raise ValueError(f"Split manifest is empty: {split_file}")
+        for other, filename in self.SPLITS.items():
+            path = self.root / filename
+            if other != self.split and path.is_file():
+                other_images = {line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()}
+                overlap = images & other_images
+                if overlap:
+                    raise ValueError(f"Flickr8k {self.split} and {other} split manifests overlap: {sorted(overlap)[:5]}")
+        return images
 
-    def _load_data(self) -> list[dict]:
-        """Load image-caption pairs."""
+    def _load_data(self) -> list[Caption]:
+        """Read real captions and selected images; missing inputs are errors."""
         caption_file = self.root / "captions.txt"
         image_dir = self.root / "Images"
-
-        # Try alternative paths
         if not caption_file.exists():
             caption_file = self.root / "Flickr8k.token.txt"
         if not image_dir.exists():
             image_dir = self.root / "Flickr8k_Dataset"
-
-        # Load split filter if available
         valid_images = self._load_split_images()
-
-        data = []
-        if caption_file.exists():
-            with open(caption_file) as f:
-                # Skip header if present
-                first_line = f.readline()
-                if not first_line.startswith("image"):
-                    f.seek(0)
-
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    # Handle both CSV format and token format
-                    if "," in line:
-                        # CSV format: image,caption
-                        parts = line.split(",", 1)
-                        if len(parts) >= 2:
-                            image_name = parts[0].strip()
-                            caption = parts[1].strip()
-                    else:
-                        # Token format: image#idx\tcaption
-                        parts = line.split("\t")
-                        if len(parts) >= 2:
-                            image_name = parts[0].split("#")[0]
-                            caption = parts[1]
-                        else:
-                            continue
-
-                    # Filter by split if split file exists
-                    if valid_images is not None and image_name not in valid_images:
-                        continue
-
-                    image_path = image_dir / image_name
-                    if image_path.exists():
-                        data.append({"image_path": image_path, "caption": caption})
-
+        data: list[Caption] = []
+        with caption_file.open(encoding="utf-8", newline="") as stream:
+            first_line = stream.readline()
+            stream.seek(0)
+            rows = (line.rstrip("\n").split("\t", 1) for line in stream) if "\t" in first_line else csv.reader(stream)
+            for row in rows:
+                if not row:
+                    continue
+                if len(row) != 2:
+                    raise ValueError(f"Expected image and caption in {caption_file}, got {row!r}")
+                if row[0] in {"image", "image_name"} and row[1] == "caption":
+                    continue
+                image_name, caption = row[0].split("#", 1)[0], row[1]
+                if image_name not in valid_images:
+                    continue
+                image_path = image_dir / image_name
+                if not image_path.is_file():
+                    raise FileNotFoundError(f"Selected Flickr8k image is missing: {image_path}")
+                data.append({"image_path": image_path, "caption": caption})
+        missing = valid_images - {item["image_path"].name for item in data}
+        if missing:
+            raise ValueError(f"Selected Flickr8k images have no captions: {sorted(missing)[:5]}")
         return data
 
     def __len__(self) -> int:
@@ -243,19 +235,15 @@ class Flickr8kDataset(Dataset):
         if self.image_transform:
             image = self.image_transform(image)
 
-        if self.tokenizer:
-            encoding = self.tokenizer(
-                item["caption"],
-                max_length=self.max_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-            )
-            input_ids = encoding["input_ids"].squeeze(0)
-            attention_mask = encoding["attention_mask"].squeeze(0)
-        else:
-            input_ids = torch.zeros(self.max_length, dtype=torch.long)
-            attention_mask = torch.ones(self.max_length, dtype=torch.long)
+        encoding = self.tokenizer(
+            item["caption"],
+            max_length=self.max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        input_ids = encoding["input_ids"].squeeze(0)
+        attention_mask = encoding["attention_mask"].squeeze(0)
 
         return {
             "image": image,
@@ -268,7 +256,7 @@ class Flickr8kDataset(Dataset):
         """Load image from file."""
         from torchvision.io import read_image
 
-        return read_image(str(path)).float() / 255.0
+        return cast(torch.Tensor, read_image(str(path))).float() / 255.0
 
 
 class COCOCaptionsDataset(Dataset):
@@ -292,12 +280,14 @@ class COCOCaptionsDataset(Dataset):
         self,
         root: str,
         ann_file: str,
-        tokenizer=None,
+        tokenizer: Callable[..., dict[str, torch.Tensor]] | None = None,
         max_length: int = 77,
         image_transform: Callable | None = None,
     ) -> None:
         self.root = Path(root)
         self.ann_file = Path(ann_file)
+        if not callable(tokenizer):
+            raise ValueError("A callable tokenizer is required; configure a tokenizer matching the text encoder vocabulary")
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.image_transform = image_transform
@@ -316,11 +306,11 @@ class COCOCaptionsDataset(Dataset):
                 "  - annotations/captions_train2017.json"
             )
 
-    def _load_annotations(self) -> list[dict]:
+    def _load_annotations(self) -> list[Caption]:
         """Load COCO annotations."""
         import json
 
-        data = []
+        data: list[Caption] = []
         if self.ann_file.exists():
             with open(self.ann_file) as f:
                 coco = json.load(f)
@@ -350,19 +340,15 @@ class COCOCaptionsDataset(Dataset):
         if self.image_transform:
             image = self.image_transform(image)
 
-        if self.tokenizer:
-            encoding = self.tokenizer(
-                item["caption"],
-                max_length=self.max_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-            )
-            input_ids = encoding["input_ids"].squeeze(0)
-            attention_mask = encoding["attention_mask"].squeeze(0)
-        else:
-            input_ids = torch.zeros(self.max_length, dtype=torch.long)
-            attention_mask = torch.ones(self.max_length, dtype=torch.long)
+        encoding = self.tokenizer(
+            item["caption"],
+            max_length=self.max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        input_ids = encoding["input_ids"].squeeze(0)
+        attention_mask = encoding["attention_mask"].squeeze(0)
 
         return {
             "image": image,
@@ -374,7 +360,7 @@ class COCOCaptionsDataset(Dataset):
         """Load image from file."""
         from torchvision.io import read_image
 
-        return read_image(str(path)).float() / 255.0
+        return cast(torch.Tensor, read_image(str(path))).float() / 255.0
 
 
 def collate_fn(batch: list[dict]) -> dict:
