@@ -22,6 +22,14 @@ runs:
         python-version: ${{ inputs.python-version }}
         enable-cache: true
 
+    - name: Check paired dependency availability
+      if: inputs.install-deps == 'true'
+      run: >-
+        uv run --no-project --python '${{ inputs.python-version }}'
+        --with 'tomli>=2.0.1; python_version < "3.11"'
+        python .github/scripts/check_release_dependencies.py
+      shell: bash
+
     - name: Install dependencies
       if: inputs.install-deps == 'true'
       run: uv sync ${{ inputs.install-groups }}

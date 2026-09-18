@@ -37,22 +37,34 @@ lighter fit config.yaml model::optimizer::lr=0.001
 lighter fit config.yaml model::optimizer::lr=0.01
 lighter fit config.yaml model::optimizer::lr=0.1
 
-# Every experiment is reproducible - just version control your configs
+# Track the recipe together with code, environment and data identities
 ```
 
-## Quick Start
+## Installation and a complete first experiment
+
+This working branch is the paired development release **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. It requires Sparkwheel's retained-construction API; older published Sparkwheel versions are incompatible. Nothing in the local build workflow publishes packages.
+
+With both reviewed source checkouts available, use Python 3.11 and [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
-pip install lighter
+python scripts/check_paired_install.py \
+  --sparkwheel /path/to/sparkwheel \
+  --python /path/to/python3.11 \
+  --output /path/to/project-lighter/artifacts/reference-pair
 ```
 
-**Use your existing PyTorch Lightning code:**
+The output and optional `--environment` paths must be new and outside both source checkouts. The script builds both packages, generates a hash-locked environment, installs their wheels, checks imports from site-packages, and executes the complete fit/test/predict/resume workflow with inspection and records. `--dry-run` prints the plan; `--profile numpy2` selects the additional tested profile. Dependency downloads may require network access.
+
+See [compatibility and local installation](docs/guides/compatibility.md) for exact profiles, editable development, registry-only CI limitations and the release sequence. The generated lock is a concrete local artifact lock; broad package version bounds are not a claim that every possible dependency combination has been tested.
+
+Start with the [download-free CPU experiment](projects/tabular_regression/README.md), which verifies checkpoint progress, exact prediction IDs and values, and continuation. Existing native Lightning code remains supported. Place empty `__lighter__.py` and `__init__.py` files next to `model.py`, then run from that project directory:
 
 ```python
 # model.py
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
+
 
 class MyModel(pl.LightningModule):
     def __init__(self, network, learning_rate=0.001):
@@ -79,7 +91,7 @@ trainer:
   max_epochs: 10
 
 model:
-  _target_: model.MyModel
+  _target_: project.model.MyModel
   network:
     _target_: torchvision.models.resnet18
     num_classes: 10
@@ -95,6 +107,8 @@ data:
       root: ./data
       train: true
       download: true
+      transform:
+        _target_: torchvision.transforms.ToTensor
 ```
 
 **Run and iterate fast:**
@@ -111,18 +125,18 @@ lighter fit config.yaml data::train_dataloader::batch_size=64
 # Use multiple GPUs
 lighter fit config.yaml trainer::devices=4
 
-# Every run creates timestamped outputs with saved configs
-# outputs/2025-11-21/14-30-45/config.yaml  # Fully reproducible
+# Local attempt records and source snapshots default to
+# trainer.default_root_dir/lighter_runs/ATTEMPT_ID/
 ```
 
 ## Key Benefits
 
-- **Reproducible**: Every experiment = one YAML file. Version control configs like code.
+- **Inspectable**: Preserve recipes and observed native state in local attempt records; version code, dependencies and data alongside them.
 - **Fast iteration**: Override any parameter from CLI without editing code.
 - **Zero lock-in**: Works with any PyTorch Lightning module. Your code, your logic.
 - **Composable**: Merge configs, create recipes, share experiments as files.
-- **Organized**: Automatic timestamped output directories with saved configs.
-- **Simple**: ~500 lines of code. Read the framework in 30 minutes.
+- **Organized**: Local attempt IDs and explicit checkpoint/prediction paths, including without an external logger.
+- **Native**: Lightning owns training loops and strategy behavior; familiar scientific steps remain Python.
 
 ## Optional: Use LighterModule for Less Boilerplate
 
@@ -130,6 +144,7 @@ If you want automatic optimizer configuration and dual logging (step + epoch), u
 
 ```python
 from lighter import LighterModule
+
 
 class MyModel(LighterModule):
     def training_step(self, batch, batch_idx):
@@ -147,7 +162,7 @@ class MyModel(LighterModule):
 
 ```yaml
 model:
-  _target_: model.MyModel
+  _target_: project.model.MyModel
   network:
     _target_: torchvision.models.resnet18
     num_classes: 10
@@ -158,9 +173,9 @@ model:
     params: "$@model::network.parameters()"
     lr: 0.001
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
 ```
 
 **LighterModule gives you:**
