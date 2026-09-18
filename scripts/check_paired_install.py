@@ -27,6 +27,21 @@ def python_in(environment: Path) -> Path:
     return environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def verify_record_packages(record: dict, environment: Path, versions: dict[str, str]) -> None:
+    """Check the packages actually used by each non-isolated workflow child."""
+    packages = record.get("environment", {}).get("packages", {})
+    for name, expected_version in versions.items():
+        observed = packages.get(name, {})
+        filename = observed.get("module_path")
+        path = Path(filename).resolve() if isinstance(filename, str) else None
+        if path is None or not path.is_file() or environment.resolve() not in path.parents:
+            raise ValueError(
+                f"Attempt {record.get('attempt_id')} loaded {name} outside the installed environment: {filename!r}"
+            )
+        if observed.get("loaded_version") != expected_version or observed.get("distribution_version") != expected_version:
+            raise ValueError(f"Attempt {record.get('attempt_id')} used inconsistent {name} versions: {observed!r}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sparkwheel", required=True, type=Path, help="Sparkwheel source checkout")
@@ -205,6 +220,7 @@ def main():
         if any(record["status"] != "completed" for record in records):
             raise ValueError("An installed workflow record did not complete")
         for record in records:
+            verify_record_packages(record, environment, versions)
             run_path = workflow_output / "lighter_runs" / record["attempt_id"]
             shown = json.loads(
                 run(
