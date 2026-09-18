@@ -391,6 +391,6 @@ def diff_records(left: str | Path, right: str | Path) -> list[dict[str, Any]]:
                 }
             )
 
-    for key in ("seed", "requested", "observed_start", "progress", "observed_end", "metrics", "execution"):
+    for key in ("seed", "requested", "environment", "observed_start", "progress", "observed_end", "metrics", "execution"):
         visit(key, first.get(key, missing), second.get(key, missing))
     return changes

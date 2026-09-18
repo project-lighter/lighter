@@ -32,3 +32,22 @@ def test_record_inspection_list_show_and_diff(tmp_path, capsys):
     assert inspection_cli(["runs", "diff", str(tmp_path / "first"), str(tmp_path / "second")])
     assert json.loads(capsys.readouterr().out)[0]["after"] == 42
     assert not inspection_cli(["fit", "config.yaml"])
+
+
+def test_comparison_exposes_software_provenance_drift(tmp_path, capsys):
+    first = {"schema_version": 1, "environment": {"packages": {"torch": {"distribution_version": "2.7.1"}}}}
+    second = {"schema_version": 1, "environment": {"packages": {"torch": {"distribution_version": "2.8.0"}}}}
+    left, right = tmp_path / "left.json", tmp_path / "right.json"
+    left.write_text(json.dumps(first))
+    right.write_text(json.dumps(second))
+    assert inspection_cli(["runs", "diff", str(left), str(right)])
+    changes = json.loads(capsys.readouterr().out)
+    assert changes == [
+        {
+            "path": "environment::packages::torch::distribution_version",
+            "before_present": True,
+            "after_present": True,
+            "before": "2.7.1",
+            "after": "2.8.0",
+        }
+    ]
