@@ -41,6 +41,7 @@ jobs:
           uv run coverage run -m pytest tests --durations=10 \
             --junit-xml=test-results.xml \
             --html=test-report.html --self-contained-html
+          uv run coverage combine
 
       - name: Generate test summary
         if: always()
@@ -54,10 +55,12 @@ jobs:
         with:
           name: test-results-py${{ matrix.python }}
           retention-days: 7
+          include-hidden-files: true
           path: |
             test-results.xml
             test-report.html
             .coverage
+            .coverage.*
 
       - name: Generate coverage report
         if: matrix.python == '3.12'

@@ -63,3 +63,18 @@ When publishing is explicitly authorized later:
 4. Build and verify Lighter from that final commit, then release it through the ordinary review process. Development versions are distinct from final versions under the [Python version specification](https://packaging.python.org/en/latest/specifications/version-specifiers/).
 
 No publication, Git tag or push is performed by the current implementation work. The existing repository release workflow is separate and must only be triggered after that explicit release decision.
+
+## Repository verification
+
+With the matching pair installed, run:
+
+```bash
+python -m pytest tests -m "not slow"
+python -m coverage run -m pytest tests -m "not slow"
+python -m coverage combine
+python -m coverage report
+```
+
+The non-slow suite includes actual two-process CPU/Gloo training and native/Lighter prediction controls when the backend is available. These preserve the mathematical update, sampler and CSV identity checks used during independent evaluation. They need local process creation and loopback communication; a platform without Gloo skips them explicitly.
+
+Coverage includes the real CLI subprocesses and spawned training ranks using Coverage.py's documented [process collection](https://coverage.readthedocs.io/en/latest/subprocess.html). Combine process files before reporting; the existing 95% gate remains in place. Lint, repository formatting and `mypy src` are separate checks. A coverage percentage is an execution measure, not a correctness or hardware certification.

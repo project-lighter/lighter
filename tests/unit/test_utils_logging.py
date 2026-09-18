@@ -1,31 +1,32 @@
+"""Explicit legacy logging setup remains usable without mutating the test host."""
+
+import subprocess
+import sys
+
+
+def test_explicit_logging_setup_routes_standard_logs_custom_levels_and_warnings():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+import logging
 import warnings
-from unittest.mock import MagicMock, patch
-
 from loguru import logger
-
 from lighter.utils.logging import _setup_logging
-
-
-def test_setup_logging():
-    """Test basic logging setup completes without error."""
-    _setup_logging()
-    # Test passes if no exception is raised
-
-
-def test_warnings_handler():
-    """Test that warnings are properly captured by loguru."""
-    _setup_logging()  # Setup logging to ensure warnings are captured
-
-    # Create a mock logger with opt method
-    mock_logger = MagicMock()
-    mock_opt = MagicMock()
-    mock_opt.warning = MagicMock()
-    mock_logger.opt.return_value = mock_opt
-
-    # Mock logger to verify warning is captured
-    with patch.object(logger, "opt", mock_logger.opt):
-        # Trigger a warning
-        warnings.warn("Test warning", stacklevel=2)
-        # Verify the warning was captured by loguru
-        mock_logger.opt.assert_called_with(depth=2)
-        mock_opt.warning.assert_called_once()
+_setup_logging()
+logger.info("direct_marker")
+logging.getLogger("external").warning("standard_marker")
+logging.getLogger("external").log(35, "custom_level_marker")
+warnings.warn("warning_marker")
+""",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    output = result.stdout + result.stderr
+    for marker in ("direct_marker", "standard_marker", "custom_level_marker", "warning_marker"):
+        assert marker in output
+    assert "Logging error" not in output

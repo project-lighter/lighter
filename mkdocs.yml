@@ -80,6 +80,7 @@ nav:
       - Training: guides/training.md
       - Freezing parameters: guides/freezing.md
       - Experiment records: guides/experiment-records.md
+      - Compatibility and installation: guides/compatibility.md
       - Best Practices: guides/best-practices.md
   - Examples: examples/index.md
   - Reference:
