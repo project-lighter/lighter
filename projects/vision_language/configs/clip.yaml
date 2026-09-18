@@ -39,8 +39,7 @@ trainer:
     # Freeze image encoder backbone for first 5 epochs
     # This helps when using pretrained vision encoder
     - _target_: lighter.callbacks.Freezer
-      names:
-        - image_encoder.backbone
+      name_starts_with: image_encoder.backbone.
       until_epoch: 5
 
     # Early stopping on retrieval accuracy

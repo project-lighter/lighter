@@ -78,6 +78,7 @@ nav:
       - Your LightningModule: guides/lightning-module.md
       - LighterModule: guides/lighter-module.md
       - Training: guides/training.md
+      - Freezing parameters: guides/freezing.md
       - Best Practices: guides/best-practices.md
   - Examples: examples/index.md
   - Reference:
