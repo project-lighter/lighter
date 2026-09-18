@@ -6,10 +6,13 @@ title: Example Projects
 
 Lighter includes example projects demonstrating real-world applications across various domains. Each project is self-contained with its own config files and documentation.
 
+Start with the [download-free complete workflow](../quickstart.md): CPU fit, checkpoint evaluation, exact CSV identities and continuation, with an executable verifier. Domain projects below illustrate additional integrations and are not all validated research protocols.
+
 ## Available Projects
 
 | Project | Domain | Description | Extra Dependencies |
 |---------|--------|-------------|-------------------|
+| [tabular_regression](https://github.com/project-lighter/lighter/tree/main/projects/tabular_regression) | General regression | Complete download-free CPU workflow | None beyond core |
 | [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic image classification with ResNet | - |
 | [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Brain signal classification | braindecode, eegdash, mne |
 | [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Text Classification | Sentiment analysis with HuggingFace Transformers | transformers, datasets |
@@ -57,7 +60,7 @@ lighter fit configs/example.yaml
 
 ### cifar10
 
-The simplest starting point. Demonstrates:
+An image-classification integration example that requires a dataset download. Demonstrates:
 
 - Basic `LighterModule` usage
 - Data augmentation in config

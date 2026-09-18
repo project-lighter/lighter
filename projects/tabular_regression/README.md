@@ -1,0 +1,37 @@
+# A complete local experiment
+
+This is the download-free starting point for Lighter. It fits a linear regressor to a known synthetic relationship, evaluates a concrete checkpoint, exports every held-out prediction with its original ID, and continues training from saved optimizer state. It runs on CPU with no external logger or dataset service.
+
+From the repository root, install the working package and enter this project:
+
+```bash
+pip install -e .
+cd projects/tabular_regression
+```
+
+The environment must also contain the matching Sparkwheel revision with retained construction support. Released package constraints are listed in the repository metadata; do not mix this working branch with an older Sparkwheel source checkout.
+
+Run the commands yourself:
+
+```bash
+lighter fit config.yaml model::optimizer::lr=0.05
+lighter test config.yaml --ckpt-path outputs/tabular_regression/checkpoints/last.ckpt --no-verbose
+lighter predict config.yaml --ckpt-path outputs/tabular_regression/checkpoints/last.ckpt --no-return-predictions
+lighter fit config.yaml --ckpt-path outputs/tabular_regression/checkpoints/last.ckpt trainer::max_epochs=5
+```
+
+`python -m lighter` is equivalent to the `lighter` console command. Multiple configuration files are separate arguments; nested overrides use `::`. Each command runs only its requested stage. A fresh process uses an explicit checkpoint path; `best` and `last` shortcuts depend on native Trainer checkpoint context.
+
+For the same workflow with executable checks and saved command logs:
+
+```bash
+python workflow.py --output-dir outputs/verified
+```
+
+The verifier executes the actual CLI in four separate processes. The fit command overrides the recipe LR from 0.01 to 0.05; native resume restores that saved optimizer LR even though its fresh recipe contains 0.01. It requires 9 training steps after the initial three epochs, all seven prediction IDs exactly once and in order, predictions matching a native Linear loaded from the chosen checkpoint, targets matching the known synthetic relationship, and 15 steps after continuation to five total epochs. It writes `workflow.json`, four command logs, `predictions.csv` and explicit checkpoints. Checkpoint loading in this verifier uses `weights_only=False` for checkpoints it has just produced itself.
+
+The scientific code in `task.py` contains only the data definition and familiar step methods. The inherited constructor and optimizer hook let Lighter create a fresh optimizer at Lightning's setup point. The YAML explicitly selects the seed, CPU execution, SGD, checkpoint monitor, filenames and CSV columns. `logger: false` disables external logging; automatic callback metrics still drive checkpoint selection. Prediction streaming uses native `--no-return-predictions` and CsvWriter.
+
+The train, validation and test populations use disjoint synthetic sample indices and separate stable identifiers. There is no fitted preprocessing, external download or random split. Validation chooses the monitored best checkpoint, while the commands above intentionally evaluate the last checkpoint; this distinction is explicit. The test set is not used during fitting. IDs include leading zeros, missing-value-like strings, punctuation, Unicode and a newline to verify exact CSV identity preservation.
+
+This is a workflow fixture, not evidence of generalization on a real dataset or a recommended benchmark protocol. Replace its populations and scientific model for your experiment; keep the complete fit/evaluate/export/continue checks. For run inspection and local records, see the [experiment records guide](../../docs/guides/experiment-records.md).

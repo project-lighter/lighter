@@ -1,9 +1,10 @@
 # Example Projects
 
-Example projects demonstrating Lighter across domains.
+Start with [tabular_regression](./tabular_regression/), a verified download-free CPU fit/evaluate/export/continue workflow. The other projects demonstrate domain integrations; treat their datasets, split protocols and extra dependencies as project-specific choices.
 
 | Project | Domain | Extra Dependencies |
 |---------|--------|-----------|
+| [tabular_regression](./tabular_regression/) | General regression and complete local workflow | None beyond core |
 | [cifar10](./cifar10/) | Image Classification | - |
 | [eeg](./eeg/) | EEG Analysis | braindecode, eegdash, mne |
 | [huggingface_llm](./huggingface_llm/) | Sentiment Classification | transformers, datasets |
