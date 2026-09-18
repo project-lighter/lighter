@@ -78,3 +78,32 @@ python -m coverage report
 The non-slow suite includes actual two-process CPU/Gloo training and native/Lighter prediction controls when the backend is available. These preserve the mathematical update, sampler and CSV identity checks used during independent evaluation. They need local process creation and loopback communication; a platform without Gloo skips them explicitly.
 
 Coverage includes the real CLI subprocesses and spawned training ranks using Coverage.py's documented [process collection](https://coverage.readthedocs.io/en/latest/subprocess.html). Combine process files before reporting; the existing 95% gate remains in place. Lint, repository formatting and `mypy src` are separate checks. A coverage percentage is an execution measure, not a correctness or hardware certification.
+
+## Version maintenance
+
+The maintenance recipes invoke exactly `bump-my-version==0.30.1` through `uvx`,
+so inspecting a version transition does not require resolving the unpublished
+runtime pair. Supported parts are `major`, `minor`, `patch`, and `release`:
+
+```bash
+just bump-dry release  # Preview 0.2.0.dev0 -> 0.2.0
+just bump-dry patch    # A stable 0.2.0 previews 0.2.1
+```
+
+`release` promotes an existing `.devN` version without changing its numeric
+components. A numeric bump resets subordinate fields to stable; `patch` from
+`0.2.0.dev0` previews `0.2.1`, so use `release` when the intended result is
+`0.2.0`. Other recipe parts, including the raw development counter, are rejected
+before tool execution. A new development cycle needs a separately reviewed
+explicit version choice.
+
+`bump-dry` disables writes, commits and tags. Once a release is authorized,
+`just bump <part>` updates package metadata, the source version constant and the
+bump configuration, and creates its configured local commit and tag. It does not
+publish the compatible Sparkwheel dependency or create a registry lock. Follow
+the publication order above and verify the pair before separately authorizing a
+push or publication.
+
+The existing remote tag workflows assume stable releases and may publish any
+pushed tag. Do not route development tags through them; local version preparation
+does not authorize triggering those workflows.
