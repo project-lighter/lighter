@@ -159,6 +159,20 @@ No manual implementation needed!
 2. **Metrics** - Dual logging (step + epoch)
 3. **Optimizer stats** - Learning rate, momentum, betas, weight decay (epoch only)
 
+#### Measurements without an external logger
+
+Setting `trainer.logger: false` disables external output only. Automatic losses and
+metrics still populate Lightning's `trainer.callback_metrics`, so callbacks such as
+`EarlyStopping` and `ModelCheckpoint` can monitor them. TorchMetrics state resets
+between evaluations and after sanity validation in the same way as with a logger.
+For example, a single `torchmetrics.MeanMetric` uses
+`val/metrics/MeanMetric/epoch` as its callback monitor.
+
+This corrects earlier behavior that skipped automatic measurements when no logger
+was configured. No configuration change is required. Native Lightning controls the
+stage return dictionary: values logged with `logger=False` remain available through
+`callback_metrics` but may be absent from `validate()` or `test()` return values.
+
 #### Loss Logging
 
 Return loss from your step methods:

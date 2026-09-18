@@ -301,13 +301,18 @@ def test_validate_and_log_dict_loss_without_total(simple_model, mock_trainer):
 
 
 def test_validate_and_log_without_logger(simple_system, mock_trainer):
-    """Test _log_outputs does nothing when no logger."""
+    """No external sink must not suppress callback metric registration."""
     simple_system.trainer = mock_trainer
+    mock_trainer_state(mock_trainer, training=True)
     mock_trainer.logger = None
+    simple_system.log = MagicMock()
 
-    output = {"loss": torch.tensor(1.0)}
-    # Should not raise any errors
-    simple_system._log_outputs(output, batch_idx=0)
+    simple_system._log_outputs({"loss": torch.tensor(1.0)}, batch_idx=0)
+
+    logged_names = [call.args[0] for call in simple_system.log.call_args_list]
+    assert "train/loss/epoch" in logged_names
+    assert "train/metrics/MulticlassAccuracy/epoch" in logged_names
+    assert all(call.kwargs["logger"] is False for call in simple_system.log.call_args_list)
 
 
 def test_batch_end_hooks_call_validate_and_log(simple_system, mock_trainer):

@@ -299,8 +299,6 @@ class LighterModule(pl.LightningModule):
             outputs: Dict from user's step method
             batch_idx: Current batch index
         """
-        if self.trainer.logger is None:
-            return
         self._log_loss(outputs.get("loss"))
         self._log_metrics()
         self._log_optimizer_stats(batch_idx)
@@ -370,7 +368,7 @@ class LighterModule(pl.LightningModule):
         self.log(
             f"{name}/{suffix}",
             value,
-            logger=True,
+            logger=self.trainer.logger is not None,
             on_step=on_step,
             on_epoch=on_epoch,
             sync_dist=sync_dist,
