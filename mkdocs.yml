@@ -1,4 +1,6 @@
 site_name: Lighter
+exclude_docs: |
+  /overrides/
 theme:
   icon:
     repo: fontawesome/brands/github
@@ -78,6 +80,7 @@ nav:
       - Your LightningModule: guides/lightning-module.md
       - LighterModule: guides/lighter-module.md
       - Training: guides/training.md
+      - Predictions: guides/predictions.md
       - Freezing parameters: guides/freezing.md
       - Experiment records: guides/experiment-records.md
       - Compatibility and installation: guides/compatibility.md
