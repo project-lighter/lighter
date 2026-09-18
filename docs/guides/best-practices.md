@@ -696,13 +696,10 @@ model:
 ### Set Seeds
 
 ```yaml
+seed: 42  # Applied before project imports and model/data construction
 trainer:
   _target_: pytorch_lightning.Trainer
-  deterministic: true  # Reproducible
-
-# In __lighter__.py
-import pytorch_lightning as pl
-pl.seed_everything(42, workers=True)
+  deterministic: true  # Request native deterministic execution
 ```
 
 ### Log Everything

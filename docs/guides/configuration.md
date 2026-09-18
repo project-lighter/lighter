@@ -393,7 +393,7 @@ lighter fit config.yaml \
 Combine multiple YAML files:
 
 ```bash
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 ```
 
 ### Default Behavior: Merge

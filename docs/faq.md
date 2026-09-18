@@ -197,10 +197,10 @@ Results saved to `predictions.csv`.
 
 ## Can I merge multiple configs?
 
-Yes! Separate comma-separated paths:
+Yes! Pass each path as a separate argument:
 
 ```bash
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 ```
 
 Later files override earlier ones. Use this for:

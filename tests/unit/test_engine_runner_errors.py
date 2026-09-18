@@ -66,8 +66,8 @@ class TestRunnerErrorHandling:
             Path(config_path1).unlink()
             Path(config_path2).unlink()
 
-    def test_resolve_datamodule_missing_data_and_no_dataloaders(self):
-        """Test that missing data config raises error when model has no dataloaders."""
+    def test_resolve_datamodule_missing_data_allows_native_stage_loaders(self):
+        """Data may be supplied directly to the selected native Trainer stage."""
         from unittest.mock import MagicMock
 
         from pytorch_lightning import LightningModule
@@ -86,8 +86,7 @@ class TestRunnerErrorHandling:
         # Create config without data key
         config = Config().update({"trainer": {"_target_": "pytorch_lightning.Trainer"}})
 
-        with pytest.raises(ValueError, match="Missing required 'data:' config key"):
-            runner._resolve_datamodule(config, mock_model)
+        assert runner._resolve_datamodule(config, mock_model) is None
 
     def test_resolve_datamodule_invalid_type(self):
         """Test that invalid datamodule type raises TypeError."""

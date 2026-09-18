@@ -17,7 +17,11 @@ lighter test       # Test only
 lighter predict    # Run inference
 ```
 
-All commands use the same configuration system.
+All commands use the same configuration system. Pass multiple files as separate arguments; commas remain literal characters. Stage options may appear before, between or after configuration inputs. Boolean options are flags: use `--no-verbose` or `--no-return-predictions` for false, without a following `True`/`False` value. Underscore spellings remain accepted, and `--ckpt-path`, `--weights-only` and `--return-predictions` are equivalent hyphenated spellings.
+
+`args::<stage>` in YAML supplies native Trainer stage arguments. Explicit CLI or `Runner.run(..., **kwargs)` values override those defaults, including false and null values. Only the selected stage and non-overridden values are constructed. For example, `args::predict::dataloaders` can construct a native DataLoader without a DataModule. The top-level `model` owns the model; stage arguments cannot replace it. Unsupported native arguments fail with the installed Trainer signature, including `weights_only` on Lightning versions that do not expose it. This checkpoint-loading option does not mean that optimizer and loop state are omitted from a training resume.
+
+Use `seed: 42` (or `seed=42` as an override) to seed Python, NumPy and Torch before project imports and component construction, with Lightning worker seeding enabled. An omitted seed means 0, independent of a previous run's environment. Seeds must be literal integers in `[0, 4294967295]`. Prebuilt objects have already been constructed and cannot be retroactively seeded. Deterministic algorithms remain a separate native Trainer setting; a seed alone does not guarantee identical results across devices or software versions.
 
 ## lighter fit
 
@@ -35,7 +39,7 @@ lighter fit CONFIG [OPTIONS] [OVERRIDES...]
 |----------|-------------|----------|
 | `CONFIG` | Path to YAML config file | Yes |
 | `--ckpt_path PATH` | Checkpoint path to resume from ("last", "best", or file path) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
+| `--weights_only` / `--no-weights_only` | Native checkpoint loading option; requires a supporting Lightning version | No |
 | `OVERRIDES` | Config overrides (key::path=value) | No |
 
 ### Examples
@@ -51,7 +55,7 @@ lighter fit config.yaml --ckpt_path checkpoints/last.ckpt
 lighter fit config.yaml model::optimizer::lr=0.01
 
 # Multiple configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Combine CLI flags and overrides
 lighter fit config.yaml --ckpt_path last trainer::max_epochs=100
@@ -103,8 +107,8 @@ lighter validate CONFIG [OPTIONS] [OVERRIDES...]
 |----------|-------------|----------|
 | `CONFIG` | Path to YAML config file | Yes |
 | `--ckpt_path PATH` | Checkpoint path for validation ("last", "best", or file path) | No |
-| `--verbose BOOL` | Print validation results (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
+| `--verbose` / `--no-verbose` | Print validation results (default: True) | No |
+| `--weights_only` / `--no-weights_only` | Native checkpoint loading option; requires a supporting Lightning version | No |
 | `OVERRIDES` | Config overrides | No |
 
 ### Examples
@@ -145,8 +149,8 @@ lighter test CONFIG [OPTIONS] [OVERRIDES...]
 |----------|-------------|----------|
 | `CONFIG` | Path to YAML config file | Yes |
 | `--ckpt_path PATH` | Checkpoint path for testing ("last", "best", or file path) | No |
-| `--verbose BOOL` | Print test results (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
+| `--verbose` / `--no-verbose` | Print test results (default: True) | No |
+| `--weights_only` / `--no-weights_only` | Native checkpoint loading option; requires a supporting Lightning version | No |
 | `OVERRIDES` | Config overrides | No |
 
 ### Examples
@@ -194,8 +198,8 @@ lighter predict CONFIG [OPTIONS] [OVERRIDES...]
 |----------|-------------|----------|
 | `CONFIG` | Path to YAML config file | Yes |
 | `--ckpt_path PATH` | Checkpoint path for predictions ("last", "best", or file path) | No |
-| `--return_predictions BOOL` | Whether to return predictions (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
+| `--return_predictions` / `--no-return_predictions` | Native prediction retention (default depends on strategy) | No |
+| `--weights_only` / `--no-weights_only` | Native checkpoint loading option; requires a supporting Lightning version | No |
 | `OVERRIDES` | Config overrides | No |
 
 ### Examples
@@ -317,10 +321,10 @@ Later files override earlier ones (dictionary merge).
 
 ```bash
 # Base + experiment
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Multiple overrides
-lighter fit base.yaml,data.yaml,model.yaml,overrides.yaml
+lighter fit base.yaml data.yaml model.yaml overrides.yaml
 ```
 
 ### Example Files
@@ -542,7 +546,7 @@ lighter predict config.yaml
 lighter fit config.yaml key::path=value
 
 # Multiple configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Checkpoints
 lighter fit config.yaml --ckpt_path path/to/checkpoint.ckpt
