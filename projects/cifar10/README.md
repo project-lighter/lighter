@@ -1,5 +1,7 @@
 # CIFAR-10 Image Classification
 
+> **Status: Legacy classifier.** The recommended classification walkthrough is now Compare and Continue. This earlier model/configuration remains for reference; its source has not been requalified as a research protocol in the current pilot. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Reference example - simple CNN for CIFAR-10 classification.
 
 ## Dataset

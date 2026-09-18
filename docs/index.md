@@ -21,9 +21,7 @@ toc_depth: 1
 <div style="width:65%; margin:auto; text-align:center">
 </br>
 
-```bash
-pip install lighter
-```
+This working development pair requires matching Lighter and Sparkwheel builds. Follow [compatibility and local installation](guides/compatibility.md).
 
 <!-- [![PyPI](https://img.shields.io/pypi/v/lighter)](https://pypi.org/project/lighter/)
 [![Python](https://img.shields.io/pypi/pyversions/lighter)](https://pypi.org/project/lighter/)
@@ -51,19 +49,19 @@ pip install lighter
 
     ---
 
-    One YAML file = one experiment. Version control configs like code.
+    Version recipes alongside code, data identities, dependencies and recorded runtime evidence.
 
 -   :material-lightning-bolt:{ .lg .middle } **Pure Lightning**
 
     ---
 
-    Use any LightningModule. Full PyTorch Lightning power. Zero lock-in.
+    Use native LightningModules with their own hooks and optimization.
 
 </div>
 
 ## What is Lighter?
 
-Lighter runs PyTorch Lightning experiments from YAML configs instead of hardcoded Python values.
+Lighter composes PyTorch Lightning experiments from YAML recipes. Scientific behavior remains ordinary Python.
 
 **You write Lightning code. Lighter handles configuration.**
 
@@ -150,7 +148,7 @@ Choose the approach that fits your workflow:
 
 - Automatic `configure_optimizers()`
 - Dual logging (step + epoch)
-- Config-driven everything
+- Configured objects and dependencies
 
 [Learn more →](guides/lighter-module.md)
 
@@ -158,8 +156,8 @@ Choose the approach that fits your workflow:
 
 </div>
 
-!!! tip "You can switch anytime"
-    Both approaches use the same config system. Start with one, switch to the other by changing `_target_`. No code rewrite needed.
+!!! tip "Choose ownership explicitly"
+    Both approaches use the same configuration system. Native LightningModules own their hooks and optimization; LighterModule supplies selected conveniences. Moving between them may require adapting constructors, logging or optimizer ownership. Changing `_target_` alone does not transform arbitrary module code.
 
 ## Quick Comparison
 
@@ -209,6 +207,8 @@ Choose the approach that fits your workflow:
           root: ./data
           train: true
           download: true
+          transform:
+            _target_: torchvision.transforms.ToTensor
     ```
 
     ```bash
@@ -275,6 +275,8 @@ Choose the approach that fits your workflow:
           root: ./data
           train: true
           download: true
+          transform:
+            _target_: torchvision.transforms.ToTensor
     ```
 
     ```bash
@@ -285,7 +287,7 @@ Choose the approach that fits your workflow:
 
 ### Reproducibility
 
-One YAML = one experiment. Version control, share, compare.
+Version and compare the intended recipe, then retain code, data, environment, effective settings and artifact identities. A configuration diff alone does not establish equivalent execution.
 
 ```bash
 git diff experiment_v1.yaml experiment_v2.yaml
@@ -312,16 +314,14 @@ lighter fit config.yaml model::learning_rate=0.01 trainer::max_epochs=100
 
 Lighter is a thin layer over PyTorch Lightning:
 
-- Use **any** LightningModule
-- Use **any** Lightning callback
-- Use **any** Lightning logger
-- Switch back to pure Lightning anytime
+- Keep native LightningModule hooks and custom optimization
+- Compose compatible native callbacks and loggers
+- Inspect the native objects and observed runtime state
+- Use an explicit native implementation as a scientific control
 
 ## Installation
 
-```bash
-pip install lighter
-```
+This working development pair requires matching Lighter and Sparkwheel builds. Follow [compatibility and local installation](guides/compatibility.md).
 
 ## Get Started
 
@@ -341,7 +341,7 @@ Ready to try it? Pick your path:
 
     ---
 
-    Full, working code you can copy-paste.
+    One research walkthrough, a diagnostic and explicit integration status.
 
     [:octicons-arrow-right-24: Examples](examples/index.md)
 
@@ -357,20 +357,9 @@ Ready to try it? Pick your path:
 
 ## Example Projects
 
-Ready-to-run projects demonstrating Lighter across domains:
+Start with [Compare and Continue](https://github.com/project-lighter/lighter/tree/main/projects/experiment_comparison) for an actual research decision, matched native controls, selected-checkpoint predictions and restored-state continuation. Use the [quick start](quickstart.md) for a download-free diagnostic.
 
-| Project | Domain | Features |
-|---------|--------|----------|
-| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic setup, MetricCollection, FileWriter |
-| [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Braindecode integration, regression |
-| [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Sentiment Classification | Transformers, datasets, model-computed loss |
-| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Fine-Tuning | PEFT/LoRA, parameter filtering |
-| [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | MONAI, 3D volumes, sliding window |
-| [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | SSL Computer Vision | SimCLR, lightly library |
-| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video | 3D CNNs, PytorchVideo |
-| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style dual encoders |
-
-Each project includes a README with setup instructions and demonstrates different Lighter features.
+The [project guide](examples/index.md) explains the scope and status of older domain integrations. Lighter is general purpose; each new scientific task still needs its own data, objective and artifact checks.
 
 ## Community
 

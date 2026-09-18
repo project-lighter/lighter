@@ -1,0 +1,2 @@
+# The only scientific change is a tenfold learning rate.
+learning_rate: 0.1

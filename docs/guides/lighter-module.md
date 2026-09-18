@@ -705,7 +705,7 @@ def configure_optimizers(self):
 
 ## Automatic Optimizer Stats Logging
 
-**LighterModule automatically logs optimizer statistics** including learning rate, momentum, betas, and weight decay at the start of each training epoch. You do **not** need to add `LearningRateMonitor` callback.
+**LighterModule automatically logs optimizer statistics** including learning rate, momentum, betas, and weight decay from the first training batch of each epoch. These are epoch summaries; they do not capture every change made by a scheduler within an epoch.
 
 Logged stats (per parameter group):
 - **Learning rate**: `train/optimizer/{OptimizerName}/lr/epoch`
@@ -725,8 +725,8 @@ train/optimizer/Adam/beta1/epoch: 0.9
 train/optimizer/Adam/beta2/epoch: 0.999
 ```
 
-!!! note "No LearningRateMonitor needed"
-    The PyTorch Lightning `LearningRateMonitor` callback is redundant with LighterModule since optimizer stats are already logged automatically.
+!!! note "Choose the observation frequency you need"
+    Native Lightning `LearningRateMonitor(logging_interval="step")` is useful when you need a history of changes within an epoch. It works alongside LighterModule and requires a configured Lightning logger in the tested Lightning 2.5.1 profile. Its batch logging cadence also follows Trainer settings such as `log_every_n_steps`; choose that frequency explicitly. Lighter's local records and first-batch summaries remain available without an external logger; neither is proof of every optimizer update.
 
 ## Working with Metrics
 
@@ -1109,5 +1109,16 @@ Each native optimizer setup gets fresh parameter iterators, optimizer and schedu
 The managed path applies to a statically named class with the inherited `LighterModule.__init__` and `configure_optimizers`, using ordinary keyword component definitions. It also supports a local `%` copy of that definition. Custom constructors, optimizer hooks, positional module construction and computed class targets retain their existing eager/native ownership. As a conservative boundary, any prebuilt optimizer, scheduler, parameter or iterator leaf anywhere in the retained source also preserves eager/native ownership, including aliases and unused helper leaves. Lighter only inspects source containers; it never evaluates an inactive recipe for this check. A prebuilt network module by itself still permits managed optimizer setup. Manual optimization remains manual. An optimizer or scheduler is available after native setup; a callback constructor or another eager recipe cannot require it earlier. Such a cross-stage dependency fails with its source path.
 
 A managed optimizer can use parameters replaced within the existing network during `configure_model`, because its parameter expression is evaluated afterward. Replacing the entire managed network, or removing/replacing a separately constructed shared child module or parameter, fails with an explicit alias-conflict diagnostic. Use a native/custom `configure_optimizers` for these ownership patterns. Lighter does not rewrite arbitrary Python aliases or transform arbitrary constructors. This ordinary eager-network profile does not certify sharded construction.
+
+When another component needs the requested learning-rate value during construction, make that value a shared source setting:
+
+```yaml
+learning_rate: 0.01
+model:
+  optimizer:
+    lr: "@learning_rate"
+```
+
+This is an overlay for an existing model/optimizer recipe. An eager callback can also reference `@learning_rate`. In this managed path, referencing `@model::optimizer::lr` asks the resolver to enter an optimizer subtree that is reserved for later native setup. A callback that needs the **effective live optimizer**, including restored values, should inspect `trainer.optimizers` in a suitable native runtime hook. The [Compare and continue workflow](../examples/index.md) demonstrates the shared scalar and requested/restored distinction without factories.
 
 Migration: inherited-constructor subclasses previously received an eagerly constructed optimizer. Code that reads `model.optimizer` before native setup must move that dependency to a native runtime hook or retain custom ownership. Directly constructed modules and their supplied optimizer objects keep their native lifetime. No factory, additional step output or user setup hook is required for ordinary recipes.

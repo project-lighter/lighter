@@ -1,0 +1,66 @@
+seed: 17
+batch_size: 64
+learning_rate: 0.01
+output_dir: outputs/lr-001
+data_manifest: data/data.json
+initial_state: null
+order_manifest: null
+trace_updates: false
+
+model:
+  _target_: project.task.ClassificationTask
+  network:
+    _target_: project.task.Classifier
+    initial_state: "@initial_state"
+  optimizer:
+    _target_: torch.optim.SGD
+    params: "$@model::network.parameters()"
+    lr: "@learning_rate"
+    momentum: 0.9
+    dampening: 0
+    weight_decay: 0
+    nesterov: false
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  accelerator: cpu
+  devices: 1
+  precision: 32-true
+  max_epochs: 5
+  logger: false
+  deterministic: true
+  num_sanity_val_steps: 0
+  default_root_dir: "@output_dir"
+  enable_progress_bar: false
+  enable_model_summary: false
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      dirpath: "$@output_dir + '/checkpoints'"
+      filename: epoch-{epoch:02d}-step-{step}
+      auto_insert_metric_name: false
+      monitor: val/ce
+      mode: min
+      save_top_k: 1
+      save_last: true
+    - _target_: project.artifacts.ExperimentArtifacts
+      output_dir: "@output_dir"
+      trace_updates: "@trace_updates"
+      requested_lr: "@learning_rate"
+    - _target_: lighter.callbacks.CsvWriter
+      path: "$@output_dir + '/predictions.csv'"
+      keys: [id, label, logit_0, logit_1, logit_2, logit_3, logit_4, logit_5, logit_6, logit_7, logit_8, logit_9]
+
+data:
+  _target_: project.data.ComparisonData
+  data_manifest: "@data_manifest"
+  order_manifest: "@order_manifest"
+  seed: "@seed"
+  batch_size: "@batch_size"
+
+run:
+  root_dir: "$@output_dir + '/lighter_runs'"
+  name: compare-and-continue
+
+args:
+  predict:
+    return_predictions: false

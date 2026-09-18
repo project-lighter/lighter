@@ -1,5 +1,7 @@
 # Video Action Recognition
 
+> **Status: Specialist reference.** This integration is outside the maintained onboarding path. Reopening it requires actual decoding, tensor-layout and clip-to-video evaluation controls for one selected model; qualifying one architecture would not qualify the others. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 3D CNN and Video Transformer for action recognition.
 
 ## Dataset

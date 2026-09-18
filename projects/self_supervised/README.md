@@ -1,5 +1,7 @@
 # Self-Supervised Learning with SimCLR
 
+> **Status: Archived gallery integration.** The historical SimCLR example remains available for reference. It is outside the maintained onboarding path. Reopening it requires an owned representation-transfer question and independent scientific controls; a shared-encoder diagnostic does not qualify contrastive learning. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Contrastive learning using the [lightly](https://github.com/lightly-ai/lightly) library.
 
 ## Overview

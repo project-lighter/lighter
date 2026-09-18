@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "scope": "Descriptive observations on this fixed CIFAR-10 subset and CPU profile; all conditions retained.",
+  "profile": {
+    "device": "cpu",
+    "precision": "32-true",
+    "threads": 2,
+    "loader_workers": 0,
+    "train_count": 2000,
+    "val_count": 500,
+    "test_count": 1000,
+    "batch_size": 64,
+    "max_epochs": 5,
+    "seeds": [
+      17,
+      23,
+      41
+    ],
+    "lrs": [
+      0.01,
+      0.1
+    ],
+    "software": {
+      "python": "3.11.14",
+      "torch": "2.7.1",
+      "torchvision": "0.22.1",
+      "pytorch_lightning": "2.5.1",
+      "torchmetrics": "1.9.0",
+      "numpy": "1.26.4",
+      "platform": "macOS 26.3.1",
+      "architecture": "arm64",
+      "lighter": "0.2.0.dev0",
+      "sparkwheel": "0.1.0.dev0"
+    }
+  },
+  "provenance": {
+    "comparison_sha256": "85eb387cb5f8e2814ed012f55ce16b7d518d82eeb0dcdcf073e9c813a0041b61",
+    "test_release_sha256": "48d1fdd9982938a95992ecb8de4593a10ac5fa593a94a16d51925fde01662fcb",
+    "data_manifest_sha256": "cd61c5ded2ace244a5cbb5805109abfdb500ce772f3fa77fafbb3ae52d1aa5f6",
+    "scientific_source_sha256": {
+      "task.py": "6eac45bdd020a60232642c19935828f3c7120f1f8433909d9e6ed2d9dd6b10e2",
+      "data.py": "3b4bffc8d269f5229b769617c2b5478eb8c41d4fbe6334875dd7a2d06d32f7e1",
+      "config.yaml": "ae875e524452c837da71bab0f4b488d50a1add631b8b9f66ce9f884ba35e3107",
+      "high_lr.yaml": "726b12142809f36f7fdd5cccbdb6da27564149d03c4b7c612d1111d86878ed83"
+    },
+    "lighter_base_commit": "8f0ab61ebda1310f3c0228d54af48a79f5d7d83c",
+    "sparkwheel_commit": "007efa5d40bff0c1daa225277f1cf51479ba9ae7",
+    "environment_receipt_sha256": "73aad9e5e0d3d0fe58366e9079e7299237fffc040fd719fc3a032cfaa3ede094",
+    "scientific_child_runtime_records_checked": 50
+  },
+  "results": [
+    {
+      "seed": 17,
+      "lr": 0.01,
+      "updates": 160,
+      "selected_epoch_one_based": 5,
+      "initial_val_ce": 2.306538703918457,
+      "val_ce": 2.2717010507583617,
+      "val_accuracy": 0.144,
+      "test_ce": 2.273398544549942,
+      "test_accuracy": 0.148,
+      "selected_checkpoint_sha256": {
+        "lighter": "6aefeae3adee3378517dd186acc7c75e1b36a2e3763de90f833429fdc75a11ff",
+        "native": "03ab17e8c28251416c43c5f6fa6b5947bb47f5c08c8b65967af7dc57340869f5"
+      }
+    },
+    {
+      "seed": 17,
+      "lr": 0.1,
+      "updates": 160,
+      "selected_epoch_one_based": 5,
+      "initial_val_ce": 2.306538703918457,
+      "val_ce": 2.125192586183548,
+      "val_accuracy": 0.208,
+      "test_ce": 2.1216946781873705,
+      "test_accuracy": 0.208,
+      "selected_checkpoint_sha256": {
+        "lighter": "b49a0fb7cd98564a41af09a29804560133a7ed5b67c8b734ae4694d2dd329981",
+        "native": "f209daeb03adf02e5240ac27b63b22524de414c5b58f93b257ac07066d2bbbc9"
+      }
+    },
+    {
+      "seed": 23,
+      "lr": 0.01,
+      "updates": 160,
+      "selected_epoch_one_based": 5,
+      "initial_val_ce": 2.315977473258972,
+      "val_ce": 2.299726722240448,
+      "val_accuracy": 0.106,
+      "test_ce": 2.2987944889068603,
+      "test_accuracy": 0.13,
+      "selected_checkpoint_sha256": {
+        "lighter": "be3f77037700bf7676a0dd3e57ec4cab95d6976dd3730bfc9d4bc003d0a27697",
+        "native": "8d6163180e14af4449634f3df7a2270c163a2995715a85fa35c4a39f4bcea2ad"
+      }
+    },
+    {
+      "seed": 23,
+      "lr": 0.1,
+      "updates": 160,
+      "selected_epoch_one_based": 5,
+      "initial_val_ce": 2.315977473258972,
+      "val_ce": 2.147750399470329,
+      "val_accuracy": 0.188,
+      "test_ce": 2.1624578706622124,
+      "test_accuracy": 0.201,
+      "selected_checkpoint_sha256": {
+        "lighter": "7144181f752344d82855479376f0e6e40ef257eca577cd0551a15d18c09547a1",
+        "native": "5248c1fbea892506ab15926bf2cab6309002498773d5dac5cb1bb7e9603fd389"
+      }
+    },
+    {
+      "seed": 41,
+      "lr": 0.01,
+      "updates": 160,
+      "selected_epoch_one_based": 5,
+      "initial_val_ce": 2.306190472126007,
+      "val_ce": 2.2994827346801756,
+      "val_accuracy": 0.084,
+      "test_ce": 2.29993141579628,
+      "test_accuracy": 0.111,
+      "selected_checkpoint_sha256": {
+        "lighter": "cbd30d88326c0d739080812868ad3de1b48b1804dd10b7520f8d31f58a58cff8",
+        "native": "11da77564443d4a753362df0af710edf4172236a6bb54d9cba729c26065654a3"
+      }
+    },
+    {
+      "seed": 41,
+      "lr": 0.1,
+      "updates": 160,
+      "selected_epoch_one_based": 4,
+      "initial_val_ce": 2.306190472126007,
+      "val_ce": 2.119861830472946,
+      "val_accuracy": 0.176,
+      "test_ce": 2.1358655932545663,
+      "test_accuracy": 0.184,
+      "selected_checkpoint_sha256": {
+        "lighter": "88278cfec952564034bae0978e444cd7b92f7ed3b3d0484bef4ff2624b92ca9c",
+        "native": "a41664386290288af995df3d7fe56ab90f541ea4cf19e2358f7fe287ee08c9af"
+      }
+    }
+  ],
+  "native_agreement": "Every matched training update tensor, gradient, momentum buffer and final logit agreed exactly in the declared profile; independent verification accepted every fit and final evaluation.",
+  "continuations": [
+    {
+      "backend": "native",
+      "seed": 17,
+      "source_lr": 0.01,
+      "requested_lr": 0.1,
+      "effective_lr": 0.01,
+      "start_global_step": 160,
+      "end_global_step": 192,
+      "selected_epoch_one_based": 6,
+      "checkpoint_selection_scope": "current_attempt",
+      "val_ce": 2.2519779551029204,
+      "val_accuracy": 0.164,
+      "parent_last_checkpoint_sha256": "03ab17e8c28251416c43c5f6fa6b5947bb47f5c08c8b65967af7dc57340869f5",
+      "continued_last_checkpoint_sha256": "3a3aa2789d2e1e2fe2eb123c32374c589c98c00c2d2b497b013a0aeb569aad38",
+      "independent_verdict_sha256": "83dbf1666d197499b33d382c459ffd8b4430f080c38678def1148b0d32107dd5"
+    },
+    {
+      "backend": "lighter",
+      "seed": 17,
+      "source_lr": 0.01,
+      "requested_lr": 0.1,
+      "effective_lr": 0.01,
+      "start_global_step": 160,
+      "end_global_step": 192,
+      "selected_epoch_one_based": 6,
+      "checkpoint_selection_scope": "current_attempt",
+      "val_ce": 2.2519779551029204,
+      "val_accuracy": 0.164,
+      "parent_last_checkpoint_sha256": "6aefeae3adee3378517dd186acc7c75e1b36a2e3763de90f833429fdc75a11ff",
+      "continued_last_checkpoint_sha256": "51bb965da1fb9267396fa25d3d9ba0db49442e911f3b5612592d748fe6cbefda",
+      "independent_verdict_sha256": "d5109f84d99897028f8e78e5c2268a489904de49bb6f429e55beadc838a18c10"
+    }
+  ]
+}

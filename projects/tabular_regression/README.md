@@ -1,6 +1,6 @@
 # A complete local experiment
 
-This is the download-free starting point for Lighter. It fits a linear regressor to a known synthetic relationship, evaluates a concrete checkpoint, exports every held-out prediction with its original ID, and continues training from saved optimizer state. It runs on CPU with no external logger or dataset service.
+This is the download-free diagnostic and reference workflow for Lighter. For the public research walkthrough, start with [Compare and Continue](../experiment_comparison/README.md). This diagnostic fits a linear regressor to a known synthetic relationship, evaluates a concrete checkpoint, exports every held-out prediction with its original ID, and continues training from saved optimizer state. It runs on CPU with no external logger or dataset service.
 
 From the repository root, install the working package and enter this project:
 

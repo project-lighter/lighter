@@ -1,5 +1,7 @@
 # EEG 2025 Challenge
 
+> **Status: Specialist reference.** This integration is outside the maintained onboarding path. Reopening it requires a maintained task/API contract, participant grouping, deterministic windows, trial/subject targets, worker RNG control and a verified prediction export route. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Implementation for the [NeurIPS 2025 EEG Foundation Challenge](https://eeg2025.github.io/).
 
 ## Challenges

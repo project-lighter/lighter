@@ -1,5 +1,7 @@
 # LoRA (Low-Rank Adaptation)
 
+> **Status: Archived gallery integration.** This optional PEFT illustration is outside the maintained onboarding path. Reopening it requires actual adapter training and restoration checks, including which parameters change. Parameter membership or mocked imports alone do not qualify adaptation. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Parameter-efficient fine-tuning using [HuggingFace PEFT](https://github.com/huggingface/peft).
 
 ## Overview

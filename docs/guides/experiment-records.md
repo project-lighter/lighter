@@ -28,6 +28,10 @@ run:
 
 A name or experiment ID groups observations; it is not a recipe hash or an execution identity. Checkpoint continuation and scientific branching both create new attempts. Use `parent_attempt_id` when you want to explicitly link them; a checkpoint path does not automatically establish lineage. `run: false` disables local attempt records. Existing native logger configuration and checkpoint hyperparameters still work.
 
+Omit optional record fields when absent; an explicit `parent_attempt_id: null` is not a parent identity. For a continuation, a nested override is `run::parent_attempt_id=PREVIOUS_ID`.
+
+Attempt IDs identify execution attempts; they do not claim exclusive ownership of an arbitrary scientific output directory. Use a fresh output directory for each stage, especially when several attempts run concurrently. The Compare and continue example rejects a reused stage directory before its callbacks publish artifacts.
+
 Programmatic callers receive the native result and can inspect `runner.last_run_path` afterward, including after process-spawn execution. It is `None` when no record was published. Temporary record callbacks are removed even when a stage fails, including when a native model replaces the Trainer callback list.
 
 ## What the evidence means
@@ -45,3 +49,9 @@ Only rank zero publishes files, while all required ranks participate in identity
 Opaque prebuilt Python objects, generators and tensors are described by type and marked non-replayable. They are never copied or consumed merely to record metadata. YAML snapshots with such descriptors support inspection, not automatic reconstruction. Even a plain YAML snapshot does not promise identical numerical results across software, hardware or unversioned data.
 
 Recording I/O failures emit warnings and set the recorder's error diagnostic; they do not replace a scientific result or its original exception. A record can therefore remain incomplete if storage is unavailable. Diff output compares recorded requests, environment provenance and observations, with explicit presence flags to distinguish a missing value from a literal null.
+
+## Requested settings and restored results
+
+Full checkpoint continuation restores the optimizer state, including its learning rate and momentum. A larger LR in the new recipe therefore does not by itself change the resumed optimizer. Read the requested source and `observed_start` together. Identify an evaluated model by its selected checkpoint and data identity; an unused optimizer request on a test/predict command does not identify the training condition.
+
+With the tested native ModelCheckpoint callback, changing the checkpoint directory skips restoration of the old ranking/top-k state, so newly saved checkpoints are ranked within the new attempt. The callback can still retain the preceding `best_model_path` until it saves a new checkpoint. Preserve the preceding attempt's selected checkpoint separately when comparing across attempts, and inspect the actual saved checkpoint metadata. A “best” path needs both its selection metric and its attempt/population context.

@@ -1,5 +1,7 @@
 # Vision-Language Learning (CLIP-style)
 
+> **Status: Specialist reference.** This integration is outside the maintained onboarding path. A qualified replacement needs fixed-gallery, multi-positive retrieval with stable image/caption identities and a declared model/dependency profile. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Dual-encoder for learning aligned image-text representations.
 
 ## Task

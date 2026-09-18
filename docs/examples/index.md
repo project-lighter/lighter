@@ -2,109 +2,26 @@
 title: Example Projects
 ---
 
-# Example Projects
+# Example projects
 
-Lighter includes example projects demonstrating real-world applications across various domains. Each project is self-contained with its own config files and documentation.
+The recommended research walkthrough is [Compare and Continue](https://github.com/project-lighter/lighter/tree/main/projects/experiment_comparison). It asks a concrete question about two learning rates on fixed CIFAR-10 populations, then follows the selected checkpoint through evaluation, identified prediction export and checkpoint continuation. An equivalent native Lightning implementation provides a fair comparison. The README records every included condition and the limits of its small CPU experiment.
 
-Start with the [download-free complete workflow](../quickstart.md): CPU fit, checkpoint evaluation, exact CSV identities and continuation, with an executable verifier. Domain projects below illustrate additional integrations and are not all validated research protocols.
+Use the [download-free diagnostic](../quickstart.md) to check an installation with a known synthetic regression problem. Its role is a small reference workflow; the public comparison is the next step for research use.
 
-## Available Projects
+## What to learn from the walkthrough
 
-| Project | Domain | Description | Extra Dependencies |
-|---------|--------|-------------|-------------------|
-| [tabular_regression](https://github.com/project-lighter/lighter/tree/main/projects/tabular_regression) | General regression | Complete download-free CPU workflow | None beyond core |
-| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic image classification with ResNet | - |
-| [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Brain signal classification | braindecode, eegdash, mne |
-| [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Text Classification | Sentiment analysis with HuggingFace Transformers | transformers, datasets |
-| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Parameter-Efficient Fine-Tuning | LoRA fine-tuning of language models | peft |
-| [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | 3D medical image segmentation | monai, itk |
-| [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | Self-Supervised Learning | SimCLR contrastive learning | lightly |
-| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video Understanding | Video classification with SlowFast | pytorchvideo, av |
-| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style image-text contrastive learning | transformers |
+- Keep scientific steps and data policy in ordinary Python, with native Lightning owning execution.
+- Compose the same task, data, Trainer and callbacks in a readable recipe; change one scalar with an overlay.
+- Inspect definitions before constructing objects. Distinguish requested settings from observed and restored optimizer state.
+- Select on validation data, then evaluate a concrete immutable checkpoint against exact final-population IDs.
+- Continue from the last full-state checkpoint into a new attempt. Preserve the original selected model separately.
 
-## Running an Example
+## Earlier integrations
 
-Each project follows the same structure:
+The [repository project index](https://github.com/project-lighter/lighter/blob/main/projects/README.md) records the disposition of all earlier projects. The old CIFAR classifier is superseded for onboarding; text, LoRA and self-supervision examples are legacy references; vision-language, video, segmentation and EEG are specialist illustrations awaiting their own declared scientific and dependency qualification. Their sources remain available, with status notices and migration pointers. They are not a set of universally ready-to-run research protocols.
 
-```
-projects/<name>/
-├── __lighter__.py      # Project marker (enables project.* imports)
-├── __init__.py
-├── *.py                # Custom modules
-├── configs/
-│   └── *.yaml          # Experiment configs
-└── README.md           # Project-specific documentation
-```
+## Create your own project
 
-To run any example:
+Use the public comparison as a structural example, then define your own question, data populations and correctness controls. Place empty `__lighter__.py` and `__init__.py` files in the project so recipes can import `project.*`. Native Lightning modules can keep their custom optimization and hooks; ordinary Lighter modules can use managed optimizer construction. Neither path requires LightningCLI or author-written factories.
 
-```bash
-# Clone the repo
-git clone https://github.com/project-lighter/lighter.git
-cd lighter
-
-# Install Lighter
-pip install -e .
-
-# Navigate to a project
-cd projects/cifar10
-
-# Install extra dependencies if needed (check the README)
-pip install <extra-deps>
-
-# Run training
-lighter fit configs/example.yaml
-```
-
-## Project Highlights
-
-### cifar10
-
-An image-classification integration example that requires a dataset download. Demonstrates:
-
-- Basic `LighterModule` usage
-- Data augmentation in config
-- Standard training workflow
-
-### medical_segmentation
-
-Shows how to use MONAI with Lighter for 3D medical imaging:
-
-- 3D UNet architecture
-- Medical imaging transforms
-- Dice loss and metrics
-
-### self_supervised
-
-Contrastive learning with SimCLR:
-
-- Custom projection heads
-- Multi-view data augmentation
-- NT-Xent loss
-
-### huggingface_llm
-
-Integrates HuggingFace Transformers:
-
-- Tokenizer configuration
-- Pre-trained model loading
-- Text classification
-
-### lora
-
-Parameter-efficient fine-tuning:
-
-- LoRA adapters via PEFT
-- Freezing base model layers
-- Memory-efficient training
-
-## Creating Your Own Project
-
-Use any example as a template:
-
-1. Copy the project directory
-2. Add a `__lighter__.py` marker file
-3. Modify configs to point to your data and model
-4. Run with `lighter fit configs/your_config.yaml`
-
-See the [Custom Code Guide](../guides/custom-code.md) for details on project structure.
+See [custom code](../guides/custom-code.md), [LighterModule](../guides/lighter-module.md), [native LightningModule](../guides/lightning-module.md) and [experiment records](../guides/experiment-records.md).
