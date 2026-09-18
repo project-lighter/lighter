@@ -79,7 +79,7 @@ class Runner:
         stage: Stage,
         inputs: list,
         **stage_kwargs: Any,
-    ) -> None:
+    ) -> Any:
         """
         Run a training stage with configuration inputs.
 
@@ -99,6 +99,10 @@ class Runner:
                    - Dicts → merged into config
             **stage_kwargs: Additional keyword arguments from CLI (e.g., ckpt_path, verbose)
                            passed directly to the trainer stage method
+
+        Returns:
+            The native Trainer stage result. Fit normally returns None; evaluation
+            and prediction return their native values, subject to Trainer options.
 
         Raises:
             ValueError: If config validation fails or required components are missing
@@ -121,7 +125,7 @@ class Runner:
         self._save_config(config, trainer, model)
 
         # 5. Execute stage
-        self._execute(stage, model, trainer, datamodule, **stage_kwargs)
+        return self._execute(stage, model, trainer, datamodule, **stage_kwargs)
 
     def _resolve_model(self, config: Config) -> LightningModule:
         """Resolve and validate model from config."""
@@ -225,9 +229,9 @@ class Runner:
         trainer: Trainer,
         datamodule: LightningDataModule | None,
         **stage_kwargs: Any,
-    ) -> None:
+    ) -> Any:
         """
-        Execute the training stage.
+        Execute the training stage and return its native result.
 
         Args:
             stage: Stage to execute (fit, validate, test, predict)
@@ -238,10 +242,10 @@ class Runner:
         """
         stage_method = getattr(trainer, str(stage))
         if datamodule is not None:
-            stage_method(model, datamodule=datamodule, **stage_kwargs)
+            return stage_method(model, datamodule=datamodule, **stage_kwargs)
         else:
             # Plain Lightning module with built-in dataloaders
-            stage_method(model, **stage_kwargs)
+            return stage_method(model, **stage_kwargs)
 
 
 def cli() -> None:
