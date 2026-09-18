@@ -223,7 +223,7 @@ class MyModule(pl.LightningModule):
     def __init__(self, network, learning_rate=0.001, weight_decay=0.0):
         super().__init__()
         # Save all args except objects
-        self.save_hyperparameters(ignore=['network'])
+        self.save_hyperparameters(ignore=["network"])
         self.network = network
 ```
 
@@ -235,12 +235,9 @@ Access with `self.hparams.learning_rate`.
 from typing import Dict, Any
 import torch
 
+
 class MyModule(LighterModule):
-    def training_step(
-        self,
-        batch: tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
-    ) -> Dict[str, torch.Tensor]:
+    def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> Dict[str, torch.Tensor]:
         x, y = batch
         loss = self.criterion(self(x), y)
         return {"loss": loss}
@@ -261,14 +258,7 @@ class MyDataset(Dataset):
         cache: Whether to cache preprocessed data in memory
     """
 
-    def __init__(
-        self,
-        root: str,
-        split: str = 'train',
-        transform: Optional[Callable] = None,
-        cache: bool = False
-    ):
-        ...
+    def __init__(self, root: str, split: str = "train", transform: Optional[Callable] = None, cache: bool = False): ...
 ```
 
 Users can see available options in docstrings.
@@ -369,7 +359,7 @@ Check data availability early:
 
 ```python
 class MyDataset(Dataset):
-    def __init__(self, root, split='train'):
+    def __init__(self, root, split="train"):
         self.root = Path(root)
 
         # Validate
@@ -400,31 +390,20 @@ def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
 
     # Warmup for first 1000 steps
-    warmup = torch.optim.lr_scheduler.LinearLR(
-        optimizer,
-        start_factor=0.1,
-        total_iters=1000
-    )
+    warmup = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=1000)
 
     # Then cosine decay
-    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=self.trainer.max_epochs - 10
-    )
+    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs - 10)
 
     # Combine
-    scheduler = torch.optim.lr_scheduler.SequentialLR(
-        optimizer,
-        schedulers=[warmup, cosine],
-        milestones=[10]
-    )
+    scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[10])
 
     return {
         "optimizer": optimizer,
         "lr_scheduler": {
             "scheduler": scheduler,
             "interval": "epoch",
-        }
+        },
     }
 ```
 
@@ -513,11 +492,7 @@ def validation_step(self, batch, batch_idx):
         pred = self(x)
 
         # Log first 8 images
-        self.logger.experiment.add_images(
-            "val/predictions",
-            x[:8],
-            self.global_step
-        )
+        self.logger.experiment.add_images("val/predictions", x[:8], self.global_step)
 ```
 
 ### Use Structured Logging
@@ -590,11 +565,7 @@ def training_step(self, batch, batch_idx):
     if batch_idx % 100 == 0:
         for name, param in self.named_parameters():
             if param.grad is not None:
-                self.logger.experiment.add_histogram(
-                    f"gradients/{name}",
-                    param.grad,
-                    self.global_step
-                )
+                self.logger.experiment.add_histogram(f"gradients/{name}", param.grad, self.global_step)
 
     return loss
 ```
@@ -751,6 +722,7 @@ import pytest
 import torch
 from src.models import MyModule
 
+
 def test_forward_pass():
     model = MyModule(network=...)
     x = torch.randn(2, 3, 32, 32)
@@ -758,6 +730,7 @@ def test_forward_pass():
 
     assert y.shape == (2, 10)
     assert not torch.isnan(y).any()
+
 
 def test_training_step():
     model = MyModule(...)
@@ -783,13 +756,15 @@ def test_config_loads():
     assert config.model is not None
     assert config.data is not None
 
+
 def test_fast_dev_run(tmp_path):
     """Test full pipeline on 1 batch."""
     import subprocess
 
     result = subprocess.run(
         [
-            "lighter", "fit",
+            "lighter",
+            "fit",
             "experiments/resnet18.yaml",
             f"trainer::default_root_dir={tmp_path}",
             "trainer::fast_dev_run=true",
@@ -843,6 +818,7 @@ For large models:
 
 ```python
 from torch.utils.checkpoint import checkpoint
+
 
 def forward(self, x):
     # Trade compute for memory
@@ -931,6 +907,7 @@ def validation_step(self, batch, batch_idx):
     self.train()  # ❌ Wrong!
     ...
 
+
 # GOOD - Lightning handles this
 def validation_step(self, batch, batch_idx):
     # Already in eval mode
@@ -978,7 +955,7 @@ Before production:
 
 ```python
 # Save hyperparameters
-self.save_hyperparameters(ignore=['network'])
+self.save_hyperparameters(ignore=["network"])
 
 # Dual logging
 self.log("train/loss", loss, on_step=True, on_epoch=True, batch_size=x.size(0))

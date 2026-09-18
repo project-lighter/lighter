@@ -70,6 +70,7 @@ Lighter runs PyTorch Lightning experiments from YAML configs instead of hardcode
 ```python title="model.py"
 import pytorch_lightning as pl
 
+
 class MyModule(pl.LightningModule):
     def __init__(self, learning_rate=0.001):
         super().__init__()
@@ -169,6 +170,7 @@ Choose the approach that fits your workflow:
     import torch.nn.functional as F
     import pytorch_lightning as pl
 
+
     class MyModule(pl.LightningModule):
         def __init__(self, network, learning_rate=0.001):
             super().__init__()
@@ -217,6 +219,7 @@ Choose the approach that fits your workflow:
 
     ```python title="model.py"
     from lighter import LighterModule
+
 
     class MyModel(LighterModule):
         def training_step(self, batch, batch_idx):

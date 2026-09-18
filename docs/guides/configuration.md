@@ -46,10 +46,7 @@ model:
 
 **Equivalent Python:**
 ```python
-model = torch.nn.Sequential(
-    torch.nn.Linear(in_features=784, out_features=128),
-    torch.nn.ReLU()
-)
+model = torch.nn.Sequential(torch.nn.Linear(in_features=784, out_features=128), torch.nn.ReLU())
 ```
 
 The `_args_` list contains positional arguments passed to the target class. Each item can have its own `_target_` for nested instantiation.
@@ -111,6 +108,7 @@ model:
 This is equivalent to:
 ```python
 import pdb
+
 network = pdb.runcall(ComplexModel, num_layers=12, hidden_size=768)
 ```
 

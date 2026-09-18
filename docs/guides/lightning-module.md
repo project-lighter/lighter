@@ -42,6 +42,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 
+
 class ImageClassifier(pl.LightningModule):
     """Standard PyTorch Lightning module."""
 
@@ -161,12 +162,13 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 
+
 class FlexibleClassifier(pl.LightningModule):
     """Accepts any network architecture."""
 
     def __init__(self, network, learning_rate=0.001):
         super().__init__()
-        self.save_hyperparameters(ignore=['network'])
+        self.save_hyperparameters(ignore=["network"])
         self.network = network
         self.lr = learning_rate
 
@@ -235,10 +237,11 @@ Multiple optimizers use Lightning manual optimization. Keep the update order and
 import pytorch_lightning as pl
 import torch
 
+
 class GAN(pl.LightningModule):
     def __init__(self, generator, discriminator, lr_g=0.0002, lr_d=0.0002):
         super().__init__()
-        self.save_hyperparameters(ignore=['generator', 'discriminator'])
+        self.save_hyperparameters(ignore=["generator", "discriminator"])
         self.generator = generator
         self.discriminator = discriminator
         self.automatic_optimization = False
@@ -271,16 +274,8 @@ class GAN(pl.LightningModule):
         self.log_dict({"train/g_loss": g_loss, "train/d_loss": d_loss})
 
     def configure_optimizers(self):
-        opt_g = torch.optim.Adam(
-            self.generator.parameters(),
-            lr=self.hparams.lr_g,
-            betas=(0.5, 0.999)
-        )
-        opt_d = torch.optim.Adam(
-            self.discriminator.parameters(),
-            lr=self.hparams.lr_d,
-            betas=(0.5, 0.999)
-        )
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.hparams.lr_g, betas=(0.5, 0.999))
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.hparams.lr_d, betas=(0.5, 0.999))
         return [opt_g, opt_d]
 ```
 
@@ -314,25 +309,17 @@ import torch
 import torch.nn.functional as F
 import torchmetrics
 
+
 class MetricsModule(pl.LightningModule):
     def __init__(self, network, num_classes=10, learning_rate=0.001):
         super().__init__()
-        self.save_hyperparameters(ignore=['network'])
+        self.save_hyperparameters(ignore=["network"])
         self.network = network
 
         # Initialize metrics
-        self.train_acc = torchmetrics.Accuracy(
-            task='multiclass',
-            num_classes=num_classes
-        )
-        self.val_acc = torchmetrics.Accuracy(
-            task='multiclass',
-            num_classes=num_classes
-        )
-        self.val_f1 = torchmetrics.F1Score(
-            task='multiclass',
-            num_classes=num_classes
-        )
+        self.train_acc = torchmetrics.Accuracy(task="multiclass", num_classes=num_classes)
+        self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=num_classes)
+        self.val_f1 = torchmetrics.F1Score(task="multiclass", num_classes=num_classes)
 
     def forward(self, x):
         return self.network(x)
@@ -366,10 +353,7 @@ class MetricsModule(pl.LightningModule):
         self.log("val/f1", self.val_f1, on_step=False, on_epoch=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(
-            self.parameters(),
-            lr=self.hparams.learning_rate
-        )
+        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
 ```
 
 ### Example 4: Learning Rate Schedulers
@@ -380,11 +364,7 @@ Add schedulers in `configure_optimizers`:
 def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=self.trainer.max_epochs,
-        eta_min=1e-6
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs, eta_min=1e-6)
 
     return {
         "optimizer": optimizer,
@@ -392,7 +372,7 @@ def configure_optimizers(self):
             "scheduler": scheduler,
             "interval": "epoch",
             "frequency": 1,
-        }
+        },
     }
 ```
 
@@ -402,13 +382,7 @@ Or use ReduceLROnPlateau:
 def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode='min',
-        factor=0.5,
-        patience=5,
-        min_lr=1e-6
-    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, min_lr=1e-6)
 
     return {
         "optimizer": optimizer,
@@ -416,7 +390,7 @@ def configure_optimizers(self):
             "scheduler": scheduler,
             "monitor": "val/loss",  # Metric to monitor
             "interval": "epoch",
-        }
+        },
     }
 ```
 
@@ -437,11 +411,7 @@ trainer:
 
 ```python
 def configure_gradient_clipping(self, optimizer, gradient_clip_val, gradient_clip_algorithm):
-    self.clip_gradients(
-        optimizer,
-        gradient_clip_val=gradient_clip_val,
-        gradient_clip_algorithm=gradient_clip_algorithm
-    )
+    self.clip_gradients(optimizer, gradient_clip_val=gradient_clip_val, gradient_clip_algorithm=gradient_clip_algorithm)
 ```
 
 ### Example 6: Model Hooks
@@ -462,7 +432,7 @@ class MyModule(pl.LightningModule):
     def on_train_epoch_end(self):
         """Called at the end of each epoch."""
         # Log learning rate
-        current_lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
         self.log("train/lr", current_lr)
 
     def on_validation_epoch_end(self):
@@ -472,11 +442,11 @@ class MyModule(pl.LightningModule):
 
     def on_save_checkpoint(self, checkpoint):
         """Modify what gets saved."""
-        checkpoint['custom_data'] = {'my_value': 42}
+        checkpoint["custom_data"] = {"my_value": 42}
 
     def on_load_checkpoint(self, checkpoint):
         """Load custom data."""
-        custom_data = checkpoint.get('custom_data', {})
+        custom_data = checkpoint.get("custom_data", {})
         print(f"Loaded custom data: {custom_data}")
 ```
 
@@ -516,9 +486,9 @@ model:
 
 ```python
 def __init__(self, config):
-    self.hidden_dim = config['hidden_dim']
-    self.num_layers = config['num_layers']
-    self.dropout = config['dropout']
+    self.hidden_dim = config["hidden_dim"]
+    self.num_layers = config["num_layers"]
+    self.dropout = config["dropout"]
 ```
 
 ### Nested Objects
@@ -640,7 +610,7 @@ Always save hyperparameters for reproducibility:
 def __init__(self, network, learning_rate=0.001, weight_decay=0.0):
     super().__init__()
     # Save all args except network (it's not serializable)
-    self.save_hyperparameters(ignore=['network'])
+    self.save_hyperparameters(ignore=["network"])
     self.network = network
 ```
 
@@ -648,11 +618,7 @@ Now `self.hparams` contains your config:
 
 ```python
 def configure_optimizers(self):
-    return torch.optim.Adam(
-        self.parameters(),
-        lr=self.hparams.learning_rate,
-        weight_decay=self.hparams.weight_decay
-    )
+    return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
 ```
 
 ### Pattern 2: Separate Forward from Loss
@@ -663,6 +629,7 @@ Keep forward pass separate from loss calculation:
 def forward(self, x):
     """Just the forward pass."""
     return self.network(x)
+
 
 def training_step(self, batch, batch_idx):
     """Loss calculation and logging."""
@@ -691,11 +658,14 @@ def _shared_step(self, batch, stage):
 
     return loss
 
+
 def training_step(self, batch, batch_idx):
     return self._shared_step(batch, "train")
 
+
 def validation_step(self, batch, batch_idx):
     return self._shared_step(batch, "val")
+
 
 def test_step(self, batch, batch_idx):
     return self._shared_step(batch, "test")
@@ -780,7 +750,7 @@ Both give you YAML configs and CLI overrides!
 class MyModule(pl.LightningModule):
     def __init__(self, network, learning_rate=0.001):
         super().__init__()
-        self.save_hyperparameters(ignore=['network'])
+        self.save_hyperparameters(ignore=["network"])
         self.network = network
 
     def training_step(self, batch, batch_idx):

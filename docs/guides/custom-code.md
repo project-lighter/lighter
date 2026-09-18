@@ -62,6 +62,7 @@ Or use it for project-level imports:
 ```python
 # __lighter__.py
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Any imports here run before config loading
@@ -92,6 +93,7 @@ Create **`model.py`**:
 
 ```python
 import torch.nn as nn
+
 
 class SimpleNet(nn.Module):
     """Custom network for CIFAR-10."""
@@ -160,6 +162,7 @@ from torch.utils.data import Dataset
 from pathlib import Path
 from PIL import Image
 
+
 class CustomImageDataset(Dataset):
     """Load images from directory structure."""
 
@@ -225,6 +228,7 @@ Create **`transforms.py`**:
 import torch
 import random
 
+
 class RandomCutout:
     """Randomly mask out a square patch from the image."""
 
@@ -240,7 +244,7 @@ class RandomCutout:
         y = random.randint(0, h - self.size)
         x = random.randint(0, w - self.size)
 
-        img[:, y:y+self.size, x:x+self.size] = 0
+        img[:, y : y + self.size, x : x + self.size] = 0
         return img
 ```
 
@@ -273,12 +277,13 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 
+
 class MyCIFAR10Module(pl.LightningModule):
     """Custom training logic for CIFAR-10."""
 
     def __init__(self, network, learning_rate=0.001, weight_decay=1e-4):
         super().__init__()
-        self.save_hyperparameters(ignore=['network'])
+        self.save_hyperparameters(ignore=["network"])
         self.network = network
         self.lr = learning_rate
         self.weight_decay = weight_decay
@@ -308,21 +313,14 @@ class MyCIFAR10Module(pl.LightningModule):
         self.log("val/acc", acc)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(
-            self.parameters(),
-            lr=self.lr,
-            weight_decay=self.weight_decay
-        )
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=self.trainer.max_epochs
-        )
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
                 "interval": "epoch",
-            }
+            },
         }
 ```
 
@@ -439,19 +437,18 @@ Create base modules for common functionality:
 ```python
 from lighter import LighterModule
 
+
 class BaseVisionModule(LighterModule):
     """Base module with common vision model utilities."""
 
     def on_train_start(self):
         # Log model architecture
-        self.logger.experiment.add_text(
-            "model/architecture",
-            str(self.network)
-        )
+        self.logger.experiment.add_text("model/architecture", str(self.network))
 
     def log_images(self, images, name, n=8):
         # Helper to log images
         import torchvision
+
         grid = torchvision.utils.make_grid(images[:n])
         self.logger.experiment.add_image(name, grid, self.global_step)
 ```
@@ -460,6 +457,7 @@ Use in your modules:
 
 ```python
 from project.modules.base import BaseVisionModule
+
 
 class MyModule(BaseVisionModule):
     def training_step(self, batch, batch_idx):
@@ -626,12 +624,13 @@ Remember: `::` navigates config, `.` accesses Python attributes.
 
 ```python
 # ❌ Avoid generic names
-class Net(nn.Module):
-    ...
+class Net(nn.Module): ...
+
 
 # ✅ Use descriptive names
 class ResNetCIFAR10(nn.Module):
     """ResNet-18 adapted for CIFAR-10."""
+
     ...
 ```
 
@@ -650,8 +649,7 @@ class CustomDataset(Dataset):
         target_transform: Optional target transform
     """
 
-    def __init__(self, root_dir, split='train', transform=None, target_transform=None):
-        ...
+    def __init__(self, root_dir, split="train", transform=None, target_transform=None): ...
 ```
 
 ### 3. Keep Configs DRY with Variables
@@ -712,6 +710,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 import torch.nn.functional as F
 
+
 class SimpleCNN(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()
@@ -728,6 +727,7 @@ class SimpleCNN(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
+
 
 class CIFAR10Module(pl.LightningModule):
     def __init__(self, network, lr=0.001):

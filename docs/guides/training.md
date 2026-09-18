@@ -362,6 +362,7 @@ Subclass the defining module's base class and implement its batch-level signatur
 import json
 from lighter.callbacks.base_writer import BaseWriter
 
+
 class CustomWriter(BaseWriter):
     def write(self, outputs, batch, batch_idx, dataloader_idx):
         path = self.path / f"loader-{dataloader_idx}-batch-{batch_idx}.json"

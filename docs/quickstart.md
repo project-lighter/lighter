@@ -38,6 +38,7 @@ A project directory contains an empty `__lighter__.py` marker and `__init__.py`.
 ```python
 from lighter import LighterModule
 
+
 class RegressionTask(LighterModule):
     def training_step(self, batch, batch_idx):
         prediction = self(batch["x"]).squeeze(-1)

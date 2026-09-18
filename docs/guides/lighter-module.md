@@ -39,6 +39,7 @@ Build models with less boilerplate using `LighterModule`.
 ```python
 from lighter import LighterModule
 
+
 class MyModel(LighterModule):
     """Minimal model - just implement steps."""
 
@@ -204,8 +205,8 @@ Lightning behavior; this correction does not change optimization weighting.
 ```python
 def training_step(self, batch, batch_idx):
     return {
-        "loss": total_loss,          # Scalar optimization loss
-        "loss_terms": {              # Optional observations
+        "loss": total_loss,  # Scalar optimization loss
+        "loss_terms": {  # Optional observations
             "ce": ce_loss,
             "reg": reg_loss,
         },
@@ -297,13 +298,13 @@ See [Automatic Optimizer Stats Logging](#automatic-optimizer-stats-logging) for 
 class MyModel(LighterModule):
     def training_step(self, batch, batch_idx):
         # Available attributes:
-        self.network          # From config: model::network
-        self.criterion        # From config: model::criterion
-        self.optimizer        # From config: model::optimizer
-        self.scheduler        # From config: model::scheduler (optional)
-        self.train_metrics    # From config: model::train_metrics (optional)
-        self.val_metrics      # From config: model::val_metrics (optional)
-        self.test_metrics     # From config: model::test_metrics (optional)
+        self.network  # From config: model::network
+        self.criterion  # From config: model::criterion
+        self.optimizer  # From config: model::optimizer
+        self.scheduler  # From config: model::scheduler (optional)
+        self.train_metrics  # From config: model::train_metrics (optional)
+        self.val_metrics  # From config: model::val_metrics (optional)
+        self.test_metrics  # From config: model::test_metrics (optional)
 ```
 
 All optional except `network` (you need something to run!).
@@ -325,9 +326,11 @@ def validation_step(self, batch, batch_idx):
     """Optional."""
     return {"loss": loss}
 
+
 def test_step(self, batch, batch_idx):
     """Optional."""
     return {"loss": loss}
+
 
 def predict_step(self, batch, batch_idx):
     """Optional."""
@@ -353,6 +356,7 @@ hooks; use a native/custom DataModule for setup-dependent loader construction.
 
 ```python
 from lighter import LighterModule
+
 
 class ImageClassifier(LighterModule):
     """Image classification with metrics."""
@@ -442,6 +446,7 @@ model:
 from lighter import LighterModule
 import torch.nn.functional as F
 
+
 class SemanticSegmentation(LighterModule):
     """Semantic segmentation with dice loss."""
 
@@ -453,12 +458,7 @@ class SemanticSegmentation(LighterModule):
 
         # Resize logits to match mask size if needed
         if logits.shape[-2:] != masks.shape[-2:]:
-            logits = F.interpolate(
-                logits,
-                size=masks.shape[-2:],
-                mode='bilinear',
-                align_corners=False
-            )
+            logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
 
         # Loss
         loss = self.criterion(logits, masks)
@@ -475,12 +475,7 @@ class SemanticSegmentation(LighterModule):
         logits = self(images)
 
         if logits.shape[-2:] != masks.shape[-2:]:
-            logits = F.interpolate(
-                logits,
-                size=masks.shape[-2:],
-                mode='bilinear',
-                align_corners=False
-            )
+            logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
 
         loss = self.criterion(logits, masks)
 
@@ -528,15 +523,15 @@ model:
 ```python
 from lighter import LighterModule
 
+
 class MultiTaskModel(LighterModule):
     """Multi-task: classification + regression."""
 
-    def __init__(self, network, criterion_cls, criterion_reg,
-                 optimizer, alpha=0.5):
+    def __init__(self, network, criterion_cls, criterion_reg, optimizer, alpha=0.5):
         super().__init__(
             network=network,
             criterion=None,  # We have multiple
-            optimizer=optimizer
+            optimizer=optimizer,
         )
         self.criterion_cls = criterion_cls
         self.criterion_reg = criterion_reg
@@ -588,6 +583,7 @@ Override `forward` for custom logic:
 ```python
 from lighter import LighterModule
 
+
 class AutoencoderModel(LighterModule):
     """Autoencoder with custom forward."""
 
@@ -607,7 +603,7 @@ class AutoencoderModel(LighterModule):
         loss_recon = self.criterion(reconstruction, images)
 
         # Optional: regularization on latent
-        loss_kl = 0.001 * (latent ** 2).mean()
+        loss_kl = 0.001 * (latent**2).mean()
 
         loss = loss_recon + loss_kl
 
@@ -693,28 +689,17 @@ For complex schedules, override `configure_optimizers`:
 ```python
 def configure_optimizers(self):
     # Warmup then cosine
-    warmup = torch.optim.lr_scheduler.LinearLR(
-        self.optimizer,
-        start_factor=0.1,
-        total_iters=1000
-    )
-    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
-        self.optimizer,
-        T_max=self.trainer.max_epochs - 10
-    )
+    warmup = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.1, total_iters=1000)
+    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.trainer.max_epochs - 10)
 
-    scheduler = torch.optim.lr_scheduler.SequentialLR(
-        self.optimizer,
-        schedulers=[warmup, cosine],
-        milestones=[10]
-    )
+    scheduler = torch.optim.lr_scheduler.SequentialLR(self.optimizer, schedulers=[warmup, cosine], milestones=[10])
 
     return {
         "optimizer": self.optimizer,
         "lr_scheduler": {
             "scheduler": scheduler,
             "interval": "epoch",
-        }
+        },
     }
 ```
 
@@ -822,14 +807,10 @@ Need custom setup? Override `__init__`:
 ```python
 from lighter import LighterModule
 
+
 class MyModel(LighterModule):
-    def __init__(self, network, criterion, optimizer,
-                 special_param=42):
-        super().__init__(
-            network=network,
-            criterion=criterion,
-            optimizer=optimizer
-        )
+    def __init__(self, network, criterion, optimizer, special_param=42):
+        super().__init__(network=network, criterion=criterion, optimizer=optimizer)
 
         # Custom initialization
         self.special_param = special_param
@@ -872,7 +853,7 @@ class MyModel(LighterModule):
 
     def on_train_epoch_end(self):
         # Log custom metrics
-        avg_loss = self.trainer.callback_metrics.get('train/loss')
+        avg_loss = self.trainer.callback_metrics.get("train/loss")
         if avg_loss is not None:
             print(f"Epoch {self.current_epoch}: {avg_loss:.4f}")
 
@@ -882,11 +863,11 @@ class MyModel(LighterModule):
 
     def on_save_checkpoint(self, checkpoint):
         # Add custom data
-        checkpoint['my_data'] = self.custom_buffer
+        checkpoint["my_data"] = self.custom_buffer
 
     def on_load_checkpoint(self, checkpoint):
         # Load custom data
-        self.custom_buffer = checkpoint.get('my_data', [])
+        self.custom_buffer = checkpoint.get("my_data", [])
 ```
 
 ## Differential Learning Rates
@@ -975,10 +956,10 @@ def validation_step(self, batch, batch_idx):
 def training_step(self, batch, batch_idx):
     # Everything in the dict gets logged automatically
     return {
-        "loss": loss,                    # Required
-        "accuracy": accuracy,            # Optional
-        "learning_rate": current_lr,     # Optional
-        "custom_metric": custom_value,   # Optional
+        "loss": loss,  # Required
+        "accuracy": accuracy,  # Optional
+        "learning_rate": current_lr,  # Optional
+        "custom_metric": custom_value,  # Optional
     }
 ```
 
@@ -997,11 +978,7 @@ def training_step(self, batch, batch_idx):
 
     # Only log images every 100 steps
     if batch_idx % 100 == 0:
-        self.logger.experiment.add_images(
-            "train/images",
-            x[:8],
-            self.global_step
-        )
+        self.logger.experiment.add_images("train/images", x[:8], self.global_step)
 
     return {"loss": loss}
 ```
@@ -1061,6 +1038,7 @@ Both give you YAML configs and CLI overrides!
 
 ```python
 from lighter import LighterModule
+
 
 class MyModel(LighterModule):
     # Required: training step
