@@ -1063,14 +1063,6 @@ Both give you YAML configs and CLI overrides!
 from lighter import LighterModule
 
 class MyModel(LighterModule):
-    # Optional custom __init__
-    def __init__(self, network, criterion, optimizer, **kwargs):
-        super().__init__(
-            network=network,
-            criterion=criterion,
-            optimizer=optimizer
-        )
-
     # Required: training step
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -1106,3 +1098,38 @@ model:
     _target_: ...
     params: "$@model::network.parameters()"
 ```
+
+
+## Construction and optimizer ownership
+
+With an ordinary step-only `LighterModule` subclass, Runner constructs the network, loss and metrics before the module is attached to Lightning. It constructs the optimizer and scheduler when Lightning calls `configure_optimizers()`, after its normal model setup. Keep writing the same recipe:
+
+```yaml
+model:
+  _target_: models.MyModel
+  network:
+    _target_: torch.nn.Linear
+    in_features: 16
+    out_features: 1
+  criterion:
+    _target_: torch.nn.MSELoss
+  optimizer:
+    _target_: torch.optim.AdamW
+    params: "$@model::network.parameters()"
+    lr: 0.001
+  scheduler:
+    scheduler:
+      _target_: torch.optim.lr_scheduler.StepLR
+      optimizer: "@model::optimizer"
+      step_size: 10
+    interval: epoch
+    frequency: 1
+```
+
+Each native optimizer setup gets fresh parameter iterators, optimizer and scheduler objects. Parameter groups, subsets, order and options remain exactly those selected by the recipe. Native checkpoint restoration then loads optimizer and scheduler state. The network stays the same object throughout a module instance's fit, validation and test stages. Separate Runner runs construct separate objects unless the caller explicitly supplies shared Python objects.
+
+The managed path applies to a statically named class with the inherited `LighterModule.__init__` and `configure_optimizers`, using ordinary keyword component definitions. It also supports a local `%` copy of that definition. Custom constructors, optimizer hooks, positional module construction and computed class targets retain their existing eager/native ownership. As a conservative boundary, any prebuilt optimizer, scheduler, parameter or iterator leaf anywhere in the retained source also preserves eager/native ownership, including aliases and unused helper leaves. Lighter only inspects source containers; it never evaluates an inactive recipe for this check. A prebuilt network module by itself still permits managed optimizer setup. Manual optimization remains manual. An optimizer or scheduler is available after native setup; a callback constructor or another eager recipe cannot require it earlier. Such a cross-stage dependency fails with its source path.
+
+A managed optimizer can use parameters replaced within the existing network during `configure_model`, because its parameter expression is evaluated afterward. Replacing the entire managed network, or removing/replacing a separately constructed shared child module or parameter, fails with an explicit alias-conflict diagnostic. Use a native/custom `configure_optimizers` for these ownership patterns. Lighter does not rewrite arbitrary Python aliases or transform arbitrary constructors. This ordinary eager-network profile does not certify sharded construction.
+
+Migration: inherited-constructor subclasses previously received an eagerly constructed optimizer. Code that reads `model.optimizer` before native setup must move that dependency to a native runtime hook or retain custom ownership. Directly constructed modules and their supplied optimizer objects keep their native lifetime. No factory, additional step output or user setup hook is required for ordinary recipes.

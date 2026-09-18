@@ -14,6 +14,7 @@ from loguru import logger
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
 from sparkwheel import Config, ValidationError
 
+from lighter.engine.construction import resolve_managed_model
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types.enums import Stage
 
@@ -70,11 +71,12 @@ class _ResolutionView:
     def __init__(self, source: Config, stage: Stage, overrides: dict[str, Any]):
         self.source = source
         self.recipe = source.retain()
+        self.managed_binding: Any = None
         arguments = source.get("args", {})
         selected = arguments.get(str(stage), {})
-        bindings = {f"args::{stage}::{key}": value for key, value in overrides.items() if key in selected}
-        blocked = {f"args::{name}" for name in arguments if name != str(stage)}
-        self.scope = self.recipe.scope(bindings=bindings, blocked_paths=blocked)
+        self.bindings = {f"args::{stage}::{key}": value for key, value in overrides.items() if key in selected}
+        self.blocked_paths = {f"args::{name}" for name in arguments if name != str(stage)}
+        self.scope = self.recipe.scope(bindings=self.bindings, blocked_paths=self.blocked_paths)
 
     def get(self, path: str = "", default: Any = None) -> Any:
         return self.source.get(path, default)
@@ -157,6 +159,10 @@ class Runner:
             **stage_kwargs,
         }
 
+        binding = resolution.managed_binding
+        if binding is not None:
+            binding.finalize(resolution.scope.materialized_components())
+
         # 4. Save configuration to trainer's log directory, logger, and model hparams for checkpoint access
         self._save_config(config, trainer, model)
 
@@ -177,7 +183,9 @@ class Runner:
 
     def _resolve_model(self, config: Config | _ResolutionView) -> LightningModule:
         """Resolve and validate model from config."""
-        model = config.resolve("model")
+        model = resolve_managed_model(config) if isinstance(config, _ResolutionView) else None
+        if model is None:
+            model = config.resolve("model")
         if not isinstance(model, LightningModule):
             raise TypeError(f"model must be LightningModule or LighterModule, got {type(model)}")
         return model

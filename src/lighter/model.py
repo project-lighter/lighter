@@ -174,6 +174,9 @@ class LighterModule(pl.LightningModule):
     ) -> None:
         super().__init__()
 
+        # Set only by the compatible Runner-managed construction path.
+        self._optimizer_binding: Any = None
+
         # A detached observation, never an input to optimization.
         self._training_step_loss: torch.Tensor | dict[str, Any] | None = None
         self._training_step_observed = False
@@ -508,7 +511,9 @@ class LighterModule(pl.LightningModule):
     # ============================================================================
 
     def configure_optimizers(self):
-        """Configure optimizer and scheduler."""
+        """Configure optimizer and scheduler at Lightning's native setup point."""
+        if self._optimizer_binding is not None:
+            self._optimizer_binding.build(self)
         if self.optimizer is None:
             raise ValueError("Optimizer not configured.")
 
