@@ -233,6 +233,47 @@ def training_step(self, batch, batch_idx):
 - `train/metrics/Accuracy/epoch` - Epoch average
 - `train/metrics/F1Score/step`, `train/metrics/F1Score/epoch`
 
+#### Separate evaluation populations
+
+With multiple validation or test dataloaders, keep the same step code and accept
+Lightning's `dataloader_idx` argument:
+
+```python
+def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    x, y = batch
+    pred = self(x)
+    self.val_metrics(pred, y)
+    return self.criterion(pred, y)
+```
+
+During the step, `self.val_metrics` refers to that loader's independent metric
+state. The same applies to `self.test_metrics`. Lighter chooses the state before
+your code updates it, and Lightning adds `/dataloader_idx_0`, `/dataloader_idx_1`,
+and so on to the automatic logging names. MetricCollection prefixes and postfixes
+are preserved. Successive evaluations reset their state through native Lightning
+logging, including sanity validation. Reordering dataloaders changes which
+population each index represents in the next evaluation; no state is pooled.
+
+Outside the step, these attributes refer to the original loader-0 metric. Read
+per-loader epoch results through `trainer.callback_metrics`. Native custom metrics
+on other attributes and native LightningModules retain their usual ownership.
+Managed `val_metrics`/`test_metrics` are logged automatically. If you need custom
+manual `self.log` behavior for several populations, use explicit per-loader native
+metric attributes; Lightning's automatic attribute lookup can cache identities
+before Lighter creates later loader states.
+
+Automatic per-loader cloning currently requires metrics with an empty
+`state_dict()`. Metrics with persisted state, registered weights, or nested
+checkpoint state are rejected for multiple loaders with a clear error. Existing
+single-loader state and checkpoint paths are preserved. For checkpoint-bearing
+metrics across several populations, define and log separate native metric
+attributes in a LightningModule; Lighter does not silently discard that state.
+
+This corrects earlier versions where separate loader labels could refer to one
+shared metric state. For example, populations containing three zeros and one ten
+now report 0 and 10. Previously, the second population could incorrectly report
+the pooled value 2.5. Historical measurements are not rewritten.
+
 #### Optimizer Stats Logging
 
 Automatically logged at the start of each training epoch:

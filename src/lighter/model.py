@@ -5,11 +5,11 @@ Users implement abstract step methods while the framework handles automatic dual
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, cast
 
 import pytorch_lightning as pl
 import torch
-from torch.nn import Module
+from torch.nn import Module, ModuleDict
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torchmetrics import Metric, MetricCollection
@@ -79,6 +79,15 @@ class LighterModule(pl.LightningModule):
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
+        cls._wrap_training_step()
+        for name, stage in (("validation_step", "val"), ("test_step", "test")):
+            step = getattr(cls, name)
+            if step is getattr(LighterModule, name) or getattr(step, "_lighter_metric_selector", None) is step:
+                continue
+            setattr(cls, name, cls._wrap_evaluation_step(step, stage))
+
+    @classmethod
+    def _wrap_training_step(cls) -> None:
         training_step = cls.training_step
         if training_step is LighterModule.training_step:
             return
@@ -108,6 +117,37 @@ class LighterModule(pl.LightningModule):
         observe_training_step.__dict__["_lighter_loss_observer"] = observe_training_step
         cls.training_step = observe_training_step  # type: ignore[method-assign]
 
+    @staticmethod
+    def _wrap_evaluation_step(step: Callable, stage: str) -> Callable:
+        @wraps(step)
+        def select_metrics(self: "LighterModule", *args: Any, **kwargs: Any) -> Any:
+            if stage in self._evaluation_steps_active:
+                return step(self, *args, **kwargs)
+            index = kwargs.get("dataloader_idx", args[2] if len(args) > 2 else 0)
+            self._evaluation_dataloader_indices[stage] = index
+            metrics = self._evaluation_metrics_for(stage, index)
+            if metrics is None:
+                return step(self, *args, **kwargs)
+
+            # A temporary ordinary attribute provides the familiar user-facing
+            # view without registering an alias or moving the canonical owner.
+            attribute = f"{stage}_metrics"
+            had_view = attribute in self.__dict__
+            previous = self.__dict__.get(attribute)
+            self.__dict__[attribute] = metrics
+            self._evaluation_steps_active.add(stage)
+            try:
+                return step(self, *args, **kwargs)
+            finally:
+                self._evaluation_steps_active.remove(stage)
+                if had_view:
+                    self.__dict__[attribute] = previous
+                else:
+                    self.__dict__.pop(attribute, None)
+
+        select_metrics.__dict__["_lighter_metric_selector"] = select_metrics
+        return select_metrics
+
     def __init__(
         self,
         network: Module,
@@ -134,6 +174,10 @@ class LighterModule(pl.LightningModule):
         self.train_metrics = self._prepare_metrics(train_metrics)
         self.val_metrics = self._prepare_metrics(val_metrics)
         self.test_metrics = self._prepare_metrics(test_metrics)
+        self._evaluation_metrics = ModuleDict({"val": ModuleDict(), "test": ModuleDict()})
+        self._evaluation_dataloader_indices: dict[str, int] = {"val": 0, "test": 0}
+        self._evaluation_steps_active: set[str] = set()
+        self._evaluation_metric_sources = {"val": self.val_metrics, "test": self.test_metrics}
 
     def _prepare_metrics(self, metrics: Metric | MetricCollection | None) -> Metric | MetricCollection | None:
         """Validate metrics - must be Metric or MetricCollection."""
@@ -158,6 +202,33 @@ class LighterModule(pl.LightningModule):
             f"      - _target_: torchmetrics.F1Score\n"
             f"        task: multiclass"
         )
+
+    def _evaluation_metrics_for(self, stage: str, index: int) -> Metric | MetricCollection | None:
+        # Read the canonical module, bypassing any temporary nested-step view.
+        primary = self._modules.get(f"{stage}_metrics")
+        if not isinstance(primary, (Metric, MetricCollection)):
+            return None
+        bank = cast(ModuleDict, self._evaluation_metrics[stage])
+        if self._evaluation_metric_sources[stage] is not primary:
+            bank.clear()
+            self._evaluation_metric_sources[stage] = primary
+
+        counts = getattr(self._trainer, f"num_{stage}_batches", ()) if self._trainer is not None else ()
+        populations = max(len(counts) if isinstance(counts, (list, tuple)) else 1, index + 1)
+        if populations > 1 and primary.state_dict():
+            raise ValueError(
+                f"Automatic {stage} metrics contain checkpoint state and cannot be cloned per-dataloader. "
+                "Use explicit native Lightning metric ownership for each dataloader, or a metric configuration without checkpoint state. "
+                "Single-dataloader checkpoint behavior is unchanged."
+            )
+        # Prepare configured populations before loader0 accumulates any data.
+        # Cloning an AUROC-like metric after its first population could copy a
+        # large prediction buffer only to discard that buffer during reset.
+        while len(bank) < populations - 1:
+            metric = primary.clone()
+            metric.reset()
+            bank[str(len(bank) + 1)] = metric
+        return primary if index == 0 else cast(Metric | MetricCollection, bank[str(index)])
 
     # ============================================================================
     # Step Methods - Override as Needed
@@ -279,6 +350,7 @@ class LighterModule(pl.LightningModule):
         dataloader_idx: int = 0,
     ) -> None:
         """Framework hook - automatically logs validation outputs."""
+        self._evaluation_dataloader_indices["val"] = dataloader_idx
         self._on_batch_end(outputs, batch_idx)
 
     def on_test_batch_end(
@@ -289,6 +361,7 @@ class LighterModule(pl.LightningModule):
         dataloader_idx: int = 0,
     ) -> None:
         """Framework hook - automatically logs test outputs."""
+        self._evaluation_dataloader_indices["test"] = dataloader_idx
         self._on_batch_end(outputs, batch_idx)
 
     def _normalize_output(self, output: torch.Tensor | dict[str, Any]) -> dict[str, Any]:
@@ -374,21 +447,30 @@ class LighterModule(pl.LightningModule):
         User already called metrics in their step method.
         Handles both single Metric and MetricCollection.
         """
-        metrics = getattr(self, f"{self.mode}_metrics", None)
+        stage = self.mode
+        attribute = f"{stage}_metrics"
+        if stage in (Mode.VAL, Mode.TEST):
+            index = self._evaluation_dataloader_indices[stage]
+            metrics = self._evaluation_metrics_for(stage, index)
+            if index > 0:
+                attribute = f"_evaluation_metrics.{stage}.{index}"
+        else:
+            metrics = getattr(self, attribute, None)
         if metrics is None:
             return
 
         if isinstance(metrics, MetricCollection):
-            # MetricCollection - iterate over named metrics
+            # Public names may include a prefix/postfix; registered child paths do not.
+            paths = {id(metric): path for path, metric in metrics.named_modules()}
             for name, metric in metrics.items():
-                name = f"{self.mode}/metrics/{name}"
-                self._log(name, metric, on_step=True)
-                self._log(name, metric, on_epoch=True, sync_dist=True)
+                name = f"{stage}/metrics/{name}"
+                metric_attribute = f"{attribute}.{paths[id(metric)]}"
+                self._log(name, metric, on_step=True, metric_attribute=metric_attribute)
+                self._log(name, metric, on_epoch=True, sync_dist=True, metric_attribute=metric_attribute)
         else:
-            # Single Metric - use class name (consistent with MetricCollection auto-naming)
-            name = f"{self.mode}/metrics/{metrics.__class__.__name__}"
-            self._log(name, metrics, on_step=True)
-            self._log(name, metrics, on_epoch=True, sync_dist=True)
+            name = f"{stage}/metrics/{metrics.__class__.__name__}"
+            self._log(name, metrics, on_step=True, metric_attribute=attribute)
+            self._log(name, metrics, on_epoch=True, sync_dist=True, metric_attribute=attribute)
 
     def _log_optimizer_stats(self, batch_idx: int) -> None:
         """
@@ -405,7 +487,15 @@ class LighterModule(pl.LightningModule):
             name = f"{self.mode}/{name}"
             self._log(name, stat, on_epoch=True, sync_dist=False)
 
-    def _log(self, name: str, value: Any, on_step: bool = False, on_epoch: bool = False, sync_dist: bool = False) -> None:
+    def _log(
+        self,
+        name: str,
+        value: Any,
+        on_step: bool = False,
+        on_epoch: bool = False,
+        sync_dist: bool = False,
+        metric_attribute: str | None = None,
+    ) -> None:
         suffix = "step" if on_step and not on_epoch else "epoch"
         self.log(
             f"{name}/{suffix}",
@@ -414,6 +504,7 @@ class LighterModule(pl.LightningModule):
             on_step=on_step,
             on_epoch=on_epoch,
             sync_dist=sync_dist,
+            metric_attribute=metric_attribute,
         )
 
     # ============================================================================

@@ -261,3 +261,177 @@ def test_effective_inherited_or_decorated_step_owns_loss(tmp_path, model_type, e
     trainer = _trainer(tmp_path, max_epochs=1, callbacks=[recorder], accumulate_grad_batches=4)
     trainer.fit(model_type(), _loader(range(1, 11)))
     assert recorder.values == pytest.approx([expected])
+
+
+class PopulationModule(MeasuredModule):
+    def __init__(self, collection=False, persistent=False):
+        super().__init__(collection=collection)
+        if collection:
+            self.val_metrics = MetricCollection({"mean": MeanMetric()}, prefix="sample_", postfix="_value")
+            self.test_metrics = MetricCollection({"mean": MeanMetric()}, prefix="sample_", postfix="_value")
+        if persistent:
+            self.val_metrics.persistent(True)
+            self.test_metrics.persistent(True)
+
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        self.val_metrics(batch)
+        return batch.mean()
+
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        self.test_metrics(batch)
+        return batch.mean()
+
+
+class NativePopulationModule(pl.LightningModule):
+    def __init__(self, collection=False):
+        super().__init__()
+        self.population_metrics = nn.ModuleList(
+            [
+                MetricCollection({"mean": MeanMetric()}, prefix="sample_", postfix="_value") if collection else MeanMetric()
+                for _ in range(3)
+            ]
+        )
+
+    def _measure(self, batch, dataloader_idx, prefix):
+        metrics = self.population_metrics[dataloader_idx]
+        metrics(batch)
+        if isinstance(metrics, MetricCollection):
+            metric = metrics["mean"]
+            name = "sample_mean_value"
+            attribute = f"population_metrics.{dataloader_idx}.mean"
+        else:
+            metric = metrics
+            name = "MeanMetric"
+            attribute = f"population_metrics.{dataloader_idx}"
+        self.log(
+            f"{prefix}/metrics/{name}/epoch",
+            metric,
+            on_step=False,
+            on_epoch=True,
+            logger=self.trainer.logger is not None,
+            metric_attribute=attribute,
+        )
+
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        self._measure(batch, dataloader_idx, "val")
+
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        self._measure(batch, dataloader_idx, "test")
+
+
+@pytest.mark.parametrize("stage,prefix", [("validate", "val"), ("test", "test")])
+@pytest.mark.parametrize("collection", [False, True])
+@pytest.mark.parametrize("external_logger", [False, True])
+def test_evaluation_metrics_keep_population_ownership(tmp_path, stage, prefix, collection, external_logger):
+    sequences = [
+        ([[0, 0, 0], [10]], [0, 10]),
+        ([[10], [0, 0, 0]], [10, 0]),
+        ([[7, 7]], [7]),
+        ([[3], [9, 9, 9], [15]], [3, 9, 15]),
+    ]
+    name = "sample_mean_value" if collection else "MeanMetric"
+    for model_type in [NativePopulationModule, PopulationModule]:
+        model = model_type(collection=collection)
+        trainer = _trainer(tmp_path, external_logger)
+        for populations, expected in sequences:
+            getattr(trainer, stage)(model, [_loader(values) for values in populations], verbose=False)
+            for index, mean in enumerate(expected):
+                suffix = f"/dataloader_idx_{index}" if len(populations) > 1 else ""
+                assert trainer.callback_metrics[f"{prefix}/metrics/{name}/epoch{suffix}"].item() == pytest.approx(mean)
+
+
+class PopulationValidationHistory(Callback):
+    def __init__(self):
+        self.means = []
+
+    def on_validation_end(self, trainer, pl_module):
+        if trainer.sanity_checking:
+            return
+        self.means.append(
+            [trainer.callback_metrics[f"val/metrics/MeanMetric/epoch/dataloader_idx_{index}"].item() for index in range(2)]
+        )
+
+
+def test_population_metrics_survive_sanity_fit_validate_and_test(tmp_path):
+    model = PopulationModule()
+    original_val, original_test = model.val_metrics, model.test_metrics
+    history = PopulationValidationHistory()
+    trainer = _trainer(tmp_path, max_epochs=2, num_sanity_val_steps=1, callbacks=[history])
+    populations = [_loader([0, 0, 6]), _loader([10])]
+    trainer.fit(model, _loader([1, 3]), populations)
+    assert len(history.means) == 2
+    for observed, expected in zip(history.means, [[2, 10], [2, 10]], strict=True):
+        assert observed == pytest.approx(expected)
+    trainer.validate(model, [_loader([8]), _loader([4, 4, 4])], verbose=False)
+    assert history.means[-1] == pytest.approx([8, 4])
+    trainer.test(model, [_loader([3]), _loader([9, 9, 9])], verbose=False)
+    assert trainer.callback_metrics["test/metrics/MeanMetric/epoch/dataloader_idx_0"].item() == pytest.approx(3)
+    assert trainer.callback_metrics["test/metrics/MeanMetric/epoch/dataloader_idx_1"].item() == pytest.approx(9)
+    assert model.val_metrics is original_val
+    assert model.test_metrics is original_test
+    assert all(metric.update_count == 0 for metric in model.modules() if isinstance(metric, MeanMetric))
+
+
+def test_persistent_metric_single_loader_state_round_trip():
+    model = PopulationModule(persistent=True)
+    model.validation_step(torch.tensor([2.0, 4.0]), 0)
+    state = model.state_dict()
+    assert "val_metrics.mean_value" in state
+    restored = PopulationModule(persistent=True)
+    restored.load_state_dict(state)
+    assert restored.val_metrics.compute().item() == pytest.approx(3)
+
+
+@pytest.mark.parametrize("collection", [False, True])
+def test_automatic_population_cloning_rejects_checkpoint_state(tmp_path, collection):
+    trainer = _trainer(tmp_path)
+    with pytest.raises(ValueError, match="checkpoint state.*per.dataloader"):
+        trainer.validate(
+            PopulationModule(collection=collection, persistent=True), [_loader([0, 0]), _loader([10])], verbose=False
+        )
+
+
+class TensorOnlyEvaluation(LighterModule):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        return batch.mean()
+
+
+def test_multiple_loaders_without_metrics_keep_native_loss_logging(tmp_path):
+    model = TensorOnlyEvaluation(network=nn.Identity())
+    trainer = _trainer(tmp_path)
+    trainer.validate(model, [_loader([0, 0, 0]), _loader([10])], verbose=False)
+    for index, expected in enumerate([0, 10]):
+        assert trainer.callback_metrics[f"val/loss/epoch/dataloader_idx_{index}"].item() == pytest.approx(expected)
+
+
+class DelegatedPopulationModule(PopulationModule):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        # The outer native invocation owns the population, even when the parent
+        # method does not need the index for its scientific calculation.
+        return super().validation_step(batch, batch_idx)
+
+
+def test_outer_evaluation_step_owns_population_during_super_call(tmp_path):
+    trainer = _trainer(tmp_path)
+    trainer.validate(DelegatedPopulationModule(), [_loader([0, 0, 0]), _loader([10])], verbose=False)
+    for index, expected in enumerate([0, 10]):
+        key = f"val/metrics/MeanMetric/epoch/dataloader_idx_{index}"
+        assert trainer.callback_metrics[key].item() == pytest.approx(expected)
+
+
+class CloneBeforeUpdateMean(MeanMetric):
+    def clone(self):
+        # Metrics such as AUROC may retain large prediction buffers. Cloning
+        # those after loader0 runs would copy the full population before reset.
+        assert self.update_count == 0, "clone must precede population updates"
+        return super().clone()
+
+
+def test_loader_metrics_are_cloned_before_population_data_accumulates(tmp_path):
+    model = PopulationModule()
+    model.val_metrics = CloneBeforeUpdateMean()
+    trainer = _trainer(tmp_path)
+    trainer.validate(model, [_loader([0, 0, 0]), _loader([10])], verbose=False)
+    for index, expected in enumerate([0, 10]):
+        key = f"val/metrics/CloneBeforeUpdateMean/epoch/dataloader_idx_{index}"
+        assert trainer.callback_metrics[key].item() == pytest.approx(expected)

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
-from torchmetrics import Accuracy, MetricCollection
+from torchmetrics import Accuracy, MeanMetric, MetricCollection
 
 from lighter.model import LighterModule
 from lighter.utils.types.enums import Mode
@@ -586,3 +586,22 @@ def test_training_step_observation_preserves_signature_and_return_identity():
     assert not logged_outputs["loss"].requires_grad
     assert native_outputs["loss"].item() == 2
     assert logged_outputs["pred"] is native_outputs["pred"]
+
+
+def test_evaluation_metric_view_restores_after_exception_without_registered_aliases():
+    class FailingEvaluation(LighterModule):
+        def validation_step(self, batch, batch_idx, dataloader_idx=0):
+            self.observed_metric_id = id(self.val_metrics)
+            raise RuntimeError("deliberate step failure")
+
+    metric = MeanMetric()
+    system = FailingEvaluation(network=nn.Identity(), val_metrics=metric)
+    with pytest.raises(RuntimeError, match="deliberate step failure"):
+        system.validation_step(torch.ones(2), 0, dataloader_idx=1)
+    assert system.val_metrics is metric
+    assert system.observed_metric_id != id(metric)
+    registered = [
+        (name, id(module)) for name, module in system.named_modules(remove_duplicate=False) if isinstance(module, MeanMetric)
+    ]
+    assert [name for name, _ in registered] == ["val_metrics", "_evaluation_metrics.val.1"]
+    assert len({identity for _, identity in registered}) == 2
