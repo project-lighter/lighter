@@ -16,14 +16,14 @@ Lighter provides four main commands:
 # Train and validate
 lighter fit config.yaml
 
-# Validate only (requires checkpoint)
-lighter validate config.yaml
+# Validate trained weights
+lighter validate config.yaml --ckpt-path checkpoints/selected.ckpt
 
-# Test only (requires checkpoint)
-lighter test config.yaml
+# Test trained weights
+lighter test config.yaml --ckpt-path checkpoints/selected.ckpt
 
-# Run inference
-lighter predict config.yaml
+# Run inference with trained weights
+lighter predict config.yaml --ckpt-path checkpoints/selected.ckpt
 ```
 
 All commands use the same config structure.
@@ -44,18 +44,9 @@ lighter fit config.yaml
 4. Saves checkpoints automatically
 5. Logs metrics to configured logger
 
-### Output Structure
+### Output locations
 
-```
-outputs/
-└── YYYY-MM-DD/
-    └── HH-MM-SS/
-        ├── config.yaml          # Copy of config used
-        ├── checkpoints/
-        │   ├── last.ckpt       # Latest checkpoint
-        │   └── epoch=09-step=1000.ckpt
-        └── logs/               # Tensorboard/CSV logs
-```
+Set `trainer.default_root_dir`, logger paths and `ModelCheckpoint.dirpath` explicitly. Lighter does not imply timestamped directories or a `last.ckpt` file without the relevant callback settings. The [complete local example](../quickstart.md) demonstrates an explicit output layout and verifies fit, test, prediction and resume through four CLI invocations.
 
 ### Resuming Training
 
@@ -106,7 +97,7 @@ lighter fit config.yaml \
 ```bash
 # Add callbacks from CLI
 lighter fit config.yaml \
-  'trainer::callbacks=[{_target_: pytorch_lightning.callbacks.EarlyStopping, monitor: val/loss}]'
+  'trainer::callbacks=[{_target_: pytorch_lightning.callbacks.EarlyStopping, monitor: val/loss/epoch}]'
 ```
 
 ## Merging Configs
@@ -114,7 +105,7 @@ lighter fit config.yaml \
 Combine multiple YAML files:
 
 ```bash
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 ```
 
 ### Example: Base + Experiment
@@ -165,7 +156,7 @@ Control how configs merge:
 trainer:
   =callbacks:  # Replace entire list
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/loss
+      monitor: val/loss/epoch
 ```
 
 **Delete with `~`**:
@@ -181,17 +172,19 @@ data:
 
 ## Checkpointing
 
+A callback monitor must match a logged metric exactly. The automatic Lighter loss is `val/loss/epoch`; native modules use the names they pass to `self.log`. Accuracy examples below assume an explicit metric named `val/acc`.
+
 ### Automatic Checkpointing
 
-Lightning saves `last.ckpt` automatically. For more control:
+Request `last.ckpt` explicitly with `save_last: true`. For Lighter's automatic loss names, monitor `val/loss/epoch`:
 
 ```yaml
 trainer:
   callbacks:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       dirpath: checkpoints
-      filename: 'epoch{epoch:02d}-loss{val/loss:.4f}'
-      monitor: val/loss
+      filename: 'epoch-{epoch:02d}'
+      monitor: val/loss/epoch
       mode: min
       save_top_k: 3          # Keep best 3
       save_last: true        # Keep last checkpoint
@@ -225,7 +218,7 @@ trainer:
 
     # Best loss
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val/loss
+      monitor: val/loss/epoch
       mode: min
       save_top_k: 1
       filename: 'best-loss'
@@ -315,9 +308,9 @@ trainer:
       project: my_project
 ```
 
-### No Logging
+### No External Logger
 
-Disable logging:
+Disable the external logger while retaining callback metrics, checkpoint monitoring and metric resets:
 
 ```yaml
 trainer:
@@ -330,88 +323,52 @@ Use Writers to save predictions to files.
 
 ### CSV Writer
 
-Save predictions to CSV:
-
 ```yaml
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.CSVWriter
-      write_interval: batch  # or 'epoch'
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [id, prediction, target]
 ```
 
-Your `predict_step` should return a dict:
+Return a dictionary whose selected values have one element per sample:
 
 ```python
 def predict_step(self, batch, batch_idx):
-    x, y = batch
-    pred = self(x)
-
-    return {
-        "prediction": pred.argmax(dim=1),
-        "probability": pred.max(dim=1).values,
-        "target": y,
-    }
+    return {"id": batch["id"], "prediction": self(batch["x"]).squeeze(-1), "target": batch["target"]}
 ```
 
-Output: `predictions.csv` with columns for each key.
+CSV preserves lexical identifiers such as `00001` and `NA`. Read IDs as strings. For streaming export without an in-memory prediction list, use `lighter predict config.yaml --no-return-predictions`. Writers leave native return behavior intact.
 
 ### File Writer
-
-Save predictions to individual files:
 
 ```yaml
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      write_interval: batch
+      directory: predictions
+      value_key: prediction
+      name_key: id
+      writer_fn: tensor
 ```
 
-Return dict with data and filenames:
-
-```python
-def predict_step(self, batch, batch_idx, dataloader_idx=0):
-    images, paths = batch
-
-    predictions = self(images)
-
-    # Save each prediction
-    results = []
-    for i, (pred, path) in enumerate(zip(predictions, paths)):
-        results.append({
-            "prediction": pred.cpu().numpy(),
-            "$id": f"pred_{batch_idx}_{i}",  # Unique filename
-        })
-
-    return results
-```
-
-Saves: `predictions/pred_0_0.npz`, `pred_0_1.npz`, etc.
+Return `{"prediction": tensor_batch, "id": identifiers}` with one value and safe unique filename per sample. The tensor writer saves `.pt` files; `writer_fn` also accepts `image_2d`, `image_3d`, `text` or a callable.
 
 ### Custom Writer
 
-Create your own:
+Subclass the defining module's base class and implement its batch-level signature:
 
 ```python
-from lighter.callbacks import BaseWriter
+import json
+from lighter.callbacks.base_writer import BaseWriter
 
 class CustomWriter(BaseWriter):
-    def write(self, data):
-        """Save data however you want."""
-        # data is what you returned from predict_step
-        output_path = self.output_dir / f"{data['$id']}.pkl"
-
-        with open(output_path, 'wb') as f:
-            pickle.dump(data, f)
+    def write(self, outputs, batch, batch_idx, dataloader_idx):
+        path = self.path / f"loader-{dataloader_idx}-batch-{batch_idx}.json"
+        path.write_text(json.dumps(outputs["text"]))
 ```
 
-Use in config:
-
-```yaml
-trainer:
-  callbacks:
-    - _target_: my_project.writers.CustomWriter
-      write_interval: batch
-```
+Configure `_target_: project.writers.CustomWriter` with `path: predictions`. This small custom example assumes a single process; distributed writers must preserve rank identity and coordinate publication. See the [prediction contract](predictions.md) for output ownership and native return semantics.
 
 ## Debugging
 
@@ -474,7 +431,7 @@ Results saved to logs directory.
 
 ### Find Learning Rate
 
-Automatically find optimal LR:
+Estimate a learning-rate range with a native module exposing `learning_rate` or `lr` and reading that attribute in `configure_optimizers`:
 
 ```yaml
 trainer:
@@ -485,11 +442,9 @@ trainer:
       max_lr: 1.0
 ```
 
-Or run tuner:
+The managed recipe field `model::optimizer::lr` is not itself Lightning's tuning attribute. Use custom native optimizer ownership for this tuning pattern.
 
-```bash
-lighter fit config.yaml trainer::auto_lr_find=true
-```
+For programmatic tuning, use Lightning's `Tuner(trainer).lr_find(model, datamodule=...)` with a module exposing the learning-rate attribute expected by that API. `Trainer(auto_lr_find=...)` is not a supported parameter. Treat tuning as a real run that updates model state; validate its assumptions for custom/manual optimization.
 
 ## Multi-GPU Training
 
@@ -613,7 +568,7 @@ Stop training when metric stops improving:
 trainer:
   callbacks:
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/loss
+      monitor: val/loss/epoch
       patience: 10
       mode: min
       verbose: true
@@ -699,16 +654,14 @@ trainer:
 Run final test after training:
 
 ```bash
-# Fit then test automatically
+# Fit runs training and configured validation only
 lighter fit config.yaml
 
 # Test separately
 lighter test config.yaml --ckpt_path checkpoints/best.ckpt
 ```
 
-### Test During Fit
-
-Not recommended, but possible by loading checkpoint at end of fit.
+Fit does not run the test stage. Evaluate the selected checkpoint explicitly after model selection; keep the final test population out of tuning.
 
 ## Prediction/Inference
 
@@ -738,7 +691,9 @@ data:
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      write_interval: batch
+      directory: predictions
+      value_key: predictions
+      writer_fn: tensor
 ```
 
 Example predict_step:
@@ -829,19 +784,21 @@ Training crashed? Resume:
 lighter fit config.yaml --ckpt_path outputs/2024-01-15/10-30-45/checkpoints/last.ckpt
 ```
 
-### Workflow 3: Incremental Training
+### Workflow 3: Fine-Tuning with Fresh Optimizer State
 
-Train, then finetune:
+`fit --ckpt_path ...` resumes the saved optimizer and loop state, including its learning rate. An LR recipe override does not turn a resume into fine-tuning with a fresh optimizer.
 
-```bash
-# Initial training
-lighter fit pretrain.yaml
+For a new fine-tuning experiment, configure a fresh model/optimizer with the new LR and load only compatible model weights through ordinary native Python ownership, then call fit without `ckpt_path`:
 
-# Finetune with lower LR
-lighter fit finetune.yaml \
-  --ckpt_path outputs/.../checkpoints/last.ckpt \
-  model::optimizer::lr=0.0001
+```python
+# model, trainer and data belong to the newly configured fine-tuning experiment.
+# Load only a checkpoint whose source you trust.
+checkpoint = torch.load("pretrain.ckpt", map_location="cpu", weights_only=False)
+model.load_state_dict(checkpoint["state_dict"])
+trainer.fit(model, datamodule=data)
 ```
+
+For an architecture change, explicitly define which weights are transferred and check missing/unexpected keys. Keep checkpoint continuation and weight-transfer experiments distinct in their recipes and records.
 
 ### Workflow 4: Cross-Validation
 
@@ -974,10 +931,7 @@ trainer:
    lighter fit config.yaml trainer::overfit_batches=10
    ```
 
-2. Check learning rate:
-   ```bash
-   lighter fit config.yaml trainer::auto_lr_find=true
-   ```
+2. Inspect optimizer learning rates and compare a small explicit `model::optimizer::lr` override. Use native Lightning tuning only with its documented module contract.
 
 3. Visualize data:
    ```python
@@ -1010,7 +964,7 @@ lighter predict config.yaml
 lighter fit config.yaml key::path=value
 
 # Merge configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Resume training
 lighter fit config.yaml --ckpt_path path/to/last.ckpt

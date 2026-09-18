@@ -227,7 +227,7 @@ network:
 
 ### Example 2: Multiple Optimizers
 
-For GANs or other multi-optimizer setups:
+Multiple optimizers use Lightning manual optimization. Keep the update order and gradient ownership in Python. This illustrative GAN uses binary cross-entropy logits; it is an API example, not a complete generative-model benchmark:
 
 `gan.py`:
 
@@ -241,29 +241,34 @@ class GAN(pl.LightningModule):
         self.save_hyperparameters(ignore=['generator', 'discriminator'])
         self.generator = generator
         self.discriminator = discriminator
+        self.automatic_optimization = False
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
-        real_imgs, _ = batch
+    def training_step(self, batch, batch_idx):
+        real, _ = batch
+        optimizer_g, optimizer_d = self.optimizers()
+        z = torch.randn(real.size(0), self.generator.latent_dim, device=self.device)
 
-        # Train generator
-        if optimizer_idx == 0:
-            z = torch.randn(real_imgs.size(0), self.generator.latent_dim)
-            fake_imgs = self.generator(z)
-            g_loss = -torch.mean(self.discriminator(fake_imgs))
-            self.log("train/g_loss", g_loss)
-            return g_loss
+        self.toggle_optimizer(optimizer_g)
+        fake = self.generator(z)
+        logits = self.discriminator(fake)
+        g_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, torch.ones_like(logits))
+        optimizer_g.zero_grad()
+        self.manual_backward(g_loss)
+        optimizer_g.step()
+        self.untoggle_optimizer(optimizer_g)
 
-        # Train discriminator
-        if optimizer_idx == 1:
-            z = torch.randn(real_imgs.size(0), self.generator.latent_dim)
-            fake_imgs = self.generator(z).detach()
-
-            d_loss_real = -torch.mean(self.discriminator(real_imgs))
-            d_loss_fake = torch.mean(self.discriminator(fake_imgs))
-            d_loss = d_loss_real + d_loss_fake
-
-            self.log("train/d_loss", d_loss)
-            return d_loss
+        self.toggle_optimizer(optimizer_d)
+        real_logits = self.discriminator(real)
+        fake_logits = self.discriminator(fake.detach())
+        d_loss = 0.5 * (
+            torch.nn.functional.binary_cross_entropy_with_logits(real_logits, torch.ones_like(real_logits))
+            + torch.nn.functional.binary_cross_entropy_with_logits(fake_logits, torch.zeros_like(fake_logits))
+        )
+        optimizer_d.zero_grad()
+        self.manual_backward(d_loss)
+        optimizer_d.step()
+        self.untoggle_optimizer(optimizer_d)
+        self.log_dict({"train/g_loss": g_loss, "train/d_loss": d_loss})
 
     def configure_optimizers(self):
         opt_g = torch.optim.Adam(

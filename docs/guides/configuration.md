@@ -168,22 +168,22 @@ model:
 - Returns **final computed values** after instantiation and evaluation
 - Gets the actual Python object, so you can call methods on it
 
-### 3. `%`: Raw References (Eager)
+### 3. `%`: Definition Copies
 
-Copy **raw YAML content** that is processed **eagerly** during config merge:
+Reuse a **source definition** while constructing a separate value:
 
 ```yaml
 model:
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
 
   val_metrics: "%model::train_metrics"  # Copies raw YAML
 ```
 
 **What `%` does:**
-- Processes **eagerly** (during config loading, before instantiation)
+- Preserves the local source reference through composition; resolution constructs its value
 - Copies **unprocessed YAML** definition
 - Creates a **new instance** when later resolved (not shared!)
 
@@ -285,12 +285,16 @@ model:
 ```yaml
 model:
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      accuracy:
+        _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
+      f1:
+        _target_: torchmetrics.F1Score
+        task: multiclass
+        num_classes: 10
 
   val_metrics: "%model::train_metrics"  # Reuse config
   test_metrics: "%model::train_metrics"
@@ -355,9 +359,9 @@ data:     # LighterDataModule or custom LightningDataModule
 ### Optional Sections
 
 ```yaml
-_requires_:  # Import Python modules
-  - "$import torch"
-  - "$from datetime import datetime"
+_imports_:  # Names available to Python expressions
+  torch: torch
+  datetime: datetime.datetime
 
 vars:        # Reusable variables
   num_classes: 10
@@ -501,9 +505,9 @@ model:
 ## Advanced: Dynamic Imports
 
 ```yaml
-_requires_:
-  - "$import datetime"
-  - "$from pathlib import Path"
+_imports_:
+  datetime: datetime
+  Path: pathlib.Path
 
 trainer:
   logger:
@@ -513,8 +517,8 @@ trainer:
 ## Complete Example
 
 ```yaml
-_requires_:
-  - "$import torch"
+_imports_:
+  torch: torch
 
 vars:
   num_classes: 10
@@ -552,9 +556,9 @@ model:
     T_max: "%vars::max_epochs"
 
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: "%vars::num_classes"
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: "%vars::num_classes"
 
   val_metrics: "%model::train_metrics"
 

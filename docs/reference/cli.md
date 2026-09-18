@@ -79,17 +79,7 @@ data:
 
 ### Output
 
-Creates directory structure:
-
-```
-outputs/
-└── YYYY-MM-DD/
-    └── HH-MM-SS/
-        ├── config.yaml          # Config used
-        ├── checkpoints/
-        │   └── last.ckpt       # Latest checkpoint
-        └── logs/               # Training logs
-```
+Output paths follow `trainer.default_root_dir`, the chosen logger and checkpoint callbacks. Configure `ModelCheckpoint(save_last=True)` if you need `last.ckpt`; a timestamped directory is not implicit. See the [complete local example](../quickstart.md) for an executable output layout.
 
 ## lighter validate
 
@@ -211,7 +201,7 @@ lighter predict config.yaml --ckpt_path checkpoints/best.ckpt
 # With writer to save results
 lighter predict config.yaml \
   --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.CSVWriter}]'
+  'trainer::callbacks=[{_target_: lighter.callbacks.CsvWriter, path: predictions.csv, keys: [id, prediction]}]'
 ```
 
 ### Config Structure
@@ -226,8 +216,9 @@ data:
 
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.CSVWriter  # Optional: save predictions
-      write_interval: batch
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [id, prediction]
 ```
 
 ### Requirements
@@ -310,7 +301,7 @@ Combine multiple config files.
 ### Syntax
 
 ```bash
-lighter COMMAND config1.yaml,config2.yaml,...
+lighter COMMAND config1.yaml config2.yaml
 ```
 
 ### Behavior
@@ -354,21 +345,13 @@ model:
 
 ## Environment Variables
 
-### LIGHTER_OUTPUT_DIR
-
-Change default output directory:
+Set the output directory through the recipe or an override:
 
 ```bash
-export LIGHTER_OUTPUT_DIR=./my_outputs
-lighter fit config.yaml
+lighter fit config.yaml trainer::default_root_dir=./my_outputs
 ```
 
-Or in config:
-
-```yaml
-trainer:
-  default_root_dir: ./my_outputs
-```
+Lighter does not implement a `LIGHTER_OUTPUT_DIR` environment variable.
 
 ### CUDA_VISIBLE_DEVICES
 
@@ -438,11 +421,13 @@ lighter fit config.yaml 'trainer::devices=[0,2,3]' trainer::strategy=ddp
 # Resume from last checkpoint
 lighter fit config.yaml --ckpt_path outputs/.../checkpoints/last.ckpt
 
-# Resume with different LR
+# Resume while increasing the total epoch target
 lighter fit config.yaml \
   --ckpt_path outputs/.../checkpoints/last.ckpt \
-  model::optimizer::lr=0.0001
+  trainer::max_epochs=100
 ```
+
+Native resume restores optimizer state, including saved learning rates; a recipe LR override alone does not reset that state.
 
 ### Save Predictions
 
@@ -450,12 +435,12 @@ lighter fit config.yaml \
 # CSV output
 lighter predict config.yaml \
   --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.CSVWriter}]'
+  'trainer::callbacks=[{_target_: lighter.callbacks.CsvWriter, path: predictions.csv, keys: [id, prediction]}]'
 
 # File output
 lighter predict config.yaml \
   --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.FileWriter}]'
+  'trainer::callbacks=[{_target_: lighter.callbacks.FileWriter, directory: predictions, value_key: prediction, writer_fn: tensor}]'
 ```
 
 ## Exit Codes
@@ -463,8 +448,8 @@ lighter predict config.yaml \
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Config error (invalid YAML, missing files) |
-| 2 | Runtime error (training failed, OOM, etc.) |
+| 1 | Unhandled configuration or runtime failure |
+| 2 | CLI argument parsing error |
 
 ## Verbosity
 
@@ -488,33 +473,13 @@ lighter fit config.yaml
 
 ## Tips
 
-### Shell Completion
-
-Add to your shell config:
-
-```bash
-# Bash
-eval "$(_LIGHTER_COMPLETE=bash_source lighter)"
-
-# Zsh
-eval "$(_LIGHTER_COMPLETE=zsh_source lighter)"
-```
-
-### Config Validation
-
-Validate config without training:
+### Smoke Test
 
 ```bash
 lighter fit config.yaml trainer::fast_dev_run=true
 ```
 
-### Find Config Issues
-
-Enable Sparkwheel debug output:
-
-```bash
-SPARKWHEEL_DEBUG=1 lighter fit config.yaml
-```
+This executes user imports, constructors and real training/validation batches. It is not static validation. Use CLI error paths and tracebacks for diagnosis; `SPARKWHEEL_DEBUG` and `_LIGHTER_COMPLETE` shell completion variables are not implemented.
 
 ### See Resolved Config
 

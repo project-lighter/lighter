@@ -174,20 +174,20 @@ Use Writers:
 ```yaml
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.CSVWriter
-      write_interval: batch
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [id, prediction, probability]
 ```
 
 In your module:
 
 ```python
 def predict_step(self, batch, batch_idx):
-    x = batch
-    pred = self(x)
-
+    probabilities = self(batch["x"]).softmax(dim=-1)
     return {
-        "prediction": pred.argmax(dim=1),
-        "probability": pred.max(dim=1).values,
+        "id": batch["id"],
+        "prediction": probabilities.argmax(dim=-1),
+        "probability": probabilities.max(dim=-1).values,
     }
 ```
 
