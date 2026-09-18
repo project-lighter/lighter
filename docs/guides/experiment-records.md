@@ -36,7 +36,7 @@ Programmatic callers receive the native result and can inspect `runner.last_run_
 - `observed_start` records native restored progress, selected checkpoint path, and optimizer group settings after restoration. A requested learning rate may differ from the restored one; both are retained. Non-string custom group metadata is described separately.
 - `progress` and `metrics` update at training epoch and fit-validation boundaries. `observed_end` records terminal progress. Native loggers remain the choice for batch-level dashboards.
 - `checkpoints` contains native ModelCheckpoint references. `prediction_destinations` lists configured Lighter writer paths for prediction, with observed existence at stage end. Existence alone does not prove that an artifact was newly written by this attempt.
-- Environment information distinguishes installed distribution versions from actually imported versions/paths and available source Git identity. This is provenance, not a complete environment or dataset lockfile.
+- Environment information distinguishes installed distribution versions from actually imported versions/paths and available source Git identity. Package source Git identity is reported only when the imported module file is tracked; a wheel inside an ignored virtual environment is not attributed to its surrounding application repository. Git entries include their root and queried directory. This is provenance, not a complete environment or dataset lockfile.
 
 Only rank zero publishes files, while all required ranks participate in identity broadcast and metric computation. Source and record files are published atomically. The tested distributed profile is two-process CPU/Gloo DDP; this does not certify every strategy or storage backend.
 

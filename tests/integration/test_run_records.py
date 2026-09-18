@@ -282,3 +282,49 @@ def test_prepare_preserves_attempt_identity_without_publishing(tmp_path):
     spawned.setup(trainer, RecordTask(), "fit")
     assert spawned.path == record.path
     assert read_record(record.path)["attempt_id"] == record.attempt_id
+
+
+@pytest.mark.parametrize("installed_in_ignored_environment", [False, True])
+def test_package_git_provenance_requires_a_tracked_module(tmp_path, monkeypatch, installed_in_ignored_environment):
+    import shutil
+    import subprocess
+    import sys
+    from types import ModuleType
+
+    from lighter.engine.records import _environment
+
+    if shutil.which("git") is None:
+        pytest.skip("Git unavailable")
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / ".gitignore").write_text("environment/\n")
+    tracked = tmp_path / "src/lighter/__init__.py"
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text('__version__ = "example"\n')
+    git("add", ".gitignore", "src")
+    git(
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-qm",
+        "fixture",
+    )
+    installed = tmp_path / "environment/site-packages/lighter/__init__.py"
+    installed.parent.mkdir(parents=True)
+    installed.write_text(tracked.read_text())
+    module = ModuleType("lighter")
+    module.__file__ = str(installed if installed_in_ignored_environment else tracked)
+    monkeypatch.setitem(sys.modules, "lighter", module)
+    evidence = _environment()["packages"]["lighter"]["source_git"]
+    if installed_in_ignored_environment:
+        assert evidence is None, "A surrounding application's Git commit is not the installed package's source revision"
+    else:
+        assert evidence["commit"]
+        assert Path(evidence["root"]).resolve() == tmp_path.resolve()

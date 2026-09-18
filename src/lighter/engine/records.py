@@ -65,7 +65,7 @@ def atomic_write(path: Path, text: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def _git_identity(directory: Path) -> dict[str, Any] | None:
+def _git_identity(directory: Path, *, tracked_file: Path | None = None) -> dict[str, Any] | None:
     try:
 
         def git(*args: str) -> str:
@@ -73,7 +73,16 @@ def _git_identity(directory: Path) -> dict[str, Any] | None:
                 ["git", "-C", str(directory), *args], stderr=subprocess.DEVNULL, text=True, timeout=3
             ).strip()
 
-        return {"commit": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain", "--untracked-files=normal"))}
+        if tracked_file is not None:
+            # An installed wheel inside an ignored environment does not belong
+            # to the surrounding application's source revision.
+            git("ls-files", "--error-unmatch", "--", str(tracked_file.resolve()))
+        return {
+            "root": git("rev-parse", "--show-toplevel"),
+            "directory": str(directory.resolve()),
+            "commit": git("rev-parse", "HEAD"),
+            "dirty": bool(git("status", "--porcelain", "--untracked-files=normal")),
+        }
     except (OSError, subprocess.SubprocessError):
         return None
 
@@ -94,7 +103,7 @@ def _environment() -> dict[str, Any]:
             "module_path": file,
         }
         if file and name in ("lighter", "sparkwheel"):
-            packages[name]["source_git"] = _git_identity(Path(file).parent)
+            packages[name]["source_git"] = _git_identity(Path(file).parent, tracked_file=Path(file))
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
