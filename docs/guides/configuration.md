@@ -592,3 +592,9 @@ data:
 - [Custom Code Guide](custom-code.md) - Use your own models/datasets
 - [Training Guide](training.md) - Run experiments
 - [Sparkwheel Docs](https://project-lighter.github.io/sparkwheel/) - Complete reference
+
+## Importing Lighter in a host application
+
+`import lighter` preserves application logging handlers, warning and exception hooks, and multiprocessing serialization. Configure logging in your application; the optional `lighter.utils.logging._setup_logging()` helper remains available for applications that deliberately want its process-wide formatting.
+
+The `__lighter__.py` marker is a discovery marker, not an executed configuration script. Runner imports the enclosing package's `__init__.py` after applying the configured seed. Explicit path imports activate Lighter's existing process-wide dynamic-module finder and multiprocessing serialization support so project classes can reach spawned workers. Use normally installed/importable Python packages when a host must retain its own multiprocessing serializer. A module name already imported from another directory is rejected instead of silently running the wrong project.
