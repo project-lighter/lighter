@@ -27,3 +27,6 @@ def test_reference_cli_workflow(tmp_path):
     assert summary["prediction_ids"][:3] == ["00001", "NA", "NULL"]
     assert len(summary["prediction_ids"]) == len(set(summary["prediction_ids"])) == 7
     assert [command[3] for command in summary["commands"]] == ["fit", "test", "predict", "fit"]
+
+    assert len(summary["attempt_ids"]) == len(set(summary["attempt_ids"])) == 4
+    assert [command[3] for command in summary["inspection_commands"]] == ["inspect", "inspect", "runs", "runs", "runs"]

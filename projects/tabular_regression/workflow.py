@@ -18,6 +18,22 @@ def run_workflow(output_dir: Path) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     override = f"output_dir={json.dumps(str(output_dir))}"
     commands = []
+    inspection_commands = []
+
+    def inspect_json(label, *arguments):
+        command = [sys.executable, "-m", "lighter", *arguments]
+        inspection_commands.append(command)
+        result = subprocess.run(command, cwd=project_dir, capture_output=True, text=True, check=True)
+        value = json.loads(result.stdout)
+        (output_dir / f"{label}.json").write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+        return value
+
+    source = inspect_json("source", "inspect", "config.yaml", override, "--json")
+    changed = inspect_json("changed-source", "inspect", "config.yaml", override, "model::optimizer::lr=0.05", "--json")
+    assert source["model"]["optimizer"]["lr"] == 0.01
+    assert changed["model"]["optimizer"]["lr"] == 0.05
+    record_root = output_dir / "lighter_runs"
+    prior_ids = {path.parent.name for path in record_root.glob("*/record.json")}
 
     def execute(label, stage, *arguments):
         command = [sys.executable, "-m", "lighter", stage, "config.yaml", override, *arguments]
@@ -65,11 +81,35 @@ def run_workflow(output_dir: Path) -> dict:
     # Resume restores saved optimizer settings despite the recipe default 0.01.
     assert continued["optimizer_states"][0]["param_groups"][0]["lr"] == 0.05
     assert continued["optimizer_states"][0]["state"], "SGD momentum state must survive continuation"
+    records = inspect_json("attempts", "runs", "list", str(record_root), "--json")
+    records = [record for record in records if record["attempt_id"] not in prior_ids]
+    assert sorted(record["stage"] for record in records) == ["fit", "fit", "predict", "test"]
+    assert all(record["status"] == "completed" for record in records)
+    fits = sorted(
+        (record for record in records if record["stage"] == "fit"), key=lambda item: item["observed_start"]["global_step"]
+    )
+    first, resumed = fits
+    assert first["observed_start"]["global_step"] == 0
+    assert resumed["observed_start"]["global_step"] == initial_step
+    assert resumed["observed_end"]["global_step"] == 15
+    assert resumed["requested"]["source"]["model"]["optimizer"]["lr"] == 0.01
+    assert resumed["observed_start"]["optimizers"][0]["groups"][0]["settings"]["lr"] == 0.05
+    selected = inspect_json("selected-attempt", "runs", "show", str(record_root / first["attempt_id"]))
+    assert selected == first
+    changes = inspect_json(
+        "attempt-diff", "runs", "diff", str(record_root / first["attempt_id"]), str(record_root / resumed["attempt_id"])
+    )
+    assert any(
+        change["path"] == "requested::source::trainer::max_epochs" and change["before"] == 3 and change["after"] == 5
+        for change in changes
+    )
     summary = {
         "initial_step": initial_step,
         "continued_step": continued["global_step"],
         "prediction_ids": ids,
         "commands": commands,
+        "inspection_commands": inspection_commands,
+        "attempt_ids": [record["attempt_id"] for record in records],
     }
     (output_dir / "workflow.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
     return summary
