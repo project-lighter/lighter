@@ -500,5 +500,7 @@ def test_literal_record_check_does_not_inspect_opaque_values_or_subclasses():
         pass
 
     options = {CustomKey("name"): "trial"}
+    nested = {CustomKey("_target_"): "unused"}
     CustomKey.__hash__ = CustomKey.__eq__ = forbidden
     _validate_literal_run_options(options)
+    _validate_literal_run_options({"name": nested})

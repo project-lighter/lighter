@@ -123,7 +123,7 @@ def _validate_run_options(options: dict[str, Any], *, literal_only: bool = False
         if literal_only:
             if type(value) is str and value.startswith(("@", "%", "$")):
                 continue
-            if type(value) is dict and "_target_" in value:
+            if type(value) is dict and (any(type(item) is not str for item in value) or "_target_" in value):
                 continue
             if type(value) not in (str, bool, int, float, list, tuple, dict, type(None)):
                 continue  # Opaque values and subclasses wait for authoritative resolution.
