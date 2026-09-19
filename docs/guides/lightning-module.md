@@ -101,6 +101,6 @@ print(runner.last_run_path)
 
 Runner preserves native results and exceptions; its last record path can be absent when setup fails before recording. Calling this runs prediction, rather than merely describing a recipe.
 
-Generated references cover [Runner](../reference/engine/runner.md), [LighterModule](../reference/model.md), [LighterDataModule](../reference/data.md) and [callbacks](../reference/callbacks/index.md). Prefer documented public methods and native Lightning hooks for extensions. Underscored helpers and generated internal entries are implementation details, not stable extension contracts.
+Generated references cover [Runner](../reference/engine/runner.md), [LighterModule](../reference/model.md), [LighterDataModule](../reference/data.md) and [callbacks](../reference/callbacks/index.md). These reference pages are generated when the documentation site is built; they are not files in the source checkout. In an installed environment, `from lighter import LighterModule; help(LighterModule)` also exposes the class API. Prefer documented public methods and native Lightning hooks for extensions. Underscored helpers and generated internal entries are implementation details, not stable extension contracts.
 
 For advanced strategies, tuning, precision and distributed execution, consult the [native Lightning documentation](https://lightning.ai/docs/pytorch/stable/) alongside Lighter's [tested-profile limits](compatibility.md#exact-validation-profiles). The native route remains available without claiming every configuration has been exercised.

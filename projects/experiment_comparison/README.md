@@ -8,11 +8,13 @@ The default CPU pilot uses 2,000 training images, 500 validation images and 1,00
 
 ## Prepare the data
 
-Install the [current paired sources](../../docs/guides/compatibility.md#install-the-current-source-pair) first and keep that environment active. From the `project-lighter` directory containing the sibling checkouts:
+Install the [current paired sources](../../docs/guides/compatibility.md#install-the-current-source-pair) first and keep that environment active. From the `lighter-start` directory created during installation:
 
 ```bash
-cd lighter/projects/experiment_comparison
+cd lighter-examples/projects/experiment_comparison
 ```
+
+For a development checkout, use `cd projects/experiment_comparison` from the Lighter repository root instead.
 
 Run the remaining commands from this project directory. Download the [official CIFAR-10 Python archive](https://www.cs.toronto.edu/~kriz/cifar.html) into `.cache/cifar-10-python.tar.gz`, then prepare it:
 

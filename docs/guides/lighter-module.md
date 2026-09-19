@@ -89,7 +89,19 @@ This step excerpt assumes those tensors were computed by your algorithm. Automat
 
 The training observation is captured before Lightning divides closure loss for gradient accumulation. This preserves the returned scientific loss without changing gradients or optimization weighting. A nested dictionary under the automatic training `loss` is invalid; put named observations under `loss_terms`.
 
-Epoch aggregation follows native logging behavior. A batch mean over valid tokens, pixels or masked elements is not necessarily an equally weighted mean over examples. For task-specific denominators, use explicit native metrics or sums/counts; automatic logging does not infer the scientific population.
+Epoch aggregation follows native logging behavior. A batch mean over valid tokens, pixels or masked elements is not necessarily an equally weighted mean over examples. For task-specific denominators, use explicit native metrics or sums/counts; automatic logging does not infer the scientific population. For example, if `loss` is the mean over the nonempty valid elements selected by `batch["mask"]`, log its validation population mean explicitly:
+
+```python
+self.log(
+    "val/loss_per_observation",
+    loss,
+    on_step=False,
+    on_epoch=True,
+    batch_size=int(batch["mask"].sum()),
+)
+```
+
+Here the mask is boolean and each `True` identifies one observation contributing to the loss. Native epoch logging weights each batch mean by its valid-observation count. Monitor `val/loss_per_observation` for checkpoint selection and population comparisons; the automatic `val/loss/epoch` may use a different denominator. This example covers one process. Distributed evaluation additionally needs deliberate synchronization and handling of any sampler-added duplicates. This logging choice does not change the loss or its gradient used for optimization.
 
 ### Metric logging
 
