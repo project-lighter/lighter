@@ -73,6 +73,8 @@ def main(argv=None):
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=0.01)
     parser.add_argument("--max-epochs", type=int, default=5)
+    parser.add_argument("--accelerator", choices=("cpu", "cuda", "mps"), default="cpu")
+    parser.add_argument("--precision", choices=("32-true", "16-mixed", "bf16-mixed"), default="32-true")
     parser.add_argument("--ckpt-path", type=Path)
     parser.add_argument("--parent-attempt-id")
     parser.add_argument("--trace-updates", action="store_true")
@@ -84,6 +86,8 @@ def main(argv=None):
         "parent_attempt_id": options.parent_attempt_id,
         "stage": options.stage,
         "requested_lr": options.lr,
+        "requested_accelerator": options.accelerator,
+        "requested_precision": options.precision,
         "checkpoint": str(options.ckpt_path) if options.ckpt_path else None,
         "argv": sys.argv,
         "status": "running",
@@ -105,9 +109,9 @@ def main(argv=None):
         save_last=True,
     )
     trainer = pl.Trainer(
-        accelerator="cpu",
+        accelerator=options.accelerator,
         devices=1,
-        precision="32-true",
+        precision=options.precision,
         max_epochs=options.max_epochs,
         logger=False,
         enable_progress_bar=False,

@@ -112,4 +112,17 @@ The native baseline has a direct entrypoint too:
 python native.py fit --data-manifest data/data.json --output-dir outputs/direct-native --lr 0.01 --max-epochs 5
 ```
 
+### Choose a device and precision
+
+The workflow and native entrypoint accept `--accelerator` and `--precision`; their defaults remain `cpu` and `32-true`. For example, after installing and checking a compatible CUDA environment:
+
+```bash
+python workflow.py --backend lighter --data-manifest data/data.json --output-dir outputs/cuda-low --seed 17 --lr 0.01 --max-epochs 5 --accelerator cuda --precision 16-mixed
+python workflow.py --backend native --data-manifest data/data.json --output-dir outputs/cuda-native-low --seed 17 --lr 0.01 --max-epochs 5 --accelerator cuda --precision 16-mixed
+```
+
+Pass the same settings when evaluating or continuing. Ordinary `python -m lighter` commands use `trainer::accelerator=cuda trainer::precision=16-mixed`. Each stage's `runtime.json` records the actual device, precision plugin and process count; the workflow rejects a successful child that used a different device or precision. For fp16, the start/end observations also record native scaler state. Full checkpoint continuation restores that precision state along with optimizer state.
+
+Changing device or precision is a new execution profile. Compare against native Lightning on the same hardware and precision, and check predictions against the selected checkpoint under that precision policy. The CPU results above do not establish CUDA or mixed-precision qualification. `--trace-updates` observes gradients after native AMP unscaling and before clipping; its progress counter alone does not prove that a scaler applied every attempted update. The focused accelerator tests separately count actual optimizer steps. This example still assumes one process.
+
 The comparison concerns this declared CPU profile. The example does not establish unfamiliar-user usability, broader model quality, accelerator behavior or arbitrary recovery semantics. Population totals and output ownership in this example assume one process; scaling requires explicit cross-rank aggregation and output checks beyond changing `trainer::devices`.

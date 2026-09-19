@@ -39,6 +39,14 @@ def runtime_identity(trainer=None):
         else {
             "device": str(trainer.strategy.root_device),
             "precision": str(trainer.precision),
+            "precision_plugin": type(trainer.precision_plugin).__name__,
+            "cuda": None
+            if trainer.strategy.root_device.type != "cuda"
+            else {
+                "name": torch.cuda.get_device_name(trainer.strategy.root_device),
+                "capability": list(torch.cuda.get_device_capability(trainer.strategy.root_device)),
+                "build_version": torch.version.cuda,
+            },
             "world_size": trainer.world_size,
             "loader_num_workers": {
                 stage: [
@@ -110,6 +118,7 @@ class ExperimentArtifacts(pl.Callback):
                 "global_step": trainer.global_step,
                 "requested_lr": self.requested_lr,
                 "effective_lr": optimizer.param_groups[0]["lr"],
+                "precision_state": trainer.precision_plugin.state_dict(),
             },
         )
 
@@ -171,6 +180,7 @@ class ExperimentArtifacts(pl.Callback):
                 "global_step": trainer.global_step,
                 "requested_lr": self.requested_lr,
                 "effective_lr": optimizer.param_groups[0]["lr"],
+                "precision_state": trainer.precision_plugin.state_dict(),
             },
         )
         if self.trace_updates:

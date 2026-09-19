@@ -72,6 +72,8 @@ def build_parser():
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=0.01)
     parser.add_argument("--max-epochs", type=int, default=5)
+    parser.add_argument("--accelerator", choices=("cpu", "cuda", "mps"), default="cpu")
+    parser.add_argument("--precision", choices=("32-true", "16-mixed", "bf16-mixed"), default="32-true")
     parser.add_argument("--evaluation", choices=("validation", "final"), default="validation")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--evaluate-from", type=Path)
@@ -109,6 +111,8 @@ def run(options):
         "mode": mode,
         "seed": options.seed,
         "requested_lr": options.lr,
+        "requested_accelerator": options.accelerator,
+        "requested_precision": options.precision,
         "max_epochs": options.max_epochs,
         "case_revision": controls.get("case_revision"),
         "identities": controls,
@@ -134,6 +138,8 @@ def run(options):
                 "batch_size": options.batch_size,
                 "learning_rate": options.lr,
                 "trainer::max_epochs": options.max_epochs,
+                "trainer::accelerator": options.accelerator,
+                "trainer::precision": options.precision,
                 "trace_updates": options.trace_updates,
             }
             if options.parent_attempt_id is not None:
@@ -163,6 +169,10 @@ def run(options):
                 str(options.max_epochs),
                 "--batch-size",
                 str(options.batch_size),
+                "--accelerator",
+                options.accelerator,
+                "--precision",
+                options.precision,
             ]
             for flag, value in (
                 ("--initial-state", options.initial_state),
@@ -205,6 +215,9 @@ def run(options):
             raise RuntimeError(f"{name} failed with exit {completed.returncode}; see preserved logs in {output}")
         if not record.get("attempt_id") or not runtime.exists():
             raise ValueError(f"{name} did not produce its attempt/runtime evidence")
+        execution = json.loads(runtime.read_text())["execution"]
+        if execution["device"].split(":")[0] != options.accelerator or execution["precision"] != options.precision:
+            raise ValueError(f"{name} used a different device or precision than requested: {execution}")
         for filename in (
             "updates.pt",
             "observed_initial_state.pt",

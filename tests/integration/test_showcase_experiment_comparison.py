@@ -253,3 +253,93 @@ def test_ordinary_and_continued_run_options_satisfy_record_contract(example, tmp
         source=config.get(), stage="fit", seed=17, requested_args={}, inputs=inputs, options=config.resolve("run")
     )
     assert recorder.options.get("parent_attempt_id") == parent
+
+
+@pytest.mark.parametrize("backend", ["lighter", "native"])
+@pytest.mark.parametrize("accelerator,precision", [("cpu", "32-true"), ("cuda", "16-mixed")])
+def test_workflow_forwards_device_and_precision_to_scientific_child(
+    example, fixture_data, tmp_path, monkeypatch, backend, accelerator, precision
+):
+    class ScientificLaunch(Exception):
+        pass
+
+    observed = []
+
+    def intercept(command, **kwargs):
+        if "inspect" in command:
+            return SimpleNamespace(stdout="{}", returncode=0)
+        observed.append(command)
+        raise ScientificLaunch
+
+    monkeypatch.setattr(example.workflow.subprocess, "run", intercept)
+    options = example.workflow.build_parser().parse_args(
+        [
+            "--backend",
+            backend,
+            "--data-manifest",
+            str(fixture_data),
+            "--output-dir",
+            str(tmp_path / "workflow"),
+            "--accelerator",
+            accelerator,
+            "--precision",
+            precision,
+        ]
+    )
+    with pytest.raises(ScientificLaunch):
+        example.workflow.run(options)
+    (command,) = observed
+    if backend == "lighter":
+        assert f'trainer::accelerator="{accelerator}"' in command
+        assert f'trainer::precision="{precision}"' in command
+    else:
+        assert command[command.index("--accelerator") + 1] == accelerator
+        assert command[command.index("--precision") + 1] == precision
+
+
+def test_native_runner_passes_explicit_precision_and_preserves_defaults(example, fixture_data, tmp_path, monkeypatch):
+    native = importlib.import_module("experiment_comparison.native")
+    observed = []
+
+    class TrainerConstructed(Exception):
+        pass
+
+    def trainer(**kwargs):
+        observed.append(kwargs)
+        raise TrainerConstructed
+
+    monkeypatch.setattr(native.pl, "Trainer", trainer)
+    for name, arguments in (("default", []), ("cuda", ["--accelerator", "cuda", "--precision", "16-mixed"])):
+        with pytest.raises(TrainerConstructed):
+            native.main(["fit", "--data-manifest", str(fixture_data), "--output-dir", str(tmp_path / name), *arguments])
+    assert [(item["accelerator"], item["precision"], item["devices"]) for item in observed] == [
+        ("cpu", "32-true", 1),
+        ("cuda", "16-mixed", 1),
+    ]
+    options = example.workflow.build_parser().parse_args(["--output-dir", str(tmp_path / "defaults")])
+    assert (options.accelerator, options.precision) == ("cpu", "32-true")
+
+
+@pytest.mark.parametrize("backend", ["lighter", "native"])
+def test_workflow_rejects_a_successful_child_with_precision_fallback(example, fixture_data, tmp_path, monkeypatch, backend):
+    output = tmp_path / "workflow"
+
+    def child(command, **kwargs):
+        if "inspect" in command:
+            return SimpleNamespace(stdout="{}", returncode=0)
+        stage = output / "initial-validation"
+        record = stage / "lighter_runs" / "attempt" / "record.json" if backend == "lighter" else stage / "native-attempt.json"
+        record.parent.mkdir(parents=True)
+        example.artifacts.write_json(record, {"attempt_id": "attempt", "status": "completed"})
+        example.artifacts.write_json(stage / "runtime.json", {"execution": {"device": "cpu", "precision": "bf16-mixed"}})
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(example.workflow.subprocess, "run", child)
+    options = example.workflow.build_parser().parse_args(
+        ["--backend", backend, "--data-manifest", str(fixture_data), "--output-dir", str(output), "--precision", "16-mixed"]
+    )
+    with pytest.raises(ValueError, match="different device or precision"):
+        example.workflow.run(options)
+    receipt = json.loads((output / "workflow.json").read_text())
+    assert receipt["stages"][0]["exit_code"] == 0  # Process success cannot certify the requested precision.
+    assert receipt["requested_precision"] == "16-mixed"
