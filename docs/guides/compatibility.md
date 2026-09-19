@@ -41,7 +41,7 @@ For an RTX 5080/CUDA 12.8 qualification, install the official `torch==2.7.1+cu12
 <a id="editable-development"></a>
 ### Editable development
 
-To edit the frameworks themselves, use the public sibling clones and editable installation in [Contributing](https://github.com/project-lighter/lighter/blob/codex/reliability-and-documentation/CONTRIBUTING.md). A wheel/VCS user install does not follow changes in a local checkout. Do not substitute registry-only `pip install lighter` or `uv sync` for the explicit development pair.
+To edit the frameworks themselves, use the public sibling clones and editable installation in [Contributing](https://github.com/project-lighter/lighter/blob/854418a15478a7b35e0f885e3883218fe2d728a7/CONTRIBUTING.md). A wheel/VCS user install does not follow changes in a local checkout. Do not substitute registry-only `pip install lighter` or `uv sync` for the explicit development pair.
 
 ## Exact validation profiles
 
