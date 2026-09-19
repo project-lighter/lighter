@@ -13,10 +13,11 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write
 
 env:
   FORCE_COLOR: 1
+  # Temporary reviewed companion until the compatible release is available.
+  PAIRED_SPARKWHEEL_SHA: f7f154bc87a9a409ed7548a9cde89cc566813ce4
 
 jobs:
   quality:
@@ -35,11 +36,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
           install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
+          paired-sparkwheel-sha: ${{ github.event_name == 'pull_request' && matrix.check == 'types' && env.PAIRED_SPARKWHEEL_SHA || '' }}
 
       - name: Run format check
         if: matrix.check == 'format'
@@ -51,7 +54,7 @@ jobs:
 
       - name: Run type check
         if: matrix.check == 'types'
-        run: uv run mypy src
+        run: uv run --no-sync mypy src
 
   tests:
     name: Tests (Python 3.12)
@@ -62,21 +65,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
+          paired-sparkwheel-sha: ${{ github.event_name == 'pull_request' && env.PAIRED_SPARKWHEEL_SHA || '' }}
 
       - name: Run pytest with coverage
         run: |
-          uv run coverage run -m pytest tests --durations=10 -m "not slow" \
+          uv run --no-sync coverage run -m pytest tests --durations=10 -m "not slow" \
             --junit-xml=test-results.xml \
             --html=test-report.html --self-contained-html
-          uv run coverage combine
+          uv run --no-sync coverage combine
 
       - name: Generate test summary
         if: always()
-        run: python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
+        run: python3 .github/scripts/test_summary.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
@@ -90,11 +95,13 @@ jobs:
             test-report.html
             .coverage
             .coverage.*
+            paired-ci-requirements.txt
 
       - name: Generate coverage report
-        run: uv run coverage xml
+        run: uv run --no-sync coverage xml
 
       - name: Upload coverage to Codecov
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: codecov/codecov-action@v5.4.3
         with:
           files: ./coverage.xml

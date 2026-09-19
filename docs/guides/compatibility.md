@@ -61,7 +61,13 @@ The generated hash lock refers to retained local wheels and its platform. Keep t
 
 The old lock selected incompatible Sparkwheel 0.0.x and has been removed. A registry-only resolution cannot reproduce this pair until a compatible distribution is available in that registry. The local paired workflow supplies the source or built wheel explicitly.
 
-CI checks the required registry version before runtime installation. Availability is not qualification; unavailable dependency jobs are not passing jobs. Remote matrix definitions describe intended checks, not evidence that an unpublished pair passed.
+Main, full-matrix, documentation and other default CI callers check the required registry version before runtime installation. Availability is not qualification; unavailable dependency jobs are not passing jobs.
+
+For this unpublished pair, PR type/test jobs use a temporary, explicit Sparkwheel commit pinned in `.github/workflows/ci.yml`. The setup action checks out that exact commit from the public companion repository, verifies its identity, and installs both sources together with the development group and existing reference/build constraints. The job summary records the actual tested Lighter checkout separately from its PR head, companion commit, versions and import origins. The resolved environment is logged and included in the ordinary test artifact as `paired-ci-requirements.txt`; this is not an offline lock.
+
+Paired jobs use `uv run --no-sync` so later commands consume that installed environment. Their existing Python 3.12/Ubuntu checks and coverage gate remain in place; the Python 3.11 local profile does not certify that combination. A changed companion requires updating the full commit pin and checking the new pair. Format/lint jobs do not receive the companion checkout. PR jobs receive no Codecov secret; coverage calculation still runs.
+
+This PR-only source route does not establish registry delivery or make default main/deployment jobs pass. Remote matrix definitions describe intended checks until actual results exist. Resolve the publication and registry-lock sequence below before merging for release readiness; a green paired PR is insufficient by itself.
 
 When a release is separately authorized, qualify the exact pair, publish compatible Sparkwheel first, regenerate and verify Lighter's registry lock, then qualify and release Lighter. See uv's distinction between [locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/). No publication is part of local installation.
 

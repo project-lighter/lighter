@@ -13,24 +13,127 @@ inputs:
     description: 'Dependency groups to install'
     required: false
     default: '--all-extras --all-groups'
+  paired-sparkwheel-sha:
+    description: 'Exact public Sparkwheel commit for temporary paired-source PR checks'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
+    - name: Validate paired-source inputs
+      env:
+        PAIR_SHA: ${{ inputs.paired-sparkwheel-sha }}
+        INSTALL_DEPS: ${{ inputs.install-deps }}
+        INSTALL_GROUPS: ${{ inputs.install-groups }}
+      run: |
+        if [[ -n "$PAIR_SHA" ]]; then
+          if [[ ! "$PAIR_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo 'paired-sparkwheel-sha must be a full 40-character hexadecimal commit SHA.' >&2
+            exit 1
+          fi
+          if [[ "$INSTALL_DEPS" != 'true' ]]; then
+            echo 'Paired-source setup requires install-deps: true.' >&2
+            exit 1
+          fi
+          if [[ "$INSTALL_GROUPS" != '--all-extras --all-groups' ]]; then
+            echo 'Paired-source setup installs the dev group; custom install-groups are unsupported.' >&2
+            exit 1
+          fi
+        fi
+      shell: bash
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
+        version: '0.12.6'
         python-version: ${{ inputs.python-version }}
         enable-cache: true
 
     - name: Check paired dependency availability
-      if: inputs.install-deps == 'true'
+      if: inputs.install-deps == 'true' && inputs.paired-sparkwheel-sha == ''
       run: >-
         uv run --no-project --python '${{ inputs.python-version }}'
         --with 'tomli>=2.0.1; python_version < "3.11"'
         python .github/scripts/check_release_dependencies.py
       shell: bash
 
-    - name: Install dependencies
-      if: inputs.install-deps == 'true'
+    - name: Install registry dependencies
+      if: inputs.install-deps == 'true' && inputs.paired-sparkwheel-sha == ''
       run: uv sync ${{ inputs.install-groups }}
+      shell: bash
+
+    - name: Check out the exact public companion
+      if: inputs.paired-sparkwheel-sha != ''
+      uses: actions/checkout@v4
+      with:
+        repository: project-lighter/sparkwheel
+        ref: ${{ inputs.paired-sparkwheel-sha }}
+        path: .ci-deps/sparkwheel
+        persist-credentials: false
+
+    - name: Verify companion identity and fresh environment
+      if: inputs.paired-sparkwheel-sha != ''
+      env:
+        PAIR_SHA: ${{ inputs.paired-sparkwheel-sha }}
+      run: |
+        expected=$(printf '%s' "$PAIR_SHA" | tr '[:upper:]' '[:lower:]')
+        actual=$(git -C .ci-deps/sparkwheel rev-parse HEAD)
+        if [[ "$actual" != "$expected" ]]; then
+          echo "Companion SHA mismatch: expected $expected, found $actual." >&2
+          exit 1
+        fi
+        if [[ -e .venv || -L .venv ]]; then
+          echo 'Paired-source setup requires a fresh .venv path.' >&2
+          exit 1
+        fi
+      shell: bash
+
+    - name: Install and inspect the source pair
+      if: inputs.paired-sparkwheel-sha != ''
+      env:
+        PYTHON_VERSION: ${{ inputs.python-version }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        uv venv --python "$PYTHON_VERSION" .venv
+        uv pip install --python .venv/bin/python \
+          --constraints requirements/profiles/reference.constraints \
+          --build-constraints requirements/profiles/build.constraints \
+          --group dev --editable . --editable .ci-deps/sparkwheel
+        uv pip check --python .venv/bin/python
+        .venv/bin/python - <<'PYTHON'
+        import hashlib
+        import importlib
+        import importlib.metadata
+        import os
+        import platform
+        import subprocess
+        from pathlib import Path
+
+        def git_head(path):
+            return subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+
+        lines = [
+            "### Paired-source CI",
+            f"- Lighter tested checkout: `{git_head('.')}`",
+            f"- Lighter PR head: `{os.environ['PR_HEAD_SHA']}`",
+            f"- Sparkwheel checkout: `{git_head('.ci-deps/sparkwheel')}`",
+            f"- Python: `{platform.python_version()}`",
+            f"- uv: `{subprocess.check_output(['uv', '--version'], text=True).strip()}`",
+        ]
+        for name, source in (("lighter", "src/lighter"), ("sparkwheel", ".ci-deps/sparkwheel/src/sparkwheel")):
+            module = importlib.import_module(name)
+            origin = Path(module.__file__).resolve()
+            expected = (Path(source) / "__init__.py").resolve()
+            if origin != expected:
+                raise SystemExit(f"Unexpected {name} import origin: {origin}; expected {expected}")
+            lines.append(f"- {name}: `{importlib.metadata.version(name)}`, imported from `{origin}`")
+        for filename in ("reference.constraints", "build.constraints"):
+            path = Path("requirements/profiles") / filename
+            lines.append(f"- {path}: SHA256 `{hashlib.sha256(path.read_bytes()).hexdigest()}`")
+        report = "\n".join(lines) + "\n"
+        print(report)
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+            summary.write(report)
+        PYTHON
+        uv pip freeze --python .venv/bin/python | tee paired-ci-requirements.txt
       shell: bash

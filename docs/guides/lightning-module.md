@@ -46,9 +46,7 @@ class RegressionTask(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.SGD(
-            self.parameters(), lr=self.learning_rate, momentum=0.2
-        )
+        return torch.optim.SGD(self.parameters(), lr=self.learning_rate, momentum=0.2)
 ```
 
 This is a training-only module, not the full diagnostic replacement: add validation, test and prediction behavior before using those stages or a validation monitor. The existing [Compare and Continue native implementation](../examples/index.md) provides the complete research comparison.
