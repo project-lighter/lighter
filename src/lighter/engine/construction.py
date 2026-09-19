@@ -7,7 +7,7 @@ from pydoc import locate
 from typing import Any
 
 from sparkwheel import Component
-from sparkwheel.construction import RetainedConfig
+from sparkwheel.construction import BlockedPathError, ResolutionScope, RetainedConfig
 from torch.nn import Module, Parameter
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
@@ -16,6 +16,24 @@ from lighter.model import LighterModule
 
 _FIELDS = {name for name in inspect.signature(LighterModule.__init__).parameters if name != "self"}
 _DEFERRED = {"optimizer", "scheduler"}
+
+
+def _resolve_managed_path(scope: ResolutionScope, path: str, deferred: set[str]) -> Any:
+    """Explain only blockers installed by the managed optimizer binding."""
+    try:
+        return scope.resolve(path)
+    except BlockedPathError as error:
+        # blocked_path is the registered root, not the requested descendant.
+        if error.blocked_path not in {f"model::{name}" for name in deferred}:
+            raise
+        raise ValueError(
+            f"{error}\n"
+            "Runner-managed optimizer and scheduler definitions are reserved for native configure_optimizers setup. "
+            "Share a top-level scalar when an eager component needs a requested setting. "
+            "For ordinary Trainer.fit, read trainer.optimizers in on_train_start after setup/restoration "
+            "for effective settings. A custom lifecycle owns availability; use native custom ownership "
+            "when construction requires a live optimizer."
+        ) from error
 
 
 def _has_owned_input(value: Any) -> bool:
@@ -119,7 +137,7 @@ def resolve_managed_model(view: Any) -> LighterModule | None:
     blocked = view.blocked_paths | {f"model::{name}" for name in deferred}
     view.scope = view.recipe.scope(bindings=view.bindings, blocked_paths=blocked)
     values = {
-        name: view.scope.resolve(f"model::{name}")
+        name: _resolve_managed_path(view.scope, f"model::{name}", deferred)
         for name in definition
         if name not in Component.non_arg_keys and name not in _DEFERRED
     }

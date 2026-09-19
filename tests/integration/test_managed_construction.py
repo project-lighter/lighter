@@ -6,7 +6,8 @@ import pickle
 import pytest
 import torch
 from pytorch_lightning import Callback, LightningModule, Trainer
-from sparkwheel import Config
+from sparkwheel import Config, InstantiationError
+from sparkwheel.construction import BlockedPathError
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -469,3 +470,123 @@ def test_evaluation_only_does_not_construct_unneeded_optimizer(tmp_path):
     assert captured.model.optimizer is None
     assert captured.model.scheduler is None
     assert captured.trainer.callback_metrics["test/loss/epoch"].isfinite()
+
+
+class DiagnosticValue(Callback):
+    def __init__(self, value):
+        self.value = value
+
+
+@pytest.fixture
+def managed_diagnostic_construction(tmp_path, monkeypatch):
+    events = []
+    for name, cls in (
+        ("network", nn.Linear),
+        ("model", LighterModule),
+        ("trainer", Trainer),
+        ("callback", DiagnosticValue),
+        ("optimizer", torch.optim.SGD),
+    ):
+        original = cls.__init__
+
+        def counted(self, *args, _name=name, _original=original, **kwargs):
+            events.append(_name)
+            _original(self, *args, **kwargs)
+
+        monkeypatch.setattr(cls, "__init__", counted)
+    config = recipe(tmp_path)
+    config["trainer"]["callbacks"] = [{"_target_": f"{__name__}.DiagnosticValue", "value": "@learning_rate"}]
+    config["learning_rate"] = 0.05
+    return config, events
+
+
+@pytest.mark.parametrize(
+    ("dependency", "requested", "blocked"),
+    [
+        ("@model::optimizer", "model::optimizer", "model::optimizer"),
+        ("@model::optimizer::lr", "model::optimizer::lr", "model::optimizer"),
+        ("$@model::optimizer::lr + 0", "model::optimizer::lr", "model::optimizer"),
+        ("@model::scheduler::scheduler::step_size", "model::scheduler::scheduler::step_size", "model::scheduler"),
+    ],
+)
+def test_managed_diagnostic_callback_paths_preserve_cause_before_construction(
+    managed_diagnostic_construction, dependency, requested, blocked
+):
+    config, events = managed_diagnostic_construction
+    config["trainer"]["callbacks"][0]["value"] = dependency
+    view = _ResolutionView(Config(data=config), Stage.FIT, {})
+    Runner()._resolve_model(view)
+    with pytest.raises(ValueError, match="Runner-managed.*configure_optimizers") as caught:
+        Runner()._resolve_trainer(view)
+    cause = caught.value.__cause__
+    assert isinstance(cause, BlockedPathError)
+    assert cause.requested_path == requested
+    assert cause.blocked_path == blocked
+    assert str(caught.value).startswith(str(cause) + "\n")
+    assert "top-level scalar" in str(caught.value)
+    assert "ordinary Trainer.fit" in str(caught.value)
+    assert "trainer.optimizers in on_train_start" in str(caught.value)
+    assert "custom lifecycle owns availability" in str(caught.value)
+    assert events == ["network", "model"]
+
+
+def test_managed_diagnostic_eager_field_uses_local_deferred_paths(managed_diagnostic_construction):
+    config, events = managed_diagnostic_construction
+    config["model"]["criterion"] = "@model::optimizer"
+    view = _ResolutionView(Config(data=config), Stage.FIT, {})
+    with pytest.raises(ValueError, match="Runner-managed.*configure_optimizers") as caught:
+        Runner()._resolve_model(view)
+    assert view.managed_binding is None
+    cause = caught.value.__cause__
+    assert isinstance(cause, BlockedPathError)
+    assert cause.requested_path == cause.blocked_path == "model::optimizer"
+    assert events == ["network"]
+
+
+def test_managed_diagnostic_shared_requested_scalar_requires_no_optimizer(managed_diagnostic_construction):
+    config, events = managed_diagnostic_construction
+    view = _ResolutionView(Config(data=config), Stage.FIT, {})
+    model = Runner()._resolve_model(view)
+    trainer = Runner()._resolve_trainer(view)
+    callback = next(callback for callback in trainer.callbacks if isinstance(callback, DiagnosticValue))
+    assert callback.value == 0.05
+    assert model.optimizer is model.scheduler is None
+    assert events == ["network", "model", "callback", "trainer"]
+
+
+def test_managed_diagnostic_inactive_stage_blocker_has_no_optimizer_guidance(managed_diagnostic_construction):
+    config, events = managed_diagnostic_construction
+    config["args"]["test"] = {"dataloaders": {"_target_": f"{__name__}.fail_if_constructed"}}
+    config["trainer"]["callbacks"][0]["value"] = "@args::test::dataloaders"
+    view = _ResolutionView(Config(data=config), Stage.FIT, {})
+    Runner()._resolve_model(view)
+    with pytest.raises(BlockedPathError) as caught:
+        Runner()._resolve_trainer(view)
+    assert caught.value.requested_path == "args::test::dataloaders"
+    assert caught.value.blocked_path == "args::test"
+    assert caught.value.__cause__ is None
+    assert "Runner-managed" not in str(caught.value)
+    assert events == ["network", "model"]
+
+
+def test_managed_diagnostic_does_not_scrape_unrelated_constructor_errors(managed_diagnostic_construction):
+    config, events = managed_diagnostic_construction
+    original = ValueError("Cannot resolve 'model::optimizer::lr': construction path 'model::optimizer' is blocked")
+
+    def fail():
+        raise original
+
+    config["trainer"]["callbacks"] = [{"_target_": fail}]
+    view = _ResolutionView(Config(data=config), Stage.FIT, {})
+    Runner()._resolve_model(view)
+    with pytest.raises(InstantiationError) as caught:
+        Runner()._resolve_trainer(view)
+    assert str(original) in str(caught.value)
+    chain = []
+    error = caught.value
+    while error is not None:
+        chain.append(error)
+        assert "Runner-managed" not in str(error)
+        error = error.__cause__
+    assert original in chain
+    assert events == ["network", "model"]

@@ -14,8 +14,8 @@ from loguru import logger
 from pytorch_lightning import Callback, LightningDataModule, LightningModule, Trainer, seed_everything
 from sparkwheel import Config, ValidationError
 
-from lighter.engine.construction import resolve_managed_model
-from lighter.engine.records import RunRecorder, atomic_write, describe
+from lighter.engine.construction import _resolve_managed_path, resolve_managed_model
+from lighter.engine.records import RunRecorder, _validate_literal_run_options, atomic_write, describe
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types.enums import Stage
 
@@ -83,7 +83,9 @@ class _ResolutionView:
         return self.source.get(path, default)
 
     def resolve(self, path: str) -> Any:
-        return self.scope.resolve(path)
+        if self.managed_binding is None:
+            return self.scope.resolve(path)
+        return _resolve_managed_path(self.scope, path, self.managed_binding.deferred)
 
 
 def _publish_source(source: dict[str, Any], trainer: Trainer) -> None:
@@ -166,6 +168,7 @@ class Runner:
             raise ValueError("seed must be an integer between 0 and 4294967295 (default: 0)")
         seed_everything(seed, workers=True)
         self._validate_stage_args(config, stage, stage_kwargs)
+        _validate_literal_run_options(config.get("run", {}))
 
         # 2. Auto-discover and import project
         ProjectImporter.auto_discover_and_import()

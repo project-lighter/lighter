@@ -59,7 +59,7 @@ model:
 
 This is an overlay for an existing recipe. An eager callback may also use `@learning_rate`. Referencing `@model::optimizer::lr` enters the blocked optimizer subtree and fails with its source path.
 
-To observe the **effective restored** LR, read `trainer.optimizers` in a native runtime hook such as `on_train_start`. [Compare and Continue](../examples/index.md) and [records](experiment-records.md#requested-settings-and-restored-results) demonstrate the distinction.
+For ordinary `Trainer.fit`, observe the **effective restored** LR through `trainer.optimizers` in `on_train_start`, after native setup and checkpoint restoration. A custom lifecycle owns when those objects are available. [Compare and Continue](../examples/index.md) and [records](experiment-records.md#requested-settings-and-restored-results) demonstrate the distinction.
 
 ### Custom construction and strategies
 

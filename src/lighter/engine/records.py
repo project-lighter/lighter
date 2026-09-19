@@ -112,6 +112,38 @@ def _environment() -> dict[str, Any]:
     }
 
 
+_RUN_RECORD_OPTIONS = {"root_dir", "name", "experiment_id", "parent_attempt_id"}
+
+
+def _validate_run_options(options: dict[str, Any], *, literal_only: bool = False) -> None:
+    unknown = options.keys() - _RUN_RECORD_OPTIONS
+    if unknown:
+        raise ValueError(f"Unknown run record options: {sorted(unknown)}")
+    for key, value in options.items():
+        if literal_only:
+            if type(value) is str and value.startswith(("@", "%", "$")):
+                continue
+            if type(value) is dict and "_target_" in value:
+                continue
+            if type(value) not in (str, bool, int, float, list, tuple, dict, type(None)):
+                continue  # Opaque values and subclasses wait for authoritative resolution.
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"run::{key} must be a nonempty literal string")
+
+
+def _validate_literal_run_options(options: Any) -> None:
+    """Reject certain source mistakes without resolving definitions or inspecting opaque values."""
+    if options is False:
+        return
+    if not isinstance(options, dict):
+        raise TypeError("run must be false or a mapping of experiment record options")
+    if type(options) is not dict or any(type(key) is not str for key in options):
+        return
+    if "_target_" in options:
+        return
+    _validate_run_options(options, literal_only=True)
+
+
 class RunRecorder(Callback):
     """Record one native stage attempt. All ranks participate; only rank zero writes."""
 
@@ -131,13 +163,7 @@ class RunRecorder(Callback):
         self.seed = seed
         self.requested_args = describe(requested_args)
         self.options = dict(options or {})
-        allowed = {"root_dir", "name", "experiment_id", "parent_attempt_id"}
-        unknown = self.options.keys() - allowed
-        if unknown:
-            raise ValueError(f"Unknown run record options: {sorted(unknown)}")
-        for key, value in self.options.items():
-            if not isinstance(value, str) or not value:
-                raise ValueError(f"run::{key} must be a nonempty literal string")
+        _validate_run_options(self.options)
         self.inputs = describe(inputs)
         self.input_files = []
         for item in inputs:

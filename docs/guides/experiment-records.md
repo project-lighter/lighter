@@ -16,7 +16,7 @@ run:
   # parent_attempt_id: previous-attempt-id
 ```
 
-Names and experiment IDs group observations; they are not recipe hashes or execution identities. Set `parent_attempt_id` to the actual earlier attempt when linking a continuation or branch. A checkpoint path alone does not establish lineage. Omit absent optional fields; `parent_attempt_id: null` is invalid. `run: false` disables local records.
+Names and experiment IDs group observations; they are not recipe hashes or execution identities. Set `parent_attempt_id` to the actual earlier attempt when linking a continuation or branch. A checkpoint path alone does not establish lineage. Omit absent optional fields; `parent_attempt_id: null` is invalid. `run: false` disables local records. Invalid literal options fail before project import or model, Trainer and data construction. References, expressions and component values are checked after their normal resolution.
 
 Attempt identity does not make scientific output paths exclusive. Choose fresh directories for separate research stages and concurrent attempts. The diagnostic intentionally shares one directory through a sequential workflow; Compare and Continue rejects reused stage directories.
 

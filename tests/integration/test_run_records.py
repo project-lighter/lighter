@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from pytorch_lightning import Callback, LightningModule, Trainer
+from pytorch_lightning import Callback, LightningDataModule, LightningModule, Trainer
 from torch.utils.data import DataLoader
 
 from lighter import LighterModule
@@ -328,3 +328,177 @@ def test_package_git_provenance_requires_a_tracked_module(tmp_path, monkeypatch,
     else:
         assert evidence["commit"]
         assert Path(evidence["root"]).resolve() == tmp_path.resolve()
+
+
+@pytest.fixture
+def record_construction(tmp_path, monkeypatch):
+    """Count real construction, replacing only project discovery and native stage execution."""
+    from lighter import Runner
+    from lighter.engine.runner import ProjectImporter
+
+    events = []
+    for name, cls in (
+        ("network", torch.nn.Linear),
+        ("model", LighterModule),
+        ("trainer", Trainer),
+        ("data", LightningDataModule),
+        ("optimizer", torch.optim.SGD),
+    ):
+        original = cls.__init__
+
+        def counted(self, *args, _name=name, _original=original, **kwargs):
+            events.append(_name)
+            _original(self, *args, **kwargs)
+
+        monkeypatch.setattr(cls, "__init__", counted)
+
+    original_save = Runner._save_config
+
+    def save(self, *args, **kwargs):
+        events.append("snapshot")
+        return original_save(self, *args, **kwargs)
+
+    def stage(self, stage, model, trainer, datamodule, **kwargs):
+        events.append("stage")
+        return [callback.options for callback in trainer.callbacks if isinstance(callback, RunRecorder)]
+
+    monkeypatch.setattr(ProjectImporter, "auto_discover_and_import", lambda: events.append("project"))
+    monkeypatch.setattr(Runner, "_execute", stage)
+    monkeypatch.setattr(Runner, "_save_config", save)
+    config = {
+        "model": {
+            "_target_": f"{__name__}.OpaqueInputTask",
+            "network": {"_target_": "torch.nn.Linear", "in_features": 1, "out_features": 1},
+            "optimizer": {"_target_": "torch.optim.SGD", "params": "$@model::network.parameters()", "lr": 0.05},
+        },
+        "trainer": {
+            "_target_": "pytorch_lightning.Trainer",
+            "accelerator": "cpu",
+            "devices": 1,
+            "logger": False,
+            "enable_checkpointing": False,
+            "enable_progress_bar": False,
+            "enable_model_summary": False,
+            "default_root_dir": str(tmp_path),
+        },
+        "data": {"_target_": "pytorch_lightning.LightningDataModule"},
+    }
+    return Runner(), config, events
+
+
+@pytest.mark.parametrize("options", [None, True, 1, [], "@options", "%options", "$dict()"])
+def test_literal_record_envelope_fails_before_construction(record_construction, options):
+    runner, config, events = record_construction
+    config["run"] = options
+    with pytest.raises(TypeError, match="run must be false or a mapping of experiment record options"):
+        runner.run("fit", [config])
+    assert events == []
+    assert runner.last_run_path is None
+    assert list(Path(config["trainer"]["default_root_dir"]).rglob("config.yaml")) == []
+
+
+@pytest.mark.parametrize("options", [{"unknown": "@missing"}, {"_disabled_": True}])
+def test_literal_record_unknown_key_fails_before_construction(record_construction, options):
+    runner, config, events = record_construction
+    config["run"] = options
+    with pytest.raises(ValueError, match="Unknown run record options"):
+        runner.run("fit", [config])
+    assert events == []
+
+
+@pytest.mark.parametrize("value", [None, "", False, 0, 0.5, [], ["$1 / 0"], {}, ()])
+def test_literal_record_value_fails_before_construction(record_construction, value):
+    runner, config, events = record_construction
+    config["run"] = {"parent_attempt_id": value}
+    with pytest.raises(ValueError, match="run::parent_attempt_id must be a nonempty literal string"):
+        runner.run("fit", [config])
+    assert events == []
+    assert list(Path(config["trainer"]["default_root_dir"]).rglob("config.yaml")) == []
+
+
+@pytest.mark.parametrize("invalid", [{"seed": True}, {"args": {"unknown": {}}}])
+def test_literal_record_check_preserves_seed_and_stage_error_precedence(record_construction, invalid):
+    runner, config, events = record_construction
+    config.update(invalid, run=None)
+    expected = "seed must be an integer" if "seed" in invalid else "Unknown stage"
+    with pytest.raises(ValueError, match=expected):
+        runner.run("fit", [config])
+    assert events == []
+
+
+@pytest.mark.parametrize("options", [None, False, {}, {"name": " "}, {"name": "trial", "experiment_id": "series"}])
+def test_literal_record_valid_options_reach_native_stage_boundary(record_construction, options):
+    runner, config, events = record_construction
+    if options is not None:  # None here denotes an omitted source section, not a null option.
+        config["run"] = options
+    result = runner.run("fit", [config])
+    assert result == ([] if options is False else [options or {}])
+    assert events == ["project", "network", "model", "trainer", "data", "snapshot", "stage"]
+
+
+@pytest.mark.parametrize("kind", ["reference", "copy", "expression", "component", "whole"])
+@pytest.mark.parametrize("value", ["trial", None])
+def test_dynamic_record_options_keep_normal_resolution_and_final_validation(record_construction, kind, value):
+    runner, config, events = record_construction
+
+    def dynamic():
+        events.append("dynamic")
+        return {"name": value} if kind == "whole" else value
+
+    component = {"_target_": dynamic}
+    config["label"] = component
+    definitions = {"reference": "@label", "copy": "%label", "expression": "$@label", "component": component}
+    config["run"] = component if kind == "whole" else {"name": definitions[kind]}
+    if value is None and kind not in {"copy", "component"}:
+        with pytest.raises(ValueError, match="run::name must be a nonempty literal string"):
+            runner.run("fit", [config])
+        assert events == ["project", "network", "model", "trainer", "data", "snapshot", "dynamic"]
+    else:
+        # A nested component returning None is pruned by Sparkwheel; references
+        # and expressions returning None remain values for final validation.
+        expected = {} if value is None else {"name": "trial"}
+        assert runner.run("fit", [config]) == [expected]
+        assert events == ["project", "network", "model", "trainer", "data", "snapshot", "dynamic", "stage"]
+
+
+@pytest.mark.parametrize("resolved", [None, False, 0, [], {}, [("name", "trial")]])
+def test_dynamic_record_component_preserves_existing_option_normalization(record_construction, resolved):
+    runner, config, events = record_construction
+
+    def dynamic():
+        events.append("dynamic")
+        return resolved
+
+    config["run"] = {"_target_": dynamic}
+    expected = {"name": "trial"} if resolved else {}
+    assert runner.run("fit", [config]) == [expected]
+    assert events == ["project", "network", "model", "trainer", "data", "snapshot", "dynamic", "stage"]
+    direct = RunRecorder(source={}, stage="fit", seed=0, requested_args={}, inputs=[], options=resolved)
+    assert direct.options == expected
+
+
+def test_literal_record_check_does_not_inspect_opaque_values_or_subclasses():
+    from lighter.engine.records import _validate_literal_run_options
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Early validation must not invoke opaque user methods")
+
+    class Opaque:
+        __bool__ = __iter__ = __repr__ = forbidden
+
+    class CustomString(str):
+        startswith = __bool__ = forbidden
+
+    class CustomMapping(dict):
+        __contains__ = __iter__ = keys = items = forbidden
+
+    for value in (Opaque(), CustomString("dynamic"), CustomMapping()):
+        _validate_literal_run_options({"name": value})
+    _validate_literal_run_options(CustomMapping(name="trial"))
+
+    class CustomKey(str):
+        pass
+
+    options = {CustomKey("name"): "trial"}
+    CustomKey.__hash__ = CustomKey.__eq__ = forbidden
+    _validate_literal_run_options(options)
