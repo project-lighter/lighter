@@ -4,10 +4,10 @@ Run one complete experiment on CPU with generated data and no external logger. Y
 
 ## Install and run
 
-First follow [installation](guides/compatibility.md#install-the-current-source-pair). Keep that environment active. From the `project-lighter` directory containing the supplied sibling checkouts:
+First follow [installation](guides/compatibility.md#install-the-current-source-pair). Keep that environment active. From the `lighter-start` directory containing the pinned example checkout:
 
 ```bash
-cd lighter/projects/tabular_regression
+cd lighter-examples/projects/tabular_regression
 ```
 
 The project already contains `__lighter__.py`, `__init__.py`, `task.py` and `config.yaml`. Use a new `outputs/first-experiment` directory for this sequence. If it exists, choose a different name consistently; the commands do not clean previous runs.

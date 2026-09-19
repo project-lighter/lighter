@@ -2,7 +2,7 @@
 
 A recipe composes Python objects and values. Lighter uses Sparkwheel for this composition, then passes the resulting objects to native Lightning. Scientific behavior stays in your module and data code.
 
-For this unpublished pair, the matching configuration reference is in the supplied sibling checkout at `sparkwheel/docs/user-guide/`. Links to the [upstream Sparkwheel site](https://project-lighter.github.io/sparkwheel/) may describe a different released version.
+For the pinned installation snapshot, read the [matching Sparkwheel reference](https://github.com/project-lighter/sparkwheel/tree/c2286a0626748e913296d7127c16060cb705b6d0/docs/user-guide). Links to the [upstream Sparkwheel site](https://project-lighter.github.io/sparkwheel/) may describe a different released version.
 
 Use the existing [quick-start project](../quickstart.md) for a complete runnable recipe. The YAML below illustrates individual sections and overlays.
 

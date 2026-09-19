@@ -17,7 +17,7 @@ permissions:
 env:
   FORCE_COLOR: 1
   # Temporary reviewed companion until the compatible release is available.
-  PAIRED_SPARKWHEEL_SHA: c2286a0626748e913296d7127c16060cb705b6d0
+  PAIRED_SPARKWHEEL_SHA: b73e786e8716d11a77206fb3482d21a621a4ba81
 
 jobs:
   quality:

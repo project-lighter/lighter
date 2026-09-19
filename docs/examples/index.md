@@ -6,7 +6,7 @@ Choose an example by the decision you need to make.
 |---|---|---|
 | [Download-free diagnostic](../quickstart.md) | Check fit/evaluation/export/continuation and local records | Current source pair, CPU; generated data |
 | [Compare and Continue](compare-and-continue.md) | Compare learning rates, select on validation, evaluate a checkpoint, inspect restored state | Current pair, prepared CIFAR-10 subset, declared CPU budget |
-| Earlier integrations in the supplied `projects/` directory | Explore domain-specific reference code | Each project's scientific and dependency checks |
+| Earlier integrations in the example checkout’s `projects/` directory | Explore domain-specific reference code | Each project's scientific and dependency checks |
 
 ## What to learn from the walkthrough
 
@@ -18,7 +18,7 @@ The workflow distinguishes validation-selected versus last checkpoints, immutabl
 
 The old CIFAR classifier is superseded for onboarding. Text, LoRA and self-supervision remain legacy references; vision-language, video, segmentation and EEG are specialist illustrations awaiting their own declared scientific/dependency qualification. A passing import or another example's result does not make them universally ready research protocols.
 
-See `projects/README.md` in the supplied checkout for each disposition. These examples demonstrate possible domains; they do not make medical imaging the organizing scope of Lighter.
+See `projects/README.md` in the pinned example checkout for each disposition. These examples demonstrate possible domains; they do not make medical imaging the organizing scope of Lighter.
 
 ## Create your own project
 

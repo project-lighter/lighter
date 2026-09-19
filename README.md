@@ -6,9 +6,9 @@ Lighter supports ordinary LightningModules with their own hooks and optimization
 
 ## Start here
 
-This checkout is the unpublished development pair **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. Older published Sparkwheel packages do not provide the APIs this Lighter version requires.
+This checkout is the development pair **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. Older published Sparkwheel packages do not provide the APIs this Lighter version requires. Use the source documentation linked below for this pair; the hosted site may describe an earlier release.
 
-1. [Install the supplied source pair](docs/guides/compatibility.md#install-the-current-source-pair) in a fresh Python 3.11 environment.
+1. [Install the public source pair](docs/guides/compatibility.md#install-the-current-source-pair) in a fresh Python 3.11 environment.
 2. [Run your first experiment](docs/quickstart.md): inspect, change, fit, evaluate, export and continue a download-free CPU example.
 3. [Compare and Continue](projects/experiment_comparison/README.md): make a research decision on fixed CIFAR-10 populations, then follow the selected checkpoint and restored optimizer state.
 

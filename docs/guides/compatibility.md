@@ -1,32 +1,47 @@
 # Compatibility and installation
 
-This checkout is the unpublished development pair **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. Lighter requires `sparkwheel>=0.1.0.dev0,<0.2.0` for retained definitions and isolated resolution scopes. An older published Sparkwheel package cannot replace the supplied current source.
+The current development pair is **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. Both sources are public. Older PyPI Sparkwheel releases do not provide the APIs this Lighter version requires, so install both explicit source revisions together.
 
 ## Install the current source pair
 
-Use Python 3.11. The commands below assume you have received both source checkouts as siblings in this layout:
+Use Python 3.11, Git and a new working directory. This **immutable reviewed snapshot** is Lighter `61660b511026f914f1e4be54cadfeaa67bd1ec3d` with Sparkwheel `c2286a0626748e913296d7127c16060cb705b6d0`. It predates later changes on the review branches; a commit pin does not follow those branches. Release handoffs name the exact pair they qualify.
 
-```text
-project-lighter/
-├── lighter/
-└── sparkwheel/
-```
-
-Start in the directory containing `project-lighter`. The environment directory must be new. These commands install both local distributions in one resolver invocation; dependency downloads may need network access.
+On macOS or Linux, create a fresh environment and install the two distributions in one resolver invocation:
 
 ```bash
-cd project-lighter
+mkdir lighter-start
+cd lighter-start
 python3.11 -m venv .venv-lighter
 . .venv-lighter/bin/activate
-python -m pip install --constraint lighter/requirements/profiles/reference.constraints --editable ./sparkwheel --editable ./lighter
+python -m pip install "pip==26.0"
+LIGHTER_REV=61660b511026f914f1e4be54cadfeaa67bd1ec3d
+SPARKWHEEL_REV=c2286a0626748e913296d7127c16060cb705b6d0
+python -m pip install \
+  --constraint "https://raw.githubusercontent.com/project-lighter/lighter/$LIGHTER_REV/requirements/profiles/reference.constraints" \
+  --build-constraint "https://raw.githubusercontent.com/project-lighter/lighter/$LIGHTER_REV/requirements/profiles/build.constraints" \
+  "sparkwheel @ git+https://github.com/project-lighter/sparkwheel.git@$SPARKWHEEL_REV" \
+  "lighter @ git+https://github.com/project-lighter/lighter.git@$LIGHTER_REV"
 python -m pip check
-python -c "import lighter, sparkwheel; print(lighter.__file__); print(sparkwheel.__file__)"
+python -c "import lighter, sparkwheel; print(lighter.__version__, lighter.__file__); print(sparkwheel.__version__, sparkwheel.__file__)"
 ```
 
-The final command should name these two supplied source trees. If it names another checkout, inspect your environment and `PYTHONPATH` before proceeding. Keep this environment active and follow the [quick start](../quickstart.md), starting from the current `project-lighter` directory.
+Expect versions `0.2.0.dev0` and `0.1.0.dev0`, with imports inside `.venv-lighter`'s `site-packages`. Installation needs network access but no GitHub account. The constraints select the reference dependencies and build backend; they are not a complete transitive or offline lock. A fresh environment avoids reusing a different already-installed development snapshot. pip's installation metadata retains both VCS commit IDs.
+
+The examples live in the repository, outside the installed wheel. In the same `lighter-start` directory, with the environment still active, fetch the matching example files:
+
+```bash
+git clone https://github.com/project-lighter/lighter.git lighter-examples
+git -C lighter-examples checkout --detach "$LIGHTER_REV"
+```
+
+Now follow the [quick start](../quickstart.md). Installing and fetching examples are ordinary pip/Git operations; neither needs a supplied private checkout. Windows users can use `py -3.11` and the venv's PowerShell activation script, adapting the shell variable syntax. The literal commands above are POSIX shell commands.
+
+For an RTX 5080/CUDA 12.8 qualification, install the official `torch==2.7.1+cu128` and `torchvision==0.22.1+cu128` wheels first. Keep those exact local versions in an additional constraints file passed to the **same pair-install command**, together with the reference constraints. Check versions, import origins and `python -m pip check` afterward. The CPU/macOS reference profile does not establish CUDA success; use the separately qualified accelerator handoff for the complete GPU commands and evidence.
 
 <a id="editable-development"></a>
-This editable installation is the ordinary source-development route. It is distinct from the built-wheel qualification below. The profile constrains dependencies; it is not a complete transitive or offline lock. Do not substitute registry-only `pip install lighter` or `uv sync` for this unpublished pair.
+### Editable development
+
+To edit the frameworks themselves, use the public sibling clones and editable installation in [Contributing](https://github.com/project-lighter/lighter/blob/codex/reliability-and-documentation/CONTRIBUTING.md). A wheel/VCS user install does not follow changes in a local checkout. Do not substitute registry-only `pip install lighter` or `uv sync` for the explicit development pair.
 
 ## Exact validation profiles
 
@@ -43,7 +58,7 @@ Dependency bounds describe resolver compatibility, not every possible supported 
 
 ## Build and check the unpublished pair
 
-This section is for maintainers qualifying artifacts. It is not required to start the example after editable installation.
+This section is for maintainers qualifying artifacts. It is not required to start the example after the source-revision installation above.
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/). From the Lighter checkout, the existing script builds and installs both packages into a fresh environment, then executes the diagnostic outside the checkout:
 
@@ -87,4 +102,4 @@ just bump-dry release
 
 This previews 0.2.0.dev0 → 0.2.0 without writes, commits or tags. A numeric `patch` from 0.2.0.dev0 instead previews 0.2.1; use `release` to promote the existing development version. A new development cycle needs an explicit version decision.
 
-After separate authorization, `just bump <part>` updates metadata and creates its configured local commit and tag. It does not publish the dependency or regenerate the registry lock. Remote tag workflows may publish pushed tags; do not route development tags through them. Local preparation does not authorize a push or publication.
+After separate authorization, `just bump <part>` updates metadata and creates its configured local commit and tag. It does not publish the dependency or regenerate the registry lock. Remote publication requires a tag push named exactly `vMAJOR.MINOR.PATCH`, matching both package metadata and the source version, at a commit on fetched `main`. Development/prerelease tags and mismatches are rejected. Manual dispatch builds and retains workflow artifacts without publishing. The GitHub Release workflow applies the same stable-tag guard. Local preparation does not authorize a push or publication.

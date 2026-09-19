@@ -6,7 +6,7 @@ Lighter connects Python scientific code to YAML recipes and command-line overrid
 
 ## Get started
 
-[Install the current source pair](guides/compatibility.md#install-the-current-source-pair), then run the [download-free quick start](quickstart.md). The packages in this checkout are unpublished development versions; install both supplied sources together.
+[Install the current source pair](guides/compatibility.md#install-the-current-source-pair), then run the [download-free quick start](quickstart.md). The packages in this checkout are unpublished development versions; install both public source revisions together.
 
 | Task | Where to go | What you get |
 |---|---|---|

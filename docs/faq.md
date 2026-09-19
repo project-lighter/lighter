@@ -4,7 +4,7 @@ Start with the symptom, then follow the authoritative contract. The [quick start
 
 ## Installation or import fails
 
-The current checkout needs the supplied compatible Sparkwheel source. Follow the [paired installation](guides/compatibility.md#install-the-current-source-pair); do not silently downgrade to an older registry dependency.
+The current checkout needs the compatible public Sparkwheel source revision. Follow the [paired installation](guides/compatibility.md#install-the-current-source-pair); do not silently downgrade to an older registry dependency.
 
 For `project.*` imports, run from the directory containing `__lighter__.py` and `__init__.py`. A class in `task.py` is `project.task.ClassName`. Normally installed modules keep their ordinary import names. Check the imported file paths if another checkout is unexpectedly selected.
 

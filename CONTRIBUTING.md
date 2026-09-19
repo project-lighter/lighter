@@ -2,19 +2,25 @@
 
 Keep changes focused on a concrete workflow or contract. Scientific steps remain Python, configuration composes objects, and native Lightning owns execution. Include relevant tests and documentation with behavior changes.
 
-## Set up the supplied pair
+## Set up the public source pair
 
-Follow [current-pair installation](docs/guides/compatibility.md#install-the-current-source-pair) first. This checkout depends on unpublished Sparkwheel APIs; `just setup` uses registry-based `uv sync` and is not the setup route for the supplied pair.
-
-With that environment active, start in `project-lighter`, install [uv](https://docs.astral.sh/uv/getting-started/installation/) if needed, then add the existing development group:
+For package use, follow [installation](docs/guides/compatibility.md#install-the-current-source-pair). To edit both frameworks, use public sibling clones instead. The commands below select the same immutable reviewed snapshot as installation; use the explicitly agreed branch/revision for new development. Start from a new directory, with Python 3.11, Git and [uv](https://docs.astral.sh/uv/getting-started/installation/) available:
 
 ```bash
+mkdir lighter-development
+cd lighter-development
+git clone https://github.com/project-lighter/lighter.git lighter
+git clone https://github.com/project-lighter/sparkwheel.git sparkwheel
+git -C lighter checkout --detach 61660b511026f914f1e4be54cadfeaa67bd1ec3d
+git -C sparkwheel checkout --detach c2286a0626748e913296d7127c16060cb705b6d0
+python3.11 -m venv .venv-lighter
+. .venv-lighter/bin/activate
 cd lighter
-uv pip install --python ../.venv-lighter/bin/python --constraints requirements/profiles/reference.constraints --editable ../sparkwheel --editable . --group dev
+uv pip install --python ../.venv-lighter/bin/python --constraints requirements/profiles/reference.constraints --build-constraints requirements/profiles/build.constraints --editable ../sparkwheel --editable . --group dev
 python -m pip check
 ```
 
-The `dev` group includes `doc`, `maintain`, `quality`, `types` and `test`, plus pre-commit tooling. It does not replace the requirement to supply both local packages. See `pyproject.toml` for the authoritative group definitions.
+Create a working branch before committing changes. The `dev` group includes `doc`, `maintain`, `quality`, `types` and `test`, plus pre-commit tooling. These editable installs follow changes in the two clones. `just setup` uses registry-based `uv sync`; use the explicit pair above until compatible Sparkwheel is published. See `pyproject.toml` for the authoritative groups.
 
 ## Run relevant checks
 
@@ -30,7 +36,7 @@ python -m mkdocs build --strict
 
 Choose focused tests while developing, then complete the checks appropriate to the change. The non-slow suite includes subprocess/native/math controls; unavailable platform capabilities remain explicit skips. Do not claim that a documentation build establishes scientific correctness.
 
-For a local documentation preview, use `python -m mkdocs serve --dev-addr localhost:8000`. Existing `just` recipes remain in the repository, but many invoke `uv run` and may trigger registry resolution. Direct commands above use the environment containing the supplied pair.
+For a local documentation preview, use `python -m mkdocs serve --dev-addr localhost:8000`. Existing `just` recipes remain in the repository, but many invoke `uv run` and may trigger registry resolution. Direct commands above use the environment containing the installed source pair.
 
 ## Source map
 

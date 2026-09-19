@@ -15,7 +15,7 @@ jobs:
     name: Build the package
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: startsWith(github.ref, 'refs/tags') || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
 
@@ -28,14 +28,16 @@ jobs:
         with:
           install-deps: 'false'
 
-      - name: Verify tag is on main branch
-        if: startsWith(github.ref, 'refs/tags')
+      - name: Verify stable release tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor ${{ github.sha }} origin/main; then
-            echo "Error: Tag is not on the main branch"
-            exit 1
-          fi
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          uv run --no-project --python 3.12 python .github/scripts/check_release_tag.py \
+            --event "$RELEASE_EVENT" --ref "$RELEASE_REF" --sha "$RELEASE_SHA"
 
       - name: Build a binary wheel and a source tarball
         run: uv build
@@ -49,6 +51,7 @@ jobs:
   publish:
     name: Publish the package
     needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
