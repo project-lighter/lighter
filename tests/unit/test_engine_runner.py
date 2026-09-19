@@ -1,6 +1,6 @@
 """Unit tests for the Runner class in lighter/engine/runner.py"""
 
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pytorch_lightning import Trainer
@@ -267,30 +267,15 @@ def test_setup_without_project_or_discovery(mock_import, runner, base_config, mo
 # Tests for configuration saving
 
 
-@patch("builtins.open", new_callable=mock_open)
-@patch("lighter.engine.runner.yaml.dump")
-def test_save_config_to_trainer_log_dir(mock_yaml_dump, mock_file, runner, base_config, tmp_path, mock_model):
-    """Test that _save_config saves configuration to trainer's log directory."""
+def test_save_config_to_trainer_log_dir(runner, base_config, tmp_path, mock_model):
+    """The complete source snapshot is published to the native logger directory."""
+    import yaml
+
     config = Config().update(base_config)
-
-    # Create mock trainer with log_dir
-    mock_trainer = MagicMock(spec=Trainer)
-    log_dir = tmp_path / "lightning_logs" / "version_0"
-    mock_trainer.log_dir = str(log_dir)
-
-    # Call _save_config with model
-    runner._save_config(config, mock_trainer, mock_model)
-
-    # Verify file was opened at correct path
-    expected_path = log_dir / "config.yaml"
-    mock_file.assert_called_once_with(expected_path, "w")
-
-    # Verify yaml.dump was called with config
-    mock_yaml_dump.assert_called_once()
-    call_args = mock_yaml_dump.call_args
-    assert call_args[0][0] == config.get()
-    assert call_args[1]["default_flow_style"] is False
-    assert call_args[1]["sort_keys"] is False
+    trainer = MagicMock(spec=Trainer)
+    trainer.log_dir = str(tmp_path / "lightning_logs" / "version_0")
+    runner._save_config(config, trainer, mock_model)
+    assert yaml.safe_load((tmp_path / "lightning_logs" / "version_0" / "config.yaml").read_text()) == config.get()
 
 
 def test_save_config_without_log_dir(runner, base_config, mock_model):

@@ -1,3 +1,5 @@
+seed: 42
+
 # LoRA (Low-Rank Adaptation)
 #
 # Parameter-efficient fine-tuning using HuggingFace PEFT.
@@ -123,7 +125,8 @@ data:
     dataset:
       _target_: project.dataset.CIFAR100Dataset
       root: ./.datasets/
-      train: true
+      split: train
+      split_seed: 42
       download: true
       transform:
         _target_: torchvision.transforms.Compose
@@ -147,7 +150,8 @@ data:
     dataset:
       _target_: project.dataset.CIFAR100Dataset
       root: ./.datasets/
-      train: false
+      split: val
+      split_seed: 42
       download: true
       transform:
         _target_: torchvision.transforms.Compose
@@ -167,7 +171,7 @@ data:
     dataset:
       _target_: project.dataset.CIFAR100Dataset
       root: ./.datasets/
-      train: false
+      split: test
       download: true
       transform:
         _target_: torchvision.transforms.Compose
@@ -187,7 +191,7 @@ data:
     dataset:
       _target_: project.dataset.CIFAR100Dataset
       root: ./.datasets/
-      train: false
+      split: test
       download: true
       transform:
         _target_: torchvision.transforms.Compose

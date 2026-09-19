@@ -1,107 +1,27 @@
----
-title: Example Projects
----
+# Example projects
 
-# Example Projects
+Choose an example by the decision you need to make.
 
-Lighter includes example projects demonstrating real-world applications across various domains. Each project is self-contained with its own config files and documentation.
+| Example | Purpose | Prerequisites |
+|---|---|---|
+| [Download-free diagnostic](../quickstart.md) | Check fit/evaluation/export/continuation and local records | Current source pair, CPU; generated data |
+| [Compare and Continue](compare-and-continue.md) | Compare learning rates, select on validation, evaluate a checkpoint, inspect restored state | Current pair, prepared CIFAR-10 subset, declared CPU budget |
+| Earlier integrations in the example checkout’s `projects/` directory | Explore domain-specific reference code | Each project's scientific and dependency checks |
 
-## Available Projects
+## What to learn from the walkthrough
 
-| Project | Domain | Description | Extra Dependencies |
-|---------|--------|-------------|-------------------|
-| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic image classification with ResNet | - |
-| [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Brain signal classification | braindecode, eegdash, mne |
-| [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Text Classification | Sentiment analysis with HuggingFace Transformers | transformers, datasets |
-| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Parameter-Efficient Fine-Tuning | LoRA fine-tuning of language models | peft |
-| [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | 3D medical image segmentation | monai, itk |
-| [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | Self-Supervised Learning | SimCLR contrastive learning | lightly |
-| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video Understanding | Video classification with SlowFast | pytorchvideo, av |
-| [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style image-text contrastive learning | transformers |
+Compare and Continue keeps scientific steps and data policy in ordinary Python. YAML composes the task, native Trainer and callbacks; one small overlay changes the requested LR. Its native Lightning counterpart makes the same scientific behavior visible without recreating Lighter's record service.
 
-## Running an Example
+The workflow distinguishes validation-selected versus last checkpoints, immutable evaluation inputs, identified predictions and full optimizer restoration. Its README shows ordinary commands first and optional maintainer verification afterward. All recorded conditions and limits remain visible.
 
-Each project follows the same structure:
+## Earlier integrations
 
-```
-projects/<name>/
-├── __lighter__.py      # Project marker (enables project.* imports)
-├── __init__.py
-├── *.py                # Custom modules
-├── configs/
-│   └── *.yaml          # Experiment configs
-└── README.md           # Project-specific documentation
-```
+The old CIFAR classifier is superseded for onboarding. Text, LoRA and self-supervision remain legacy references; vision-language, video, segmentation and EEG are specialist illustrations awaiting their own declared scientific/dependency qualification. A passing import or another example's result does not make them universally ready research protocols.
 
-To run any example:
+See `projects/README.md` in the pinned example checkout for each disposition. These examples demonstrate possible domains; they do not make medical imaging the organizing scope of Lighter.
 
-```bash
-# Clone the repo
-git clone https://github.com/project-lighter/lighter.git
-cd lighter
+## Create your own project
 
-# Install Lighter
-pip install -e .
+Begin with [custom code](../guides/custom-code.md), select [native](../guides/lightning-module.md) or [managed](../guides/lighter-module.md) ownership, then define your scientific question, populations, update policy and outputs. Reuse a working structure without assuming its loss, metric or recovery semantics apply to a different task.
 
-# Navigate to a project
-cd projects/cifar10
-
-# Install extra dependencies if needed (check the README)
-pip install <extra-deps>
-
-# Run training
-lighter fit configs/example.yaml
-```
-
-## Project Highlights
-
-### cifar10
-
-The simplest starting point. Demonstrates:
-
-- Basic `LighterModule` usage
-- Data augmentation in config
-- Standard training workflow
-
-### medical_segmentation
-
-Shows how to use MONAI with Lighter for 3D medical imaging:
-
-- 3D UNet architecture
-- Medical imaging transforms
-- Dice loss and metrics
-
-### self_supervised
-
-Contrastive learning with SimCLR:
-
-- Custom projection heads
-- Multi-view data augmentation
-- NT-Xent loss
-
-### huggingface_llm
-
-Integrates HuggingFace Transformers:
-
-- Tokenizer configuration
-- Pre-trained model loading
-- Text classification
-
-### lora
-
-Parameter-efficient fine-tuning:
-
-- LoRA adapters via PEFT
-- Freezing base model layers
-- Memory-efficient training
-
-## Creating Your Own Project
-
-Use any example as a template:
-
-1. Copy the project directory
-2. Add a `__lighter__.py` marker file
-3. Modify configs to point to your data and model
-4. Run with `lighter fit configs/your_config.yaml`
-
-See the [Custom Code Guide](../guides/custom-code.md) for details on project structure.
+Keep the [research checks](../guides/best-practices.md) proportionate to the new behavior. No control factories, evaluation platform or agent-specific authoring interface is required.

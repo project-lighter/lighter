@@ -1,558 +1,119 @@
----
-title: CLI Reference
----
+# CLI reference
 
-# CLI Reference
-
-Complete reference for Lighter's command-line interface.
+`lighter` and `python -m lighter` invoke the same CLI. Use the [quick start](../quickstart.md) for a complete executable sequence with known data and outputs.
 
 ## Commands
 
-Lighter provides four main commands:
+| Command | Purpose |
+|---|---|
+| `inspect` | Compose and print source without configured execution |
+| `fit` | Train with configured validation |
+| `validate` | Run validation |
+| `test` | Run test evaluation |
+| `predict` | Produce native predictions and configured writer artifacts |
+| `runs list/show/diff` | Read local records without replaying recipes |
+
+There is no separate export verb: predict plus a writer exports outputs.
+
+## Inspect source
+
+From the diagnostic project:
 
 ```bash
-lighter fit        # Train and validate
-lighter validate   # Validate only
-lighter test       # Test only
-lighter predict    # Run inference
+python -m lighter inspect config.yaml model::optimizer::lr=0.05 --json
 ```
 
-All commands use the same configuration system.
+`inspect` accepts one or more configuration files/overrides and optional `--json`. Without that flag it emits YAML. Composition may read declared included files, but does not import the configured project/targets, evaluate expressions or construct components. This is source inspection, not runtime validation.
 
-## lighter fit
+## Stage arguments
 
-Train your model with automatic validation.
+General syntax:
 
-### Basic Usage
-
-```bash
-lighter fit CONFIG [OPTIONS] [OVERRIDES...]
+```text
+lighter STAGE CONFIG [MORE_CONFIGS...] [OVERRIDES...] [OPTIONS...]
 ```
 
-### Arguments
+Pass multiple paths as separate arguments; commas remain literal. Options may appear before, between or after input arguments.
 
-| Argument | Description | Required |
-|----------|-------------|----------|
-| `CONFIG` | Path to YAML config file | Yes |
-| `--ckpt_path PATH` | Checkpoint path to resume from ("last", "best", or file path) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
-| `OVERRIDES` | Config overrides (key::path=value) | No |
+| Option | Stages | Behavior |
+|---|---|---|
+| `--ckpt-path PATH` | All four | Supply a native checkpoint argument |
+| `--weights-only` / `--no-weights-only` | All four | Supply the native deserialization option if the installed Trainer supports it |
+| `--verbose` / `--no-verbose` | validate, test | Control native result printing |
+| `--return-predictions` / `--no-return-predictions` | predict | Control native prediction retention/return |
+| `--help` | Each command | Show its actual parser help |
 
-### Examples
+Underscore aliases such as `--ckpt_path`, `--weights_only` and `--return_predictions` are also supported, including their negative boolean forms. Boolean options are flags: do not append `True` or `False`.
 
-```bash
-# Basic training
-lighter fit config.yaml
+If an option is omitted, YAML stage defaults apply, then the installed native default. Native verbose defaults to true; prediction-return defaults depend on strategy. Unsupported stage arguments fail against the installed Trainer signature. In particular, the reference Lightning 2.5.1 profile does not expose every argument introduced by later Lightning versions.
 
-# Resume from checkpoint
-lighter fit config.yaml --ckpt_path checkpoints/last.ckpt
+### lighter fit
 
-# With config overrides
-lighter fit config.yaml model::optimizer::lr=0.01
+Fit invokes training and configured validation; it does not run test. A concrete `--ckpt-path` resumes saved model, optimizer and loop state. `trainer::max_epochs` is the total limit. Changing the recipe LR does not override a restored optimizer automatically.
 
-# Multiple configs
-lighter fit base.yaml,experiment.yaml
+### lighter validate
 
-# Combine CLI flags and overrides
-lighter fit config.yaml --ckpt_path last trainer::max_epochs=100
-```
+Validate invokes the configured validation stage. In a fresh process, name a concrete checkpoint to evaluate trained state. Without one, the command uses the newly configured model.
 
-### Config Structure
+### lighter test
+
+Test is a separate stage. Reserve its population for final evaluation after the model-selection policy is fixed. As with validate, omitting a checkpoint in a fresh process does not recover a previous fit.
+
+### lighter predict
+
+Predict invokes the model's prediction behavior. Configure a writer to persist artifacts and pass `--no-return-predictions` when the complete native list is unnecessary. Your step supplies IDs and output fields; see [prediction contracts](../guides/predictions.md).
+
+### Checkpoint paths
+
+Native `best` and `last` shortcuts depend on the current Trainer checkpoint context. They are not a cross-process experiment lookup. Use a concrete file path, as in the quick start. The `weights_only` loading option does not request fresh optimizer/loop state during fit; see [checkpointing](../guides/training.md#checkpointing).
+
+## Stage defaults and programmatic precedence
+
+YAML `args::<stage>` supplies native arguments. For example, this is an optional stage-default section for a project with the named checkpoint:
 
 ```yaml
-trainer:
-  _target_: pytorch_lightning.Trainer
-  # ... trainer args ...
-
-model:
-  _target_: your.Module
-  # ... model args ...
-
-data:
-  _target_: lighter.LighterDataModule
-  # ... data args ...
+args:
+  test:
+    ckpt_path: checkpoints/selected.ckpt
+    verbose: false
 ```
 
-### Output
+Explicit CLI options or `Runner.run(..., **kwargs)` override corresponding defaults, including false/null programmatic values. Only the selected stage and non-overridden stage-argument definitions are constructed. The top-level model owns the module; stage arguments cannot replace it. A native DataLoader can be supplied through the appropriate stage argument instead of a DataModule.
 
-Creates directory structure:
+Runner accepts a stage string and a list of files, dictionaries or overrides. It returns native results; see [programmatic use](../guides/lightning-module.md#public-api-and-extension-contracts). Fit normally returns None. Evaluation results follow native logging/return semantics.
 
-```
-outputs/
-└── YYYY-MM-DD/
-    └── HH-MM-SS/
-        ├── config.yaml          # Config used
-        ├── checkpoints/
-        │   └── last.ckpt       # Latest checkpoint
-        └── logs/               # Training logs
-```
+## Config overrides and merging
 
-## lighter validate
+`model::optimizer::lr=0.05` is a nested override. Values use Sparkwheel's YAML parsing; quote an entire argument when the shell would otherwise interpret its contents. Later input files compose over earlier ones.
 
-Run validation on a trained model.
+Use `=` and `~` operators for explicit replacement/deletion. Do not assume replacing a callback list behaves like appending one. [Configuration](../guides/configuration.md#merging-configs) explains the source semantics.
 
-### Basic Usage
+## Seeds and project imports
 
-```bash
-lighter validate CONFIG [OPTIONS] [OVERRIDES...]
-```
+`seed: 42` or `seed=42` seeds Python, NumPy and Torch before project imports and component construction, with native worker seeding enabled. An omitted seed means 0, independent of a previous run's environment.
 
-### Arguments
+Seeds must be literal integers in `[0, 4294967295]`. Prebuilt objects cannot be retroactively seeded. Deterministic algorithms are a separate native Trainer setting; a seed alone does not establish equal results across devices or dependency versions.
 
-| Argument | Description | Required |
-|----------|-------------|----------|
-| `CONFIG` | Path to YAML config file | Yes |
-| `--ckpt_path PATH` | Checkpoint path for validation ("last", "best", or file path) | No |
-| `--verbose BOOL` | Print validation results (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
-| `OVERRIDES` | Config overrides | No |
+Runner's project marker convention and installed-package alternative are documented in [custom code](../guides/custom-code.md#the-project-folder-pattern).
 
-### Examples
+## Read and compare records
 
-```bash
-# Validate with checkpoint
-lighter validate config.yaml --ckpt_path checkpoints/best.ckpt
+Syntax uses your actual record root and attempt directories:
 
-# Override config
-lighter validate config.yaml \
-  --ckpt_path checkpoints/best.ckpt \
-  data::val_dataloader::batch_size=128
+```text
+lighter runs list ROOT [--json]
+lighter runs show ATTEMPT_DIRECTORY_OR_RECORD_JSON
+lighter runs diff FIRST_ATTEMPT SECOND_ATTEMPT
 ```
 
-### Config Structure
+List emits a small table by default or full records with `--json`. Show and diff already emit JSON and do not accept a `--json` flag. They read files without executing saved definitions.
 
-Same as `fit` command.
+Use actual IDs from list output; [quick start](../quickstart.md#inspect-the-attempts) demonstrates selection. `running` does not prove process liveness. Records may be absent for early failures; [record meanings](../guides/experiment-records.md) explain the remaining boundaries.
 
-### Requirements
+## Troubleshooting and exit status
 
-- Checkpoint file (`.ckpt`)
-- `val_dataloader` in data config
-- `validation_step` in your module
+Parsing and execution errors return a nonzero status. Preserve stderr and the failing command; a missing record does not imply that no user construction occurred. Static inspection and a real `fast_dev_run` answer different questions.
 
-## lighter test
+Use `python -m lighter fit --help`, `inspect --help` or `runs --help` for the installed parser. `_LIGHTER_COMPLETE` is not implemented as a shell-completion interface.
 
-Run test on a trained model.
-
-### Basic Usage
-
-```bash
-lighter test CONFIG [OPTIONS] [OVERRIDES...]
-```
-
-### Arguments
-
-| Argument | Description | Required |
-|----------|-------------|----------|
-| `CONFIG` | Path to YAML config file | Yes |
-| `--ckpt_path PATH` | Checkpoint path for testing ("last", "best", or file path) | No |
-| `--verbose BOOL` | Print test results (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
-| `OVERRIDES` | Config overrides | No |
-
-### Examples
-
-```bash
-# Test with checkpoint
-lighter test config.yaml --ckpt_path checkpoints/best.ckpt
-
-# Multiple test sets
-lighter test config.yaml \
-  --ckpt_path checkpoints/best.ckpt \
-  data::test_dataloader::dataset::root=./test_data
-```
-
-### Config Structure
-
-Same as `fit` command, with a test dataloader:
-
-```yaml
-data:
-  test_dataloader:
-    _target_: torch.utils.data.DataLoader
-    # ... test dataloader config ...
-```
-
-### Requirements
-
-- Checkpoint file (`.ckpt`)
-- `test_dataloader` in data config
-- `test_step` in your module
-
-## lighter predict
-
-Run inference on data.
-
-### Basic Usage
-
-```bash
-lighter predict CONFIG [OPTIONS] [OVERRIDES...]
-```
-
-### Arguments
-
-| Argument | Description | Required |
-|----------|-------------|----------|
-| `CONFIG` | Path to YAML config file | Yes |
-| `--ckpt_path PATH` | Checkpoint path for predictions ("last", "best", or file path) | No |
-| `--return_predictions BOOL` | Whether to return predictions (default: True) | No |
-| `--weights_only BOOL` | Load only weights (security option) | No |
-| `OVERRIDES` | Config overrides | No |
-
-### Examples
-
-```bash
-# Basic prediction
-lighter predict config.yaml --ckpt_path checkpoints/best.ckpt
-
-# With writer to save results
-lighter predict config.yaml \
-  --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.CSVWriter}]'
-```
-
-### Config Structure
-
-Same as `fit` command, with a predict dataloader:
-
-```yaml
-data:
-  predict_dataloader:
-    _target_: torch.utils.data.DataLoader
-    # ... predict dataloader config ...
-
-trainer:
-  callbacks:
-    - _target_: lighter.callbacks.CSVWriter  # Optional: save predictions
-      write_interval: batch
-```
-
-### Requirements
-
-- Checkpoint file (`.ckpt`)
-- `predict_dataloader` in data config
-- `predict_step` in your module
-- Optional: Writer callback to save results
-
-## Config Overrides
-
-Override any config value from command line.
-
-### Syntax
-
-```bash
-lighter COMMAND config.yaml key::path=value
-```
-
-### Examples
-
-#### Simple Values
-
-```bash
-# Numbers
-lighter fit config.yaml model::optimizer::lr=0.01
-
-# Strings
-lighter fit config.yaml trainer::logger::name=my_experiment
-
-# Booleans
-lighter fit config.yaml trainer::enable_checkpointing=false
-```
-
-#### Nested Values
-
-```bash
-# Deep nesting
-lighter fit config.yaml \
-  model::optimizer::lr=0.01 \
-  model::optimizer::weight_decay=0.0001 \
-  model::network::num_classes=100
-```
-
-#### Lists
-
-```bash
-# Python list syntax
-lighter fit config.yaml 'trainer::devices=[0,1,2,3]'
-```
-
-#### Objects
-
-```bash
-# YAML object syntax
-lighter fit config.yaml \
-  'trainer::callbacks=[{_target_: pytorch_lightning.callbacks.EarlyStopping, monitor: val/loss, patience: 10}]'
-```
-
-### Path Syntax
-
-Use `::` to navigate config hierarchy:
-
-```yaml
-# Config structure
-model:
-  optimizer:
-    lr: 0.001
-```
-
-```bash
-# Override
-lighter fit config.yaml model::optimizer::lr=0.01
-```
-
-## Config Merging
-
-Combine multiple config files.
-
-### Syntax
-
-```bash
-lighter COMMAND config1.yaml,config2.yaml,...
-```
-
-### Behavior
-
-Later files override earlier ones (dictionary merge).
-
-### Examples
-
-```bash
-# Base + experiment
-lighter fit base.yaml,experiment.yaml
-
-# Multiple overrides
-lighter fit base.yaml,data.yaml,model.yaml,overrides.yaml
-```
-
-### Example Files
-
-**base.yaml**:
-```yaml
-trainer:
-  max_epochs: 100
-  accelerator: auto
-
-model:
-  network:
-    num_classes: 10
-```
-
-**experiment.yaml**:
-```yaml
-trainer:
-  max_epochs: 200  # Override
-
-model:
-  optimizer:  # Add
-    lr: 0.01
-```
-
-**Result**: Merged config with `max_epochs=200` and new optimizer.
-
-## Environment Variables
-
-### LIGHTER_OUTPUT_DIR
-
-Change default output directory:
-
-```bash
-export LIGHTER_OUTPUT_DIR=./my_outputs
-lighter fit config.yaml
-```
-
-Or in config:
-
-```yaml
-trainer:
-  default_root_dir: ./my_outputs
-```
-
-### CUDA_VISIBLE_DEVICES
-
-Control GPU visibility:
-
-```bash
-# Use only GPU 2
-CUDA_VISIBLE_DEVICES=2 lighter fit config.yaml
-
-# Use GPUs 0 and 3
-CUDA_VISIBLE_DEVICES=0,3 lighter fit config.yaml trainer::devices=2
-```
-
-### MASTER_ADDR / MASTER_PORT
-
-For multi-node training:
-
-```bash
-MASTER_ADDR=node0 MASTER_PORT=12345 lighter fit config.yaml
-```
-
-## Common Patterns
-
-### Quick Debugging
-
-```bash
-# Fast dev run (1 batch)
-lighter fit config.yaml trainer::fast_dev_run=true
-
-# Overfit 10 batches
-lighter fit config.yaml trainer::overfit_batches=10
-
-# Limit batches
-lighter fit config.yaml trainer::limit_train_batches=0.1
-```
-
-### Hyperparameter Tuning
-
-```bash
-# Learning rate sweep
-for lr in 0.0001 0.001 0.01; do
-  lighter fit config.yaml model::optimizer::lr=$lr
-done
-
-# Batch size sweep
-for bs in 32 64 128 256; do
-  lighter fit config.yaml data::train_dataloader::batch_size=$bs
-done
-```
-
-### Multi-GPU
-
-```bash
-# All GPUs
-lighter fit config.yaml trainer::devices=-1 trainer::strategy=ddp
-
-# Specific GPUs
-lighter fit config.yaml trainer::devices=4 trainer::strategy=ddp
-
-# Specific GPU IDs
-lighter fit config.yaml 'trainer::devices=[0,2,3]' trainer::strategy=ddp
-```
-
-### Resume Training
-
-```bash
-# Resume from last checkpoint
-lighter fit config.yaml --ckpt_path outputs/.../checkpoints/last.ckpt
-
-# Resume with different LR
-lighter fit config.yaml \
-  --ckpt_path outputs/.../checkpoints/last.ckpt \
-  model::optimizer::lr=0.0001
-```
-
-### Save Predictions
-
-```bash
-# CSV output
-lighter predict config.yaml \
-  --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.CSVWriter}]'
-
-# File output
-lighter predict config.yaml \
-  --ckpt_path checkpoints/best.ckpt \
-  'trainer::callbacks=[{_target_: lighter.callbacks.FileWriter}]'
-```
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Config error (invalid YAML, missing files) |
-| 2 | Runtime error (training failed, OOM, etc.) |
-
-## Verbosity
-
-PyTorch Lightning controls logging verbosity.
-
-### Reduce Logging
-
-```yaml
-trainer:
-  enable_progress_bar: false
-  enable_model_summary: false
-```
-
-### Increase Logging
-
-```bash
-# Python logging
-export PYTHONWARNINGS=default
-lighter fit config.yaml
-```
-
-## Tips
-
-### Shell Completion
-
-Add to your shell config:
-
-```bash
-# Bash
-eval "$(_LIGHTER_COMPLETE=bash_source lighter)"
-
-# Zsh
-eval "$(_LIGHTER_COMPLETE=zsh_source lighter)"
-```
-
-### Config Validation
-
-Validate config without training:
-
-```bash
-lighter fit config.yaml trainer::fast_dev_run=true
-```
-
-### Find Config Issues
-
-Enable Sparkwheel debug output:
-
-```bash
-SPARKWHEEL_DEBUG=1 lighter fit config.yaml
-```
-
-### See Resolved Config
-
-Add print in your module:
-
-```python
-def __init__(self, ...):
-    super().__init__()
-    self.save_hyperparameters()
-    print(self.hparams)  # See final values
-```
-
-## Next Steps
-
-- [Configuration Guide](../guides/configuration.md) - Learn config syntax
-- [Training Guide](../guides/training.md) - Training workflows
-- [Example Projects](../examples/index.md) - Complete examples
-
-## Quick Reference
-
-```bash
-# Basic commands
-lighter fit config.yaml
-lighter validate config.yaml
-lighter test config.yaml
-lighter predict config.yaml
-
-# Overrides
-lighter fit config.yaml key::path=value
-
-# Multiple configs
-lighter fit base.yaml,experiment.yaml
-
-# Checkpoints
-lighter fit config.yaml --ckpt_path path/to/checkpoint.ckpt
-lighter validate config.yaml --ckpt_path path/to/checkpoint.ckpt
-lighter test config.yaml --ckpt_path path/to/checkpoint.ckpt
-lighter predict config.yaml --ckpt_path path/to/checkpoint.ckpt
-
-# Multi-GPU
-lighter fit config.yaml trainer::devices=4 trainer::strategy=ddp
-
-# Debugging
-lighter fit config.yaml trainer::fast_dev_run=true
-```
+`SPARKWHEEL_DEBUG=1`, set before importing Sparkwheel, enables interactive debugging of construction and expressions. It is not a verbose-logging flag: expression debugging returns `None` instead of the normal evaluated result. Leave it unset or `0` for ordinary and unattended runs. The matching sibling guide, `sparkwheel/docs/user-guide/troubleshooting.md`, describes this behavior. Native device/distributed environment variables retain native ownership. See [troubleshooting](../faq.md).

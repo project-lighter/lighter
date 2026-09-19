@@ -13,10 +13,11 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write
 
 env:
   FORCE_COLOR: 1
+  # Temporary reviewed companion until the compatible release is available.
+  PAIRED_SPARKWHEEL_SHA: 9a67c0796fce60f9c47a4afefe9da9009eb9be38
 
 jobs:
   quality:
@@ -35,11 +36,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
           install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
+          paired-sparkwheel-sha: ${{ github.event_name == 'pull_request' && matrix.check == 'types' && env.PAIRED_SPARKWHEEL_SHA || '' }}
 
       - name: Run format check
         if: matrix.check == 'format'
@@ -51,7 +54,7 @@ jobs:
 
       - name: Run type check
         if: matrix.check == 'types'
-        run: uv run mypy src
+        run: uv run --no-sync mypy src
 
   tests:
     name: Tests (Python 3.12)
@@ -62,20 +65,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
+          paired-sparkwheel-sha: ${{ github.event_name == 'pull_request' && env.PAIRED_SPARKWHEEL_SHA || '' }}
 
       - name: Run pytest with coverage
         run: |
-          uv run coverage run -m pytest tests --durations=10 -m "not slow" \
+          uv run --no-sync coverage run -m pytest tests --durations=10 -m "not slow" \
             --junit-xml=test-results.xml \
             --html=test-report.html --self-contained-html
+          uv run --no-sync coverage combine
 
       - name: Generate test summary
         if: always()
-        run: python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
+        run: python3 .github/scripts/test_summary.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
@@ -83,16 +89,20 @@ jobs:
         with:
           name: test-results-py312
           retention-days: 7
+          include-hidden-files: true
           path: |
             test-results.xml
             test-report.html
             .coverage
+            .coverage.*
+            paired-ci-requirements.txt
 
       - name: Generate coverage report
-        run: uv run coverage xml
+        run: uv run --no-sync coverage xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.4.3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
           fail_ci_if_error: true

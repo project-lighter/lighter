@@ -318,3 +318,28 @@ model:
             _, args, kwargs = mock_runner.run.mock_calls[0]
             assert args[0] == "fit"
             assert args[1] == [temp_config_file]  # Just the config file, no overrides
+
+
+@pytest.mark.parametrize("stage", ["fit", "validate", "test", "predict"])
+def test_cli_options_can_be_between_inputs(stage):
+    argv = ["lighter", stage, "base.yaml", "--ckpt_path", "last", "experiment.yaml", "seed=11"]
+    with patch.object(sys, "argv", argv), patch("lighter.engine.runner.Runner") as runner:
+        cli()
+    runner.return_value.run.assert_called_once_with(stage, ["base.yaml", "experiment.yaml", "seed=11"], ckpt_path="last")
+
+
+@pytest.mark.parametrize("flag", ["--no-return_predictions", "--no-return-predictions"])
+def test_cli_can_request_streaming_predictions(flag):
+    with (
+        patch.object(sys, "argv", ["lighter", "predict", "config.yaml", flag]),
+        patch("lighter.engine.runner.Runner") as runner,
+    ):
+        cli()
+    runner.return_value.run.assert_called_once_with("predict", ["config.yaml"], return_predictions=False)
+
+
+def test_cli_preserves_comma_inside_single_filename_and_override():
+    argv = ["lighter", "fit", "base,variant.yaml", "--ckpt_path", "last", "label=a,b"]
+    with patch.object(sys, "argv", argv), patch("lighter.engine.runner.Runner") as runner:
+        cli()
+    runner.return_value.run.assert_called_once_with("fit", ["base,variant.yaml", "label=a,b"], ckpt_path="last")

@@ -1,100 +1,66 @@
 # Contributing to Lighter
 
-Thank you for your interest in contributing to Lighter! This guide will help you get started.
+Keep changes focused on a concrete workflow or contract. Scientific steps remain Python, configuration composes objects, and native Lightning owns execution. Include relevant tests and documentation with behavior changes.
 
-## Quick Start
+## Set up the public source pair
 
-1. **Set up your development environment:**
-    ```bash
-    just setup
-    ```
-    This will install `uv` (if needed), sync all dependencies, and set up pre-commit hooks.
+For package use, follow [installation](docs/guides/compatibility.md#install-the-current-source-pair). To edit both frameworks, use public sibling clones instead. The commands below select the same immutable reviewed snapshot as installation; use the explicitly agreed branch/revision for new development. Start from a new directory, with Python 3.11, Git and [uv](https://docs.astral.sh/uv/getting-started/installation/) available:
 
-2. **Make your changes and test them:**
-    ```bash
-    just test        # Run tests
-    just lint        # Check code style
-    just types       # Run type checking
-    ```
-
-3. **Submit your contribution** via a pull request.
-
-## Available Commands
-
-We use [just](https://github.com/casey/just) as our command runner. Here are the available commands:
-
-### Development Setup
-- `just setup` - Complete development environment setup (installs uv, syncs dependencies, installs pre-commit)
-- `just clean` - Clean up build artifacts, caches, and temporary files
-
-### Code Quality
-- `just lint` - Run linting checks
-- `just types` - Run type checking with mypy
-- `just test` - Run the test suite
-- `just coverage` - Generate test coverage report and badge
-
-### Documentation
-- `just docs` - Serve documentation locally at http://localhost:8000
-
-### Version Management
-- `just bump [patch|minor|major]` - Bump version and create git tag (default: patch)
-- `just bump-dry [patch|minor|major]` - Preview version bump without making changes
-- `just push` - Push commits and tags to remote
-
-## Development Workflow
-
-### Making Changes
-
-1. **Fork and clone** the repository
-2. **Set up your environment:**
-    ```bash
-    just setup
-    ```
-
-3. **Create a feature branch:**
-    ```bash
-    git checkout -b feature/your-feature-name
-    ```
-
-4. **Make your changes** and add tests for new functionality
-
-5. **Run quality checks:**
-    ```bash
-    just lint
-    just types
-    just test
-    ```
-
-6. **Commit your changes** (pre-commit hooks will run automatically)
-
-7. **Push and create a pull request**
-
-### Before Submitting a PR
-
-Ensure all of these pass:
-- ✅ `just lint` - Code follows style guidelines
-- ✅ `just types` - No type checking errors
-- ✅ `just test` - All tests pass
-- ✅ Add tests for any new functionality
-- ✅ Update documentation if needed
-
-## Project Structure
-
-```
-src/lighter/           # Main package code
-├── __init__.py       # Package initialization and version
-├── engine/           # Core engine components
-├── system.py         # System class
-└── utils/            # Utility modules
-
-tests/                # Test suite
-docs/                 # Documentation source
+```bash
+mkdir lighter-development
+cd lighter-development
+git clone https://github.com/project-lighter/lighter.git lighter
+git clone https://github.com/project-lighter/sparkwheel.git sparkwheel
+git -C lighter checkout --detach 61660b511026f914f1e4be54cadfeaa67bd1ec3d
+git -C sparkwheel checkout --detach c2286a0626748e913296d7127c16060cb705b6d0
+python3.11 -m venv .venv-lighter
+. .venv-lighter/bin/activate
+cd lighter
+uv pip install --python ../.venv-lighter/bin/python --constraints requirements/profiles/reference.constraints --build-constraints requirements/profiles/build.constraints --editable ../sparkwheel --editable . --group dev
+python -m pip check
 ```
 
-## Release Process
+Create a working branch before committing changes. The `dev` group includes `doc`, `maintain`, `quality`, `types` and `test`, plus pre-commit tooling. These editable installs follow changes in the two clones. `just setup` uses registry-based `uv sync`; use the explicit pair above until compatible Sparkwheel is published. See `pyproject.toml` for the authoritative groups.
 
-Releases are automated:
+## Run relevant checks
 
-1. **Bump version:** `just bump patch` (or `minor`/`major`)
-2. **Push tags:** `just push`
-3. **Automated publishing:** GitHub Actions will automatically build and publish to PyPI when a tag is pushed
+From the Lighter checkout, with that environment active, invoke the installed tools directly:
+
+```bash
+python -m ruff check
+python -m ruff format --check
+python -m mypy src
+python -m pytest tests -m "not slow"
+python -m mkdocs build --strict
+```
+
+Choose focused tests while developing, then complete the checks appropriate to the change. The non-slow suite includes subprocess/native/math controls; unavailable platform capabilities remain explicit skips. Do not claim that a documentation build establishes scientific correctness.
+
+For a local documentation preview, use `python -m mkdocs serve --dev-addr localhost:8000`. Existing `just` recipes remain in the repository, but many invoke `uv run` and may trigger registry resolution. Direct commands above use the environment containing the installed source pair.
+
+## Source map
+
+| Path | Responsibility |
+|---|---|
+| `src/lighter/model.py` | LighterModule steps, measurements and optimizer interface |
+| `src/lighter/data.py` | Loader wrapper |
+| `src/lighter/engine/` | Runner, managed construction, inspection and records |
+| `src/lighter/callbacks/` | Writers and selected-parameter freezing |
+| `src/lighter/utils/` | Supporting utilities |
+| `tests/` | Unit and integration checks |
+| `docs/`, `mkdocs.yml` | Manual pages, API rendering and navigation |
+| `projects/` | Diagnostic, research walkthrough and labeled specialist references |
+
+## Maintain the documentation
+
+Keep one authoritative explanation of each contract and link it from related pages. Preserve useful page paths and incoming anchors when reorganizing. State working directory, prerequisites, literal command, expected artifact and next decision for runnable workflows. Distinguish complete examples from excerpts.
+
+When changing a runnable example, execute the touched commands and check their real outputs. Use the existing diagnostic verifier when applicable. Build the site strictly and check links/anchors; review the rendered page for navigation and code readability. Keep source, profiles and evidence claims aligned. Generated internal entries do not make underscored helpers public extension APIs.
+
+## Prepare a contribution or release
+
+Describe the concrete problem, resulting behavior and validation in a pull request. Preserve unrelated changes and report platform or dependency limits. Do not update expected scientific results merely to hide a failure.
+
+Release work follows [paired artifact qualification and ordering](docs/guides/compatibility.md#build-and-check-the-unpublished-pair): verify the final pair, publish compatible Sparkwheel first, then regenerate/verify Lighter's registry lock and release artifacts. Version and tag commands have side effects; consult [version maintenance](docs/guides/compatibility.md#version-maintenance) before using them. A documentation edit or local build is not a release operation.
+
+Contributions use the project's [MIT license](LICENSE). Report reproducible issues through [GitHub](https://github.com/project-lighter/lighter/issues).

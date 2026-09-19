@@ -1,5 +1,7 @@
 # Medical Image Segmentation with MONAI
 
+> **Status: Specialist reference.** This integration is outside the maintained onboarding path. Reopening it requires a declared MONAI/ITK profile and independent spatial geometry, phantom and exported-volume checks. Lighter is general purpose; this is a specialist validation boundary, not a restriction on medical applications. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 3D CT spleen segmentation using MONAI.
 
 ## Dataset

@@ -145,9 +145,15 @@ def _hybrid_dump(obj: Any, file: IO[bytes], protocol: int | None = None) -> None
     _HybridPickler(file, protocol).dump(obj)
 
 
-# Module initialization: install finder and patch multiprocessing
-sys.meta_path.insert(0, _DynamicModuleFinder())
-reduction.dump = _hybrid_dump  # type: ignore[assignment]
+def _install_dynamic_support() -> None:
+    """Enable process-wide path-import support only when explicitly used.
+
+    Ordinary package imports and native modules retain the host multiprocessing
+    policy. The path importer opts into by-value serialization for spawned workers.
+    """
+    if not any(isinstance(finder, _DynamicModuleFinder) for finder in sys.meta_path):
+        sys.meta_path.insert(0, _DynamicModuleFinder())
+    reduction.dump = _hybrid_dump  # type: ignore[assignment]
 
 
 def import_module_from_path(module_name: str, module_path: Path | str) -> ModuleType:
@@ -174,7 +180,10 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
     # Check if already imported
     if module_name in sys.modules:
         existing_path = _registry.get(module_name)
-        if existing_path is not None and existing_path != module_path:
+        if existing_path is None:
+            file = vars(sys.modules[module_name]).get("__file__")
+            existing_path = Path(file).resolve().parent if file else None
+        if existing_path != module_path:
             raise ValueError(f"Module '{module_name}' was already imported from '{existing_path}'.")
         # Same path - return cached module (normal Python behavior)
         return sys.modules[module_name]
@@ -188,6 +197,7 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
     if spec is None or spec.loader is None:
         raise ModuleNotFoundError(f"Could not load '{module_name}' from '{module_path}'.")
 
+    _install_dynamic_support()
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:

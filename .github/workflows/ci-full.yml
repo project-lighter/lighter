@@ -41,12 +41,13 @@ jobs:
           uv run coverage run -m pytest tests --durations=10 \
             --junit-xml=test-results.xml \
             --html=test-report.html --self-contained-html
+          uv run coverage combine
 
       - name: Generate test summary
         if: always()
         run: |
-          echo "## Test Results - Python ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
-          python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results - Python ${{ matrix.python }}" >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/test_summary.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
@@ -54,10 +55,12 @@ jobs:
         with:
           name: test-results-py${{ matrix.python }}
           retention-days: 7
+          include-hidden-files: true
           path: |
             test-results.xml
             test-report.html
             .coverage
+            .coverage.*
 
       - name: Generate coverage report
         if: matrix.python == '3.12'
@@ -65,7 +68,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python == '3.12'
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
           fail_ci_if_error: true

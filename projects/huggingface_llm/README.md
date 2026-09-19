@@ -1,5 +1,7 @@
 # HuggingFace Text Classification
 
+> **Status: Legacy text integration.** This source is not a qualified text research workflow. A replacement needs held-out evaluation, explicit token/mask and fitting policies, and an actual dependency/model profile. The current pilot does not certify pretrained model acquisition or this integration. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 DistilBERT sentiment classification on IMDB reviews.
 
 ## Dataset

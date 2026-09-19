@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
-from torchmetrics import Accuracy, MetricCollection
+from torchmetrics import Accuracy, MeanMetric, MetricCollection
 
 from lighter.model import LighterModule
 from lighter.utils.types.enums import Mode
@@ -116,11 +116,10 @@ def test_system_requires_step_implementation(simple_model):
     with pytest.raises(NotImplementedError, match="must implement training_step"):
         system.training_step(batch, batch_idx=0)
 
-    with pytest.raises(NotImplementedError, match="must implement validation_step"):
-        system.validation_step(batch, batch_idx=0)
+    from pytorch_lightning.utilities.model_helpers import is_overridden
 
-    with pytest.raises(NotImplementedError, match="must implement test_step"):
-        system.test_step(batch, batch_idx=0)
+    assert not is_overridden("validation_step", system)
+    assert not is_overridden("test_step", system)
 
     with pytest.raises(NotImplementedError, match="must implement predict_step"):
         system.predict_step(batch, batch_idx=0)
@@ -301,13 +300,18 @@ def test_validate_and_log_dict_loss_without_total(simple_model, mock_trainer):
 
 
 def test_validate_and_log_without_logger(simple_system, mock_trainer):
-    """Test _log_outputs does nothing when no logger."""
+    """No external sink must not suppress callback metric registration."""
     simple_system.trainer = mock_trainer
+    mock_trainer_state(mock_trainer, training=True)
     mock_trainer.logger = None
+    simple_system.log = MagicMock()
 
-    output = {"loss": torch.tensor(1.0)}
-    # Should not raise any errors
-    simple_system._log_outputs(output, batch_idx=0)
+    simple_system._log_outputs({"loss": torch.tensor(1.0)}, batch_idx=0)
+
+    logged_names = [call.args[0] for call in simple_system.log.call_args_list]
+    assert "train/loss/epoch" in logged_names
+    assert "train/metrics/MulticlassAccuracy/epoch" in logged_names
+    assert all(call.kwargs["logger"] is False for call in simple_system.log.call_args_list)
 
 
 def test_batch_end_hooks_call_validate_and_log(simple_system, mock_trainer):
@@ -552,3 +556,51 @@ def test_log_metrics_with_single_metric(simple_model, mock_trainer):
 
     # Should log on_step and on_epoch (2 calls for single metric)
     assert system._log.call_count == 2
+
+
+def test_training_step_observation_preserves_signature_and_return_identity():
+    import inspect
+
+    from pytorch_lightning.utilities.model_helpers import is_overridden
+
+    class ObservedModule(LighterModule):
+        def training_step(self, batch, batch_idx):
+            return batch
+
+    system = ObservedModule(network=nn.Linear(1, 1))
+    loss = torch.tensor(4.0, requires_grad=True)
+    output = {"loss": loss, "pred": torch.tensor([7.0])}
+    assert list(inspect.signature(system.training_step).parameters) == ["batch", "batch_idx"]
+    assert is_overridden("training_step", system)
+    assert system.training_step(output, 0) is output
+    assert output["loss"] is loss
+    assert loss.requires_grad
+
+    # Callback outputs stay native; Lighter's logging observes the original loss.
+    native_outputs = {"loss": torch.tensor(2.0), "pred": output["pred"]}
+    system._log_outputs = MagicMock()
+    system.on_train_batch_end(native_outputs, None, 0)
+    logged_outputs = system._log_outputs.call_args.args[0]
+    assert logged_outputs["loss"].item() == 4
+    assert not logged_outputs["loss"].requires_grad
+    assert native_outputs["loss"].item() == 2
+    assert logged_outputs["pred"] is native_outputs["pred"]
+
+
+def test_evaluation_metric_view_restores_after_exception_without_registered_aliases():
+    class FailingEvaluation(LighterModule):
+        def validation_step(self, batch, batch_idx, dataloader_idx=0):
+            self.observed_metric_id = id(self.val_metrics)
+            raise RuntimeError("deliberate step failure")
+
+    metric = MeanMetric()
+    system = FailingEvaluation(network=nn.Identity(), val_metrics=metric)
+    with pytest.raises(RuntimeError, match="deliberate step failure"):
+        system.validation_step(torch.ones(2), 0, dataloader_idx=1)
+    assert system.val_metrics is metric
+    assert system.observed_metric_id != id(metric)
+    registered = [
+        (name, id(module)) for name, module in system.named_modules(remove_duplicate=False) if isinstance(module, MeanMetric)
+    ]
+    assert [name for name, _ in registered] == ["val_metrics", "_evaluation_metrics.val.1"]
+    assert len({identity for _, identity in registered}) == 2

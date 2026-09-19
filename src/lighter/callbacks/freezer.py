@@ -1,32 +1,24 @@
-"""
-This module provides the Freezer callback, which allows freezing model parameters during training.
-"""
+"""Selected-parameter freezing using native Lightning callbacks and checkpoints."""
 
+import json
 from typing import Any
 
+import torch
 from loguru import logger
 from pytorch_lightning import Callback, LightningModule, Trainer
+from torch.nn.parallel import DistributedDataParallel
 
 from lighter.utils.misc import ensure_list
 
 
 class Freezer(Callback):
-    """
-    Callback to freeze model parameters during training. Parameters can be frozen by exact name or prefix.
-    Freezing can be applied indefinitely or until a specified step/epoch.
+    """Freeze selected parameters, then restore their original gradient flags.
 
-    Args:
-        names: Full names of parameters to freeze.
-        name_starts_with: Prefixes of parameter names to freeze.
-        except_names: Names of parameters to exclude from freezing.
-        except_name_starts_with: Prefixes of parameter names to exclude from freezing.
-        until_step: Maximum step to freeze parameters until.
-        until_epoch: Maximum epoch to freeze parameters until.
-
-    Raises:
-        ValueError: If neither `names` nor `name_starts_with` are specified.
-        ValueError: If both `until_step` and `until_epoch` are specified.
-
+    Names are exact parameter names; prefixes use ``name_starts_with``. For a
+    LighterModule, names are relative to its network. Exceptions exclude ownership:
+    unrelated and excepted parameters are never made trainable by this callback.
+    Limits are native optimizer steps or epochs; at the limit, original flags are
+    restored. Parameters that may reactivate must already belong to an optimizer.
     """
 
     def __init__(
@@ -39,110 +31,127 @@ class Freezer(Callback):
         until_epoch: int | None = None,
     ) -> None:
         super().__init__()
-
         if names is None and name_starts_with is None:
             raise ValueError("At least one of `names` or `name_starts_with` must be specified.")
-
         if until_step is not None and until_epoch is not None:
             raise ValueError("Only one of `until_step` or `until_epoch` can be specified.")
-
+        for value in (until_step, until_epoch):
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError("Freezer limits must be nonnegative integers")
         self.names = ensure_list(names)
         self.name_starts_with = ensure_list(name_starts_with)
         self.except_names = ensure_list(except_names)
         self.except_name_starts_with = ensure_list(except_name_starts_with)
+        for selector in (self.names, self.name_starts_with, self.except_names, self.except_name_starts_with):
+            if any(not isinstance(name, str) or not name for name in selector):
+                raise ValueError("Freezer selectors must be nonempty strings")
         self.until_step = until_step
         self.until_epoch = until_epoch
+        self._original_flags: dict[str, bool] = {}
+        self._frozen_state: bool | None = None
 
-        self._frozen_state = False
+    @property
+    def state_key(self) -> str:
+        """Distinguish independent callback policies in native checkpoints."""
+        policy = {
+            "names": sorted(self.names),
+            "prefixes": sorted(self.name_starts_with),
+            "except_names": sorted(self.except_names),
+            "except_prefixes": sorted(self.except_name_starts_with),
+            "until_step": self.until_step,
+            "until_epoch": self.until_epoch,
+        }
+        return f"{type(self).__qualname__}:{json.dumps(policy, sort_keys=True)}"
 
-    def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int) -> None:
-        """
-        Called at the start of each training batch to freeze or unfreeze model parameters.
+    def state_dict(self) -> dict[str, Any]:
+        return {"original_flags": dict(self._original_flags)}
 
-        Args:
-            trainer: The trainer instance.
-            pl_module: The LightningModule instance.
-            batch: The current batch.
-            batch_idx: The index of the batch.
-        """
-        current_step = trainer.global_step
-        current_epoch = trainer.current_epoch
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        flags = state_dict.get("original_flags", {})
+        if not isinstance(flags, dict) or any(
+            not isinstance(name, str) or type(flag) is not bool for name, flag in flags.items()
+        ):
+            raise ValueError("Invalid Freezer checkpoint original_flags")
+        self._original_flags = dict(flags)
+        # requires_grad is not restored by a native module state_dict. Reapply it.
+        self._frozen_state = None
 
-        # Unfreeze if the step or epoch limit has been reached.
-        unfreeze_step = self.until_step is not None and current_step >= self.until_step
-        unfreeze_epoch = self.until_epoch is not None and current_epoch >= self.until_epoch
-        if unfreeze_step or unfreeze_epoch:
-            if self._frozen_state:
-                logger.info("Unfreezing the model.")
-                self._set_model_requires_grad(pl_module, requires_grad=True)
-                self._frozen_state = False
-            return
-
-        # Freeze if not already frozen.
-        if not self._frozen_state:
-            logger.info("Freezing the model.")
-            self._set_model_requires_grad(pl_module, requires_grad=False)
-            self._frozen_state = True
-
-    def _set_model_requires_grad(self, model: LightningModule, requires_grad: bool) -> None:
-        """
-        Sets the `requires_grad` attribute for model parameters.
-
-        When freezing (requires_grad=False):
-        - Freeze specified parameters
-        - Keep all others trainable (requires_grad=True)
-        - Respect exception rules
-
-        When unfreezing (requires_grad=True):
-        - Unfreeze specified parameters
-        - Keep all others trainable
-
-        Args:
-            model: The model whose parameters to modify.
-            requires_grad: Whether to allow gradients (unfreeze) or not (freeze).
-        """
-        # If the model is a `LighterModule`, get the underlying network so users
-        # can specify layer names without the "network." prefix.
-        from lighter import LighterModule
+    def _selected_parameters(self, model: torch.nn.Module) -> dict[str, torch.nn.Parameter]:
+        from lighter.model import LighterModule
 
         target = model.network if isinstance(model, LighterModule) else model
+        canonical: dict[int, str] = {}
+        selected: dict[str, torch.nn.Parameter] = {}
+        excluded: set[int] = set()
+        for name, parameter in target.named_parameters(remove_duplicate=False):
+            canonical.setdefault(id(parameter), name)
+            if name in self.except_names or any(name.startswith(prefix) for prefix in self.except_name_starts_with):
+                excluded.add(id(parameter))
+            if name in self.names or any(name.startswith(prefix) for prefix in self.name_starts_with):
+                selected[canonical[id(parameter)]] = parameter
+        selected = {name: parameter for name, parameter in selected.items() if id(parameter) not in excluded}
+        if not selected:
+            raise ValueError("Freezer selection matched no parameters; names are exact, use name_starts_with for prefixes")
+        return selected
 
-        frozen_layers = []
-        unfrozen_layers = []
+    def _capture_original_flags(self, selected: dict[str, torch.nn.Parameter]) -> None:
+        if self._original_flags and self._original_flags.keys() != selected.keys():
+            raise ValueError("Freezer parameter names changed since setup/checkpoint; use a matching model and policy")
+        if not self._original_flags:
+            self._original_flags = {name: parameter.requires_grad for name, parameter in selected.items()}
 
-        for name, param in target.named_parameters():
-            # Check if the parameter should be excluded from freezing.
-            is_excepted = (self.except_names and name in self.except_names) or (
-                self.except_name_starts_with and any(name.startswith(prefix) for prefix in self.except_name_starts_with)
+    def on_fit_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        selected = self._selected_parameters(pl_module)
+        self._capture_original_flags(selected)
+        # Lightning 2.5 initializes this public attribute through its connector.
+        callbacks: list[Callback] = trainer.callbacks  # type: ignore[attr-defined]
+        for callback in callbacks:
+            if isinstance(callback, Freezer) and callback is not self:
+                other_ids = {id(parameter) for parameter in callback._selected_parameters(pl_module).values()}
+                if any(id(parameter) in other_ids for parameter in selected.values()):
+                    raise ValueError("Freezer callbacks overlap in parameter ownership; combine their policy")
+        dynamic = self.until_step is not None or self.until_epoch is not None
+        if dynamic:
+            optimized = {
+                id(parameter)
+                for optimizer in trainer.optimizers
+                for group in optimizer.param_groups
+                for parameter in group["params"]
+            }
+            missing = [
+                name for name, parameter in selected.items() if self._original_flags[name] and id(parameter) not in optimized
+            ]
+            if missing:
+                raise ValueError(f"Freezer parameters that can reactivate must already belong to an optimizer: {missing}")
+        wrapped = trainer.strategy.model
+        if isinstance(wrapped, DistributedDataParallel):
+            if not wrapped.find_unused_parameters or wrapped.static_graph:
+                raise ValueError("Freezer with DDP requires find_unused_parameters=True and static_graph=False")
+            if dynamic and any(
+                self._original_flags[name] and not parameter.requires_grad for name, parameter in selected.items()
+            ):
+                raise ValueError("Reactivated Freezer parameters must be trainable when DDP wraps the model")
+        elif trainer.world_size > 1:
+            raise ValueError(
+                "Freezer supports distributed execution through DDP; other strategies require a native freezing policy"
             )
-            if is_excepted:
-                # Exceptions are always trainable
-                param.requires_grad = True
-                if not requires_grad:  # Only log when we're in freezing mode
-                    unfrozen_layers.append(name)
-                continue
+        self._frozen_state = None
 
-            # Check if the parameter should be frozen/unfrozen.
-            is_to_freeze = (self.names and name in self.names) or (
-                self.name_starts_with and any(name.startswith(prefix) for prefix in self.name_starts_with)
-            )
-            if is_to_freeze:
-                param.requires_grad = requires_grad
-                if not requires_grad:
-                    frozen_layers.append(name)
-                else:
-                    unfrozen_layers.append(name)
-            else:
-                # Not specified and not excepted - keep trainable
-                param.requires_grad = True
+    def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int) -> None:
+        released = (self.until_step is not None and trainer.global_step >= self.until_step) or (
+            self.until_epoch is not None and trainer.current_epoch >= self.until_epoch
+        )
+        frozen = not released
+        if frozen != self._frozen_state:
+            self._set_model_requires_grad(pl_module, requires_grad=released)
+            self._frozen_state = frozen
 
-        # Log the frozen/unfrozen layers.
-        if frozen_layers:
-            logger.info(
-                f"Froze layers: {frozen_layers}"
-                + (f" until step {self.until_step}" if self.until_step is not None else "")
-                + (f" until epoch {self.until_epoch}" if self.until_epoch is not None else "")
-            )
-        if unfrozen_layers:
-            suffix = " (excepted from freeze)" if not requires_grad else ""
-            logger.info(f"Unfroze layers: {unfrozen_layers}{suffix}")
+    def _set_model_requires_grad(self, model: torch.nn.Module, requires_grad: bool) -> None:
+        """Apply ownership: false freezes, true restores each original flag."""
+        selected = self._selected_parameters(model)
+        self._capture_original_flags(selected)
+        for name, parameter in selected.items():
+            parameter.requires_grad_(self._original_flags[name] if requires_grad else False)
+            if not parameter.requires_grad:
+                parameter.grad = None
+        logger.info(f"{'Restored gradient flags for' if requires_grad else 'Froze'} parameters: {list(selected)}")

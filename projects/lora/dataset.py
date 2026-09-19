@@ -1,6 +1,6 @@
 """Datasets for efficient fine-tuning examples."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sized
 
 import torch
 from torch.utils.data import Dataset
@@ -17,7 +17,10 @@ class CIFAR100Dataset(Dataset):
 
     Args:
         root: Root directory for dataset.
-        train: Whether to use training set.
+        train: Legacy full-partition selector, used only when split is omitted.
+        split: Explicit train/val/test research population.
+        validation_fraction: Fraction of official training samples reserved for validation.
+        split_seed: Independent fixed seed selecting training/validation indices.
         transform: Transform to apply to images.
         download: Whether to download if not present.
     """
@@ -28,19 +31,31 @@ class CIFAR100Dataset(Dataset):
         train: bool = True,
         transform: Callable | None = None,
         download: bool = True,
+        split: str | None = None,
+        validation_fraction: float = 0.1,
+        split_seed: int = 42,
     ) -> None:
+        if split is not None and split not in {"train", "val", "test"}:
+            raise ValueError("split must be train, val or test")
         self.dataset = datasets.CIFAR100(
             root=root,
-            train=train,
+            train=(split != "test") if split is not None else train,
             download=download,
         )
         self.transform = transform
+        self.indices = list(range(len(self.dataset)))
+        if split in {"train", "val"}:
+            count = int(len(self.dataset) * validation_fraction)
+            if not 0 < count < len(self.dataset):
+                raise ValueError("validation_fraction must give nonempty training and validation populations")
+            indices = torch.randperm(len(self.dataset), generator=torch.Generator().manual_seed(split_seed)).tolist()
+            self.indices = indices[count:] if split == "train" else indices[:count]
 
     def __len__(self) -> int:
-        return len(self.dataset)
+        return len(self.indices)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image, label = self.dataset[idx]
+        image, label = self.dataset[self.indices[idx]]
 
         if self.transform:
             image = self.transform(image)
@@ -70,6 +85,9 @@ class FewShotDataset(Dataset):
     ) -> None:
         self.samples_per_class = samples_per_class
         self.num_classes = num_classes
+
+        if not isinstance(base_dataset, Sized):
+            raise TypeError("FewShotDataset requires a map-style dataset with a length")
 
         # Group samples by class
         class_indices: dict[int, list[int]] = {}

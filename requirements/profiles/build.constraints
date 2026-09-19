@@ -1,0 +1,2 @@
+# Both development packages currently use this bounded uv build-backend family.
+uv_build==0.7.19

@@ -1,4 +1,6 @@
 site_name: Lighter
+exclude_docs: |
+  /overrides/
 theme:
   icon:
     repo: fontawesome/brands/github
@@ -59,6 +61,7 @@ plugins:
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
+      - docs/gen_examples.py
   - literate-nav:
       nav_file: SUMMARY.md
   - mkdocstrings:
@@ -71,19 +74,27 @@ plugins:
 
 nav:
   - Home: index.md
-  - Quick Start: quickstart.md
-  - Guides:
-      - Configuration: guides/configuration.md
-      - Custom Code: guides/custom-code.md
-      - Your LightningModule: guides/lightning-module.md
+  - Start:
+      - Installation: guides/compatibility.md
+      - First experiment: quickstart.md
+      - Compare and Continue: examples/compare-and-continue.md
+      - Examples: examples/index.md
+  - Concepts:
+      - Recipes and composition: guides/configuration.md
+      - Python projects and data: guides/custom-code.md
+      - Native Lightning ownership: guides/lightning-module.md
       - LighterModule: guides/lighter-module.md
-      - Training: guides/training.md
-      - Best Practices: guides/best-practices.md
-  - Examples: examples/index.md
+  - Workflows:
+      - Train, select and continue: guides/training.md
+      - Inspect and compare records: guides/experiment-records.md
+      - Export predictions: guides/predictions.md
+      - Freeze parameters: guides/freezing.md
   - Reference:
       - CLI: reference/cli.md
       - API: reference/
-  - FAQ: faq.md
+  - Help:
+      - Troubleshooting: faq.md
+      - Research practices: guides/best-practices.md
 
 markdown_extensions:
   - pymdownx.highlight:

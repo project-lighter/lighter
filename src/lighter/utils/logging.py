@@ -7,7 +7,10 @@ mapping for different log levels and handlers to intercept and redirect logging 
 """
 
 import importlib
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from loguru import Record
 
 # List of modules to suppress in Rich traceback for cleaner output
 SUPPRESSED_MODULES = [
@@ -44,7 +47,7 @@ def _setup_logging():
     import rich.traceback
     from loguru import logger
 
-    def formatter(record: dict[str, Any]) -> str:
+    def formatter(record: "Record") -> str:
         """Format log messages for better readability and clarity. Used to configure Loguru with a Rich handler."""
         lvl_name = record["level"].name
         lvl_color = LOGGING_COLOR_MAP.get(lvl_name, "cyan")

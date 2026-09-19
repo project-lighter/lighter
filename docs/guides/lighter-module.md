@@ -1,1013 +1,155 @@
----
-title: Using LighterModule
----
-
 # Using LighterModule
 
-Build models with less boilerplate using `LighterModule`.
+LighterModule supplies a default forward pass, managed optimizer/scheduler setup and automatic measurements. You implement the scientific steps and update configured metrics. Start with its inherited constructor; ordinary authoring needs no factory or setup hook.
 
-**Key insight**: You write step logic. LighterModule handles optimizers, schedulers, and logging automatically.
+Use a [native LightningModule](lightning-module.md) when your module owns a different lifecycle or optimization algorithm.
 
-## When to Use This Approach
+## Required implementations
 
-**Use LighterModule when:**
-
-- Starting new projects
-- Want less boilerplate code
-- Standard training workflows
-- Config-driven everything
-
-**You get:**
-
-- Automatic `configure_optimizers()`
-- Dual logging (step + epoch)
-- Config-driven metrics
-- All PyTorch Lightning features
-
-**You write:**
-
-- Step implementations only (`training_step`, `validation_step`, etc.)
-- Your model's forward logic
-- That's it!
-
-## Basic Example
-
-### Minimal Implementation
-
-`model.py`:
+The default `forward(*args, **kwargs)` calls `self.network`. Implement `training_step` for training and the other stages your task needs. This excerpt is from the [download-free diagnostic](../quickstart.md):
 
 ```python
 from lighter import LighterModule
 
-class MyModel(LighterModule):
-    """Minimal model - just implement steps."""
 
+class RegressionTask(LighterModule):
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)  # Forward pass through self.network
-        loss = self.criterion(pred, y)  # Use self.criterion
-
-        # Update metrics
-        if self.train_metrics:
-            self.train_metrics(pred, y)
-
-        return {"loss": loss}
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-        loss = self.criterion(pred, y)
-
-        if self.val_metrics:
-            self.val_metrics(pred, y)
-
-        return {"loss": loss}
+        prediction = self(batch["x"]).squeeze(-1)
+        return self.criterion(prediction, batch["target"])
 ```
 
-### Config
+The complete project also implements validation, test and prediction. Omitting a validation/test method leaves that stage absent according to native detection; returning `None` from an implemented evaluation method still allows explicit logging and configured metric collection. Implement a prediction step that preserves your sample IDs.
 
-`config.yaml`:
+## Construction and optimizer ownership
+
+In the ordinary managed path, the inherited constructor builds the network, criterion and metrics eagerly. Lighter retains the optimizer/scheduler recipes and resolves them at Lightning's native `configure_optimizers()` setup point:
 
 ```yaml
-trainer:
-  _target_: pytorch_lightning.Trainer
-  max_epochs: 10
-  accelerator: auto
-
 model:
-  _target_: model.MyModel
-
-  # Network architecture
+  _target_: project.task.RegressionTask
   network:
-    _target_: torchvision.models.resnet18
-    num_classes: 10
-
-  # Loss function
+    _target_: torch.nn.Linear
+    in_features: 2
+    out_features: 1
   criterion:
-    _target_: torch.nn.CrossEntropyLoss
-
-  # Optimizer (auto-configured!)
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
-    lr: 0.001
-
-  # Metrics (optional)
-  train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-
-  val_metrics: "%model::train_metrics"  # Copy config
-
-data:
-  _target_: lighter.LighterDataModule
-  train_dataloader:
-    _target_: torch.utils.data.DataLoader
-    batch_size: 32
-    shuffle: true
-    dataset:
-      _target_: torchvision.datasets.CIFAR10
-      root: ./data
-      train: true
-      download: true
-      transform:
-        _target_: torchvision.transforms.ToTensor
-```
-
-**That's it!** No `configure_optimizers()`, no manual logging.
-
-## How It Works
-
-LighterModule provides these automatically:
-
-### 1. Forward Pass
-
-```python
-def forward(self, x):
-    """Calls self.network(x) automatically."""
-    return self.network(x)
-```
-
-You can override if needed:
-
-```python
-def forward(self, x):
-    # Custom forward logic
-    features = self.network.encoder(x)
-    output = self.network.decoder(features)
-    return output
-```
-
-### 2. Configure Optimizers
-
-```python
-def configure_optimizers(self):
-    """Auto-creates optimizer and optional scheduler."""
-    # Creates optimizer from config
-    # Adds scheduler if provided
-    # Returns proper format for Lightning
-```
-
-No manual implementation needed!
-
-### 3. Automatic Logging
-
-**LighterModule automatically logs:**
-
-1. **Loss values** - Dual logging (step + epoch)
-2. **Metrics** - Dual logging (step + epoch)
-3. **Optimizer stats** - Learning rate, momentum, betas, weight decay (epoch only)
-
-#### Loss Logging
-
-Return loss from your step methods:
-
-```python
-def training_step(self, batch, batch_idx):
-    loss = self.criterion(pred, y)
-    return {"loss": loss}
-```
-
-**Automatically logged as:**
-- `train/loss/step` - Per-step values
-- `train/loss/epoch` - Epoch average
-
-**Multi-component loss:**
-
-```python
-def training_step(self, batch, batch_idx):
-    return {
-        "loss": {
-            "total": total_loss,      # Required key
-            "ce": ce_loss,            # Optional component
-            "reg": reg_loss           # Optional component
-        }
-    }
-```
-
-**Logged as:**
-- `train/loss/total/step`, `train/loss/total/epoch`
-- `train/loss/ce/step`, `train/loss/ce/epoch`
-- `train/loss/reg/step`, `train/loss/reg/epoch`
-
-#### Metrics Logging
-
-Call metrics in your step methods:
-
-```python
-def training_step(self, batch, batch_idx):
-    if self.train_metrics:
-        self.train_metrics(pred, y)
-    return {"loss": loss}
-```
-
-**Automatically logged as:**
-- `train/metrics/Accuracy/step` - Per-step values
-- `train/metrics/Accuracy/epoch` - Epoch average
-- `train/metrics/F1Score/step`, `train/metrics/F1Score/epoch`
-
-#### Optimizer Stats Logging
-
-Automatically logged at the start of each training epoch:
-- `train/optimizer/Adam/lr/epoch`
-- `train/optimizer/Adam/beta1/epoch`
-- `train/optimizer/Adam/beta2/epoch`
-
-See [Automatic Optimizer Stats Logging](#automatic-optimizer-stats-logging) for details.
-
-## What LighterModule Provides
-
-### Attributes Available
-
-```python
-class MyModel(LighterModule):
-    def training_step(self, batch, batch_idx):
-        # Available attributes:
-        self.network          # From config: model::network
-        self.criterion        # From config: model::criterion
-        self.optimizer        # From config: model::optimizer
-        self.scheduler        # From config: model::scheduler (optional)
-        self.train_metrics    # From config: model::train_metrics (optional)
-        self.val_metrics      # From config: model::val_metrics (optional)
-        self.test_metrics     # From config: model::test_metrics (optional)
-```
-
-All optional except `network` (you need something to run!).
-
-### Required Implementations
-
-You **must** implement:
-
-```python
-def training_step(self, batch, batch_idx):
-    """Required."""
-    return {"loss": loss}
-```
-
-Optional but common:
-
-```python
-def validation_step(self, batch, batch_idx):
-    """Optional."""
-    return {"loss": loss}
-
-def test_step(self, batch, batch_idx):
-    """Optional."""
-    return {"loss": loss}
-
-def predict_step(self, batch, batch_idx):
-    """Optional."""
-    return predictions
-```
-
-## Complete Examples
-
-### Example 1: Image Classification
-
-`models.py`:
-
-```python
-from lighter import LighterModule
-
-class ImageClassifier(LighterModule):
-    """Image classification with metrics."""
-
-    def training_step(self, batch, batch_idx):
-        images, labels = batch
-
-        # Forward pass
-        logits = self(images)
-
-        # Loss
-        loss = self.criterion(logits, labels)
-
-        # Metrics
-        if self.train_metrics:
-            self.train_metrics(logits, labels)
-
-        # Return dict - all values logged automatically
-        return {
-            "loss": loss,
-        }
-
-    def validation_step(self, batch, batch_idx):
-        images, labels = batch
-        logits = self(images)
-        loss = self.criterion(logits, labels)
-
-        if self.val_metrics:
-            self.val_metrics(logits, labels)
-
-        return {"loss": loss}
-
-    def test_step(self, batch, batch_idx):
-        images, labels = batch
-        logits = self(images)
-
-        if self.test_metrics:
-            self.test_metrics(logits, labels)
-
-        return {"predictions": logits.argmax(dim=1)}
-```
-
-`config.yaml`:
-
-```yaml
-model:
-  _target_: models.ImageClassifier
-
-  network:
-    _target_: torchvision.models.resnet50
-    weights: IMAGENET1K_V2  # Pretrained
-    num_classes: 10
-
-  criterion:
-    _target_: torch.nn.CrossEntropyLoss
-    label_smoothing: 0.1
-
-  optimizer:
-    _target_: torch.optim.AdamW
-    params: "$@model::network.parameters()"
-    lr: 0.001
-    weight_decay: 0.01
-
-  scheduler:
-    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
-    T_max: 100
-
-  train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
-      average: macro
-
-  val_metrics: "%model::train_metrics"
-  test_metrics: "%model::train_metrics"
-```
-
-### Example 2: Semantic Segmentation
-
-`models.py`:
-
-```python
-from lighter import LighterModule
-import torch.nn.functional as F
-
-class SemanticSegmentation(LighterModule):
-    """Semantic segmentation with dice loss."""
-
-    def training_step(self, batch, batch_idx):
-        images, masks = batch
-
-        # Forward
-        logits = self(images)
-
-        # Resize logits to match mask size if needed
-        if logits.shape[-2:] != masks.shape[-2:]:
-            logits = F.interpolate(
-                logits,
-                size=masks.shape[-2:],
-                mode='bilinear',
-                align_corners=False
-            )
-
-        # Loss
-        loss = self.criterion(logits, masks)
-
-        # Metrics
-        if self.train_metrics:
-            preds = logits.argmax(dim=1)
-            self.train_metrics(preds, masks)
-
-        return {"loss": loss}
-
-    def validation_step(self, batch, batch_idx):
-        images, masks = batch
-        logits = self(images)
-
-        if logits.shape[-2:] != masks.shape[-2:]:
-            logits = F.interpolate(
-                logits,
-                size=masks.shape[-2:],
-                mode='bilinear',
-                align_corners=False
-            )
-
-        loss = self.criterion(logits, masks)
-
-        if self.val_metrics:
-            preds = logits.argmax(dim=1)
-            self.val_metrics(preds, masks)
-
-        return {"loss": loss}
-```
-
-`config.yaml`:
-
-```yaml
-model:
-  _target_: models.SemanticSegmentation
-
-  network:
-    _target_: segmentation_models_pytorch.Unet
-    encoder_name: resnet34
-    encoder_weights: imagenet
-    in_channels: 3
-    classes: 21
-
-  criterion:
-    _target_: segmentation_models_pytorch.losses.DiceLoss
-    mode: multiclass
-
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
-    lr: 0.0001
-
-  train_metrics:
-    - _target_: torchmetrics.JaccardIndex
-      task: multiclass
-      num_classes: 21
-
-  val_metrics: "%model::train_metrics"
-```
-
-### Example 3: Multi-Task Learning
-
-`models.py`:
-
-```python
-from lighter import LighterModule
-
-class MultiTaskModel(LighterModule):
-    """Multi-task: classification + regression."""
-
-    def __init__(self, network, criterion_cls, criterion_reg,
-                 optimizer, alpha=0.5):
-        super().__init__(
-            network=network,
-            criterion=None,  # We have multiple
-            optimizer=optimizer
-        )
-        self.criterion_cls = criterion_cls
-        self.criterion_reg = criterion_reg
-        self.alpha = alpha  # Task weighting
-
-    def training_step(self, batch, batch_idx):
-        images, labels_cls, labels_reg = batch
-
-        # Forward
-        out_cls, out_reg = self(images)
-
-        # Two losses
-        loss_cls = self.criterion_cls(out_cls, labels_cls)
-        loss_reg = self.criterion_reg(out_reg, labels_reg)
-
-        # Combined loss
-        loss = self.alpha * loss_cls + (1 - self.alpha) * loss_reg
-
-        # Return all for logging
-        return {
-            "loss": loss,
-            "loss_cls": loss_cls.detach(),
-            "loss_reg": loss_reg.detach(),
-        }
-
-    def validation_step(self, batch, batch_idx):
-        images, labels_cls, labels_reg = batch
-        out_cls, out_reg = self(images)
-
-        loss_cls = self.criterion_cls(out_cls, labels_cls)
-        loss_reg = self.criterion_reg(out_reg, labels_reg)
-        loss = self.alpha * loss_cls + (1 - self.alpha) * loss_reg
-
-        # Accuracy for classification head
-        acc = (out_cls.argmax(1) == labels_cls).float().mean()
-
-        return {
-            "loss": loss,
-            "loss_cls": loss_cls,
-            "loss_reg": loss_reg,
-            "acc": acc,
-        }
-```
-
-### Example 4: Custom Forward Pass
-
-Override `forward` for custom logic:
-
-```python
-from lighter import LighterModule
-
-class AutoencoderModel(LighterModule):
-    """Autoencoder with custom forward."""
-
-    def forward(self, x):
-        """Custom forward through encoder-decoder."""
-        latent = self.network.encoder(x)
-        reconstruction = self.network.decoder(latent)
-        return reconstruction, latent
-
-    def training_step(self, batch, batch_idx):
-        images, _ = batch
-
-        # Forward returns tuple
-        reconstruction, latent = self(images)
-
-        # Reconstruction loss
-        loss_recon = self.criterion(reconstruction, images)
-
-        # Optional: regularization on latent
-        loss_kl = 0.001 * (latent ** 2).mean()
-
-        loss = loss_recon + loss_kl
-
-        return {
-            "loss": loss,
-            "loss_recon": loss_recon.detach(),
-            "loss_kl": loss_kl.detach(),
-        }
-
-    def validation_step(self, batch, batch_idx):
-        images, _ = batch
-        reconstruction, _ = self(images)
-        loss = self.criterion(reconstruction, images)
-        return {"loss": loss}
-```
-
-## Adding Schedulers
-
-LighterModule handles schedulers automatically:
-
-```yaml
-model:
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
-    lr: 0.001
-
-  scheduler:
-    _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"  # Reference optimizer
-    T_max: 100
-    eta_min: 0.00001
-```
-
-**Supported scheduler types:**
-
-### Step-based
-
-```yaml
-scheduler:
-  _target_: torch.optim.lr_scheduler.StepLR
-  optimizer: "@model::optimizer"
-  step_size: 30
-  gamma: 0.1
-```
-
-### Plateau-based
-
-```yaml
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  optimizer: "@model::optimizer"
-  mode: min
-  factor: 0.5
-  patience: 10
-```
-
-### Warmup
-
-```yaml
-scheduler:
-  _target_: torch.optim.lr_scheduler.LinearLR
-  optimizer: "@model::optimizer"
-  start_factor: 0.1
-  total_iters: 1000
-```
-
-### Chained Schedulers
-
-For complex schedules, override `configure_optimizers`:
-
-```python
-def configure_optimizers(self):
-    # Warmup then cosine
-    warmup = torch.optim.lr_scheduler.LinearLR(
-        self.optimizer,
-        start_factor=0.1,
-        total_iters=1000
-    )
-    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
-        self.optimizer,
-        T_max=self.trainer.max_epochs - 10
-    )
-
-    scheduler = torch.optim.lr_scheduler.SequentialLR(
-        self.optimizer,
-        schedulers=[warmup, cosine],
-        milestones=[10]
-    )
-
-    return {
-        "optimizer": self.optimizer,
-        "lr_scheduler": {
-            "scheduler": scheduler,
-            "interval": "epoch",
-        }
-    }
-```
-
-## Automatic Optimizer Stats Logging
-
-**LighterModule automatically logs optimizer statistics** including learning rate, momentum, betas, and weight decay at the start of each training epoch. You do **not** need to add `LearningRateMonitor` callback.
-
-Logged stats (per parameter group):
-- **Learning rate**: `train/optimizer/{OptimizerName}/lr/epoch`
-- **Momentum**: `train/optimizer/{OptimizerName}/momentum/epoch` (SGD, RMSprop)
-- **Beta1/Beta2**: `train/optimizer/{OptimizerName}/beta1/epoch`, `beta2/epoch` (Adam variants)
-- **Weight decay**: `train/optimizer/{OptimizerName}/weight_decay/epoch` (if non-zero)
-
-For multiple parameter groups (e.g., differential learning rates):
-- `train/optimizer/{OptimizerName}/lr/group1/epoch`
-- `train/optimizer/{OptimizerName}/lr/group2/epoch`
-
-**Example logged metrics:**
-
-```
-train/optimizer/Adam/lr/epoch: 0.001
-train/optimizer/Adam/beta1/epoch: 0.9
-train/optimizer/Adam/beta2/epoch: 0.999
-```
-
-!!! note "No LearningRateMonitor needed"
-    The PyTorch Lightning `LearningRateMonitor` callback is redundant with LighterModule since optimizer stats are already logged automatically.
-
-## Working with Metrics
-
-### Single Metric
-
-```yaml
-model:
-  train_metrics:
-    _target_: torchmetrics.Accuracy
-    task: multiclass
-    num_classes: 10
-```
-
-Update in code:
-
-```python
-if self.train_metrics:
-    self.train_metrics(preds, targets)
-```
-
-### Multiple Metrics
-
-```yaml
-model:
-  train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.Precision
-      task: multiclass
-      num_classes: 10
-```
-
-Update in code (same!):
-
-```python
-if self.train_metrics:
-    self.train_metrics(preds, targets)  # Updates all metrics
-```
-
-### Metric Collections
-
-Use `MetricCollection` for grouped metrics:
-
-```yaml
-model:
-  train_metrics:
-    _target_: torchmetrics.MetricCollection
-    metrics:
-      accuracy:
-        _target_: torchmetrics.Accuracy
-        task: multiclass
-        num_classes: 10
-      f1:
-        _target_: torchmetrics.F1Score
-        task: multiclass
-        num_classes: 10
-```
-
-### Per-Class Metrics
-
-```yaml
-model:
-  val_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-      average: none  # Per-class accuracy
-```
-
-## Custom Initialization
-
-Need custom setup? Override `__init__`:
-
-```python
-from lighter import LighterModule
-
-class MyModel(LighterModule):
-    def __init__(self, network, criterion, optimizer,
-                 special_param=42):
-        super().__init__(
-            network=network,
-            criterion=criterion,
-            optimizer=optimizer
-        )
-
-        # Custom initialization
-        self.special_param = special_param
-        self.custom_buffer = []
-
-        # Freeze backbone
-        for param in self.network.backbone.parameters():
-            param.requires_grad = False
-
-    def training_step(self, batch, batch_idx):
-        # Use custom attributes
-        if batch_idx % self.special_param == 0:
-            self.custom_buffer.append(batch_idx)
-
-        # ... rest of step ...
-```
-
-Config:
-
-```yaml
-model:
-  _target_: models.MyModel
-  special_param: 100
-  network:
-    _target_: ...
-  criterion:
-    _target_: ...
-  optimizer:
-    _target_: ...
-```
-
-## Using Lightning Hooks
-
-All Lightning hooks work:
-
-```python
-class MyModel(LighterModule):
-    def on_train_start(self):
-        print("Training starting!")
-
-    def on_train_epoch_end(self):
-        # Log custom metrics
-        avg_loss = self.trainer.callback_metrics.get('train/loss')
-        if avg_loss is not None:
-            print(f"Epoch {self.current_epoch}: {avg_loss:.4f}")
-
-    def on_validation_epoch_end(self):
-        # Custom validation logic
-        pass
-
-    def on_save_checkpoint(self, checkpoint):
-        # Add custom data
-        checkpoint['my_data'] = self.custom_buffer
-
-    def on_load_checkpoint(self, checkpoint):
-        # Load custom data
-        self.custom_buffer = checkpoint.get('my_data', [])
-```
-
-## Differential Learning Rates
-
-Use parameter groups in optimizer config:
-
-```yaml
-model:
+    _target_: torch.nn.MSELoss
   optimizer:
     _target_: torch.optim.SGD
-    params:
-      - params: "$@model::network.backbone.parameters()"
-        lr: 0.0001  # Low LR for pretrained backbone
-      - params: "$@model::network.head.parameters()"
-        lr: 0.01    # High LR for new head
-    momentum: 0.9
-```
-
-## Gradient Accumulation
-
-Use Trainer config:
-
-```yaml
-trainer:
-  accumulate_grad_batches: 4  # Accumulate 4 batches
-```
-
-Effective batch size = batch_size × accumulate_grad_batches.
-
-## Mixed Precision Training
-
-```yaml
-trainer:
-  precision: 16  # Use 16-bit precision
-```
-
-Or:
-
-```yaml
-trainer:
-  precision: "bf16-mixed"  # BFloat16 mixed precision
-```
-
-## Saving Predictions
-
-Override `predict_step`:
-
-```python
-def predict_step(self, batch, batch_idx):
-    images, _ = batch
-    predictions = self(images)
-
-    return {
-        "predictions": predictions.argmax(dim=1),
-        "probabilities": predictions.softmax(dim=1),
-    }
-```
-
-Run:
-
-```bash
-lighter predict config.yaml
-```
-
-Use Writers to save to files - see [Training Guide](training.md#saving-predictions).
-
-## Validation Without Training
-
-```python
-def validation_step(self, batch, batch_idx):
-    # Just metrics, no loss needed
-    x, y = batch
-    pred = self(x)
-
-    if self.val_metrics:
-        self.val_metrics(pred, y)
-
-    return {}  # Empty dict is fine
-```
-
-## Common Patterns
-
-### Pattern 1: Return Dict for Auto-Logging
-
-```python
-def training_step(self, batch, batch_idx):
-    # Everything in the dict gets logged automatically
-    return {
-        "loss": loss,                    # Required
-        "accuracy": accuracy,            # Optional
-        "learning_rate": current_lr,     # Optional
-        "custom_metric": custom_value,   # Optional
-    }
-```
-
-Logs as:
-
-- `train/loss`
-- `train/accuracy`
-- `train/learning_rate`
-- `train/custom_metric`
-
-### Pattern 2: Conditional Logging
-
-```python
-def training_step(self, batch, batch_idx):
-    loss = self.criterion(self(x), y)
-
-    # Only log images every 100 steps
-    if batch_idx % 100 == 0:
-        self.logger.experiment.add_images(
-            "train/images",
-            x[:8],
-            self.global_step
-        )
-
-    return {"loss": loss}
-```
-
-### Pattern 3: Custom Metric Update
-
-```python
-def validation_step(self, batch, batch_idx):
-    x, y = batch
-    pred = self(x)
-    loss = self.criterion(pred, y)
-
-    # Update specific metrics with transforms
-    if self.val_metrics:
-        # Apply softmax before metric
-        probs = pred.softmax(dim=1)
-        self.val_metrics(probs, y)
-
-    return {"loss": loss}
-```
-
-## Comparison: LighterModule vs LightningModule
-
-| Feature | LighterModule | LightningModule |
-|---------|--------------|---------------------|
-| Boilerplate | Less | More |
-| configure_optimizers | Automatic | Manual |
-| Logging | Automatic dual logging | Manual |
-| Metrics | Config-driven | Code-driven |
-| Learning curve | Learn LighterModule | Just Lightning |
-| Flexibility | Standard patterns | Full control |
-| Migration | Adapt existing code | Use as-is |
-
-**Choose LighterModule when:**
-
-- Starting fresh
-- Want minimal code
-- Standard workflows
-- Config everything
-
-**Choose LightningModule when:**
-
-- Have existing code
-- Need custom logic
-- Want full control
-- Complex training loops
-
-Both give you YAML configs and CLI overrides!
-
-## Next Steps
-
-- [Lightning Module Guide](lightning-module.md) - Compare with the other approach
-- [Training Guide](training.md) - Run experiments, save outputs
-- [Best Practices](best-practices.md) - Production patterns
-
-## Quick Reference
-
-```python
-from lighter import LighterModule
-
-class MyModel(LighterModule):
-    # Optional custom __init__
-    def __init__(self, network, criterion, optimizer, **kwargs):
-        super().__init__(
-            network=network,
-            criterion=criterion,
-            optimizer=optimizer
-        )
-
-    # Required: training step
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-        loss = self.criterion(pred, y)
-
-        if self.train_metrics:
-            self.train_metrics(pred, y)
-
-        return {"loss": loss}
-
-    # Optional: validation step
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-        loss = self.criterion(pred, y)
-
-        if self.val_metrics:
-            self.val_metrics(pred, y)
-
-        return {"loss": loss}
-```
-
-```yaml
-# Config
-model:
-  _target_: models.MyModel
-  network:
-    _target_: ...
-  criterion:
-    _target_: ...
-  optimizer:
-    _target_: ...
     params: "$@model::network.parameters()"
+    lr: 0.05
+    momentum: 0.2
 ```
+
+This is the diagnostic's model section with an LR change. Each native optimizer setup receives fresh parameter iterators, optimizer and scheduler objects against the actual network. Parameter groups, subsets, ordering and options remain those selected by the recipe. Native restoration then loads saved optimizer/scheduler state. The network remains the same object across one module instance's stages; separate Runner runs ordinarily construct separate modules.
+
+The managed path requires a statically named class inheriting both `LighterModule.__init__` and `configure_optimizers`, with ordinary keyword component definitions. Local `%` copies are supported. Custom constructors/hooks, positional module construction and computed class targets retain eager/native ownership.
+
+A prebuilt optimizer, scheduler, parameter or iterator leaf anywhere in retained source conservatively preserves eager/native ownership, including aliases and unused helper leaves. This source check never evaluates inactive definitions or consumes opaque objects. A prebuilt network module alone can still use managed optimizer setup.
+
+### Requested values versus live objects
+
+An eager callback cannot require an optimizer reserved for later native setup. Share the requested scalar instead:
+
+```yaml
+learning_rate: 0.01
+model:
+  optimizer:
+    lr: "@learning_rate"
+```
+
+This is an overlay for an existing recipe. An eager callback may also use `@learning_rate`. Referencing `@model::optimizer::lr` enters the blocked optimizer subtree and fails with its source path.
+
+For ordinary `Trainer.fit`, observe the **effective restored** LR through `trainer.optimizers` in `on_train_start`, after native setup and checkpoint restoration. A custom lifecycle owns when those objects are available. [Compare and Continue](../examples/index.md) and [records](experiment-records.md#requested-settings-and-restored-results) demonstrate the distinction.
+
+### Custom construction and strategies
+
+A managed optimizer can see parameters replaced inside the existing network during `configure_model`, because its parameter expression resolves afterward. Replacing the entire managed network, or removing/replacing a separately constructed shared child/parameter, raises an alias-conflict diagnostic. Use custom native ownership for those patterns. Lighter does not rewrite arbitrary aliases or constructors, and eager network construction does not certify sharded construction.
+
+Migration: code that read `model.optimizer` before native setup must move that dependency to a runtime hook or keep custom ownership. Directly constructed modules and supplied optimizer objects retain their native lifetime.
+
+## Automatic logging
+
+The module logs returned loss observations, configured metrics and optimizer settings. `trainer.logger: false` disables external logging, not callback measurements. Monitor actual keys in `trainer.callback_metrics`; logger-disabled values may not appear in native `validate()`/`test()` return dictionaries.
+
+### Loss logging
+
+Under automatic optimization, return a single-element Tensor or a dictionary whose `loss` is that Tensor. Return `None` to skip a step. Use `loss_terms` for additional named scalar observations:
+
+```python
+return {"loss": total_loss, "loss_terms": {"data": data_loss, "penalty": penalty}}
+```
+
+This step excerpt assumes those tensors were computed by your algorithm. Automatic names include:
+
+| Observation | Names |
+|---|---|
+| Training scalar loss | `train/loss/step`, `train/loss/epoch` |
+| Validation scalar loss | `val/loss/step`, `val/loss/epoch` |
+| Named training term | `train/loss/data/step`, `train/loss/data/epoch` |
+
+The training observation is captured before Lightning divides closure loss for gradient accumulation. This preserves the returned scientific loss without changing gradients or optimization weighting. A nested dictionary under the automatic training `loss` is invalid; put named observations under `loss_terms`.
+
+Epoch aggregation follows native logging behavior. A batch mean over valid tokens, pixels or masked elements is not necessarily an equally weighted mean over examples. For task-specific denominators, use explicit native metrics or sums/counts; automatic logging does not infer the scientific population. For example, if `loss` is the mean over the nonempty valid elements selected by `batch["mask"]`, log its validation population mean explicitly:
+
+```python
+self.log(
+    "val/loss_per_observation",
+    loss,
+    on_step=False,
+    on_epoch=True,
+    batch_size=int(batch["mask"].sum()),
+)
+```
+
+Here the mask is boolean and each `True` identifies one observation contributing to the loss. Native epoch logging weights each batch mean by its valid-observation count. Monitor `val/loss_per_observation` for checkpoint selection and population comparisons; the automatic `val/loss/epoch` may use a different denominator. This example covers one process. Distributed evaluation additionally needs deliberate synchronization and handling of any sampler-added duplicates. This logging choice does not change the loss or its gradient used for optimization.
+
+### Metric logging
+
+Configure a `torchmetrics.Metric` or `MetricCollection`, not a bare list. Call the metric in your step with its required inputs. For a regression step using a configured MeanSquaredError:
+
+```python
+self.val_metrics(prediction, batch["target"])
+return self.criterion(prediction, batch["target"])
+```
+
+The metric is automatically logged under `val/metrics/MeanSquaredError/step` and `val/metrics/MeanSquaredError/epoch`. A MetricCollection uses each collection key, preserving its prefix/postfix. Metric epoch values come from the metric's state/computation; they are not universally averages of batch scores.
+
+Use `%` to construct independent train/validation metric state. A copied definition can still contain `@` references to intentionally shared dependencies.
+
+### Separate evaluation populations
+
+With multiple validation/test loaders, accept `dataloader_idx` and update the metric normally:
+
+```python
+def validation_step(self, batch, batch_idx, dataloader_idx=0):
+    prediction = self(batch["x"]).squeeze(-1)
+    self.val_metrics(prediction, batch["target"])
+    return self.criterion(prediction, batch["target"])
+```
+
+Inside the step, `self.val_metrics` refers to that loader's independent state; test behaves similarly. Lightning adds `/dataloader_idx_0`, `/dataloader_idx_1`, and so on. Reordering loaders changes their population-index mapping, not their pooling policy. Successive evaluations reset through native logging, including sanity validation.
+
+Outside a step, these attributes refer to loader 0. Read per-loader epoch values through `trainer.callback_metrics`. Automatic cloning for multiple loaders currently requires an empty metric `state_dict()`; checkpoint-bearing/persistent metric state is rejected rather than discarded. Use explicit per-loader native metric attributes for such cases or for manual `self.log` ownership. Do not mix automatic managed attributes with custom manual logging that caches their identity before later loader states exist.
+
+Earlier versions could pool separate populations and rescale logged training loss during accumulation. Those fixes do not rewrite historical measurements.
+
+## Schedulers and manual ownership
+
+The constructor accepts a native scheduler or a Lightning scheduler dictionary. This is a scheduler-section excerpt for an existing managed optimizer:
+
+```yaml
+model:
+  scheduler:
+    scheduler:
+      _target_: torch.optim.lr_scheduler.StepLR
+      optimizer: "@model::optimizer"
+      step_size: 10
+    interval: epoch
+    frequency: 1
+```
+
+Native Lightning owns stepping for automatic optimization. A plateau scheduler additionally needs its actual monitor. Choose epoch or optimizer-step units deliberately; a warmup's length and transition must use the same unit.
+
+Manual optimization remains manual: own backward, zeroing, clipping, updates and scheduler stepping. Return the scientific loss you want observed, not an internal scaled backward value. Native/custom optimizer hooks remain available without an automatic-ownership promise.
+
+LighterModule's inherited batch-end hooks perform automatic logging. If you override those hooks, preserve the inherited behavior you still need. Prefer native public hooks over underscored implementation helpers. See the [public API and extension contracts](lightning-module.md#public-api-and-extension-contracts).

@@ -1,5 +1,7 @@
 # CIFAR-10 Image Classification
 
+> **Status: Legacy classifier.** The recommended classification walkthrough is now Compare and Continue. This earlier model/configuration remains for reference; its source has not been requalified as a research protocol in the current pilot. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Reference example - simple CNN for CIFAR-10 classification.
 
 ## Dataset
@@ -36,3 +38,10 @@ lighter fit configs/example.yaml trainer::max_epochs=50
 ## References
 
 - [CIFAR-10 Dataset](https://www.cs.toronto.edu/~kriz/cifar.html)
+
+
+## Evaluation protocol
+
+The example reserves 10% of the official training population for validation, selected with the independent fixed `split_seed: 42`. Training and validation indices are disjoint; their union is the official training set. Validation uses evaluation transforms. The official test population is used only by test/predict. Keep the split seed fixed while comparing model or training-seed changes, and select hyperparameters/checkpoints with validation results before opening the test results. These are example split choices, not a framework-imposed dataset policy.
+
+Earlier configurations used the official test set as validation. Results from that protocol are not directly comparable to the corrected holdout protocol. Tiny fixture checks exercise membership and deterministic splitting; full dataset training was not used to certify model quality.

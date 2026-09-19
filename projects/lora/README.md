@@ -1,5 +1,7 @@
 # LoRA (Low-Rank Adaptation)
 
+> **Status: Archived gallery integration.** This optional PEFT illustration is outside the maintained onboarding path. Reopening it requires actual adapter training and restoration checks, including which parameters change. Parameter membership or mocked imports alone do not qualify adaptation. Start with [Compare and Continue](../experiment_comparison/README.md), or use the [download-free diagnostic](../tabular_regression/README.md). See the [project index](../README.md) for qualification scope.
+
 Parameter-efficient fine-tuning using [HuggingFace PEFT](https://github.com/huggingface/peft).
 
 ## Overview
@@ -121,3 +123,10 @@ Then configure quantization in your base model. See [PEFT QLoRA docs](https://hu
 - [LoRA Paper](https://arxiv.org/abs/2106.09685) - Hu et al., 2021
 - [PEFT Library](https://github.com/huggingface/peft) - HuggingFace
 - [QLoRA Paper](https://arxiv.org/abs/2305.14314) - Quantized LoRA
+
+
+## Evaluation protocol
+
+The example reserves 10% of the official training population for validation, selected with the independent fixed `split_seed: 42`. Training and validation indices are disjoint; their union is the official training set. Validation uses evaluation transforms. The official test population is used only by test/predict. Keep the split seed fixed while comparing model or training-seed changes, and select hyperparameters/checkpoints with validation results before opening the test results. These are example split choices, not a framework-imposed dataset policy.
+
+Earlier configurations used the official test set as validation. Results from that protocol are not directly comparable to the corrected holdout protocol. Tiny fixture checks exercise membership and deterministic splitting; full dataset training was not used to certify model quality.

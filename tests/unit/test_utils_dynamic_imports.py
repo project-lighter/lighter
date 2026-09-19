@@ -282,7 +282,7 @@ class TestHybridPickler:
             recv_conn.close()
             send_conn.close()
 
-    def test_multiprocessing_objects_work_through_subprocess(self):
+    def test_multiprocessing_objects_work_through_subprocess(self, tmp_path):
         """Verify multiprocessing objects can be passed through actual child processes.
 
         This test ensures that the ForkingPickler._extra_reducers handling remains intact
@@ -295,23 +295,25 @@ class TestHybridPickler:
         ctx = multiprocessing.get_context("spawn")
         queue = ctx.Queue()
 
-        # Define worker function outside to avoid pickling issues
-        def worker(q):
-            q.put("success")
-
-        # Start a child process that uses the queue
-        process = ctx.Process(target=worker, args=(queue,))
-        process.start()
-        process.join(timeout=10)
-
-        # Verify the queue worked correctly through the subprocess
-        assert not queue.empty(), "Queue should have received data from child process"
-        result = queue.get(timeout=1)
-        assert result == "success", "Should receive correct data from child process"
-
-        # Cleanup
-        queue.close()
-        queue.join_thread()
+        # Explicitly opt into dynamic project support; do not rely on test order.
+        package = tmp_path / "spawn_project"
+        package.mkdir()
+        (package / "__init__.py").write_text('def worker(queue):\n    queue.put("success")\n')
+        module_name = "test_explicit_spawn_project"
+        module = import_module_from_path(module_name, package)
+        process = ctx.Process(target=module.worker, args=(queue,))
+        try:
+            process.start()
+            process.join(timeout=10)
+            assert process.exitcode == 0
+            assert queue.get(timeout=1) == "success"
+        finally:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)
+            queue.close()
+            queue.join_thread()
+            sys.modules.pop(module_name, None)
 
 
 class TestImportModuleFromPathErrors:
@@ -431,3 +433,12 @@ from nonexistent_module_xyz_12345 import something
         # Verify cleanup
         assert module_name not in sys.modules, "Failed module must be removed from sys.modules"
         assert _registry.find_root(module_name) is None, "Failed module must not be registered in _registry"
+
+
+def test_existing_unregistered_module_cannot_shadow_requested_project(tmp_path):
+    from types import ModuleType
+
+    other = ModuleType("already_present_project")
+    other.__file__ = str(tmp_path / "different" / "__init__.py")
+    with patch.dict(sys.modules, {other.__name__: other}), pytest.raises(ValueError, match="already imported from"):
+        import_module_from_path(other.__name__, tmp_path / "requested")

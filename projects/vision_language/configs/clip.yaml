@@ -1,3 +1,9 @@
+seed: 42
+
+tokenizer:
+  _target_: transformers.AutoTokenizer.from_pretrained
+  pretrained_model_name_or_path: bert-base-uncased
+
 # Vision-Language (CLIP-style) Training with Lighter
 #
 # This example showcases:
@@ -39,8 +45,7 @@ trainer:
     # Freeze image encoder backbone for first 5 epochs
     # This helps when using pretrained vision encoder
     - _target_: lighter.callbacks.Freezer
-      names:
-        - image_encoder.backbone
+      name_starts_with: image_encoder.backbone.
       until_epoch: 5
 
     # Early stopping on retrieval accuracy
@@ -123,6 +128,7 @@ data:
       _target_: project.dataset.Flickr8kDataset
       root: "%vars::data_root"
       split: train
+      tokenizer: "@tokenizer"
       max_length: "%vars::max_text_length"
       image_transform:
         _target_: torchvision.transforms.Compose
@@ -149,6 +155,7 @@ data:
       _target_: project.dataset.Flickr8kDataset
       root: "%vars::data_root"
       split: val
+      tokenizer: "@tokenizer"
       max_length: "%vars::max_text_length"
       image_transform:
         _target_: torchvision.transforms.Compose
@@ -171,6 +178,7 @@ data:
       _target_: project.dataset.Flickr8kDataset
       root: "%vars::data_root"
       split: test
+      tokenizer: "@tokenizer"
       max_length: "%vars::max_text_length"
       image_transform:
         _target_: torchvision.transforms.Compose

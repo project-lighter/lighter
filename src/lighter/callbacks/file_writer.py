@@ -7,10 +7,9 @@ from typing import Any
 import torch
 import torchvision
 from loguru import logger
-from pytorch_lightning import Trainer
+from pytorch_lightning import LightningModule, Trainer
 
 from lighter.callbacks.base_writer import BaseWriter
-from lighter.model import LighterModule
 from lighter.utils.types.enums import Stage
 
 #
@@ -150,7 +149,7 @@ class FileWriter(BaseWriter):
         self._counter: int | None = None
         self._step: int = 1
 
-    def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
         super().setup(trainer, pl_module, stage)
         if stage != Stage.PREDICT:
             return

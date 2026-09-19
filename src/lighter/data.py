@@ -5,6 +5,8 @@ This module provides LighterDataModule, a helper class that wraps PyTorch datalo
 so they can be configured in YAML without requiring a custom LightningDataModule.
 """
 
+from functools import partial
+
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
@@ -36,48 +38,38 @@ class LighterDataModule(LightningDataModule):
         predict_dataloader: DataLoader for predictions (used in predict stage)
 
     Example:
+        In the repository's ``projects/tabular_regression`` directory, whose
+        ``__lighter__.py``, ``__init__.py`` and ``task.py`` provide the project
+        import route, these loaders use disjoint synthetic sample populations:
+
         ```yaml
-        # config.yaml
         data:
           _target_: lighter.LighterDataModule
           train_dataloader:
             _target_: torch.utils.data.DataLoader
-            batch_size: 32
+            batch_size: 8
             shuffle: true
             dataset:
-              _target_: torchvision.datasets.CIFAR10
-              root: ./data
-              train: true
-              transform:
-                _target_: torchvision.transforms.ToTensor
+              _target_: project.task.RegressionSamples
+              split: train
           val_dataloader:
             _target_: torch.utils.data.DataLoader
-            batch_size: 32
+            batch_size: 3
             shuffle: false
             dataset:
-              _target_: torchvision.datasets.CIFAR10
-              root: ./data
-              train: false
-              transform:
-                _target_: torchvision.transforms.ToTensor
-
-        model:
-          _target_: project.MyModel
-          network: ...
-          optimizer: ...
-
-        trainer:
-          _target_: pytorch_lightning.Trainer
-          max_epochs: 10
+              _target_: project.task.RegressionSamples
+              split: val
         ```
 
-    Note:
-        This is just a thin wrapper around PyTorch Lightning's LightningDataModule.
-        It doesn't add any special logic - it simply holds your dataloaders and
-        returns them when Lightning asks for them.
+        This is the data section of a config. See that project's ``config.yaml``
+        for the matching model, trainer, and held-out test population.
 
-        If you need more control (prepare_data, setup, etc.), write a custom
-        LightningDataModule instead.
+    Note:
+        This thin wrapper receives already constructed datasets and dataloaders;
+        configured loader construction is eager, before Lightning's data hooks.
+        It returns those objects when Lightning asks for them. Use a native
+        LightningDataModule when downloading or shared preparation belongs in
+        ``prepare_data()``, or construction depends on the stage in ``setup()``.
     """
 
     def __init__(
@@ -92,6 +84,13 @@ class LighterDataModule(LightningDataModule):
         self._val_dataloader = val_dataloader
         self._test_dataloader = test_dataloader
         self._predict_dataloader = predict_dataloader
+
+        # Use native absence semantics without masking a subclass's own hooks.
+        # Explicitly requesting an absent stage retains Lightning's diagnostic.
+        for name in ("train_dataloader", "val_dataloader", "test_dataloader", "predict_dataloader"):
+            if getattr(self, f"_{name}") is None and getattr(type(self), name) is getattr(LighterDataModule, name):
+                native_hook = getattr(LightningDataModule, name)
+                setattr(self, name, partial(native_hook, self))
 
     def train_dataloader(self) -> DataLoader | None:
         """Return the training dataloader."""

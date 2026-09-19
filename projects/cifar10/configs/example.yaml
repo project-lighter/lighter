@@ -1,3 +1,5 @@
+seed: 42
+
 trainer:
     _target_: pytorch_lightning.Trainer
     max_epochs: 2
@@ -61,10 +63,11 @@ data:
         pin_memory: True
         shuffle: True
         dataset:
-            _target_: torchvision.datasets.CIFAR10
+            _target_: project.dataset.cifar10_split
             download: True
             root: ./.datasets/
-            train: True
+            split: train
+            split_seed: 42
             transform:
                 _target_: torchvision.transforms.Compose
                 transforms:
@@ -81,10 +84,11 @@ data:
         pin_memory: True
         shuffle: False
         dataset:
-            _target_: torchvision.datasets.CIFAR10
+            _target_: project.dataset.cifar10_split
             download: True
             root: ./.datasets/
-            train: False
+            split: val
+            split_seed: 42
             transform:
                 _target_: torchvision.transforms.Compose
                 transforms:
@@ -94,5 +98,15 @@ data:
                       std: [0.5, 0.5, 0.5]
             target_transform: null
 
-    test_dataloader: "%data::val_dataloader"
-    predict_dataloader: "%data::val_dataloader"
+    test_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: 512
+        num_workers: 2
+        shuffle: False
+        dataset:
+            _target_: project.dataset.cifar10_split
+            root: ./.datasets/
+            split: test
+            download: True
+            transform: "%data::val_dataloader::dataset::transform"
+    predict_dataloader: "%data::test_dataloader"

@@ -4,14 +4,18 @@ Contains the Runner class and CLI entry point.
 """
 
 import argparse
+import inspect
+import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
 from loguru import logger
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
+from pytorch_lightning import Callback, LightningDataModule, LightningModule, Trainer, seed_everything
 from sparkwheel import Config, ValidationError
 
+from lighter.engine.construction import _resolve_managed_path, resolve_managed_model
+from lighter.engine.records import RunRecorder, _validate_literal_run_options, atomic_write, describe
 from lighter.utils.dynamic_imports import import_module_from_path
 from lighter.utils.types.enums import Stage
 
@@ -62,6 +66,49 @@ class ConfigLoader:
             raise ValueError(f"Configuration loading failed:\n{e}") from e
 
 
+class _ResolutionView:
+    """Private source/runtime view for one Runner invocation."""
+
+    def __init__(self, source: Config, stage: Stage, overrides: dict[str, Any]):
+        self.source = source
+        self.recipe = source.retain()
+        self.managed_binding: Any = None
+        arguments = source.get("args", {})
+        selected = arguments.get(str(stage), {})
+        self.bindings = {f"args::{stage}::{key}": value for key, value in overrides.items() if key in selected}
+        self.blocked_paths = {f"args::{name}" for name in arguments if name != str(stage)}
+        self.scope = self.recipe.scope(bindings=self.bindings, blocked_paths=self.blocked_paths)
+
+    def get(self, path: str = "", default: Any = None) -> Any:
+        return self.source.get(path, default)
+
+    def resolve(self, path: str) -> Any:
+        if self.managed_binding is None:
+            return self.scope.resolve(path)
+        return _resolve_managed_path(self.scope, path, self.managed_binding.deferred)
+
+
+def _publish_source(source: dict[str, Any], trainer: Trainer) -> None:
+    if not trainer.logger:
+        return
+    trainer.logger.log_hyperparams(source)
+    if trainer.log_dir:
+        path = Path(trainer.log_dir) / "config.yaml"
+        atomic_write(path, yaml.safe_dump(source, default_flow_style=False, sort_keys=False, indent=4, allow_unicode=True))
+        logger.info(f"Saved config to: {path}")
+
+
+class _SourceSnapshot(Callback):
+    """Publish legacy logger source snapshots only after native rank setup."""
+
+    def __init__(self, source: dict[str, Any]):
+        self.source = source
+
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if trainer.is_global_zero:
+            _publish_source(self.source, trainer)
+
+
 class Runner:
     """
     Orchestrates training stage execution by coordinating helper classes.
@@ -74,18 +121,21 @@ class Runner:
     and executing the requested training stage.
     """
 
+    def __init__(self) -> None:
+        self.last_run_path: Path | None = None
+
     def run(
         self,
-        stage: Stage,
+        stage: Stage | str,
         inputs: list,
         **stage_kwargs: Any,
-    ) -> None:
+    ) -> Any:
         """
         Run a training stage with configuration inputs.
 
         Orchestrates the complete training workflow:
         1. Loads configuration via ConfigLoader (delegates to Sparkwheel for auto-detection)
-        2. Auto-discovers and imports project modules via ProjectImporter
+        2. Seeds Python, NumPy and Torch, then imports project modules via ProjectImporter
         3. Resolves and validates model, trainer, and datamodule components
         4. Saves configuration (to log directory, logger, and model hyperparameters)
         5. Executes the requested training stage
@@ -97,47 +147,111 @@ class Runner:
                    - Strings without '=' → file paths
                    - Strings with '=' → overrides
                    - Dicts → merged into config
-            **stage_kwargs: Additional keyword arguments from CLI (e.g., ckpt_path, verbose)
-                           passed directly to the trainer stage method
+            **stage_kwargs: Native Trainer arguments overriding args::<stage> recipe defaults.
+                           Only selected, non-overridden argument recipes are constructed.
+
+        Returns:
+            The native Trainer stage result. Fit normally returns None; evaluation
+            and prediction return their native values, subject to Trainer options.
 
         Raises:
             ValueError: If config validation fails or required components are missing
             TypeError: If model or trainer are not the correct type
         """
-        seed_everything()
+        self.last_run_path = None
+        stage = Stage(stage)
 
-        # 1. Load configuration
+        # Load static intent, then seed before project imports or object construction.
         config = ConfigLoader.load(inputs)
+        seed = config.get("seed", 0)
+        if type(seed) is not int or not 0 <= seed < 2**32:
+            raise ValueError("seed must be an integer between 0 and 4294967295 (default: 0)")
+        seed_everything(seed, workers=True)
+        self._validate_stage_args(config, stage, stage_kwargs)
+        _validate_literal_run_options(config.get("run", {}))
 
         # 2. Auto-discover and import project
         ProjectImporter.auto_discover_and_import()
 
+        # Authoritative overrides also apply to references inside the runtime graph.
+        resolution = _ResolutionView(config, stage, stage_kwargs)
+
         # 3. Resolve components
-        model = self._resolve_model(config)
-        trainer = self._resolve_trainer(config)
-        datamodule = self._resolve_datamodule(config, model)
+        model = self._resolve_model(resolution)
+        trainer = self._resolve_trainer(resolution)
+        datamodule = self._resolve_datamodule(resolution, model)
+
+        # Resolve only selected, non-overridden native stage arguments.
+        configured_args = config.get(f"args::{stage}", {})
+        stage_kwargs = {
+            **{key: resolution.resolve(f"args::{stage}::{key}") for key in configured_args if key not in stage_kwargs},
+            **stage_kwargs,
+        }
+
+        binding = resolution.managed_binding
+        if binding is not None:
+            binding.finalize(resolution.scope.materialized_components())
 
         # 4. Save configuration to trainer's log directory, logger, and model hparams for checkpoint access
-        self._save_config(config, trainer, model)
+        self._save_config(config, trainer, model, publish=False)
+        source = describe(config.get())
+        record_options = config.get("run", {})
+        recorder = None
+        if record_options is not False:
+            if not isinstance(record_options, dict):
+                raise TypeError("run must be false or a mapping of experiment record options")
+            options = resolution.resolve("run") if "run" in config.get() else {}
+            recorder = RunRecorder(
+                source=config.get(), stage=str(stage), seed=seed, requested_args=stage_kwargs, inputs=inputs, options=options
+            )
+            recorder.prepare(trainer)
+        observers: list[Callback] = ([recorder] if recorder is not None else []) + [_SourceSnapshot(source)]
+        # Lightning 2.5 initializes this public attribute through its connector.
+        callbacks: list[Callback] = trainer.callbacks  # type: ignore[attr-defined]
+        callbacks.extend(observers)
+        try:
+            return self._execute(stage, model, trainer, datamodule, **stage_kwargs)
+        finally:
+            path = recorder.path if recorder is not None else None
+            self.last_run_path = path if path is not None and path.is_file() else None
+            # Reused native Trainers must not accumulate old attempt observers.
+            current_callbacks: list[Callback] = trainer.callbacks  # type: ignore[attr-defined]
+            current_callbacks[:] = [
+                callback for callback in current_callbacks if all(callback is not observer for observer in observers)
+            ]
 
-        # 5. Execute stage
-        self._execute(stage, model, trainer, datamodule, **stage_kwargs)
+    @staticmethod
+    def _validate_stage_args(config: Config, stage: Stage, overrides: dict[str, Any]) -> None:
+        """Validate the envelope without constructing inactive or overridden values."""
+        arguments = config.get("args", {})
+        if not isinstance(arguments, dict):
+            raise TypeError("args must be a mapping of stage names to native Trainer arguments")
+        unknown_stages = set(arguments) - {item.value for item in Stage}
+        if unknown_stages:
+            raise ValueError(f"Unknown stage names under args: {sorted(str(name) for name in unknown_stages)}")
+        selected = arguments.get(str(stage), {})
+        if not isinstance(selected, dict) or any(not isinstance(key, str) for key in selected):
+            raise TypeError(f"args::{stage} must be a mapping with string argument names")
+        if "model" in selected or "model" in overrides:
+            raise ValueError(f"args::{stage} cannot replace model; use the top-level model recipe")
 
-    def _resolve_model(self, config: Config) -> LightningModule:
+    def _resolve_model(self, config: Config | _ResolutionView) -> LightningModule:
         """Resolve and validate model from config."""
-        model = config.resolve("model")
+        model = resolve_managed_model(config) if isinstance(config, _ResolutionView) else None
+        if model is None:
+            model = config.resolve("model")
         if not isinstance(model, LightningModule):
             raise TypeError(f"model must be LightningModule or LighterModule, got {type(model)}")
         return model
 
-    def _resolve_trainer(self, config: Config) -> Trainer:
+    def _resolve_trainer(self, config: Config | _ResolutionView) -> Trainer:
         """Resolve and validate trainer from config."""
         trainer = config.resolve("trainer")
         if not isinstance(trainer, Trainer):
             raise TypeError(f"trainer must be Trainer, got {type(trainer)}")
         return trainer
 
-    def _resolve_datamodule(self, config: Config, model: LightningModule) -> LightningDataModule | None:
+    def _resolve_datamodule(self, config: Config | _ResolutionView, model: LightningModule) -> LightningDataModule | None:
         """
         Resolve and validate datamodule from config.
 
@@ -153,21 +267,7 @@ class Runner:
         """
         # Data key is optional - plain Lightning modules can define their own dataloaders
         if config.get("data") is None:
-            # Check if model has dataloader methods (plain Lightning module)
-            has_dataloaders = any(
-                hasattr(model, method)
-                for method in ["train_dataloader", "val_dataloader", "test_dataloader", "predict_dataloader"]
-            )
-            if not has_dataloaders:
-                raise ValueError(
-                    "Missing required 'data:' config key and model does not define dataloader methods. "
-                    "Either:\n"
-                    "1. Add 'data:' config key:\n"
-                    "   data:\n"
-                    "     _target_: lighter.LighterDataModule\n"
-                    "     train_dataloader: ...\n"
-                    "2. Or define dataloader methods in your LightningModule (train_dataloader, val_dataloader, etc.)"
-                )
+            # Lightning validates stage-specific data ownership, including direct loaders.
             return None
 
         # Resolve and validate data key
@@ -185,7 +285,7 @@ class Runner:
 
         return datamodule
 
-    def _save_config(self, config: Config, trainer: Trainer, model: LightningModule) -> None:
+    def _save_config(self, config: Config, trainer: Trainer, model: LightningModule, *, publish: bool = True) -> None:
         """
         Save configuration to multiple destinations.
 
@@ -200,34 +300,23 @@ class Runner:
             model: Model to save hyperparameters to
         """
 
-        # Save to model checkpoint (for model.hparams access)
-        model.save_hyperparameters({"config": config.get()})
-
-        # If no logger, skip other saves
-        if not trainer.logger:
-            return
-
-        # Save to logger (for experiment tracking)
-        trainer.logger.log_hyperparams(config.get())
-
-        # Save as config.yaml to log directory if it exists
-        if trainer.log_dir:
-            config_file = Path(trainer.log_dir) / "config.yaml"
-            config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_file, "w") as f:
-                yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False, indent=4)
-            logger.info(f"Saved config to: {config_file}")
+        # Native save_hyperparameters deep-copies inputs. Runtime objects and
+        # generators belong to their scientific owners, not checkpoint metadata.
+        source = describe(config.get())
+        model.save_hyperparameters({"config": source})
+        if publish:
+            _publish_source(source, trainer)
 
     def _execute(
         self,
-        stage: Stage,
+        stage: Stage | str,
         model: LightningModule,
         trainer: Trainer,
         datamodule: LightningDataModule | None,
         **stage_kwargs: Any,
-    ) -> None:
+    ) -> Any:
         """
-        Execute the training stage.
+        Execute the training stage and return its native result.
 
         Args:
             stage: Stage to execute (fit, validate, test, predict)
@@ -238,17 +327,26 @@ class Runner:
         """
         stage_method = getattr(trainer, str(stage))
         if datamodule is not None:
-            stage_method(model, datamodule=datamodule, **stage_kwargs)
-        else:
-            # Plain Lightning module with built-in dataloaders
-            stage_method(model, **stage_kwargs)
+            if "datamodule" in stage_kwargs:
+                raise ValueError("Specify a datamodule through data or stage arguments, not both")
+            stage_kwargs = {"datamodule": datamodule, **stage_kwargs}
+        try:
+            inspect.signature(stage_method).bind(model, **stage_kwargs)
+        except TypeError as error:
+            raise TypeError(f"Arguments for Trainer.{stage} are unsupported by the installed Lightning: {error}") from error
+        return stage_method(model, **stage_kwargs)
 
 
 def cli() -> None:
     """Entry point for the lighter CLI."""
+    from lighter.engine.inspection import inspection_cli
+
+    if inspection_cli(sys.argv[1:]):
+        return
     parser = argparse.ArgumentParser(
         prog="lighter",
         description="Lighter: YAML-based deep learning framework",
+        epilog="Inspect source: lighter inspect CONFIG [--json]. Read records: lighter runs {list,show,diff} --help.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -268,15 +366,17 @@ def cli() -> None:
         )
         stage_parser.add_argument(
             "--ckpt_path",
+            "--ckpt-path",
             type=str,
             default=None,
             help='Path to checkpoint. Can be "last", "best", or a file path.',
         )
         stage_parser.add_argument(
             "--weights_only",
-            action="store_true",
+            "--weights-only",
+            action=argparse.BooleanOptionalAction,
             default=None,
-            help="Restrict checkpoint loading to state_dicts of torch.Tensor (safer for untrusted sources).",
+            help="Pass weights_only to Trainer checkpoint loading (requires a supporting Lightning version).",
         )
 
     # Fit subcommand
@@ -307,7 +407,7 @@ def cli() -> None:
     add_common_args(validate_parser)
     validate_parser.add_argument(
         "--verbose",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=None,
         help="Print validation results (default: True).",
     )
@@ -326,7 +426,7 @@ def cli() -> None:
     add_common_args(test_parser)
     test_parser.add_argument(
         "--verbose",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=None,
         help="Print test results (default: True).",
     )
@@ -345,13 +445,20 @@ def cli() -> None:
     add_common_args(predict_parser)
     predict_parser.add_argument(
         "--return_predictions",
-        action="store_true",
+        "--return-predictions",
+        action=argparse.BooleanOptionalAction,
         default=None,
         help="Whether to return predictions (default: True except with process-spawning accelerators).",
     )
 
     # Parse arguments
-    args = parser.parse_args()
+    # argparse cannot intermix a variable positional and options through subparsers.
+    # Select the known stage first, then use its normal intermixing parser.
+    if len(sys.argv) > 1 and sys.argv[1] in subparsers.choices:
+        args = subparsers.choices[sys.argv[1]].parse_intermixed_args(sys.argv[2:])
+        args.command = sys.argv[1]
+    else:
+        args = parser.parse_args()
 
     # Extract stage kwargs (exclude command and inputs)
     stage_kwargs = {k: v for k, v in vars(args).items() if k not in ["command", "inputs"] and v is not None}
