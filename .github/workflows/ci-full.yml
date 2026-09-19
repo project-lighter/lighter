@@ -46,8 +46,8 @@ jobs:
       - name: Generate test summary
         if: always()
         run: |
-          echo "## Test Results - Python ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
-          python3 .github/scripts/test_summary.py >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results - Python ${{ matrix.python }}" >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/test_summary.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python == '3.12'
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
           fail_ci_if_error: true

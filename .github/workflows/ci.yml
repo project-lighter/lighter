@@ -17,7 +17,7 @@ permissions:
 env:
   FORCE_COLOR: 1
   # Temporary reviewed companion until the compatible release is available.
-  PAIRED_SPARKWHEEL_SHA: f7f154bc87a9a409ed7548a9cde89cc566813ce4
+  PAIRED_SPARKWHEEL_SHA: c2286a0626748e913296d7127c16060cb705b6d0
 
 jobs:
   quality:
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
