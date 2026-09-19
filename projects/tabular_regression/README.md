@@ -2,14 +2,13 @@
 
 This is the download-free diagnostic and reference workflow for Lighter. For the public research walkthrough, start with [Compare and Continue](../experiment_comparison/README.md). This diagnostic fits a linear regressor to a known synthetic relationship, evaluates a concrete checkpoint, exports every held-out prediction with its original ID, and continues training from saved optimizer state. It runs on CPU with no external logger or dataset service.
 
-From the repository root, install the working package and enter this project:
+Install the [current paired sources](../../docs/guides/compatibility.md#install-the-current-source-pair) first. Keep that Python environment active. From the `project-lighter` directory containing the sibling checkouts:
 
 ```bash
-pip install -e .
-cd projects/tabular_regression
+cd lighter/projects/tabular_regression
 ```
 
-The environment must also contain the matching Sparkwheel revision with retained construction support. Released package constraints are listed in the repository metadata; do not mix this working branch with an older Sparkwheel source checkout.
+The working development versions require the matching Sparkwheel source. The [quick start](../../docs/quickstart.md) supplies the full inspection/record command sequence and expected files. Use a new output root for a new diagnostic sequence; the four commands below intentionally share this recipe's output root.
 
 Run the commands yourself:
 

@@ -1,8 +1,8 @@
 # Example projects
 
-Start with [Compare and Continue](experiment_comparison/README.md): inspect a recipe, compare two learning rates on fixed CIFAR-10 populations, evaluate the selected checkpoint, export identified predictions and continue with restored optimizer state. The matched native Lightning implementation makes the scientific behavior and the Lighter convenience visible side by side. The recorded CPU results are specific to the declared subset, seeds and software profile.
+After [installing the current source pair](../docs/guides/compatibility.md#install-the-current-source-pair), start with [Compare and Continue](experiment_comparison/README.md): inspect a recipe, compare two learning rates on fixed CIFAR-10 populations, evaluate the selected checkpoint, export identified predictions and continue with restored optimizer state. The matched native Lightning implementation makes the scientific behavior and the Lighter convenience visible side by side. The recorded CPU results are specific to the declared subset, seeds and software profile.
 
-For a quick installation check without downloads, use [tabular_regression](tabular_regression/README.md). It preserves a small known-answer fit/evaluate/export/continue diagnostic. It is not a second public research study.
+For the complete first-use command sequence, follow the [quick start](../docs/quickstart.md). Its installation check uses [tabular_regression](tabular_regression/README.md). It preserves a small known-answer fit/evaluate/export/continue diagnostic. It is not a second public research study.
 
 ## Status of earlier projects
 
@@ -24,4 +24,4 @@ These sources remain available for reference and attribution. They are not all m
 
 Copy the public project's structure, then replace its scientific task and data policy explicitly. Keep a `__lighter__.py` marker and `__init__.py` for `project.*` imports. Scientific steps remain ordinary Python; configuration composes objects, values and dependencies. Native LightningModules retain their own optimization and lifecycle hooks. `@` shares an object; `%` copies a definition. A new task needs its own independent scientific checks even when its recipe looks similar.
 
-See [custom code](../docs/guides/custom-code.md), [experiment records](../docs/guides/experiment-records.md) and [compatibility](../docs/guides/compatibility.md).
+Choose [native ownership](../docs/guides/lightning-module.md) or [LighterModule](../docs/guides/lighter-module.md) based on the task. See [custom code](../docs/guides/custom-code.md), [experiment records](../docs/guides/experiment-records.md) and [compatibility](../docs/guides/compatibility.md).

@@ -1,22 +1,12 @@
 # Inspecting and comparing experiments
 
-Runner records each stage attempt locally, including when `trainer.logger: false`. It keeps native Trainer results and exceptions. Use Lightning loggers for richer live dashboards and remote tracking; this record is a portable local summary.
+Runner records each stage attempt locally, even with `trainer.logger: false`. Use native Lightning loggers for live dashboards and remote tracking. A local record is a portable summary of one attempt.
 
-```bash
-# Compose and inspect source without importing the configured project or targets.
-python -m lighter inspect config.yaml seed=42 --json
-
-python -m lighter fit config.yaml
-python -m lighter runs list ./lighter_runs
-python -m lighter runs show ./lighter_runs/ATTEMPT_ID
-python -m lighter runs diff ./lighter_runs/FIRST ./lighter_runs/SECOND
-```
-
-`lighter` and `python -m lighter` expose the same commands. Inspection performs configuration composition, including declared file includes, but does not evaluate configured expressions/imports/constructors. Record operations only read JSON; they do not execute recorded recipes.
+For the complete runnable inspect/list/show/diff sequence, follow the [quick start](../quickstart.md#inspect-the-attempts). Inspection composes source, including declared file includes, without evaluating configured expressions/imports/constructors. Record commands only read JSON; they do not replay recipes.
 
 ## Record location and identity
 
-The default directory is `trainer.default_root_dir/lighter_runs/ATTEMPT_ID/`, containing `record.json` and `config.yaml`. Each Runner invocation receives a new attempt ID. Optional settings:
+The default directory is `trainer.default_root_dir/lighter_runs/ATTEMPT_ID/`, containing `record.json` and `config.yaml`. Each Runner invocation receives a new attempt ID. This optional recipe section changes record settings:
 
 ```yaml
 run:
@@ -26,32 +16,39 @@ run:
   # parent_attempt_id: previous-attempt-id
 ```
 
-A name or experiment ID groups observations; it is not a recipe hash or an execution identity. Checkpoint continuation and scientific branching both create new attempts. Use `parent_attempt_id` when you want to explicitly link them; a checkpoint path does not automatically establish lineage. `run: false` disables local attempt records. Existing native logger configuration and checkpoint hyperparameters still work.
+Names and experiment IDs group observations; they are not recipe hashes or execution identities. Set `parent_attempt_id` to the actual earlier attempt when linking a continuation or branch. A checkpoint path alone does not establish lineage. Omit absent optional fields; `parent_attempt_id: null` is invalid. `run: false` disables local records.
 
-Omit optional record fields when absent; an explicit `parent_attempt_id: null` is not a parent identity. For a continuation, a nested override is `run::parent_attempt_id=PREVIOUS_ID`.
+Attempt identity does not make scientific output paths exclusive. Choose fresh directories for separate research stages and concurrent attempts. The diagnostic intentionally shares one directory through a sequential workflow; Compare and Continue rejects reused stage directories.
 
-Attempt IDs identify execution attempts; they do not claim exclusive ownership of an arbitrary scientific output directory. Use a fresh output directory for each stage, especially when several attempts run concurrently. The Compare and continue example rejects a reused stage directory before its callbacks publish artifacts.
-
-Programmatic callers receive the native result and can inspect `runner.last_run_path` afterward, including after process-spawn execution. It is `None` when no record was published. Temporary record callbacks are removed even when a stage fails, including when a native model replaces the Trainer callback list.
+Programmatic callers receive the native result and may read `runner.last_run_path`, including after process-spawn execution. It is `None` when no record was published. Temporary record callbacks are removed even after stage failure.
 
 ## What the evidence means
 
-- `requested` preserves composed source, selected stage arguments (including explicit overrides), and available input-file hashes. Expressions remain expressions.
-- `observed_start` records native restored progress, selected checkpoint path, and optimizer group settings after restoration. A requested learning rate may differ from the restored one; both are retained. Non-string custom group metadata is described separately.
-- `progress` and `metrics` update at training epoch and fit-validation boundaries. `observed_end` records terminal progress. Native loggers remain the choice for batch-level dashboards.
-- `checkpoints` contains native ModelCheckpoint references. `prediction_destinations` lists configured Lighter writer paths for prediction, with observed existence at stage end. Existence alone does not prove that an artifact was newly written by this attempt.
-- Environment information distinguishes installed distribution versions from actually imported versions/paths and available source Git identity. Package source Git identity is reported only when the imported module file is tracked; a wheel inside an ignored virtual environment is not attributed to its surrounding application repository. Git entries include their root and queried directory. This is provenance, not a complete environment or dataset lockfile.
+| Field | Meaning |
+|---|---|
+| `requested` | Composed source, selected stage arguments and available input-file hashes; expressions remain expressions |
+| `observed_start` | Restored progress, selected checkpoint path and optimizer groups/settings observed after restoration |
+| `progress`, `metrics` | Updates at training-epoch and fit-validation boundaries |
+| `observed_end` | Terminal native progress |
+| `checkpoints` | Native ModelCheckpoint references |
+| `prediction_destinations` | Configured writer paths and their observed existence at stage end |
 
-Only rank zero publishes files, while all required ranks participate in identity broadcast and metric computation. Source and record files are published atomically. The tested distributed profile is two-process CPU/Gloo DDP; this does not certify every strategy or storage backend.
+Artifact existence does not prove that this attempt wrote its contents. A configuration diff compares intent; an optimizer setting does not prove that an update happened.
 
-`running` means no terminal event has been recorded. It is not proof that a process is alive: a forced termination or machine failure can leave a running record. Graceful native exceptions record `failed` or `interrupted`. Records begin when native setup reaches the recorder, so configuration/import/data-preparation errors before that point may have no attempt record. Native stderr and your launcher remain the source for those failures.
+Environment entries distinguish distribution versions from actually imported versions/paths and available source Git identities. A source Git identity is reported only when the imported module file is tracked; a wheel in an ignored environment is not attributed to the enclosing application's repository. Git entries include the root and queried directory. These fields are provenance, not complete code/data/environment locks.
 
-Opaque prebuilt Python objects, generators and tensors are described by type and marked non-replayable. They are never copied or consumed merely to record metadata. YAML snapshots with such descriptors support inspection, not automatic reconstruction. Even a plain YAML snapshot does not promise identical numerical results across software, hardware or unversioned data.
+## Failures and incomplete records
 
-Recording I/O failures emit warnings and set the recorder's error diagnostic; they do not replace a scientific result or its original exception. A record can therefore remain incomplete if storage is unavailable. Diff output compares recorded requests, environment provenance and observations, with explicit presence flags to distinguish a missing value from a literal null.
+`running` means no terminal event was recorded, not that a process is alive. Forced termination can leave that state behind. Graceful native exceptions record `failed` or `interrupted`; errors during configuration, import or data preparation before recorder setup may leave no record. Preserve native stderr for those failures.
+
+Recording I/O failures warn and set the recorder diagnostic without replacing a scientific result or its original exception. A record can therefore be incomplete when storage fails. Diff distinguishes a missing field from a literal null.
+
+Opaque Python objects, generators and tensors are described by type and marked non-replayable; recording does not copy or consume them. A snapshot containing descriptors supports inspection, not automatic reconstruction. Even ordinary YAML does not guarantee equal numerical results across environments or unversioned data.
+
+Only rank zero publishes files, while required ranks participate in identity broadcast and metric computation. Source and record publication is atomic. The exercised distributed record profile is two-process CPU/Gloo DDP, not every strategy or storage backend.
 
 ## Requested settings and restored results
 
-Full checkpoint continuation restores the optimizer state, including its learning rate and momentum. A larger LR in the new recipe therefore does not by itself change the resumed optimizer. Read the requested source and `observed_start` together. Identify an evaluated model by its selected checkpoint and data identity; an unused optimizer request on a test/predict command does not identify the training condition.
+Full continuation restores optimizer state, including LR and momentum. Read the new requested source and `observed_start` together. A test/predict command's unused optimizer request does not identify how its checkpoint was trained.
 
-With the tested native ModelCheckpoint callback, changing the checkpoint directory skips restoration of the old ranking/top-k state, so newly saved checkpoints are ranked within the new attempt. The callback can still retain the preceding `best_model_path` until it saves a new checkpoint. Preserve the preceding attempt's selected checkpoint separately when comparing across attempts, and inspect the actual saved checkpoint metadata. A “best” path needs both its selection metric and its attempt/population context.
+With the tested native ModelCheckpoint callback, changing the checkpoint directory skips restoration of old ranking/top-k state. Newly saved checkpoints are ranked in the new attempt, although the old `best_model_path` may remain until another checkpoint is saved. Preserve the preceding attempt's selected model separately and inspect actual metadata. A best path needs its metric, attempt and population context.

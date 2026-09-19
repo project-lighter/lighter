@@ -8,7 +8,13 @@ The default CPU pilot uses 2,000 training images, 500 validation images and 1,00
 
 ## Prepare the data
 
-Run these commands from this directory with Lighter and Sparkwheel installed. Download the [official CIFAR-10 Python archive](https://www.cs.toronto.edu/~kriz/cifar.html) into `.cache/cifar-10-python.tar.gz`, then prepare it:
+Install the [current paired sources](../../docs/guides/compatibility.md#install-the-current-source-pair) first and keep that environment active. From the `project-lighter` directory containing the sibling checkouts:
+
+```bash
+cd lighter/projects/experiment_comparison
+```
+
+Run the remaining commands from this project directory. Download the [official CIFAR-10 Python archive](https://www.cs.toronto.edu/~kriz/cifar.html) into `.cache/cifar-10-python.tar.gz`, then prepare it:
 
 ```bash
 python data.py prepare --cache-root .cache --output-dir data

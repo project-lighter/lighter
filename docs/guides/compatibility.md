@@ -1,6 +1,32 @@
-# Compatibility and local paired installation
+# Compatibility and installation
 
-The current working pair is **Lighter 0.2.0.dev0** and **Sparkwheel 0.1.0.dev0**. Lighter requires `sparkwheel>=0.1.0.dev0,<0.2.0` because its Runner uses retained definitions and isolated resolution scopes. Installing an earlier Sparkwheel release is not a supported workaround. These development changes have not been published by this work.
+This checkout is the unpublished development pair **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. Lighter requires `sparkwheel>=0.1.0.dev0,<0.2.0` for retained definitions and isolated resolution scopes. An older published Sparkwheel package cannot replace the supplied current source.
+
+## Install the current source pair
+
+Use Python 3.11. The commands below assume you have received both source checkouts as siblings in this layout:
+
+```text
+project-lighter/
+├── lighter/
+└── sparkwheel/
+```
+
+Start in the directory containing `project-lighter`. The environment directory must be new. These commands install both local distributions in one resolver invocation; dependency downloads may need network access.
+
+```bash
+cd project-lighter
+python3.11 -m venv .venv-lighter
+. .venv-lighter/bin/activate
+python -m pip install --constraint lighter/requirements/profiles/reference.constraints --editable ./sparkwheel --editable ./lighter
+python -m pip check
+python -c "import lighter, sparkwheel; print(lighter.__file__); print(sparkwheel.__file__)"
+```
+
+The final command should name these two supplied source trees. If it names another checkout, inspect your environment and `PYTHONPATH` before proceeding. Keep this environment active and follow the [quick start](../quickstart.md), starting from the current `project-lighter` directory.
+
+<a id="editable-development"></a>
+This editable installation is the ordinary source-development route. It is distinct from the built-wheel qualification below. The profile constrains dependencies; it is not a complete transitive or offline lock. Do not substitute registry-only `pip install lighter` or `uv sync` for this unpublished pair.
 
 ## Exact validation profiles
 
@@ -9,101 +35,50 @@ The current working pair is **Lighter 0.2.0.dev0** and **Sparkwheel 0.1.0.dev0**
 | `reference` | 3.11 | 2.7.1 / 0.22.1 | 2.5.1 | 1.9.0 | 1.26.4 | 2.2.3 |
 | `numpy2` | 3.11 | 2.7.1 / 0.22.1 | 2.6.1 | 1.9.0 | 2.2.6 | 2.2.3 |
 
-The corresponding constraints live in `requirements/profiles/`. Core source tests and the download-free public workflow have run on these tuples. The NumPy 2 profile passed the integrated non-slow suite, so the obsolete `numpy<2` restriction is replaced by `numpy>=1.26.4,<3`. Every report must still identify the exact source revisions tested; a passing earlier checkout does not qualify a later patch automatically.
+Constraints are in `requirements/profiles/`. Core tests and the download-free workflow have run on these tuples at their recorded revisions. Passing evidence for one checkout does not qualify a later change automatically.
 
-The strongest complete workflow evidence is CPU execution. Separate bounded checks exercised two-rank CPU/Gloo training and prediction, plus MPS float32 managed/native update parity. These do not certify CUDA, mixed precision, arbitrary distributed strategies, distributed checkpoint continuation or sharded construction. Metadata allows Python 3.10 and later; the qualified local profiles above use Python 3.11. Unexecuted OS/Python/version combinations remain unqualified.
+The strongest complete-workflow evidence is CPU execution. Separate bounded checks exercised two-rank CPU/Gloo training and prediction, plus MPS float32 managed/native update parity. These do not certify CUDA, mixed precision, arbitrary strategies, distributed continuation or sharded construction. Package metadata allows Python 3.10 and later; the local profiles above use 3.11. Other combinations require their own checks.
 
-Package dependency floors match the tested framework versions. They are resolver compatibility constraints, not an exhaustive support matrix. Profile files pin the main dependencies; they are not full transitive locks. The paired installation script resolves and hashes the complete installed environment for its interpreter/platform, preserving that result with its evidence.
+Dependency bounds describe resolver compatibility, not every possible supported combination. Profile files pin main dependencies; the paired verifier resolves and hashes its complete installed environment.
 
 ## Build and check the unpublished pair
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and obtain both reviewed checkouts. From the Lighter checkout:
+This section is for maintainers qualifying artifacts. It is not required to start the example after editable installation.
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/). From the Lighter checkout, the existing script builds and installs both packages into a fresh environment, then executes the diagnostic outside the checkout:
 
 ```bash
-python3.11 scripts/check_paired_install.py \
-  --sparkwheel /path/to/sparkwheel \
-  --python /path/to/python3.11 \
-  --profile reference \
-  --output /path/to/project-lighter/artifacts/reference-pair
+python scripts/check_paired_install.py --help
 ```
 
-Use `--dry-run` first to print the exact source identities and paths without building. `--environment /another/new/path` selects an explicit environment directory. Both the output and environment must be new and outside both source checkouts. The script never overwrites an existing environment, tags, pushes or publishes anything.
+Provide `--sparkwheel` with the sibling source path, `--python` with the chosen Python 3.11 executable, `--profile reference` (or `numpy2`) and `--output` with a new artifact directory outside both checkouts. `--dry-run` prints identities and paths without building; `--environment` selects a new environment directory. The script never overwrites an environment, tags, pushes or publishes packages.
 
-It builds a wheel and source archive for each package, records their SHA-256 hashes and source Git identities, creates a fresh virtual environment, compiles `requirements.txt` with hashes, installs the pair and runs `uv pip check`. It removes inherited `PYTHONPATH`, uses isolated imports to verify that both packages come from the new environment, and checks both `lighter` and `python -m lighter` entrypoints.
+It preserves wheels/source archives, hashes, source identities, a generated dependency lock, import-origin checks, `installation.json`, logs and copied-example artifacts. It checks fit/test/predict/resume, exact prediction IDs/values, restored LR/progress, static inspection and records. This diagnostic qualification alone does not qualify Compare and Continue or another scientific project. A failed command remains a failed report.
 
-It then copies the canonical example outside the source checkout and executes actual CLI fit/test/predict/resume processes. Numerical checkpoint/prediction oracles, preserved sample IDs, native restored LR and progress, static inspection, run listing, record reads and record comparison must pass. `installation.json`, command logs, the generated lock, copied example and workflow artifacts remain in the output directory. A failure remains a failed report with its command logs.
-
-The generated hash lock names the local wheel files and is tied to that artifact location and platform. Retain the entire artifact directory. If relocating it, update only the local wheel URLs while preserving their hashes, or resolve again against those exact retained wheel files and compare dependency versions. A profile alone does not freeze package indexes or future transitive resolution. Offline installation additionally requires caching or retaining every dependency distribution; the script does not claim to produce an offline wheelhouse.
-
-Build dependencies are constrained separately by `requirements/profiles/build.constraints`. uv's [dependency-source model](https://docs.astral.sh/uv/concepts/projects/dependencies/) distinguishes published dependency metadata from development sources; no absolute local source path is embedded in Lighter's published metadata.
-
-## Editable development
-
-For interactive development, install both checkouts into the same isolated environment. For example, with an already created Python 3.11 environment:
-
-```bash
-uv pip install --python /path/to/environment/bin/python \
-  --constraint requirements/profiles/reference.constraints \
-  --editable /path/to/sparkwheel --editable /path/to/lighter
-```
-
-This is convenient source development, not installed-wheel qualification. The paired verifier must still pass before a release. Avoid leaving an unrelated `PYTHONPATH` set when checking which packages are imported.
+The generated hash lock refers to retained local wheels and its platform. Keep the artifact directory. Relocation requires updating local wheel URLs without changing hashes, or resolving again against those same wheels and comparing versions. Offline installation additionally needs retained dependency distributions; this script does not create an offline wheelhouse. Build constraints live separately in `requirements/profiles/build.constraints`.
 
 ## Why there is no current registry-only uv.lock
 
-The old lock selected Sparkwheel 0.0.x and stale framework dependencies. Retaining it after requiring the new API would falsely imply a reproducible installation. It has been removed. Until the matching Sparkwheel development distribution is available from the configured package registry, a registry-only `uv sync` cannot resolve this pair. The local script supplies the exact built Sparkwheel wheel instead of silently downgrading the requirement.
+The old lock selected incompatible Sparkwheel 0.0.x and has been removed. A registry-only resolution cannot reproduce this pair until a compatible distribution is available in that registry. The local paired workflow supplies the source or built wheel explicitly.
 
-The shared CI setup now checks registry availability of the required Sparkwheel version before dependency installation and explains the paired workflow on failure. Availability is not runtime qualification. No unpushed branch is fetched, and unavailable dependency jobs are not reported as passing. Format/lint jobs that do not install the runtime can still run. Existing remote matrix definitions describe intended checks; they are not evidence that those environments passed for this unpublished pair.
+CI checks the required registry version before runtime installation. Availability is not qualification; unavailable dependency jobs are not passing jobs. Remote matrix definitions describe intended checks, not evidence that an unpublished pair passed.
 
-When publishing is explicitly authorized later:
-
-1. Pin and verify the final local source pair, including both exact profiles and installed artifacts.
-2. Publish the compatible Sparkwheel distribution first and verify that registry resolution finds that artifact.
-3. Regenerate Lighter's registry-only lock with `uv lock`, review dependency changes, and verify `uv sync --locked` against the intended profiles and Python versions. uv documents the distinction between [locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/).
-4. Build and verify Lighter from that final commit, then release it through the ordinary review process. Development versions are distinct from final versions under the [Python version specification](https://packaging.python.org/en/latest/specifications/version-specifiers/).
-
-No publication, Git tag or push is performed by the current implementation work. The existing repository release workflow is separate and must only be triggered after that explicit release decision.
+When a release is separately authorized, qualify the exact pair, publish compatible Sparkwheel first, regenerate and verify Lighter's registry lock, then qualify and release Lighter. See uv's distinction between [locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/). No publication is part of local installation.
 
 ## Repository verification
 
-With the matching pair installed, run:
+With development test dependencies installed in the matching environment, maintainers run the repository's test, coverage, lint, formatting and type-check targets. The non-slow suite includes native/math controls and actual CPU/Gloo subprocesses where available; an unavailable backend is explicitly skipped.
 
-```bash
-python -m pytest tests -m "not slow"
-python -m coverage run -m pytest tests -m "not slow"
-python -m coverage combine
-python -m coverage report
-```
-
-The non-slow suite includes actual two-process CPU/Gloo training and native/Lighter prediction controls when the backend is available. These preserve the mathematical update, sampler and CSV identity checks used during independent evaluation. They need local process creation and loopback communication; a platform without Gloo skips them explicitly.
-
-Coverage includes the real CLI subprocesses and spawned training ranks using Coverage.py's documented [process collection](https://coverage.readthedocs.io/en/latest/subprocess.html). Combine process files before reporting; the existing 95% gate remains in place. Lint, repository formatting and `mypy src` are separate checks. A coverage percentage is an execution measure, not a correctness or hardware certification.
+Coverage collects CLI and spawned-process execution and combines process files before applying the existing gate. Coverage measures execution, not correctness or hardware support. The project testing and release procedures are separate from the short user journey.
 
 ## Version maintenance
 
-The maintenance recipes invoke exactly `bump-my-version==0.30.1` through `uvx`,
-so inspecting a version transition does not require resolving the unpublished
-runtime pair. Supported parts are `major`, `minor`, `patch`, and `release`:
+Version recipes use `bump-my-version==0.30.1` through `uvx`. Supported parts are `major`, `minor`, `patch` and `release`.
 
 ```bash
-just bump-dry release  # Preview 0.2.0.dev0 -> 0.2.0
-just bump-dry patch    # A stable 0.2.0 previews 0.2.1
+just bump-dry release
 ```
 
-`release` promotes an existing `.devN` version without changing its numeric
-components. A numeric bump resets subordinate fields to stable; `patch` from
-`0.2.0.dev0` previews `0.2.1`, so use `release` when the intended result is
-`0.2.0`. Other recipe parts, including the raw development counter, are rejected
-before tool execution. A new development cycle needs a separately reviewed
-explicit version choice.
+This previews 0.2.0.dev0 → 0.2.0 without writes, commits or tags. A numeric `patch` from 0.2.0.dev0 instead previews 0.2.1; use `release` to promote the existing development version. A new development cycle needs an explicit version decision.
 
-`bump-dry` disables writes, commits and tags. Once a release is authorized,
-`just bump <part>` updates package metadata, the source version constant and the
-bump configuration, and creates its configured local commit and tag. It does not
-publish the compatible Sparkwheel dependency or create a registry lock. Follow
-the publication order above and verify the pair before separately authorizing a
-push or publication.
-
-The existing remote tag workflows assume stable releases and may publish any
-pushed tag. Do not route development tags through them; local version preparation
-does not authorize triggering those workflows.
+After separate authorization, `just bump <part>` updates metadata and creates its configured local commit and tag. It does not publish the dependency or regenerate the registry lock. Remote tag workflows may publish pushed tags; do not route development tags through them. Local preparation does not authorize a push or publication.
