@@ -4,7 +4,7 @@ The current development pair is **Lighter 0.2.0.dev0 / Sparkwheel 0.1.0.dev0**. 
 
 ## Install the current source pair
 
-Use Python 3.11, Git and a new working directory. This **immutable reviewed snapshot** is Lighter `61660b511026f914f1e4be54cadfeaa67bd1ec3d` with Sparkwheel `c2286a0626748e913296d7127c16060cb705b6d0`. It predates later changes on the review branches; a commit pin does not follow those branches. Release handoffs name the exact pair they qualify.
+Use Python 3.11, Git and a new working directory. This **immutable reviewed snapshot** is Lighter `12c09fc9f85f5ff95ac41634939a29da5c9b87c5` with Sparkwheel `b73e786e8716d11a77206fb3482d21a621a4ba81`. It includes the current runtime and documentation corrections; a commit pin does not follow subsequent branch changes. Release handoffs name the exact pair they qualify.
 
 On macOS or Linux, create a fresh environment and install the two distributions in one resolver invocation:
 
@@ -14,8 +14,8 @@ cd lighter-start
 python3.11 -m venv .venv-lighter
 . .venv-lighter/bin/activate
 python -m pip install "pip==26.0"
-LIGHTER_REV=61660b511026f914f1e4be54cadfeaa67bd1ec3d
-SPARKWHEEL_REV=c2286a0626748e913296d7127c16060cb705b6d0
+LIGHTER_REV=12c09fc9f85f5ff95ac41634939a29da5c9b87c5
+SPARKWHEEL_REV=b73e786e8716d11a77206fb3482d21a621a4ba81
 python -m pip install \
   --constraint "https://raw.githubusercontent.com/project-lighter/lighter/$LIGHTER_REV/requirements/profiles/reference.constraints" \
   --build-constraint "https://raw.githubusercontent.com/project-lighter/lighter/$LIGHTER_REV/requirements/profiles/build.constraints" \
