@@ -25,7 +25,7 @@ builds Python objects.
 | [Config cheat sheet](config.md) | `_target_`, `@`, `%`, `$`, overrides and shell quoting |
 | [Your code and `project.`](your-code.md) | How Lighter imports your files |
 | [LighterModule](lighter-module.md) | The optional base class that wires the optimizer, loss and metrics |
-| [Recipes](recipes.md) | Several GPUs, seeds, and more |
+| [Recipes](recipes.md) | Variants, resuming, sweeps, loggers, several GPUs, models in a notebook |
 | [Troubleshooting](troubleshooting.md) | What a mistake prints, and how to fix it |
 | [Coming from LightningCLI or Hydra](coming-from.md) | The same ideas, in Lighter's words |
 | [CLI](reference/cli.md) and [API](reference/index.md) reference | Every flag and every function |

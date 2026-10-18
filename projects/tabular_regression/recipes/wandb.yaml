@@ -1,0 +1,5 @@
+# Log to Weights & Biases (pip install wandb) instead of the default logger.
+trainer:
+  logger:
+    _target_: pytorch_lightning.loggers.WandbLogger
+    project: tabular_regression

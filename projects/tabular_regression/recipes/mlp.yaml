@@ -1,0 +1,13 @@
+# A variant of config.yaml: an MLP instead of a linear network. `=network` replaces the network
+# instead of merging into it. Run: lighter fit config.yaml recipes/mlp.yaml
+model:
+  =network:
+    _target_: torch.nn.Sequential
+    _args_:
+      - _target_: torch.nn.Linear
+        in_features: 2
+        out_features: 32
+      - _target_: torch.nn.ReLU
+      - _target_: torch.nn.Linear
+        in_features: 32
+        out_features: 1

@@ -1,0 +1,6 @@
+# Write each batch of predictions to a CSV file as it is made, one row per sample.
+trainer:
+  callbacks:
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [id, prediction, target]  # keys of the dict that predict_step returns

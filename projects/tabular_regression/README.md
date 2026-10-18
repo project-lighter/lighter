@@ -12,4 +12,5 @@ lighter predict config.yaml --ckpt_path lightning_logs/version_0/checkpoints/epo
 ```
 
 The [LighterModule page](https://project-lighter.github.io/lighter/lighter-module/) walks through `task.py` and
-`config.yaml`.
+`config.yaml`. `recipes/` holds the files of the [Recipes page](https://project-lighter.github.io/lighter/recipes/):
+resuming, sweeps, writers, loggers and more, each run by a test.

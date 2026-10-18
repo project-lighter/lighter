@@ -1,0 +1,17 @@
+# A W&B sweep over the learning rate. The agent runs `command` with the sampled values as Lighter overrides.
+project: tabular_regression
+method: random
+metric:
+  name: val/loss/epoch
+  goal: minimize
+parameters:
+  model::optimizer::lr:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.3
+command:
+  - lighter
+  - fit
+  - config.yaml
+  - recipes/wandb.yaml
+  - ${args_no_hyphens}

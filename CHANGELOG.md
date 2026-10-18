@@ -37,7 +37,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - The docs are ten short pages instead of ~7,000 lines that re-documented Lightning. A test builds every YAML block,
   runs every Python block and parses every `lighter` command in them, and keeps them under 3,000 lines.
 - `projects/tabular_regression`: a download-free `LighterModule` example with disjoint train, validation and test
-  samples, run by a test.
+  samples, run by a test. Its `recipes/` folder holds the files of the Recipes page (variants, resuming, seeds,
+  freezing, prediction writers, sweeps with a shell loop, Optuna or W&B, loggers, `load_model`), and a test runs
+  every command on that page in order.
 
 ### Changed
 
