@@ -104,3 +104,35 @@ jobs:
           fail_ci_if_error: false  # the uploader can fail its own signature check after the tests pass
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  quickstart:
+    name: README quick start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
+
+      - name: Use CPU-only torch on Linux (the default wheel downloads CUDA)
+        if: runner.os == 'Linux'
+        run: echo "PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu" >> "$GITHUB_ENV"
+
+      - name: Run the README quick start in a clean venv, with this wheel and checkout
+        run: |  # outside the checkout, which the script copies in place of `git clone`
+          python -m venv ../venv
+          ../venv/${{ runner.os == 'Windows' && 'Scripts/python.exe' || 'bin/python' }} \
+            .github/scripts/readme_quickstart.py dist/lighter-*.whl ../quickstart
