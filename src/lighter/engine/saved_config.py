@@ -23,11 +23,12 @@ class SaveConfig(Callback):
         self.config = config
 
     def setup(self, trainer: Any, pl_module: Any, stage: str) -> None:
+        log_dir = trainer.log_dir if trainer.logger else None  # every rank asks: under DDP it is a broadcast
         if trainer.is_global_zero and trainer.logger:
             trainer.logger.log_hyperparams(self.config)
-            if trainer.log_dir:
-                Path(trainer.log_dir).mkdir(parents=True, exist_ok=True)
-                (Path(trainer.log_dir) / "config.yaml").write_text(to_yaml(self.config))
+            if log_dir:
+                Path(log_dir).mkdir(parents=True, exist_ok=True)
+                (Path(log_dir) / "config.yaml").write_text(to_yaml(self.config))
 
     def on_save_checkpoint(self, trainer: Any, pl_module: Any, checkpoint: dict) -> None:
         checkpoint["lighter_config"] = self.config
