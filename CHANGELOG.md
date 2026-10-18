@@ -20,6 +20,12 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `lighter <stage> --help` explains the override syntax (`key::sub=value`, `=key=...`, `~key`) and shell quoting.
 - The CLI prints a two-line banner: project folder, configs and number of overrides, seed, log folder.
 
+- LighterModule's `optimizer` may be a function of the parameters and `scheduler` a function of the optimizer
+  (`_mode_: callable` in the config), so configs no longer need `params: "$@model::network.parameters()"`.
+  `scheduler` may also be Lightning's scheduler dict (`scheduler`, `monitor`, `interval`, ...).
+- A LighterModule with only a `training_step` and a LighterDataModule with only a `train_dataloader` can `fit`.
+  A stage whose dataloader is not set (e.g. `validate` without `val_dataloader`) names the key to add.
+
 ### Changed
 
 - Lighter now depends on six packages: torch, pytorch-lightning, torchmetrics, sparkwheel, pyyaml and cloudpickle.
@@ -39,6 +45,15 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `import lighter` no longer imports torch or Lightning, so `lighter --help` and `--print_config` start instantly.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
 
+- LighterModule no longer defines stub step methods. As in Lightning, validation is skipped without a
+  `validation_step`, and `validation_step`/`test_step` may return None (only the metrics are logged then).
+- `loss` must be one tensor. Migration: instead of `{"loss": {"total": total, "ce": ce}}`, return
+  `{"loss": total}` and log the parts with `self.log("train/loss/ce", ce)`; `train/loss/total/*` becomes `train/loss/*`.
+- LighterModule logs losses and metrics also with `logger: false`, so callbacks such as `ModelCheckpoint` and
+  `EarlyStopping` can monitor them.
+- One `val_metrics`/`test_metrics` object used with several dataloaders is an error (it mixed their results).
+- LighterDataModule returns `[]` instead of None for a dataloader that is not set.
+
 ### Removed
 
 - `import lighter` no longer replaces the root logging handlers, installs a rich traceback hook or overrides
@@ -52,8 +67,14 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - Prediction writers no longer empty Lightning's private list of predictions after each batch.
   Migration: `lighter predict ... --no-return_predictions` keeps memory flat when the writer is all you need.
 
+- `LighterModule.mode` and the private logging helpers (`_log_outputs`, `_log_loss`, `_log_metrics`, `_log`,
+  `_normalize_output`). Migration: use `self.trainer.training` (or `validating`, `testing`, `predicting`);
+  override `on_train_batch_end` (or the val/test hook) to change what is logged.
+
 ### Fixed
 
+- The train loss LighterModule logs with `accumulate_grad_batches > 1` is the loss your step returned
+  (it was divided by the number of accumulated batches).
 - CsvWriter keeps every value exactly as written (IDs like `00001` no longer become `1`, `NA` is no longer
   read as missing) and replaces the final file in one step, so a failed merge never leaves a partial file.
 - `numpy` is no longer pinned below 2.0, so Lighter installs next to NumPy 2.

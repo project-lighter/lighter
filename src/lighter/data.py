@@ -1,7 +1,12 @@
 """LighterDataModule: dataloaders configured in YAML."""
 
+from typing import Any
+
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
+
+# The dataloader each trainer stage needs; the others are optional (e.g. validation during `fit`).
+REQUIRED = {"fit": "train", "validate": "val", "test": "test", "predict": "predict"}
 
 
 class LighterDataModule(LightningDataModule):
@@ -9,7 +14,8 @@ class LighterDataModule(LightningDataModule):
     Holds ready-made dataloaders so they can be configured in YAML without writing a LightningDataModule.
 
     Write your own LightningDataModule instead when data needs `prepare_data()` (downloads) or
-    stage-dependent `setup()`.
+    stage-dependent `setup()`. Leave out the dataloaders you don't use: without `val_dataloader`,
+    `fit` trains without validation.
 
     Args:
         train_dataloader: DataLoader for training (used in fit stage)
@@ -38,23 +44,28 @@ class LighterDataModule(LightningDataModule):
         predict_dataloader: DataLoader | None = None,
     ) -> None:
         super().__init__()
-        self._train_dataloader = train_dataloader
-        self._val_dataloader = val_dataloader
-        self._test_dataloader = test_dataloader
-        self._predict_dataloader = predict_dataloader
+        self._loaders = {
+            "train": train_dataloader,
+            "val": val_dataloader,
+            "test": test_dataloader,
+            "predict": predict_dataloader,
+        }
 
-    def train_dataloader(self) -> DataLoader | None:
-        """Return the training dataloader."""
-        return self._train_dataloader
+    def _loader(self, name: str) -> Any:
+        """The dataloader, or `[]` (no batches) if it is not set and the running stage can do without it."""
+        stage = self.trainer.state.fn.value if self.trainer is not None and self.trainer.state.fn else None
+        if self._loaders[name] is None and stage is not None and REQUIRED[stage] == name:
+            raise ValueError(f"`trainer.{stage}` needs `data::{name}_dataloader`, which is not set.")
+        return [] if self._loaders[name] is None else self._loaders[name]
 
-    def val_dataloader(self) -> DataLoader | None:
-        """Return the validation dataloader."""
-        return self._val_dataloader
+    def train_dataloader(self) -> Any:
+        return self._loader("train")
 
-    def test_dataloader(self) -> DataLoader | None:
-        """Return the test dataloader."""
-        return self._test_dataloader
+    def val_dataloader(self) -> Any:
+        return self._loader("val")
 
-    def predict_dataloader(self) -> DataLoader | None:
-        """Return the prediction dataloader."""
-        return self._predict_dataloader
+    def test_dataloader(self) -> Any:
+        return self._loader("test")
+
+    def predict_dataloader(self) -> Any:
+        return self._loader("predict")

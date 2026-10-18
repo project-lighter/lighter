@@ -1,529 +1,180 @@
-"""Unit tests for the LighterModule class."""
+"""Tests for LighterModule: optimizer building, step outputs and logging, run through a real Trainer."""
 
-from unittest.mock import MagicMock
+from functools import partial
 
 import pytest
 import torch
-import torch.nn.functional as F
-from torch import nn
+from pytorch_lightning import Trainer
 from torch.optim import SGD
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
+from torch.utils.data import DataLoader, TensorDataset
 from torchmetrics import Accuracy, MetricCollection
 
-from lighter.model import LighterModule
-
-# Shared fixtures (mock_trainer, simple_model, dummy_dataset) are available
-# from conftest.py and auto-discovered by pytest
-
-# ============================================================================
-# Helper Functions (imported from conftest for direct use)
-# ============================================================================
+from lighter import LighterDataModule, LighterModule
+from lighter.engine.runner import load_config
 
 
-def mock_trainer_state(trainer, training=False, validating=False, testing=False, predicting=False, sanity_checking=False):
-    """Helper function to set trainer state flags for testing mode detection.
-
-    Note: This is duplicated from conftest.py because it's used as a direct function
-    call, not as a fixture.
-    """
-    trainer.training = training
-    trainer.validating = validating
-    trainer.testing = testing
-    trainer.predicting = predicting
-    trainer.sanity_checking = sanity_checking
+def loader(size=8):
+    return DataLoader(TensorDataset(torch.randn(size, 4), torch.randint(0, 2, (size,))), batch_size=4)
 
 
-# ============================================================================
-# Helper Classes and Fixtures
-# ============================================================================
+def trainer(**kwargs):
+    options = dict(accelerator="cpu", max_epochs=1, logger=False, enable_checkpointing=False, enable_progress_bar=False)
+    return Trainer(**options, enable_model_summary=False, num_sanity_val_steps=0, **kwargs)
 
 
-class SimpleLighterModule(LighterModule):
-    """Concrete implementation of LighterModule for testing."""
+class Task(LighterModule):
+    """Returns `{"loss", "pred"}` from training and `val_output(loss)` from validation."""
+
+    val_output = staticmethod(lambda loss: loss)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         pred = self(x)
-        loss = F.cross_entropy(pred, y)
-
         if self.train_metrics is not None:
             self.train_metrics(pred, y)
+        return {"loss": torch.nn.functional.cross_entropy(pred, y), "pred": pred}
 
-        return {"loss": loss, "pred": pred, "target": y}
-
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
         pred = self(x)
-        loss = F.cross_entropy(pred, y)
-
         if self.val_metrics is not None:
             self.val_metrics(pred, y)
-
-        return {"loss": loss, "pred": pred, "target": y}
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-
-        if self.test_metrics is not None:
-            self.test_metrics(pred, y)
-
-        return {"pred": pred, "target": y}
-
-    def predict_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-        return pred
+        return self.val_output(torch.nn.functional.cross_entropy(pred, y))
 
 
-@pytest.fixture
-def simple_system(simple_model):
-    """Creates a SimpleLighterModule instance using the shared simple_model fixture."""
-    criterion = nn.CrossEntropyLoss()
-    optimizer = SGD(simple_model.parameters(), lr=0.01)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+def task(**kwargs):
+    kwargs.setdefault("optimizer", partial(SGD, lr=0.1))
+    return Task(network=torch.nn.Linear(4, 2), **kwargs)
 
-    train_metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
-    val_metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
-    test_metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
 
-    system = SimpleLighterModule(
-        network=simple_model,
-        criterion=criterion,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        train_metrics=train_metrics,
-        val_metrics=val_metrics,
-        test_metrics=test_metrics,
+def test_forward_calls_the_network():
+    model = task()
+    x = torch.randn(3, 4)
+    assert torch.equal(model(x), model.network(x))
+
+
+@pytest.mark.parametrize("metrics", [[Accuracy(task="binary")], {"acc": Accuracy(task="binary")}])
+def test_metrics_must_be_metric_objects(metrics):
+    with pytest.raises(TypeError, match="`val_metrics` must be a torchmetrics Metric or MetricCollection, got"):
+        task(val_metrics=metrics)
+
+
+# Optimizer and scheduler
+
+
+def test_prebuilt_optimizer_and_scheduler_are_used_as_given():
+    model = task(optimizer=None)
+    model.optimizer = SGD(model.parameters(), lr=0.1)
+    assert model.configure_optimizers() is model.optimizer
+    model.scheduler = StepLR(model.optimizer, step_size=1)
+    assert model.configure_optimizers() == {"optimizer": model.optimizer, "lr_scheduler": {"scheduler": model.scheduler}}
+
+
+def test_callable_optimizer_and_scheduler_are_built_from_the_model():
+    model = task(scheduler={"scheduler": partial(ReduceLROnPlateau), "monitor": "val/loss/epoch"})
+    config = model.configure_optimizers()
+    assert config["optimizer"].param_groups[0]["params"] == list(model.parameters())
+    assert isinstance(config["lr_scheduler"]["scheduler"], ReduceLROnPlateau)
+    assert config["lr_scheduler"]["scheduler"].optimizer is config["optimizer"]
+    assert config["lr_scheduler"]["monitor"] == "val/loss/epoch"
+    assert callable(model.scheduler["scheduler"])  # the config is not consumed, so it can be built again
+
+
+def test_callable_optimizer_with_a_prebuilt_scheduler_is_an_error():
+    other = SGD(torch.nn.Linear(1, 1).parameters(), lr=0.1)
+    with pytest.raises(ValueError, match="give the scheduler `_mode_: callable` too"):
+        task(scheduler=StepLR(other, step_size=1)).configure_optimizers()
+
+
+def test_missing_optimizer_is_an_error():
+    with pytest.raises(ValueError, match="set `model::optimizer`"):
+        task(optimizer=None).configure_optimizers()
+
+
+def test_optimizer_and_scheduler_from_yaml_with_mode_callable(tmp_path):
+    (tmp_path / "config.yaml").write_text(
+        "model:\n"
+        "  _target_: lighter.LighterModule\n"
+        "  network: {_target_: torch.nn.Linear, in_features: 4, out_features: 2}\n"
+        "  optimizer: {_target_: torch.optim.SGD, _mode_: callable, lr: 0.1}\n"
+        "  scheduler:\n"
+        "    scheduler: {_target_: torch.optim.lr_scheduler.ReduceLROnPlateau, _mode_: callable, patience: 2}\n"
+        "    monitor: val/loss/epoch\n"
     )
-
-    return system
-
-
-# ============================================================================
-# Test System Class
-# ============================================================================
+    model = load_config(str(tmp_path / "config.yaml")).resolve("model")
+    config = model.configure_optimizers()
+    assert config["optimizer"].param_groups[0]["params"] == list(model.parameters())
+    assert config["lr_scheduler"]["scheduler"].patience == 2
 
 
-def test_system_requires_step_implementation(simple_model):
-    """Test that LighterModule raises NotImplementedError when step methods are called."""
-    system = LighterModule(network=simple_model)
-
-    # System can be instantiated, but calling unimplemented steps should raise
-    batch = (torch.randn(2, 4), torch.tensor([0, 1]))
-
-    with pytest.raises(NotImplementedError, match="must implement training_step"):
-        system.training_step(batch, batch_idx=0)
-
-    with pytest.raises(NotImplementedError, match="must implement validation_step"):
-        system.validation_step(batch, batch_idx=0)
-
-    with pytest.raises(NotImplementedError, match="must implement test_step"):
-        system.test_step(batch, batch_idx=0)
-
-    with pytest.raises(NotImplementedError, match="must implement predict_step"):
-        system.predict_step(batch, batch_idx=0)
+# Logging
 
 
-def test_system_initialization(simple_system):
-    """Check that attributes are correctly set after initialization."""
-    assert isinstance(simple_system.network, nn.Module)
-    assert simple_system.criterion is not None
-    assert simple_system.optimizer is not None
-    assert simple_system.scheduler is not None
-    assert simple_system.train_metrics is not None
-    assert simple_system.val_metrics is not None
-    assert simple_system.test_metrics is not None
+def test_train_loss_is_logged_as_returned_under_gradient_accumulation():
+    class ConstantLoss(Task):
+        def training_step(self, batch, batch_idx):
+            return self.network.weight.sum() * 0 + 8.0
+
+    run = trainer(accumulate_grad_batches=2)
+    run.fit(ConstantLoss(network=torch.nn.Linear(4, 2), optimizer=partial(SGD, lr=0.1)), loader(16))
+    assert run.callback_metrics["train/loss/epoch"] == 8.0
 
 
-def test_prepare_metrics(simple_model):
-    """Test _prepare_metrics validates input types correctly."""
-    from torchmetrics import Metric
-
-    # Test with None
-    system = SimpleLighterModule(network=simple_model)
-    assert system.train_metrics is None
-
-    # Test with single Metric
-    metric = Accuracy(task="multiclass", num_classes=2)
-    system = SimpleLighterModule(network=simple_model, train_metrics=metric)
-    assert isinstance(system.train_metrics, Metric)
-    assert system.train_metrics is metric  # Should be unchanged
-
-    # Test with MetricCollection
+def test_losses_and_metrics_are_logged_without_a_logger():
+    run = trainer()
     metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
-    system = SimpleLighterModule(network=simple_model, train_metrics=metrics)
-    assert isinstance(system.train_metrics, MetricCollection)
-    assert system.train_metrics is metrics  # Should be unchanged
+    run.fit(task(train_metrics=metrics.clone(), val_metrics=metrics.clone()), loader(), loader())
+    names = ["train/loss/step", "train/metrics/MulticlassAccuracy/step"]  # Lightning keeps only epoch values of val
+    names += [f"{mode}/{name}/epoch" for mode in ("train", "val") for name in ("loss", "metrics/MulticlassAccuracy")]
+    assert set(names) <= set(run.callback_metrics)
 
-    # Test with list raises TypeError
-    with pytest.raises(TypeError, match="metrics must be a torchmetrics Metric or MetricCollection"):
-        SimpleLighterModule(network=simple_model, train_metrics=[Accuracy(task="multiclass", num_classes=2)])
 
-    # Test with dict raises TypeError
-    with pytest.raises(TypeError, match="metrics must be a torchmetrics Metric or MetricCollection"):
-        SimpleLighterModule(network=simple_model, train_metrics={"acc": Accuracy(task="multiclass", num_classes=2)})
+@pytest.mark.parametrize("output", [None, {"pred": 1}, [1, 2]])
+def test_validation_step_may_return_no_loss(output):
+    run = trainer()
+    model = task(val_metrics=Accuracy(task="multiclass", num_classes=2))
+    model.val_output = lambda loss: output
+    run.fit(model, loader(), loader())
+    assert "val/metrics/MulticlassAccuracy/epoch" in run.callback_metrics
+    assert "val/loss/epoch" not in run.callback_metrics
 
 
-def test_configure_optimizers(simple_system):
-    """Test configure_optimizers returns correct structure."""
-    opt_config = simple_system.configure_optimizers()
-    assert isinstance(opt_config, dict)
-    assert "optimizer" in opt_config
-    assert "lr_scheduler" in opt_config
+def test_a_dict_under_loss_explains_the_migration():
+    model = task()
+    model.val_output = lambda loss: {"loss": {"total": loss, "ce": loss}}
+    with pytest.raises(TypeError, match=r"Return \{'loss': total\} and log the parts yourself"):
+        trainer().validate(model, loader())
 
 
-def test_configure_optimizers_without_optimizer(simple_model):
-    """Test configure_optimizers when no optimizer is provided."""
-    system = SimpleLighterModule(network=simple_model, optimizer=None)
+def test_one_metric_for_several_dataloaders_is_an_error():
+    model = task(val_metrics=Accuracy(task="multiclass", num_classes=2))
+    with pytest.raises(ValueError, match="`val_metrics` would mix the results of several dataloaders"):
+        trainer().validate(model, [loader(), loader()])
 
-    with pytest.raises(ValueError, match="Optimizer not configured"):
-        system.configure_optimizers()
 
+# Stages with missing steps or dataloaders
 
-def test_configure_optimizers_without_scheduler(simple_model):
-    """Test configure_optimizers when no scheduler is provided."""
-    optimizer = SGD(simple_model.parameters(), lr=0.01)
-    system = SimpleLighterModule(network=simple_model, optimizer=optimizer, scheduler=None)
 
-    opt_config = system.configure_optimizers()
-    assert isinstance(opt_config, dict)
-    assert "optimizer" in opt_config
-    assert "lr_scheduler" not in opt_config
+def test_fit_with_only_a_training_step_and_train_dataloader():
+    class TrainOnly(LighterModule):
+        def training_step(self, batch, batch_idx):
+            return torch.nn.functional.cross_entropy(self(batch[0]), batch[1])
 
+    run = trainer()
+    run.fit(TrainOnly(network=torch.nn.Linear(4, 2), optimizer=partial(SGD, lr=0.1)), datamodule=LighterDataModule(loader()))
+    assert run.global_step == 2
 
-def test_forward_delegates_to_model(simple_system):
-    """Test that forward() delegates to self.network()."""
-    x = torch.randn(2, 4)
-    output = simple_system(x)
 
-    # Should have same output as calling network directly
-    expected = simple_system.network(x)
-    assert torch.allclose(output, expected)
+def test_val_dataloader_without_validation_step_is_skipped():
+    class TrainOnly(Task):
+        validation_step = LighterModule.validation_step
 
+    run = trainer()
+    run.fit(TrainOnly(network=torch.nn.Linear(4, 2), optimizer=partial(SGD, lr=0.1)), loader(), loader())
+    assert "val/loss/epoch" not in run.callback_metrics and run.global_step == 2
 
-def test_mode_property(simple_system, mock_trainer):
-    """Test mode property detects mode from trainer state."""
-    simple_system.trainer = mock_trainer
 
-    # Test training mode
-    mock_trainer_state(mock_trainer, training=True)
-    assert simple_system.mode == "train"
-
-    # Test validation mode
-    mock_trainer_state(mock_trainer, validating=True)
-    assert simple_system.mode == "val"
-
-    # Test test mode
-    mock_trainer_state(mock_trainer, testing=True)
-    assert simple_system.mode == "test"
-
-    # Test predict mode
-    mock_trainer_state(mock_trainer, predicting=True)
-    assert simple_system.mode == "predict"
-
-    # Test sanity checking (should return VAL)
-    mock_trainer_state(mock_trainer, sanity_checking=True)
-    assert simple_system.mode == "val"
-
-
-def test_mode_without_trainer(simple_system):
-    """Test mode property raises error when no trainer attached."""
-    simple_system.trainer = None
-    with pytest.raises(RuntimeError, match="is not attached to a"):
-        _ = simple_system.mode
-
-
-def test_mode_undetermined_state(simple_system, mock_trainer):
-    """Test mode property raises error when trainer is in undetermined state."""
-    simple_system.trainer = mock_trainer
-    # Set all flags to False (no active mode)
-    mock_trainer_state(mock_trainer, training=False, validating=False, testing=False, predicting=False, sanity_checking=False)
-
-    with pytest.raises(RuntimeError, match="Cannot determine mode"):
-        _ = simple_system.mode
-
-
-# Dataloader tests removed - dataloaders are now configured via data: key in config
-
-
-def test_validate_and_log_simple_loss(simple_system, mock_trainer):
-    """Test _log_outputs with simple scalar loss."""
-    simple_system.trainer = mock_trainer
-    mock_trainer.training = True
-    simple_system.log = MagicMock()
-
-    output = {"loss": torch.tensor(1.0)}
-    simple_system._log_outputs(output, batch_idx=0)
-
-    # Should log loss twice (step + epoch)
-    assert simple_system.log.call_count >= 2
-
-
-def test_validate_and_log_dict_loss(simple_system, mock_trainer):
-    """Test _log_outputs with multi-component loss dict."""
-    simple_system.trainer = mock_trainer
-    mock_trainer.training = True
-    simple_system.log = MagicMock()
-
-    loss_dict = {"total": torch.tensor(3.0), "ce": torch.tensor(2.0), "reg": torch.tensor(1.0)}
-    output = {"loss": loss_dict}
-    simple_system._log_outputs(output, batch_idx=0)
-
-    # Should log each loss component twice (step + epoch)
-    # 3 components * 2 (step + epoch) = 6 calls minimum
-    assert simple_system.log.call_count >= 6
-
-
-def test_validate_and_log_none_loss(simple_system, mock_trainer):
-    """Test _log_outputs handles None loss gracefully (doesn't crash)."""
-    simple_system.trainer = mock_trainer
-    mock_trainer.training = True
-    simple_system.log = MagicMock()
-
-    output = {"loss": None}
-    simple_system._log_outputs(output, batch_idx=0)
-    # Test passes if no exception is raised
-
-
-def test_validate_and_log_dict_loss_without_total(simple_model, mock_trainer):
-    """Test _on_batch_end raises error when loss dict missing 'total' key."""
-    system = SimpleLighterModule(network=simple_model)
-    system.trainer = mock_trainer
-    mock_trainer.training = True
-
-    loss_dict = {"ce": torch.tensor(2.0), "reg": torch.tensor(1.0)}  # Missing 'total'
-    output = {"loss": loss_dict}
-
-    with pytest.raises(ValueError, match="Loss dict.*must include 'total' key"):
-        system._on_batch_end(output, batch_idx=0)
-
-
-def test_validate_and_log_without_logger(simple_system, mock_trainer):
-    """Test _log_outputs does nothing when no logger."""
-    simple_system.trainer = mock_trainer
-    mock_trainer.logger = None
-
-    output = {"loss": torch.tensor(1.0)}
-    # Should not raise any errors
-    simple_system._log_outputs(output, batch_idx=0)
-
-
-def test_batch_end_hooks_call_validate_and_log(simple_system, mock_trainer):
-    """Test that batch-end hooks call _log_outputs."""
-    simple_system.trainer = mock_trainer
-    simple_system._log_outputs = MagicMock()
-
-    output = {"loss": torch.tensor(1.0)}
-    batch = (torch.randn(2, 4), torch.tensor([0, 1]))
-
-    # Test on_train_batch_end
-    simple_system.on_train_batch_end(output, batch, batch_idx=0)
-    simple_system._log_outputs.assert_called_once_with(output, 0)
-
-    # Test on_validation_batch_end
-    simple_system._log_outputs.reset_mock()
-    simple_system.on_validation_batch_end(output, batch, batch_idx=0)
-    simple_system._log_outputs.assert_called_once_with(output, 0)
-
-    # Test on_test_batch_end
-    simple_system._log_outputs.reset_mock()
-    simple_system.on_test_batch_end(output, batch, batch_idx=0)
-    simple_system._log_outputs.assert_called_once_with(output, 0)
-
-
-def test_predict_step_implementation(simple_system):
-    """Test predict_step implementation."""
-    batch = (torch.randn(2, 4), torch.tensor([0, 1]))
-    output = simple_system.predict_step(batch, batch_idx=0)
-
-    # Should return predictions
-    x, y = batch
-    expected = simple_system(x)
-    assert torch.allclose(output, expected)
-
-
-def test_training_step_returns_dict(simple_system):
-    """Test that training_step returns dict."""
-    simple_system.trainer = MagicMock()
-    mock_trainer_state(simple_system.trainer, training=True)
-
-    # Create batch manually
-    x = torch.randn(2, 4)
-    y = torch.tensor([0, 1])
-    batch = (x, y)
-
-    output = simple_system.training_step(batch, batch_idx=0)
-
-    assert isinstance(output, dict)
-    assert "loss" in output
-    assert "pred" in output
-    assert "target" in output
-
-
-def test_validation_step_returns_dict(simple_system):
-    """Test that validation_step returns dict."""
-    simple_system.trainer = MagicMock()
-    mock_trainer_state(simple_system.trainer, validating=True)
-
-    # Create batch manually
-    x = torch.randn(2, 4)
-    y = torch.tensor([0, 1])
-    batch = (x, y)
-
-    output = simple_system.validation_step(batch, batch_idx=0)
-
-    assert isinstance(output, dict)
-    assert "loss" in output
-    assert "pred" in output
-
-
-def test_test_step_returns_dict(simple_system):
-    """Test that test_step returns dict."""
-    simple_system.trainer = MagicMock()
-    mock_trainer_state(simple_system.trainer, testing=True)
-
-    # Create batch manually
-    x = torch.randn(2, 4)
-    y = torch.tensor([0, 1])
-    batch = (x, y)
-
-    output = simple_system.test_step(batch, batch_idx=0)
-
-    assert isinstance(output, dict)
-    assert "loss" not in output  # Test mode doesn't require loss
-    assert "pred" in output
-
-
-def test_metrics_logging_in_validate_and_log(simple_system):
-    """Test that metrics are logged in _log_outputs."""
-    simple_system.trainer = MagicMock()
-    simple_system.trainer.logger = MagicMock()
-    simple_system.trainer.training = True
-    simple_system.log = MagicMock()
-
-    # Call train_metrics manually to update them
-    pred = torch.randn(2, 2)
-    target = torch.tensor([0, 1])
-    simple_system.train_metrics(pred, target)
-
-    output = {"loss": torch.tensor(1.0), "pred": pred, "target": target}
-    simple_system._log_outputs(output, batch_idx=0)
-
-    # Check that log was called for metrics
-    # Should have calls for loss (2) + metrics (2 per metric)
-    assert simple_system.log.call_count >= 2
-
-
-def test_log_method_sets_sync_dist_for_epoch(simple_system):
-    """Test that _log sets sync_dist=True for epoch logging."""
-    simple_system.trainer = MagicMock()
-    mock_trainer_state(simple_system.trainer, training=True)
-    simple_system.log = MagicMock()
-
-    simple_system._log("test/metric", torch.tensor(1.0), on_epoch=True, sync_dist=True)
-
-    # Check that epoch logging was called with sync_dist=True
-    assert simple_system.log.call_count == 1
-    call_kwargs = simple_system.log.call_args[1]
-    assert call_kwargs["sync_dist"] is True
-    assert call_kwargs["on_epoch"] is True
-    assert call_kwargs["on_step"] is False
-
-
-def test_normalize_output_accepts_dict(simple_model):
-    """Test that _normalize_output accepts and passes through dict."""
-    system = SimpleLighterModule(network=simple_model)
-
-    output = {"loss": torch.tensor(1.0), "pred": torch.randn(2, 2)}
-    normalized = system._normalize_output(output)
-    assert normalized is output  # Should be the same dict
-
-
-def test_normalize_output_accepts_tensor(simple_model):
-    """Test that _normalize_output converts Tensor to dict."""
-    system = SimpleLighterModule(network=simple_model)
-
-    output = torch.tensor(1.0)
-    normalized = system._normalize_output(output)
-    assert isinstance(normalized, dict)
-    assert "loss" in normalized
-    assert torch.allclose(normalized["loss"], output)
-
-
-def test_normalize_output_rejects_invalid_types(simple_model):
-    """Test that _normalize_output rejects invalid types."""
-    system = SimpleLighterModule(network=simple_model)
-
-    # List should be rejected
-    bad_output = [1.0, 2.0]
-    with pytest.raises(TypeError, match="must return torch.Tensor or dict"):
-        system._normalize_output(bad_output)
-
-    # String should be rejected
-    bad_output = "invalid"
-    with pytest.raises(TypeError, match="must return torch.Tensor or dict"):
-        system._normalize_output(bad_output)
-
-
-def test_normalize_output_validates_loss_dict_has_total(simple_model):
-    """Test that _normalize_output validates loss dict has 'total' key."""
-    system = SimpleLighterModule(network=simple_model)
-
-    # Loss dict with 'total' should be accepted
-    valid_output = {"loss": {"total": torch.tensor(3.0), "ce": torch.tensor(2.0)}}
-    normalized = system._normalize_output(valid_output)
-    assert normalized is valid_output
-
-    # Loss dict without 'total' should be rejected
-    invalid_output = {"loss": {"ce": torch.tensor(2.0), "reg": torch.tensor(1.0)}}
-    with pytest.raises(ValueError, match="Loss dict must include 'total' key"):
-        system._normalize_output(invalid_output)
-
-    # Loss as tensor should still be accepted
-    tensor_loss_output = {"loss": torch.tensor(1.0), "pred": torch.randn(2, 2)}
-    normalized = system._normalize_output(tensor_loss_output)
-    assert normalized is tensor_loss_output
-
-
-def test_batch_end_hooks_accept_tensor(simple_system, mock_trainer):
-    """Test that batch-end hooks accept and normalize tensor outputs."""
-    simple_system.trainer = mock_trainer
-    mock_trainer.training = True
-    simple_system.log = MagicMock()
-
-    # Tensor should be accepted and normalized
-    tensor_output = torch.tensor(1.0)
-    batch = (torch.randn(2, 4), torch.tensor([0, 1]))
-
-    # Should not raise
-    simple_system.on_train_batch_end(tensor_output, batch, batch_idx=0)
-    # Should have called log
-    assert simple_system.log.call_count > 0
-
-
-def test_mode_property_without_trainer(simple_model):
-    """Test that mode property raises RuntimeError when trainer is not attached."""
-    system = SimpleLighterModule(network=simple_model)
-
-    # Accessing mode without trainer should raise RuntimeError
-    # (either from Lightning's trainer property or our own check)
-    with pytest.raises(RuntimeError):
-        _ = system.mode
-
-
-def test_log_metrics_with_single_metric(simple_model, mock_trainer):
-    """Test that _log_metrics handles single Metric (not MetricCollection)."""
-    # Create system with single metric (not MetricCollection)
-    single_metric = Accuracy(task="multiclass", num_classes=2)
-    system = SimpleLighterModule(network=simple_model, train_metrics=single_metric)
-    system.trainer = mock_trainer
-    mock_trainer_state(mock_trainer, training=True)
-    system.log = MagicMock()
-    system._log = MagicMock()
-
-    # Call _log_metrics - it gets metrics from self.train_metrics
-    system._log_metrics()
-
-    # Should log on_step and on_epoch (2 calls for single metric)
-    assert system._log.call_count == 2
+def test_a_stage_without_its_dataloader_names_the_key_to_add():
+    with pytest.raises(ValueError, match=r"`trainer.validate` needs `data::val_dataloader`, which is not set"):
+        trainer().validate(task(), datamodule=LighterDataModule(train_dataloader=loader()))

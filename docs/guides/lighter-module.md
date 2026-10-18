@@ -157,7 +157,6 @@ No manual implementation needed!
 
 1. **Loss values** - Dual logging (step + epoch)
 2. **Metrics** - Dual logging (step + epoch)
-3. **Optimizer stats** - Learning rate, momentum, betas, weight decay (epoch only)
 
 #### Loss Logging
 
@@ -173,23 +172,14 @@ def training_step(self, batch, batch_idx):
 - `train/loss/step` - Per-step values
 - `train/loss/epoch` - Epoch average
 
-**Multi-component loss:**
+**Multi-component loss:** return the total as `loss` and log the parts with `self.log`:
 
 ```python
 def training_step(self, batch, batch_idx):
-    return {
-        "loss": {
-            "total": total_loss,      # Required key
-            "ce": ce_loss,            # Optional component
-            "reg": reg_loss           # Optional component
-        }
-    }
+    self.log("train/loss/ce", ce_loss)
+    self.log("train/loss/reg", reg_loss)
+    return {"loss": ce_loss + reg_loss}
 ```
-
-**Logged as:**
-- `train/loss/total/step`, `train/loss/total/epoch`
-- `train/loss/ce/step`, `train/loss/ce/epoch`
-- `train/loss/reg/step`, `train/loss/reg/epoch`
 
 #### Metrics Logging
 
