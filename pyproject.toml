@@ -133,6 +133,8 @@ show_missing = true
 # https://docs.astral.sh/ruff/configuration/
 line-length = 127
 target-version = "py310"
+# Code blocks in the docs are formatted by hand, not by `ruff format`.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 preview = true

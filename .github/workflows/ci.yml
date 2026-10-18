@@ -95,6 +95,6 @@ jobs:
         uses: codecov/codecov-action@v5.4.3
         with:
           files: ./coverage.xml
-          fail_ci_if_error: true
+          fail_ci_if_error: false  # the uploader can fail its own signature check after the tests pass
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
