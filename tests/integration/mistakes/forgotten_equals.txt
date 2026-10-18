@@ -1,0 +1,4 @@
+$ lighter fit configs/config.yaml trainer::fast_dev_run
+# exit code 2
+FileNotFoundError: Config file not found: trainer::fast_dev_run
+  Did you forget `=`? Overrides look like `trainer::fast_dev_run=value`.

@@ -1,17 +1,24 @@
-"""Build a Lightning run from YAML configs and overrides, then run one stage (`lighter fit config.yaml`)."""
+"""Build a Lightning run from YAML configs and overrides, then run one stage (`lighter fit config.yaml`).
+
+Torch and Lightning are imported only when a run is built, so `lighter --help` and `--print_config` are instant.
+"""
 
 import argparse
+import difflib
 import importlib.util
 import logging
 import os
 import re
 import sys
+import sysconfig
+import traceback
 from pathlib import Path
 from typing import Any
 
 import yaml
-from sparkwheel import Config, TargetNotFoundError
+from sparkwheel import BaseError, Config, TargetNotFoundError
 
+from lighter import __version__
 from lighter.utils.dynamic_imports import import_module_from_path
 
 logger = logging.getLogger(__name__)
@@ -22,6 +29,22 @@ STAGES = {
     "test": "Test a model",
     "predict": "Run predictions with a model",
 }
+HELP = """\
+examples:
+  lighter {stage} configs/train.yaml
+  lighter {stage} configs/base.yaml configs/big.yaml trainer::max_epochs=10 model::optimizer::lr=1e-3
+
+Inputs are YAML files and overrides, applied left to right. Overrides:
+  key::sub=value   set a value, written in YAML (10, 1e-3, true, null, [1, 2], {{a: 1}})
+  =key={{...}}       replace a whole section instead of merging into it
+  ~key             delete a key
+Quote overrides that hold $, @, spaces or brackets: 'model::lr=$@base_lr * 2'.
+New keys belong in YAML: put them in a file and stack it, e.g. lighter {stage} base.yaml extra.yaml.
+--print_config shows the composed config without running. LIGHTER_DEBUG=1 shows full tracebacks.
+"""
+# Frames from these folders are not the user's code.
+FOLDERS = {sysconfig.get_paths()[key] for key in ("stdlib", "platstdlib", "purelib", "platlib")}
+FRAMEWORK = (*(folder + os.sep for folder in FOLDERS), str(Path(__file__).parents[1]) + os.sep, "<")
 
 
 def _is_override(item: Any) -> bool:
@@ -72,13 +95,35 @@ def _lightning_package(obj: Any, kind: str, key: str) -> str:
     raise TypeError(f"`{key}` must build a {kind}, got {type(obj).__name__}.{hint}")
 
 
+def _missing_file(item: str) -> FileNotFoundError:
+    path = Path(item)
+    siblings = [file.name for file in path.parent.glob("*.y*ml")]
+    if "," in item:
+        hint = "Separate config files with spaces, not commas."
+    elif path.suffix not in (".yaml", ".yml"):
+        hint = f"Did you forget `=`? Overrides look like `{item}=value`."
+    elif close := difflib.get_close_matches(path.name, siblings, n=1):
+        hint = f"Did you mean {path.with_name(close[0])}?"
+    else:
+        hint = f"Paths are relative to the current directory, {Path.cwd()}."
+    return FileNotFoundError(f"Config file not found: {item}\n  {hint}")
+
+
 def load_config(*inputs: Any) -> Config:
     """Compose config files, dicts and overrides in order. Strings with `=` are overrides, others YAML files."""
     config = Config()
     for item in inputs:
-        # Absolute paths keep Sparkwheel from warning about `..` in paths like ../configs/base.yaml.
-        config.update(str(Path(item).resolve()) if isinstance(item, (str, Path)) and not _is_override(item) else item)
+        if isinstance(item, (str, Path)) and not _is_override(item):
+            if not Path(item).is_file():
+                raise _missing_file(str(item))
+            item = str(Path(item).resolve())  # absolute, so Sparkwheel does not warn about `..` in the path
+        config.update(item)
     return config
+
+
+def to_yaml(config: dict) -> str:
+    """The YAML of `--print_config` and of the saved config.yaml."""
+    return yaml.safe_dump(config, sort_keys=False, default_flow_style=False)
 
 
 def build(*inputs: Any) -> tuple[Any, Any, Any]:
@@ -88,9 +133,9 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     `PL_GLOBAL_SEED`, else 0) and is set before anything is built.
     `datamodule` is None when the config has no `data:` key (the model's own dataloader hooks are then used).
     """
-    from pytorch_lightning import seed_everything
-
     config = load_config(*inputs)
+    from pytorch_lightning import seed_everything  # after the config files are read, so their errors are instant
+
     seed = config.get("seed")
     if seed is None:
         seed = int(os.environ.get("PL_GLOBAL_SEED", 0))
@@ -101,7 +146,6 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     root = find_project_root(inputs)
     if root is not None:
         import_module_from_path("project", root)
-        logger.info(f"Imported 'project' module from '{root}'")
 
     try:
         model = config.resolve("model")
@@ -121,6 +165,11 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
             "package throughout, e.g. `trainer::_target_: lightning.pytorch.Trainer` if your model imports `lightning`."
         )
     _save_config(config, trainer, model)
+    if trainer.is_global_zero:
+        files = " ".join(str(item) for item in inputs if isinstance(item, (str, Path)) and not _is_override(item))
+        configs = f"{files or 'dict'} + {sum(map(_is_override, inputs))} overrides"
+        logger.info(f"Lighter {__version__} | project: {root or 'none'} | {configs} | seed: {seed}")
+        logger.info(f"Logs: {trainer.log_dir}" if trainer.logger else "Logs: off (trainer::logger is false)")
     return model, trainer, datamodule
 
 
@@ -134,8 +183,7 @@ def _save_config(config: Config, trainer: Any, model: Any) -> None:
         config_file = Path(trainer.log_dir) / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(config_file, "w") as f:
-            yaml.dump(config.get(), f, default_flow_style=False, sort_keys=False, indent=4)
-        logger.info(f"Saved config to: {config_file}")
+            f.write(to_yaml(config.get()))
 
 
 class Runner:
@@ -155,19 +203,61 @@ class Runner:
         return getattr(trainer, stage)(model, datamodule=datamodule, **stage_kwargs)
 
 
+class _Stderr(logging.StreamHandler):
+    """Logs to the current `sys.stderr`, like `logging.lastResort`."""
+
+    stream = property(lambda self: sys.stderr, lambda self, stream: None)
+
+
+def _short(path: str) -> str:
+    return os.path.relpath(path) if Path(path).resolve().is_relative_to(Path.cwd()) else path
+
+
+def _report(error: BaseException, inputs: list) -> int:
+    """Print an error raised while building the run, without framework frames. Returns the exit code.
+
+    The first line is `file:line (key): Type: message` when the config location is known. A bug in the
+    user's own code (the root cause was raised there) also shows those frames and exits with 1, like Python.
+    """
+    cause = error
+    while cause.__cause__ is not None:
+        cause = cause.__cause__
+    frames = [frame for frame in traceback.extract_tb(cause.__traceback__) if not frame.filename.startswith(FRAMEWORK)]
+    lines = [f"{type(error).__name__}: {error}"]
+    if frames:
+        lines[:0] = ["Traceback (your code only, LIGHTER_DEBUG=1 shows all frames):", *traceback.format_list(frames)]
+    if isinstance(error, yaml.MarkedYAMLError) and (mark := error.problem_mark):
+        lines[-1] = f"{_short(mark.name)}:{mark.line + 1}: {type(error).__name__}: {error.problem}"
+    elif isinstance(error, BaseError) and (where := error.source_location):
+        key = f" ({where.id})" if where.id else ""
+        lines[-1] = f"{_short(where.filepath)}:{where.line}{key}: {type(error).__name__}: {error._original_message}"
+        if not (isinstance(cause, BaseError) or error.suggestion or str(cause) in error._original_message):
+            lines.append(f"  From {type(cause).__name__}: {cause}")
+        lines += [error._get_config_snippet(), f"  {error.suggestion.replace('💡 ', '')}" if error.suggestion else ""]
+        keys = [(item, item.lstrip("=~").split("=")[0]) for item in inputs if _is_override(item)]
+        if overrides := [item for item, k in keys if where.id and (k == where.id or k.startswith(f"{where.id}::"))]:
+            lines.append(f"  Overridden by: {' '.join(overrides)}")
+    print("\n".join(line.rstrip() for line in lines if line), file=sys.stderr)
+    return 1 if frames else 2
+
+
 def cli() -> None:
     """Entry point for the lighter CLI."""
-    parser = argparse.ArgumentParser(prog="lighter", description="Lighter: YAML-based deep learning framework")
-    subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
+    parser = argparse.ArgumentParser(prog="lighter", description="Run a Lightning stage from YAML configs.")
+    parser.add_argument("--version", action="version", version=f"lighter {__version__}")
+    subparsers = parser.add_subparsers(dest="command", required=True)
     for stage, help_text in STAGES.items():
         stage_parser = subparsers.add_parser(
             stage,
             help=help_text,
-            description=f"{help_text} using the specified configuration files and overrides.",
-            epilog=f"Examples:\n  lighter {stage} config.yaml\n  lighter {stage} base.yaml experiment.yaml trainer::max_epochs=10",
+            description=help_text,
+            epilog=HELP.format(stage=stage),
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        stage_parser.add_argument("inputs", nargs="+", help="Config files and overrides. Example: config.yaml model::lr=0.001")
+        stage_parser.add_argument("inputs", nargs="+", help="Config files and overrides, e.g. config.yaml model::lr=0.001")
+        stage_parser.add_argument(
+            "--print_config", "--print-config", action="store_true", help="Print the composed config and exit."
+        )
         stage_parser.add_argument("--ckpt_path", help='Path to checkpoint. Can be "last", "best", or a file path.')
         stage_parser.add_argument(
             "--weights_only",
@@ -184,13 +274,17 @@ def cli() -> None:
             )
 
     args = parser.parse_args()
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    logging.getLogger("lighter").addHandler(handler)
+    if not any(isinstance(handler, _Stderr) for handler in logging.getLogger("lighter").handlers):
+        logging.getLogger("lighter").addHandler(_Stderr())
     logging.getLogger("lighter").setLevel(logging.INFO)
-    stage_kwargs = {k: v for k, v in vars(args).items() if k not in ["command", "inputs"] and v is not None}
-    try:
-        Runner().run(args.command, args.inputs, **stage_kwargs)
-    except Exception as e:
-        # Suppress exception chain to avoid duplicate tracebacks
-        raise e from None
+    stage_kwargs = {k: v for k, v in vars(args).items() if k not in ("command", "inputs", "print_config") and v is not None}
+    try:  # errors in the config and in building objects; errors inside the stage propagate unchanged
+        if args.print_config:
+            print(to_yaml(load_config(*args.inputs).get()), end="")
+            return
+        model, trainer, datamodule = build(*args.inputs)
+    except Exception as error:
+        if os.environ.get("LIGHTER_DEBUG", "0") != "0":
+            raise
+        sys.exit(_report(error, args.inputs))
+    getattr(trainer, args.command)(model, datamodule=datamodule, **stage_kwargs)

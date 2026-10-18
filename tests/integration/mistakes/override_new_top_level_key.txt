@@ -1,0 +1,14 @@
+$ lighter fit configs/config.yaml seeed=1 --print_config
+# exit code 0
+trainer:
+  _target_: pytorch_lightning.Trainer
+  logger: false
+num_classes: 2
+model:
+  _target_: project.model.TinyModel
+  learning_rate: 0.1
+  network:
+    _target_: torch.nn.Linear
+    in_features: 4
+    out_features: '@num_classes'
+seeed: 1

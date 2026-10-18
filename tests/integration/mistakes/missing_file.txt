@@ -1,0 +1,4 @@
+$ lighter fit configs/confg.yaml
+# exit code 2
+FileNotFoundError: Config file not found: configs/confg.yaml
+  Did you mean configs/config.yaml?

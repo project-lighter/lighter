@@ -1,0 +1,4 @@
+$ lighter fit proj/configs/config.yaml
+# exit code 0
+Lighter <version> | project: <tmp>/proj | proj/configs/config.yaml + 0 overrides | seed: 0
+Logs: off (trainer::logger is false)

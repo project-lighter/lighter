@@ -105,19 +105,8 @@ class LighterModule(pl.LightningModule):
             return metrics
 
         raise TypeError(
-            f"metrics must be Metric or MetricCollection, got {type(metrics).__name__}.\n\n"
-            f"Single metric:\n"
-            f"  train_metrics:\n"
-            f"    _target_: torchmetrics.Accuracy\n"
-            f"    task: multiclass\n\n"
-            f"Multiple metrics:\n"
-            f"  train_metrics:\n"
-            f"    _target_: torchmetrics.MetricCollection\n"
-            f"    metrics:\n"
-            f"      - _target_: torchmetrics.Accuracy\n"
-            f"        task: multiclass\n"
-            f"      - _target_: torchmetrics.F1Score\n"
-            f"        task: multiclass"
+            f"metrics must be a torchmetrics Metric or MetricCollection, got {type(metrics).__name__}. "
+            "For several metrics, use `_target_: torchmetrics.MetricCollection` with `metrics: [...]`."
         )
 
     # ============================================================================

@@ -1,0 +1,10 @@
+$ lighter fit configs/config.yaml model::learning_rate=$math.sqrt(@num_classes)
+# exit code 2
+configs/config.yaml:9 (model::learning_rate): EvaluationError: Failed to evaluate expression: 'math.sqrt(__local_refs['num_classes'])'
+  From NameError: name 'math' is not defined
+       7 │ model:
+       8 │   _target_: project.model.TinyModel
+  →    9 │   learning_rate: 0.1
+      10 │   network:
+      11 │     _target_: torch.nn.Linear
+  Overridden by: model::learning_rate=$math.sqrt(@num_classes)

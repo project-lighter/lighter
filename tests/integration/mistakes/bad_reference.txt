@@ -1,0 +1,11 @@
+$ lighter fit configs/config.yaml model::network::out_features=@num_clases
+# exit code 2
+configs/config.yaml:11 (model::network): ConfigKeyError: Reference '@num_clases' not found in configuration
+       9 │   learning_rate: 0.1
+      10 │   network:
+  →   11 │     _target_: torch.nn.Linear
+      12 │     in_features: 4
+      13 │     out_features: "@num_classes"
+  Did you mean one of these?
+    - num_classes ✓ (90% match)
+  Overridden by: model::network::out_features=@num_clases

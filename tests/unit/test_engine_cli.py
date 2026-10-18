@@ -1,320 +1,116 @@
-"""Unit tests for the CLI functionality in lighter/engine/runner.py"""
+"""Unit tests for the `lighter` command line (lighter/engine/runner.py:cli)."""
 
+import subprocess
 import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
+import lighter
 from lighter.engine.runner import cli
 
+CONFIG = "trainer:\n  _target_: pytorch_lightning.Trainer\n  max_epochs: 10\nmodel:\n  _target_: torch.nn.Identity\n"
 
-class TestCLI:
-    """Tests for CLI argument parsing and command execution."""
-
-    @pytest.fixture
-    def temp_config_file(self):
-        """Create a temporary config file for testing."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write("""
-trainer:
-  _target_: pytorch_lightning.Trainer
-  max_epochs: 10
-
-model:
-  _target_: lighter.LighterModule
-  network:
-    _target_: torch.nn.Identity
-""")
-            config_path = f.name
-        yield config_path
-        Path(config_path).unlink()
-
-    def test_cli_fit_command_basic(self, temp_config_file):
-        """Test fit command with basic config."""
-        test_args = ["lighter", "fit", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            # Verify Runner was instantiated
-            mock_runner_class.assert_called_once()
-            # Verify run was called with correct arguments
-            mock_runner.run.assert_called_once_with("fit", [temp_config_file])
-
-    def test_cli_fit_command_with_overrides(self, temp_config_file):
-        """Test fit command with CLI overrides."""
-        test_args = [
-            "lighter",
-            "fit",
-            temp_config_file,
-            "trainer::max_epochs=5",
-            "trainer::devices=2",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            # Verify run was called with overrides
-            mock_runner.run.assert_called_once_with(
-                "fit",
-                [temp_config_file, "trainer::max_epochs=5", "trainer::devices=2"],
-            )
-
-    def test_cli_validate_command(self, temp_config_file):
-        """Test validate command."""
-        test_args = ["lighter", "validate", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with("validate", [temp_config_file])
-
-    def test_cli_validate_command_with_overrides(self, temp_config_file):
-        """Test validate command with overrides."""
-        test_args = [
-            "lighter",
-            "validate",
-            temp_config_file,
-            "model::model::weights=checkpoint.ckpt",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with(
-                "validate",
-                [temp_config_file, "model::model::weights=checkpoint.ckpt"],
-            )
-
-    def test_cli_test_command(self, temp_config_file):
-        """Test test command."""
-        test_args = ["lighter", "test", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with("test", [temp_config_file])
-
-    def test_cli_test_command_with_overrides(self, temp_config_file):
-        """Test test command with overrides."""
-        test_args = [
-            "lighter",
-            "test",
-            temp_config_file,
-            "trainer::devices=1",
-            "model::model::dropout=0.5",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with(
-                "test",
-                [temp_config_file, "trainer::devices=1", "model::model::dropout=0.5"],
-            )
-
-    def test_cli_predict_command(self, temp_config_file):
-        """Test predict command."""
-        test_args = ["lighter", "predict", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with("predict", [temp_config_file])
-
-    def test_cli_predict_command_with_overrides(self, temp_config_file):
-        """Test predict command with overrides."""
-        test_args = [
-            "lighter",
-            "predict",
-            temp_config_file,
-            "model::model::weights=best.ckpt",
-            "trainer::devices=4",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once_with(
-                "predict",
-                [temp_config_file, "model::model::weights=best.ckpt", "trainer::devices=4"],
-            )
-
-    def test_cli_missing_command(self):
-        """Test that missing command raises error."""
-        test_args = ["lighter"]
-
-        with patch.object(sys, "argv", test_args), pytest.raises(SystemExit):
-            cli()
-
-    def test_cli_invalid_command(self):
-        """Test that invalid command raises error."""
-        test_args = ["lighter", "invalid_command", "config.yaml"]
-
-        with patch.object(sys, "argv", test_args), pytest.raises(SystemExit):
-            cli()
-
-    def test_cli_missing_config(self):
-        """Test that missing config argument raises error."""
-        test_args = ["lighter", "fit"]
-
-        with patch.object(sys, "argv", test_args), pytest.raises(SystemExit):
-            cli()
-
-    def test_cli_error_propagation(self, temp_config_file):
-        """Test that exceptions from runner.run are propagated without chaining."""
-        test_args = ["lighter", "fit", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-            # Make run raise an exception
-            mock_runner.run.side_effect = ValueError("Configuration error")
-
-            with pytest.raises(ValueError, match="Configuration error") as exc_info:
-                cli()
-
-            # Verify the exception has no __cause__ (raise e from None)
-            assert exc_info.value.__cause__ is None
-
-    def test_cli_multiple_overrides(self, temp_config_file):
-        """Test handling multiple overrides."""
-        test_args = [
-            "lighter",
-            "fit",
-            temp_config_file,
-            "trainer::max_epochs=100",
-            "trainer::devices=2",
-            "model::optimizer::lr=0.001",
-            "model::optimizer::weight_decay=0.0001",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            # Verify all inputs are passed (config file + overrides)
-            mock_runner.run.assert_called_once()
-            _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert args[0] == "fit"
-            assert isinstance(args[1], list)
-            assert args[1][0] == temp_config_file  # First item is config file
-            assert len(args[1]) == 5  # 1 config file + 4 overrides
-            assert "trainer::max_epochs=100" in args[1]
-            assert "trainer::devices=2" in args[1]
-            assert "model::optimizer::lr=0.001" in args[1]
-            assert "model::optimizer::weight_decay=0.0001" in args[1]
-
-    def test_cli_all_stages_independent(self, temp_config_file):
-        """Test that each stage command is independent."""
-        stages = ["fit", "validate", "test", "predict"]
-
-        for stage in stages:
-            test_args = ["lighter", stage, temp_config_file]
-
-            with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-                mock_runner = MagicMock()
-                mock_runner_class.return_value = mock_runner
-
-                cli()
-
-                # Verify correct stage is called
-                mock_runner.run.assert_called_once_with(stage, [temp_config_file])
-
-    def test_cli_multiple_configs_as_separate_args(self):
-        """Test that multiple config paths work as separate arguments."""
-        test_args = ["lighter", "fit", "config1.yaml", "config2.yaml"]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            # Runner should receive both configs in the inputs list
-            mock_runner.run.assert_called_once_with(
-                "fit",
-                ["config1.yaml", "config2.yaml"],
-            )
-
-    def test_cli_override_with_equals_in_value(self, temp_config_file):
-        """Test that overrides with = in the value are handled correctly."""
-        test_args = [
-            "lighter",
-            "fit",
-            temp_config_file,
-            "model::model::config=key1=value1",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            # Verify override is passed correctly
-            mock_runner.run.assert_called_once()
-            _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "model::model::config=key1=value1" in args[1]
-
-    def test_cli_override_with_special_characters(self, temp_config_file):
-        """Test overrides with special characters."""
-        test_args = [
-            "lighter",
-            "fit",
-            temp_config_file,
-            "model::model::name=my-model_v1.0",
-        ]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once()
-            _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert "model::model::name=my-model_v1.0" in args[1]
-
-    def test_cli_no_overrides(self, temp_config_file):
-        """Test that no overrides results in list with just config file."""
-        test_args = ["lighter", "fit", temp_config_file]
-
-        with patch.object(sys, "argv", test_args), patch("lighter.engine.runner.Runner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            cli()
-
-            mock_runner.run.assert_called_once()
-            _, args, kwargs = mock_runner.run.mock_calls[0]
-            assert args[0] == "fit"
-            assert args[1] == [temp_config_file]  # Just the config file, no overrides
+
+@pytest.fixture
+def config_file(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(CONFIG)
+    return str(path)
+
+
+@pytest.fixture
+def built(monkeypatch):
+    """Replace `build` with a mock that returns a mock trainer."""
+    model, trainer, datamodule = MagicMock(), MagicMock(), MagicMock()
+    build = MagicMock(return_value=(model, trainer, datamodule))
+    monkeypatch.setattr("lighter.engine.runner.build", build)
+    return build, model, trainer, datamodule
+
+
+def run_cli(monkeypatch, *args):
+    monkeypatch.setattr(sys, "argv", ["lighter", *args])
+    try:
+        cli()
+    except SystemExit as exit:
+        return exit.code
+    return 0
+
+
+@pytest.mark.parametrize("stage", ["fit", "validate", "test", "predict"])
+def test_cli_builds_then_runs_the_stage(monkeypatch, built, stage, config_file):
+    build, model, trainer, datamodule = built
+    assert run_cli(monkeypatch, stage, config_file, "trainer::max_epochs=5", "model::name=a=b") == 0
+    build.assert_called_once_with(config_file, "trainer::max_epochs=5", "model::name=a=b")
+    getattr(trainer, stage).assert_called_once_with(model, datamodule=datamodule)
+
+
+def test_cli_passes_stage_flags(monkeypatch, built, config_file):
+    _, model, trainer, datamodule = built
+    run_cli(monkeypatch, "test", config_file, "--ckpt_path", "best.ckpt", "--no-weights_only", "--verbose")
+    trainer.test.assert_called_once_with(model, datamodule=datamodule, ckpt_path="best.ckpt", weights_only=False, verbose=True)
+    run_cli(monkeypatch, "predict", config_file, "--no-return_predictions")
+    trainer.predict.assert_called_once_with(model, datamodule=datamodule, return_predictions=False)
+
+
+@pytest.mark.parametrize("args", [[], ["fit"], ["train", "config.yaml"]])
+def test_cli_rejects_bad_usage(monkeypatch, args):
+    assert run_cli(monkeypatch, *args) == 2
+
+
+def test_cli_version_and_help(monkeypatch, capsys):
+    assert run_cli(monkeypatch, "--version") == 0
+    assert capsys.readouterr().out == f"lighter {lighter.__version__}\n"
+    assert run_cli(monkeypatch, "fit", "--help") == 0
+    help_text = capsys.readouterr().out
+    for syntax in ("key::sub=value", "=key={...}", "~key", "'model::lr=$@base_lr * 2'", "--print_config", "LIGHTER_DEBUG"):
+        assert syntax in help_text
+
+
+@pytest.mark.parametrize("flag", ["--print_config", "--print-config"])
+def test_print_config_prints_the_composed_config_without_building(monkeypatch, capsys, built, config_file, flag):
+    assert run_cli(monkeypatch, "fit", config_file, "trainer::max_epochs=3", flag) == 0
+    assert capsys.readouterr().out == CONFIG.replace("max_epochs: 10", "max_epochs: 3")
+    built[0].assert_not_called()
+
+
+def test_missing_config_file_exits_with_code_2(monkeypatch, capsys, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    assert run_cli(monkeypatch, "fit", "missing.yaml") == 2
+    hint = f"Paths are relative to the current directory, {tmp_path}."
+    assert capsys.readouterr().err == f"FileNotFoundError: Config file not found: missing.yaml\n  {hint}\n"
+
+
+def test_build_errors_are_reported_without_a_traceback(monkeypatch, capsys, built, config_file):
+    built[0].side_effect = TypeError("`trainer` must build a Trainer, got dict.")
+    assert run_cli(monkeypatch, "fit", config_file) == 2
+    assert capsys.readouterr().err == "TypeError: `trainer` must build a Trainer, got dict.\n"
+
+
+def test_lighter_debug_shows_the_full_traceback(monkeypatch, built, config_file):
+    built[0].side_effect = TypeError("bad config")
+    monkeypatch.setenv("LIGHTER_DEBUG", "1")
+    with pytest.raises(TypeError, match="bad config"):
+        run_cli(monkeypatch, "fit", config_file)
+
+
+def test_errors_inside_the_stage_propagate_unchanged(monkeypatch, built, config_file):
+    error = RuntimeError("CUDA out of memory")
+    error.__cause__ = ValueError("root cause")
+    built[2].fit.side_effect = error
+    with pytest.raises(RuntimeError) as raised:
+        run_cli(monkeypatch, "fit", config_file)
+    assert raised.value is error and raised.value.__cause__ is error.__cause__
+
+
+def test_cli_starts_without_torch_and_ignores_the_cwd(tmp_path, config_file):
+    """`--print_config` and file errors do not import torch; `python -m lighter` does not import from the cwd."""
+    script = (
+        "import sys\nfrom lighter.engine.runner import cli\ntry:\n    cli()\nfinally:\n    assert 'torch' not in sys.modules\n"
+    )
+    subprocess.run([sys.executable, "-c", script, "fit", config_file, "--print_config"], check=True, capture_output=True)
+    missing = subprocess.run([sys.executable, "-c", script, "fit", "missing.yaml"], capture_output=True, text=True)
+    assert missing.returncode == 2 and "Config file not found" in missing.stderr, missing.stderr
+    (tmp_path / "yaml.py").write_text("raise SystemExit('imported from the cwd')\n")
+    result = subprocess.run([sys.executable, "-m", "lighter", "fit", "--help"], capture_output=True, text=True, cwd=tmp_path)
+    assert result.returncode == 0 and "usage: lighter fit" in result.stdout, result.stderr

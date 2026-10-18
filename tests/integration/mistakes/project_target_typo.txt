@@ -1,0 +1,10 @@
+$ lighter fit configs/config.yaml model::_target_=project.model.TinyModle
+# exit code 2
+configs/config.yaml:8 (model): TargetNotFoundError: Cannot locate class or function: 'project.model.TinyModle'
+       6 │ 
+       7 │ model:
+  →    8 │   _target_: project.model.TinyModel
+       9 │   learning_rate: 0.1
+      10 │   network:
+  Did you mean 'project.model.TinyModel'?
+  Overridden by: model::_target_=project.model.TinyModle

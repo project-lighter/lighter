@@ -157,11 +157,11 @@ def test_prepare_metrics(simple_model):
     assert system.train_metrics is metrics  # Should be unchanged
 
     # Test with list raises TypeError
-    with pytest.raises(TypeError, match="metrics must be Metric or MetricCollection"):
+    with pytest.raises(TypeError, match="metrics must be a torchmetrics Metric or MetricCollection"):
         SimpleLighterModule(network=simple_model, train_metrics=[Accuracy(task="multiclass", num_classes=2)])
 
     # Test with dict raises TypeError
-    with pytest.raises(TypeError, match="metrics must be Metric or MetricCollection"):
+    with pytest.raises(TypeError, match="metrics must be a torchmetrics Metric or MetricCollection"):
         SimpleLighterModule(network=simple_model, train_metrics={"acc": Accuracy(task="multiclass", num_classes=2)})
 
 

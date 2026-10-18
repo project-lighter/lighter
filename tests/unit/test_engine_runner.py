@@ -13,6 +13,7 @@ from pytorch_lightning import LightningModule, Trainer
 from sparkwheel import Config, TargetNotFoundError
 from torch.utils.data import DataLoader, TensorDataset
 
+import lighter
 from lighter import LighterDataModule, Runner, build
 from lighter.engine.runner import _save_config, find_project_root, load_config
 
@@ -150,6 +151,16 @@ def test_seed_comes_from_the_config_then_the_environment(monkeypatch):
     monkeypatch.setenv("PL_GLOBAL_SEED", "7")
     build(config())
     assert os.environ["PL_GLOBAL_SEED"] == "7"
+
+
+def test_build_logs_a_banner(tmp_path, caplog):
+    caplog.set_level("INFO", logger="lighter")
+    build(config(trainer=dict(TRAINER, logger=True, default_root_dir=str(tmp_path))), "seed=3")
+    banner = [record.getMessage() for record in caplog.records if record.name.startswith("lighter")]
+    assert banner == [
+        f"Lighter {lighter.__version__} | project: none | dict + 1 overrides | seed: 3",
+        f"Logs: {tmp_path / 'lightning_logs' / 'version_0'}",
+    ]
 
 
 def test_seed_must_be_an_integer():

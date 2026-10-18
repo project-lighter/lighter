@@ -114,7 +114,7 @@ lighter fit config.yaml \
 Combine multiple YAML files:
 
 ```bash
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 ```
 
 ### Example: Base + Experiment
@@ -1012,7 +1012,7 @@ lighter predict config.yaml
 lighter fit config.yaml key::path=value
 
 # Merge configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Resume training
 lighter fit config.yaml --ckpt_path path/to/last.ckpt

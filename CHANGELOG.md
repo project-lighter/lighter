@@ -15,6 +15,10 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   `pytorch_lightning` objects in one run is reported as an error instead of failing inside Lightning.
 - When a `_target_` names your own code without `project.` (or no `__lighter__.py` was found), the error says
   what to write instead.
+- `--print_config` (or `--print-config`) prints the composed config, as YAML like the saved `config.yaml`, and exits
+  without building anything. `lighter --version` prints the version.
+- `lighter <stage> --help` explains the override syntax (`key::sub=value`, `=key=...`, `~key`) and shell quoting.
+- The CLI prints a two-line banner: project folder, configs and number of overrides, seed, log folder.
 
 ### Changed
 
@@ -26,6 +30,13 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   directory and its parents, so `lighter fit path/to/project/configs/train.yaml` works from any folder.
   Configs from two different projects in one run are an error. The project folder no longer needs an `__init__.py`.
 - `python -m lighter` no longer imports modules from the current directory; import your code as `project.<module>`.
+- Config and build errors in the CLI print `file:line (key): Type: message`, the config lines, the hint and the
+  overrides of that key, without a framework traceback, and exit with code 2. A bug in your own code shows only
+  your frames and exits with 1. Errors raised inside `trainer.<stage>()` propagate unchanged. `LIGHTER_DEBUG=1`
+  shows the full traceback.
+- A missing config file is reported before anything is built, with a hint for files separated by commas,
+  a forgotten `=` in an override, or a similar file name.
+- `import lighter` no longer imports torch or Lightning, so `lighter --help` and `--print_config` start instantly.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
 
 ### Removed
@@ -49,3 +60,4 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - Sparkwheel is capped at `<0.1` until Lighter is tested against its next release; the minimum is 0.0.11.
 - `pyyaml` is declared as a dependency (Lighter imports it directly).
 - Project URLs point at `github.com/project-lighter/lighter`.
+- The docs passed several config files separated by commas; the CLI takes them separated by spaces.

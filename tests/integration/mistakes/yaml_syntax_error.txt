@@ -1,0 +1,3 @@
+$ lighter fit configs/broken.yaml
+# exit code 2
+configs/broken.yaml:9: ParserError: expected <block end>, but found '<block mapping start>'

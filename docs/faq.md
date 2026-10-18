@@ -200,7 +200,7 @@ Results saved to `predictions.csv`.
 Yes! Separate comma-separated paths:
 
 ```bash
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 ```
 
 Later files override earlier ones. Use this for:

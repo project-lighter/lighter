@@ -51,7 +51,7 @@ lighter fit config.yaml --ckpt_path checkpoints/last.ckpt
 lighter fit config.yaml model::optimizer::lr=0.01
 
 # Multiple configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Combine CLI flags and overrides
 lighter fit config.yaml --ckpt_path last trainer::max_epochs=100
@@ -306,7 +306,7 @@ Combine multiple config files.
 ### Syntax
 
 ```bash
-lighter COMMAND config1.yaml,config2.yaml,...
+lighter COMMAND config1.yaml config2.yaml ...
 ```
 
 ### Behavior
@@ -317,10 +317,10 @@ Later files override earlier ones (dictionary merge).
 
 ```bash
 # Base + experiment
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Multiple overrides
-lighter fit base.yaml,data.yaml,model.yaml,overrides.yaml
+lighter fit base.yaml data.yaml model.yaml overrides.yaml
 ```
 
 ### Example Files
@@ -542,7 +542,7 @@ lighter predict config.yaml
 lighter fit config.yaml key::path=value
 
 # Multiple configs
-lighter fit base.yaml,experiment.yaml
+lighter fit base.yaml experiment.yaml
 
 # Checkpoints
 lighter fit config.yaml --ckpt_path path/to/checkpoint.ckpt
