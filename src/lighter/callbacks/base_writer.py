@@ -1,13 +1,11 @@
-import gc
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-from pytorch_lightning import Callback, Trainer
+from pytorch_lightning import Callback, LightningModule, Trainer
 
-from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
+logger = logging.getLogger(__name__)
 
 
 class BaseWriter(ABC, Callback):
@@ -15,6 +13,8 @@ class BaseWriter(ABC, Callback):
     Base class for defining custom Writers. It provides a structure to save predictions.
 
     Subclasses should implement the `write` method to define the saving strategy.
+    Lightning also keeps the predictions in memory to return them; pass `return_predictions=False`
+    to `trainer.predict()` (`--no-return_predictions` in the CLI) when the writer is all you need.
 
     Args:
         path (str | Path): Path for saving predictions.
@@ -34,8 +34,8 @@ class BaseWriter(ABC, Callback):
             dataloader_idx: The index of the dataloader.
         """
 
-    def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
-        if stage != Stage.PREDICT:
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if stage != "predict":
             return
 
         self.path = trainer.strategy.broadcast(self.path, src=0)
@@ -57,7 +57,7 @@ class BaseWriter(ABC, Callback):
     def on_predict_batch_end(
         self,
         trainer: Trainer,
-        pl_module: LighterModule,
+        pl_module: LightningModule,
         outputs: dict[str, Any],
         batch: Any,
         batch_idx: int,
@@ -66,10 +66,3 @@ class BaseWriter(ABC, Callback):
         if not outputs:
             return
         self.write(outputs, batch, batch_idx, dataloader_idx)
-
-        # Clear the predictions to save CPU memory. This is a temporary workaround for a known issue in PyTorch
-        # Lightning, where predictions can accumulate in memory. This line accesses a private attribute
-        # `_predictions` of the `predict_loop`, which is a brittle dependency and may break in future
-        # versions of Lightning. For more details, see: https://github.com/Lightning-AI/pytorch-lightning/issues/19398
-        trainer.predict_loop._predictions = [[] for _ in range(trainer.predict_loop.num_dataloaders)]
-        gc.collect()

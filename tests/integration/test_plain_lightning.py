@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 from lighter.engine.runner import Runner
-from lighter.utils.types.enums import Stage
 
 
 def test_lighter_with_plain_lightning_module():
@@ -37,7 +36,7 @@ model:
 
         # Run with Lighter
         runner = Runner()
-        runner.run(Stage.FIT, [str(config_path)])
+        runner.run("fit", [str(config_path)])
 
         # Runner no longer stores system, just verify it ran successfully without error
 
@@ -61,7 +60,7 @@ model:
         config_path.write_text(config_content)
 
         runner = Runner()
-        runner.run(Stage.FIT, [str(config_path)])
+        runner.run("fit", [str(config_path)])
 
         # Runner no longer stores system, just verify it ran successfully without error
 
@@ -109,7 +108,7 @@ data:
         config_path1.write_text(config_content1)
 
         runner1 = Runner()
-        runner1.run(Stage.FIT, [str(config_path1)])
+        runner1.run("fit", [str(config_path1)])
 
         # Runner no longer stores system, just verify it ran successfully without error
 
@@ -129,6 +128,6 @@ model:
         config_path2.write_text(config_content2)
 
         runner2 = Runner()
-        runner2.run(Stage.FIT, [str(config_path2)])
+        runner2.run("fit", [str(config_path2)])
 
         # Runner no longer stores system, just verify it ran successfully without error

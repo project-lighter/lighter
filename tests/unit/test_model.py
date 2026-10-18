@@ -11,7 +11,6 @@ from torch.optim.lr_scheduler import StepLR
 from torchmetrics import Accuracy, MetricCollection
 
 from lighter.model import LighterModule
-from lighter.utils.types.enums import Mode
 
 # Shared fixtures (mock_trainer, simple_model, dummy_dataset) are available
 # from conftest.py and auto-discovered by pytest
@@ -209,23 +208,23 @@ def test_mode_property(simple_system, mock_trainer):
 
     # Test training mode
     mock_trainer_state(mock_trainer, training=True)
-    assert simple_system.mode == Mode.TRAIN
+    assert simple_system.mode == "train"
 
     # Test validation mode
     mock_trainer_state(mock_trainer, validating=True)
-    assert simple_system.mode == Mode.VAL
+    assert simple_system.mode == "val"
 
     # Test test mode
     mock_trainer_state(mock_trainer, testing=True)
-    assert simple_system.mode == Mode.TEST
+    assert simple_system.mode == "test"
 
     # Test predict mode
     mock_trainer_state(mock_trainer, predicting=True)
-    assert simple_system.mode == Mode.PREDICT
+    assert simple_system.mode == "predict"
 
     # Test sanity checking (should return VAL)
     mock_trainer_state(mock_trainer, sanity_checking=True)
-    assert simple_system.mode == Mode.VAL
+    assert simple_system.mode == "val"
 
 
 def test_mode_without_trainer(simple_system):
@@ -412,32 +411,8 @@ def test_metrics_logging_in_validate_and_log(simple_system):
     simple_system._log_outputs(output, batch_idx=0)
 
     # Check that log was called for metrics
-    # Should have calls for loss (2) + metrics (2 per metric) + optimizer stats (2)
+    # Should have calls for loss (2) + metrics (2 per metric)
     assert simple_system.log.call_count >= 2
-
-
-def test_optimizer_stats_logged_once_per_epoch(simple_system):
-    """Test that optimizer stats are logged only once per epoch (batch_idx=0)."""
-    from unittest.mock import patch
-
-    simple_system.trainer = MagicMock()
-    simple_system.trainer.training = True
-    simple_system.trainer.validating = False
-    simple_system.trainer.testing = False
-    simple_system.trainer.predicting = False
-    simple_system.trainer.sanity_checking = False
-
-    # batch_idx=0 should call get_optimizer_stats
-    with patch("lighter.model.get_optimizer_stats") as mock_get_stats:
-        mock_get_stats.return_value = {"lr": 0.01}
-        simple_system._log_optimizer_stats(batch_idx=0)
-        assert mock_get_stats.called
-
-    # batch_idx=1 should NOT call get_optimizer_stats
-    with patch("lighter.model.get_optimizer_stats") as mock_get_stats:
-        mock_get_stats.return_value = {"lr": 0.01}
-        simple_system._log_optimizer_stats(batch_idx=1)
-        assert not mock_get_stats.called
 
 
 def test_log_method_sets_sync_dist_for_epoch(simple_system):

@@ -13,9 +13,6 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torchmetrics import Metric, MetricCollection
 
-from lighter.utils.misc import get_optimizer_stats
-from lighter.utils.types.enums import Mode
-
 
 class LighterModule(pl.LightningModule):
     """
@@ -303,7 +300,6 @@ class LighterModule(pl.LightningModule):
             return
         self._log_loss(outputs.get("loss"))
         self._log_metrics()
-        self._log_optimizer_stats(batch_idx)
 
     def _log_loss(self, loss: torch.Tensor | dict[str, Any] | None) -> None:
         """
@@ -350,21 +346,6 @@ class LighterModule(pl.LightningModule):
             self._log(name, metrics, on_step=True)
             self._log(name, metrics, on_epoch=True, sync_dist=True)
 
-    def _log_optimizer_stats(self, batch_idx: int) -> None:
-        """
-        Log optimizer stats once per epoch in train mode.
-
-        Args:
-            batch_idx: Current batch index
-        """
-        if self.mode != Mode.TRAIN or batch_idx != 0 or self.optimizer is None:
-            return
-
-        # Optimizer stats only logged per epoch
-        for name, stat in get_optimizer_stats(self.optimizer).items():
-            name = f"{self.mode}/{name}"
-            self._log(name, stat, on_epoch=True, sync_dist=False)
-
     def _log(self, name: str, value: Any, on_step: bool = False, on_epoch: bool = False, sync_dist: bool = False) -> None:
         suffix = "step" if on_step and not on_epoch else "epoch"
         self.log(
@@ -409,15 +390,15 @@ class LighterModule(pl.LightningModule):
             raise RuntimeError("LighterModule is not attached to a Trainer.")
 
         if self.trainer.sanity_checking:
-            return Mode.VAL
+            return "val"
 
         if self.trainer.training:
-            return Mode.TRAIN
+            return "train"
         elif self.trainer.validating:
-            return Mode.VAL
+            return "val"
         elif self.trainer.testing:
-            return Mode.TEST
+            return "test"
         elif self.trainer.predicting:
-            return Mode.PREDICT
+            return "predict"
         else:
             raise RuntimeError("Cannot determine mode outside Lightning execution.")

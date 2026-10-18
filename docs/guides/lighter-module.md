@@ -207,14 +207,9 @@ def training_step(self, batch, batch_idx):
 - `train/metrics/Accuracy/epoch` - Epoch average
 - `train/metrics/F1Score/step`, `train/metrics/F1Score/epoch`
 
-#### Optimizer Stats Logging
+#### Learning Rate Logging
 
-Automatically logged at the start of each training epoch:
-- `train/optimizer/Adam/lr/epoch`
-- `train/optimizer/Adam/beta1/epoch`
-- `train/optimizer/Adam/beta2/epoch`
-
-See [Automatic Optimizer Stats Logging](#automatic-optimizer-stats-logging) for details.
+Add Lightning's `LearningRateMonitor` callback to log the learning rate (see [Logging the Learning Rate](#logging-the-learning-rate)).
 
 ## What LighterModule Provides
 
@@ -623,30 +618,19 @@ def configure_optimizers(self):
     }
 ```
 
-## Automatic Optimizer Stats Logging
+## Logging the Learning Rate
 
-**LighterModule automatically logs optimizer statistics** including learning rate, momentum, betas, and weight decay at the start of each training epoch. You do **not** need to add `LearningRateMonitor` callback.
+LighterModule does not log optimizer settings itself. Use Lightning's `LearningRateMonitor`, which also
+logs momentum and weight decay when asked:
 
-Logged stats (per parameter group):
-- **Learning rate**: `train/optimizer/{OptimizerName}/lr/epoch`
-- **Momentum**: `train/optimizer/{OptimizerName}/momentum/epoch` (SGD, RMSprop)
-- **Beta1/Beta2**: `train/optimizer/{OptimizerName}/beta1/epoch`, `beta2/epoch` (Adam variants)
-- **Weight decay**: `train/optimizer/{OptimizerName}/weight_decay/epoch` (if non-zero)
-
-For multiple parameter groups (e.g., differential learning rates):
-- `train/optimizer/{OptimizerName}/lr/group1/epoch`
-- `train/optimizer/{OptimizerName}/lr/group2/epoch`
-
-**Example logged metrics:**
-
+```yaml
+trainer:
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.LearningRateMonitor
+      logging_interval: epoch
+      log_momentum: true
+      log_weight_decay: true
 ```
-train/optimizer/Adam/lr/epoch: 0.001
-train/optimizer/Adam/beta1/epoch: 0.9
-train/optimizer/Adam/beta2/epoch: 0.999
-```
-
-!!! note "No LearningRateMonitor needed"
-    The PyTorch Lightning `LearningRateMonitor` callback is redundant with LighterModule since optimizer stats are already logged automatically.
 
 ## Working with Metrics
 

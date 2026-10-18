@@ -1,19 +1,14 @@
 """Tests for dynamic_imports module."""
 
+import importlib
 import pickle
 import sys
 from io import BytesIO
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from lighter.utils.dynamic_imports import (
-    _DynamicModuleFinder,
-    _HybridPickler,
-    _ModuleRegistry,
-    import_module_from_path,
-)
+from lighter.utils.dynamic_imports import _HybridPickler, import_module_from_path
 
 
 class TestImportModuleFromPath:
@@ -102,101 +97,6 @@ class TestImportModuleFromPath:
             # Cleanup
             sys.modules.pop(module_name, None)
             sys.modules.pop(f"{module_name}.submod", None)
-
-
-class TestModuleRegistry:
-    """Tests for _ModuleRegistry."""
-
-    def test_register_and_find_exact_match(self):
-        """Registry returns exact match for registered module."""
-        registry = _ModuleRegistry()
-        test_path = Path("/test/path")
-        registry.register("mymodule", test_path)
-
-        result = registry.find_root("mymodule")
-        assert result == ("mymodule", test_path)
-
-    def test_find_submodule_returns_root(self):
-        """Registry returns root module for submodule queries."""
-        registry = _ModuleRegistry()
-        test_path = Path("/test/path")
-        registry.register("mymodule", test_path)
-
-        result = registry.find_root("mymodule.sub.deep")
-        assert result == ("mymodule", test_path)
-
-    def test_find_unregistered_returns_none(self):
-        """Registry returns None for unregistered modules."""
-        registry = _ModuleRegistry()
-        assert registry.find_root("unregistered") is None
-
-
-class TestDynamicModuleFinder:
-    """Tests for _DynamicModuleFinder."""
-
-    def test_unregistered_module_returns_none(self):
-        """Finder returns None for modules not in registry."""
-        finder = _DynamicModuleFinder()
-        # Use a unique name that won't be registered
-        result = finder.find_spec("completely_unknown_module_xyz", None, None)
-        assert result is None
-
-    def test_missing_file_returns_none(self, tmp_path):
-        """Finder returns None when submodule file doesn't exist."""
-        from lighter.utils.dynamic_imports import _registry
-
-        # Create package without the submodule we'll look for
-        pkg_dir = tmp_path / "finder_test_pkg"
-        pkg_dir.mkdir()
-        (pkg_dir / "__init__.py").write_text("")
-
-        module_name = "finder_test_pkg_missing"
-        _registry.register(module_name, pkg_dir)
-
-        try:
-            finder = _DynamicModuleFinder()
-            result = finder.find_spec(f"{module_name}.nonexistent", None, None)
-            assert result is None
-        finally:
-            # Registry doesn't have unregister, but module names are unique per test
-            pass
-
-    def test_finds_root_package(self, tmp_path):
-        """Finder creates spec for root package __init__.py."""
-        from lighter.utils.dynamic_imports import _registry
-
-        pkg_dir = tmp_path / "finder_root_pkg"
-        pkg_dir.mkdir()
-        (pkg_dir / "__init__.py").write_text("# root")
-
-        module_name = "finder_root_pkg_test"
-        _registry.register(module_name, pkg_dir)
-
-        finder = _DynamicModuleFinder()
-        result = finder.find_spec(module_name, None, None)
-
-        assert result is not None
-        assert result.name == module_name
-        assert "__init__.py" in result.origin
-
-    def test_finds_submodule(self, tmp_path):
-        """Finder creates spec for submodule .py file."""
-        from lighter.utils.dynamic_imports import _registry
-
-        pkg_dir = tmp_path / "finder_sub_pkg"
-        pkg_dir.mkdir()
-        (pkg_dir / "__init__.py").write_text("")
-        (pkg_dir / "child.py").write_text("X = 1")
-
-        module_name = "finder_sub_pkg_test"
-        _registry.register(module_name, pkg_dir)
-
-        finder = _DynamicModuleFinder()
-        result = finder.find_spec(f"{module_name}.child", None, None)
-
-        assert result is not None
-        assert result.name == f"{module_name}.child"
-        assert "child.py" in result.origin
 
 
 class TestHybridPickler:
@@ -334,9 +234,7 @@ class TestImportModuleFromPathErrors:
                 import_module_from_path(module_name, pkg_dir)
 
     def test_module_load_failure_cleans_up_state(self, tmp_path):
-        """Test that module load failure cleans up sys.modules and registry."""
-        from lighter.utils.dynamic_imports import _registry
-
+        """Test that module load failure cleans up sys.modules."""
         # Create a package with a syntax error in __init__.py
         pkg_dir = tmp_path / "broken_pkg"
         pkg_dir.mkdir()
@@ -354,17 +252,12 @@ class TestImportModuleFromPathErrors:
         # Verify cleanup: module should NOT be in sys.modules after failure
         assert module_name not in sys.modules
 
-        # Verify registry was not updated (find_root returns None for unregistered)
-        assert _registry.find_root(module_name) is None
-
     def test_module_runtime_error_cleans_up_state(self, tmp_path):
-        """Test that runtime error during module execution cleans up sys.modules and registry.
+        """Test that runtime error during module execution cleans up sys.modules.
 
         This test triggers a module load failure via a runtime exception (not syntax error)
-        to verify the except block at lines 199-202 in dynamic_imports.py properly removes
-        the module from sys.modules and does not register it in _registry.
+        to verify that a failed import removes the module from sys.modules.
         """
-        from lighter.utils.dynamic_imports import _registry
 
         # Create a package that raises an error during execution
         pkg_dir = tmp_path / "runtime_error_pkg"
@@ -381,7 +274,6 @@ raise RuntimeError("Intentional failure during module load")
         # Capture initial state
         initial_modules = set(sys.modules.keys())
         assert module_name not in sys.modules, "Module should not exist before test"
-        assert _registry.find_root(module_name) is None, "Module should not be in registry before test"
 
         # Attempt import - should fail with RuntimeError
         with pytest.raises(RuntimeError, match="Intentional failure"):
@@ -398,16 +290,12 @@ raise RuntimeError("Intentional failure during module load")
             f"{[m for m in new_modules if m.startswith(module_name)]}"
         )
 
-        # Verify registry was not updated
-        assert _registry.find_root(module_name) is None, "Failed module must not be registered in _registry"
-
     def test_module_import_error_cleans_up_state(self, tmp_path):
-        """Test that ImportError during module execution cleans up sys.modules and registry.
+        """Test that ImportError during module execution cleans up sys.modules.
 
         This test triggers a failure via a missing import to verify cleanup works for
         ImportError exceptions as well.
         """
-        from lighter.utils.dynamic_imports import _registry
 
         # Create a package that fails due to missing import
         pkg_dir = tmp_path / "import_error_pkg"
@@ -422,7 +310,6 @@ from nonexistent_module_xyz_12345 import something
 
         # Verify preconditions
         assert module_name not in sys.modules
-        assert _registry.find_root(module_name) is None
 
         # Attempt import - should fail with ModuleNotFoundError
         with pytest.raises(ModuleNotFoundError):
@@ -430,4 +317,28 @@ from nonexistent_module_xyz_12345 import something
 
         # Verify cleanup
         assert module_name not in sys.modules, "Failed module must be removed from sys.modules"
-        assert _registry.find_root(module_name) is None, "Failed module must not be registered in _registry"
+
+
+@pytest.mark.slow
+def test_project_classes_work_in_spawned_dataloader_workers(tmp_path):
+    """A dataset defined in an imported project folder can be sent to spawned DataLoader workers."""
+    from torch.utils.data import DataLoader
+
+    (tmp_path / "__init__.py").write_text("")
+    (tmp_path / "data.py").write_text(
+        "import torch\n"
+        "class Squares(torch.utils.data.Dataset):\n"
+        "    def __len__(self):\n"
+        "        return 6\n"
+        "    def __getitem__(self, i):\n"
+        "        return torch.tensor(i * i)\n"
+    )
+    module_name = "spawn_worker_project"
+    try:
+        import_module_from_path(module_name, tmp_path)
+        data = importlib.import_module(f"{module_name}.data")
+        loader = DataLoader(data.Squares(), batch_size=3, num_workers=1, multiprocessing_context="spawn")
+        assert [batch.tolist() for batch in loader] == [[0, 1, 4], [9, 16, 25]]
+    finally:
+        sys.modules.pop(module_name, None)
+        sys.modules.pop(f"{module_name}.data", None)

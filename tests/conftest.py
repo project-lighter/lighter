@@ -30,8 +30,6 @@ def mock_trainer():
     trainer.logger = MagicMock()
     trainer.strategy.broadcast = lambda x, src: x
     trainer.strategy.barrier = MagicMock()
-    trainer.predict_loop._predictions = [[]]
-    trainer.predict_loop.num_dataloaders = 1
 
     # State flags
     trainer.training = False

@@ -4,32 +4,32 @@ from pathlib import Path
 
 import pytest
 
-from lighter.engine.runner import Runner, Stage
+from lighter.engine.runner import Runner
 
 
 @pytest.mark.parametrize(
     ("stage", "config"),
     [
         (
-            Stage.FIT,
+            "fit",
             "configs/example.yaml",
         ),
         (
-            Stage.TEST,
+            "test",
             "configs/example.yaml",
         ),
         (
-            Stage.PREDICT,
+            "predict",
             "configs/example.yaml",
         ),
     ],
 )
 @pytest.mark.slow
-def test_trainer_stage(stage: Stage, config: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_trainer_stage(stage: str, config: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Test the specified stage using the given configuration.
     Args:
-        stage: The stage to run (e.g., Stage.FIT, Stage.TEST, Stage.PREDICT).
+        stage: The stage to run (e.g., "fit", "test", "predict").
         config: Path to the configuration file.
         monkeypatch: Pytest fixture for changing working directory.
     """

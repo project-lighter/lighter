@@ -8,7 +8,6 @@ from sparkwheel import Config
 
 from lighter.engine.runner import Runner
 from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
 
 
 @pytest.fixture
@@ -108,7 +107,7 @@ def test_runner_applies_overrides(runner, base_config):
         mock_datamodule = MagicMock()
         mock_resolve_datamodule.return_value = mock_datamodule
 
-        runner.run(Stage.FIT, inputs)
+        runner.run("fit", inputs)
 
         # Verify methods were called
         mock_resolve_model.assert_called_once()
@@ -157,22 +156,22 @@ def test_setup_with_invalid_trainer(runner, mock_model):
 def test_execute_calls_stage_method(runner, mock_model, mock_trainer, mock_datamodule):
     """Test that _execute calls the correct trainer method."""
     # Test fit
-    runner._execute(Stage.FIT, mock_model, mock_trainer, mock_datamodule)
+    runner._execute("fit", mock_model, mock_trainer, mock_datamodule)
     mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule)
     mock_trainer.reset_mock()
 
     # Test validate
-    runner._execute(Stage.VALIDATE, mock_model, mock_trainer, mock_datamodule)
+    runner._execute("validate", mock_model, mock_trainer, mock_datamodule)
     mock_trainer.validate.assert_called_once_with(mock_model, datamodule=mock_datamodule)
     mock_trainer.reset_mock()
 
     # Test test
-    runner._execute(Stage.TEST, mock_model, mock_trainer, mock_datamodule)
+    runner._execute("test", mock_model, mock_trainer, mock_datamodule)
     mock_trainer.test.assert_called_once_with(mock_model, datamodule=mock_datamodule)
     mock_trainer.reset_mock()
 
     # Test predict
-    runner._execute(Stage.PREDICT, mock_model, mock_trainer, mock_datamodule)
+    runner._execute("predict", mock_model, mock_trainer, mock_datamodule)
     mock_trainer.predict.assert_called_once_with(mock_model, datamodule=mock_datamodule)
 
 
@@ -180,10 +179,10 @@ def test_execute_calls_stage_method(runner, mock_model, mock_trainer, mock_datam
 
 
 def test_auto_discover_project_with_marker(runner, tmp_path, monkeypatch):
-    """Test that ProjectImporter finds __lighter__.py marker file."""
+    """Test that the project folder is found by its __lighter__.py marker file."""
     import sys
 
-    from lighter.engine.runner import ProjectImporter
+    from lighter.engine.runner import _import_project
 
     # Create a project directory with marker file and __init__.py
     project_dir = tmp_path / "my_project"
@@ -199,19 +198,15 @@ def test_auto_discover_project_with_marker(runner, tmp_path, monkeypatch):
     # Clean up any previous "project" module to avoid conflicts
     sys.modules.pop("project", None)
 
-    # Test auto-discovery
-    importer = ProjectImporter()
-    found = importer.auto_discover_and_import()
-
-    assert found is True
+    assert _import_project() is True
 
     # Cleanup
     sys.modules.pop("project", None)
 
 
 def test_auto_discover_project_without_marker(runner, tmp_path, monkeypatch):
-    """Test that ProjectImporter returns False when marker is absent."""
-    from lighter.engine.runner import ProjectImporter
+    """Test that nothing is imported when the marker is absent."""
+    from lighter.engine.runner import _import_project
 
     # Create a directory without marker file
     project_dir = tmp_path / "not_a_project"
@@ -220,17 +215,13 @@ def test_auto_discover_project_without_marker(runner, tmp_path, monkeypatch):
     # Change working directory to directory without marker
     monkeypatch.chdir(project_dir)
 
-    # Test auto-discovery
-    importer = ProjectImporter()
-    found = importer.auto_discover_and_import()
-
-    assert found is False
+    assert _import_project() is False
 
 
 @patch("lighter.engine.runner.import_module_from_path")
 def test_setup_with_auto_discovery(mock_import, runner, base_config, mock_model, mock_trainer, tmp_path, monkeypatch):
-    """Test that ProjectImporter auto-discovers and imports project."""
-    from lighter.engine.runner import ProjectImporter
+    """Test that the marked project is imported as 'project'."""
+    from lighter.engine.runner import _import_project
 
     # Create project directory with marker
     project_dir = tmp_path / "auto_project"
@@ -239,7 +230,7 @@ def test_setup_with_auto_discovery(mock_import, runner, base_config, mock_model,
     monkeypatch.chdir(project_dir)
 
     # Test auto-discovery and import
-    result = ProjectImporter.auto_discover_and_import()
+    result = _import_project()
 
     # Verify auto-discovered project was imported as 'project'
     assert result is True
@@ -248,8 +239,8 @@ def test_setup_with_auto_discovery(mock_import, runner, base_config, mock_model,
 
 @patch("lighter.engine.runner.import_module_from_path")
 def test_setup_without_project_or_discovery(mock_import, runner, base_config, mock_model, mock_trainer, tmp_path, monkeypatch):
-    """Test that ProjectImporter works without project module (plain Lightning)."""
-    from lighter.engine.runner import ProjectImporter
+    """Test that runs work without a project module (plain Lightning)."""
+    from lighter.engine.runner import _import_project
 
     # Create directory without marker
     no_project_dir = tmp_path / "plain_lightning"
@@ -257,7 +248,7 @@ def test_setup_without_project_or_discovery(mock_import, runner, base_config, mo
     monkeypatch.chdir(no_project_dir)
 
     # Test auto-discovery without project
-    result = ProjectImporter.auto_discover_and_import()
+    result = _import_project()
 
     # Verify no project module was imported
     assert result is False
@@ -347,7 +338,7 @@ def test_save_config_without_logger(runner, base_config, mock_model):
 def test_execute_with_cli_kwargs(runner, mock_model, mock_trainer, mock_datamodule):
     """Test that CLI kwargs are passed to trainer method."""
     # Test with CLI kwargs
-    runner._execute(Stage.FIT, mock_model, mock_trainer, mock_datamodule, ckpt_path="checkpoint.ckpt")
+    runner._execute("fit", mock_model, mock_trainer, mock_datamodule, ckpt_path="checkpoint.ckpt")
 
     mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule, ckpt_path="checkpoint.ckpt")
 
@@ -355,7 +346,7 @@ def test_execute_with_cli_kwargs(runner, mock_model, mock_trainer, mock_datamodu
 def test_execute_without_cli_kwargs(runner, mock_model, mock_trainer, mock_datamodule):
     """Test that execute works without CLI kwargs."""
     # Test with no CLI kwargs
-    runner._execute(Stage.FIT, mock_model, mock_trainer, mock_datamodule)
+    runner._execute("fit", mock_model, mock_trainer, mock_datamodule)
 
     mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule)
 
@@ -375,7 +366,7 @@ def test_run_passes_kwargs_to_execute(runner, base_config, mock_model, mock_trai
         mock_resolve_datamodule.return_value = mock_datamodule
 
         # Run with CLI kwargs
-        runner.run(Stage.FIT, [base_config], ckpt_path="checkpoint.ckpt", verbose=True)
+        runner.run("fit", [base_config], ckpt_path="checkpoint.ckpt", verbose=True)
 
         # Verify _execute was called with kwargs
         mock_execute.assert_called_once()

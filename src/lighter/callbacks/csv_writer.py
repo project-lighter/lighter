@@ -10,11 +10,9 @@ from typing import Any
 import pandas as pd
 import torch
 import torch.distributed as dist
-from pytorch_lightning import Trainer
+from pytorch_lightning import LightningModule, Trainer
 
 from lighter.callbacks.base_writer import BaseWriter
-from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
 
 
 class CsvWriter(BaseWriter):
@@ -52,8 +50,8 @@ class CsvWriter(BaseWriter):
         self._csv_file = None
         self._csv_writer = None
 
-    def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
-        if stage != Stage.PREDICT:
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if stage != "predict":
             return
         super().setup(trainer, pl_module, stage)
 
@@ -138,7 +136,7 @@ class CsvWriter(BaseWriter):
                 record.append(self._get_record_value(value, i))
             self._csv_writer.writerow(record)
 
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterModule) -> None:
+    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         """
         At the end of the prediction epoch, it saves the temporary file to the final destination.
         """
@@ -172,11 +170,11 @@ class CsvWriter(BaseWriter):
         # Reset temporary path
         self._temp_path = None
 
-    def on_exception(self, trainer: Trainer, pl_module: LighterModule, exception: BaseException) -> None:
+    def on_exception(self, trainer: Trainer, pl_module: LightningModule, exception: BaseException) -> None:
         """Close the file on errors to prevent file handle leaks."""
         self._close_file()
 
-    def teardown(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
+    def teardown(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
         """Guarantee cleanup when stage is PREDICT."""
-        if stage == Stage.PREDICT:
+        if stage == "predict":
             self._close_file()

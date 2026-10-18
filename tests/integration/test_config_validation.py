@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from lighter.engine.runner import Runner
-from lighter.utils.types.enums import Stage
 
 
 class TestConfigValidation:
@@ -48,7 +47,7 @@ data:
             patch.object(runner, "_execute"),
         ):
             # Should not raise error - just verify config loads
-            runner.run(Stage.FIT, [str(config_path)])
+            runner.run("fit", [str(config_path)])
 
     def test_config_with_all_components(self, temp_config_dir):
         """Test config with all components."""
@@ -111,7 +110,7 @@ args:
             patch.object(runner, "_save_config"),
             patch.object(runner, "_execute"),
         ):
-            runner.run(Stage.FIT, [str(config_path)])
+            runner.run("fit", [str(config_path)])
             assert captured_config.get("project") == "./path/to/project"
             assert captured_config.get("vars::learning_rate") == 0.001
             assert captured_config.get("model::optimizer::lr") == 0.001
@@ -170,7 +169,7 @@ data:
             patch.object(runner, "_save_config"),
             patch.object(runner, "_execute"),
         ):
-            runner.run(Stage.FIT, [str(base_path), str(override_path)])
+            runner.run("fit", [str(base_path), str(override_path)])
             # Override values should be applied
             assert captured_config.get("trainer::max_epochs") == 1
             assert captured_config.get("trainer::devices") == 2
@@ -218,7 +217,7 @@ data:
             patch.object(runner, "_execute"),
         ):
             overrides = ["trainer::max_epochs=5", "model::optimizer::lr=0.1"]
-            runner.run(Stage.FIT, [str(config_path)] + overrides)
+            runner.run("fit", [str(config_path)] + overrides)
             assert captured_config.get("trainer::max_epochs") == 5
             assert captured_config.get("model::optimizer::lr") == 0.1
 
@@ -261,7 +260,7 @@ data:
             patch.object(runner, "_save_config"),
             patch.object(runner, "_execute"),
         ):
-            runner.run(Stage.FIT, [str(config_path)])
+            runner.run("fit", [str(config_path)])
             # Raw references (%) remain as strings until resolution
             # They are expanded when resolved, not during config loading
             train_metrics = captured_config.get("model::train_metrics")
@@ -318,7 +317,7 @@ data:
             patch.object(runner, "_save_config"),
             patch.object(runner, "_execute"),
         ):
-            runner.run(Stage.FIT, [str(config_path)])
+            runner.run("fit", [str(config_path)])
             # Vars should be accessible
             assert captured_config.get("vars::learning_rate") == 0.001
             assert captured_config.get("vars::batch_size") == 32

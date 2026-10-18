@@ -1,4 +1,4 @@
-import re
+import logging
 
 import pytest
 import torch
@@ -8,12 +8,6 @@ from torch.utils.data import DataLoader, Dataset
 
 from lighter.callbacks.freezer import Freezer
 from lighter.model import LighterModule
-
-
-def strip_ansi(text: str) -> str:
-    """Remove ANSI escape sequences from text."""
-    ansi_escape = re.compile(r"\x1b\[[0-9;]*m|\x1b\]8;[^\\]*\\|\x1b\\")
-    return ansi_escape.sub("", text)
 
 
 class DummyDataset(Dataset):
@@ -246,32 +240,27 @@ def test_freezer_set_model_requires_grad_with_exceptions(dummy_system):
     assert dummy_system.network.layer1.bias.requires_grad
 
 
-def test_freezer_logs_excepted_layers(dummy_system, capsys):
+def test_freezer_logs_excepted_layers(dummy_system, caplog):
     """Test that excepted layers are logged with the correct suffix during freeze."""
     freezer = Freezer(name_starts_with=["layer"], except_names=["layer2.weight", "layer2.bias"])
 
     # Directly call _set_model_requires_grad to test logging
-    freezer._set_model_requires_grad(dummy_system, requires_grad=False)
-
-    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
-    captured = capsys.readouterr()
-    output = strip_ansi(captured.out + captured.err)
+    with caplog.at_level(logging.INFO, logger="lighter"):
+        freezer._set_model_requires_grad(dummy_system, requires_grad=False)
+    output = caplog.text
     assert "(excepted from freeze)" in output
     assert "layer2.weight" in output
     assert "layer2.bias" in output
 
 
-def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, capsys):
+def test_freezer_logs_unfrozen_layers_without_suffix(dummy_system, caplog):
     """Test that unfrozen layers are logged without suffix when explicitly unfreezing."""
     freezer = Freezer(names=["layer1.weight", "layer1.bias"])
 
     # First freeze, then unfreeze
     freezer._set_model_requires_grad(dummy_system, requires_grad=False)
-    capsys.readouterr()  # Clear previous output
-    freezer._set_model_requires_grad(dummy_system, requires_grad=True)
-
-    # Loguru logs to stderr by default; strip ANSI codes for CI compatibility
-    captured = capsys.readouterr()
-    output = strip_ansi(captured.out + captured.err)
+    with caplog.at_level(logging.INFO, logger="lighter"):
+        freezer._set_model_requires_grad(dummy_system, requires_grad=True)
+    output = caplog.text
     assert "Unfroze layers" in output
     assert "(excepted from freeze)" not in output

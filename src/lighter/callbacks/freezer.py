@@ -2,12 +2,16 @@
 This module provides the Freezer callback, which allows freezing model parameters during training.
 """
 
+import logging
 from typing import Any
 
-from loguru import logger
 from pytorch_lightning import Callback, LightningModule, Trainer
 
-from lighter.utils.misc import ensure_list
+logger = logging.getLogger(__name__)
+
+
+def _as_list(value: str | list[str] | None) -> list[str]:
+    return [value] if isinstance(value, str) else list(value or [])
 
 
 class Freezer(Callback):
@@ -46,10 +50,10 @@ class Freezer(Callback):
         if until_step is not None and until_epoch is not None:
             raise ValueError("Only one of `until_step` or `until_epoch` can be specified.")
 
-        self.names = ensure_list(names)
-        self.name_starts_with = ensure_list(name_starts_with)
-        self.except_names = ensure_list(except_names)
-        self.except_name_starts_with = ensure_list(except_name_starts_with)
+        self.names = _as_list(names)
+        self.name_starts_with = _as_list(name_starts_with)
+        self.except_names = _as_list(except_names)
+        self.except_name_starts_with = _as_list(except_name_starts_with)
         self.until_step = until_step
         self.until_epoch = until_epoch
 
