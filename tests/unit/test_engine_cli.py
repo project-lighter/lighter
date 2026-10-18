@@ -2,7 +2,7 @@
 
 import subprocess
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 
@@ -47,6 +47,7 @@ def test_cli_builds_then_runs_the_stage(monkeypatch, built, stage, config_file):
 
 def test_cli_passes_stage_flags(monkeypatch, built, config_file):
     _, model, trainer, datamodule = built
+    trainer.test = create_autospec(lambda model, datamodule=None, ckpt_path=None, weights_only=None, verbose=None: None)
     run_cli(monkeypatch, "test", config_file, "--ckpt_path", "best.ckpt", "--no-weights_only", "--verbose")
     trainer.test.assert_called_once_with(model, datamodule=datamodule, ckpt_path="best.ckpt", weights_only=False, verbose=True)
     run_cli(monkeypatch, "predict", config_file, "--no-return_predictions")
@@ -70,7 +71,7 @@ def test_cli_version_and_help(monkeypatch, capsys):
 @pytest.mark.parametrize("flag", ["--print_config", "--print-config"])
 def test_print_config_prints_the_composed_config_without_building(monkeypatch, capsys, built, config_file, flag):
     assert run_cli(monkeypatch, "fit", config_file, "trainer::max_epochs=3", flag) == 0
-    assert capsys.readouterr().out == CONFIG.replace("max_epochs: 10", "max_epochs: 3")
+    assert capsys.readouterr().out == "seed: 0\n" + CONFIG.replace("max_epochs: 10", "max_epochs: 3")
     built[0].assert_not_called()
 
 
@@ -114,3 +115,16 @@ def test_cli_starts_without_torch_and_ignores_the_cwd(tmp_path, config_file):
     (tmp_path / "yaml.py").write_text("raise SystemExit('imported from the cwd')\n")
     result = subprocess.run([sys.executable, "-m", "lighter", "fit", "--help"], capture_output=True, text=True, cwd=tmp_path)
     assert result.returncode == 0 and "usage: lighter fit" in result.stdout, result.stderr
+
+
+def test_weights_only_needs_a_lightning_that_accepts_it(monkeypatch, capsys, built, config_file):
+    _, _, trainer, _ = built
+    trainer.fit = create_autospec(lambda model, datamodule=None, ckpt_path=None: None)  # Lightning before 2.6
+    assert run_cli(monkeypatch, "fit", config_file, "--no-weights_only") == 2
+    assert "--weights_only needs Lightning 2.6 or newer" in capsys.readouterr().err
+    trainer.fit.assert_not_called()
+
+
+def test_ckpt_path_best_is_rejected(monkeypatch, capsys, built, config_file):
+    assert run_cli(monkeypatch, "test", config_file, "--ckpt_path", "best") == 2
+    assert "--ckpt_path best works only after `fit` in the same process" in capsys.readouterr().err

@@ -1,7 +1,6 @@
 """Save each run's composed config, and rebuild a model from the config saved in its checkpoint."""
 
 import logging
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,6 @@ from lighter.engine.runner import _find_up, load_config, to_yaml
 from lighter.utils.dynamic_imports import import_module_from_path
 
 logger = logging.getLogger(__name__)
-SAVED_BY = "# Saved by Lighter: the composed config of this run.\n"  # load_model trusts only such a config.yaml
 
 
 class SaveConfig(Callback):
@@ -38,36 +36,30 @@ class SaveConfig(Callback):
                     logger.warning("config.yaml is not saved: the config holds Python objects that YAML cannot write.")
                     return
                 Path(log_dir).mkdir(parents=True, exist_ok=True)
-                (Path(log_dir) / "config.yaml").write_text(SAVED_BY + text)
+                (Path(log_dir) / "config.yaml").write_text(text)
 
     def on_save_checkpoint(self, trainer: Any, pl_module: Any, checkpoint: dict) -> None:
         checkpoint["lighter_config"] = self.config
 
 
-def load_model(ckpt_path: str | Path, overrides: Iterable[str] = (), weights_only: bool = True) -> Any:
+def load_model(ckpt_path: str | Path, *overrides: str, weights_only: bool = True) -> Any:
     """Rebuild the model of a Lighter run from the config in its checkpoint, and load the checkpoint's weights.
 
     Args:
         ckpt_path: A checkpoint saved by a run that Lighter built.
-        overrides: Overrides applied to the saved config first, e.g. `["model::network::dropout=0"]`.
+        *overrides: Overrides applied to the saved config first, e.g. `"model::network::dropout=0"`.
         weights_only: Load the checkpoint with `torch.load(weights_only=True)`. Pass False only for a
             checkpoint you trust whose hyperparameters hold Python objects.
 
-    A checkpoint saved with `ModelCheckpoint(save_weights_only=True)` holds no config, so the `config.yaml`
-    that the run saved next to its `checkpoints` folder is used. Your project (`__lighter__.py`) is searched for
-    upward from the checkpoint's folder, then from the current one.
+    Your project (`__lighter__.py`) is searched for upward from the checkpoint's folder, then from the current one.
     """
     checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=weights_only)
     config = checkpoint.get("lighter_config")
     if not config:
-        saved = Path(ckpt_path).resolve().parents[1] / "config.yaml"  # the run folder, unless `dirpath` was set
-        if not (saved.is_file() and saved.read_text().startswith(SAVED_BY)):
-            raise ValueError(
-                f"'{ckpt_path}' holds no Lighter config (checkpoints saved with `save_weights_only=True` don't), and "
-                f"{saved.parent} has no config.yaml saved by a run. Build the model with "
-                "`lighter.build(<the run's config.yaml>)` and load the weights yourself."
-            )
-        config = saved
+        raise ValueError(
+            f"'{ckpt_path}' holds no Lighter config (checkpoints saved with `save_weights_only=True` don't). Build the "
+            "model with `model, _, _ = lighter.build(<the run's config.yaml>)` and load the weights yourself."
+        )
     root = _find_up(Path(ckpt_path).resolve().parent, "__lighter__.py") or _find_up(Path.cwd(), "__lighter__.py")
     if root is not None:
         import_module_from_path("project", root)

@@ -142,13 +142,17 @@ def test_seed_defaults_to_zero_without_a_warning(monkeypatch):
     assert os.environ["PL_SEED_WORKERS"] == "1"
 
 
-def test_seed_comes_from_the_config_then_the_environment(monkeypatch):
+def test_seed_comes_from_the_config_and_does_not_carry_over(monkeypatch):
     build(config(seed=42))
     first = torch.rand(1)
     build(config(seed=42))
     assert torch.equal(first, torch.rand(1))
-    monkeypatch.setenv("PL_GLOBAL_SEED", "7")
-    build(config())
+    build(config())  # a later build in the same process starts again from 0
+    assert os.environ["PL_GLOBAL_SEED"] == "0"
+
+
+def test_seed_override_needs_no_seed_key_in_the_config():
+    build(config(), "seed=7")
     assert os.environ["PL_GLOBAL_SEED"] == "7"
 
 

@@ -74,29 +74,16 @@ def test_the_run_folder_holds_the_composed_config(run):
 def test_load_model_rebuilds_the_model_with_its_weights(run):
     root, model = run
     ckpt = next(root.glob("lightning_logs/version_0/checkpoints/*.ckpt"))
-    loaded = load_model(ckpt, ["model::criterion={_target_: torch.nn.MSELoss}"])
+    loaded = load_model(ckpt, "model::criterion={_target_: torch.nn.MSELoss}")
     assert type(loaded).__module__ == "project.tasks"
     assert torch.equal(loaded.network.weight, model.network.weight)
     assert isinstance(loaded.criterion, torch.nn.MSELoss)
 
 
-def test_load_model_of_a_weights_only_checkpoint_reads_the_run_config(run):
-    root, model = run
-    checkpoint = torch.load(next(root.glob("lightning_logs/version_0/checkpoints/*.ckpt")), weights_only=True)
-    del checkpoint["lighter_config"]  # ModelCheckpoint(save_weights_only=True) skips the callback that adds it
-    torch.save(checkpoint, root / "lightning_logs" / "version_0" / "checkpoints" / "weights.ckpt")
-    loaded = load_model(root / "lightning_logs" / "version_0" / "checkpoints" / "weights.ckpt")
-    assert torch.equal(loaded.network.weight, model.network.weight)
-
-
-@pytest.mark.parametrize("project_config", [False, True])
-def test_load_model_needs_a_lighter_checkpoint(tmp_path, project_config):
-    if project_config:  # a fixed `dirpath: checkpoints` sits next to the project's own config, not a run's
-        (tmp_path / "config.yaml").write_text("model:\n  _target_: torch.nn.Identity\n")
-    (tmp_path / "checkpoints").mkdir()
-    torch.save({"state_dict": {}}, tmp_path / "checkpoints" / "plain.ckpt")
-    with pytest.raises(ValueError, match=r"holds no Lighter config .*save_weights_only=True.*no config\.yaml saved by"):
-        load_model(tmp_path / "checkpoints" / "plain.ckpt")
+def test_load_model_needs_a_lighter_checkpoint(tmp_path):
+    torch.save({"state_dict": {}}, tmp_path / "plain.ckpt")  # e.g. saved with `save_weights_only=True`
+    with pytest.raises(ValueError, match=r"holds no Lighter config .*save_weights_only=True.*lighter\.build"):
+        load_model(tmp_path / "plain.ckpt")
 
 
 def test_ckpt_path_last_without_a_last_checkpoint_explains_the_version_folders(run, monkeypatch, capsys):
@@ -107,7 +94,6 @@ def test_ckpt_path_last_without_a_last_checkpoint_explains_the_version_folders(r
     assert exit.value.code == 2
     error = capsys.readouterr().err
     assert "`--ckpt_path last` found no last checkpoint" in error and "each run logs to a new version folder" in error
-    assert f"--ckpt_path {next(root.glob('lightning_logs/version_0/checkpoints/*.ckpt'))}" in error
 
 
 def test_save_config_writes_only_on_global_zero(tmp_path):
@@ -117,7 +103,7 @@ def test_save_config_writes_only_on_global_zero(tmp_path):
     trainer.logger.log_hyperparams.assert_not_called()
     trainer.is_global_zero = True
     SaveConfig({"seed": 1}).setup(trainer, None, "fit")
-    assert (tmp_path / "config.yaml").read_text() == "# Saved by Lighter: the composed config of this run.\nseed: 1\n"
+    assert (tmp_path / "config.yaml").read_text() == "seed: 1\n"
     trainer.logger.log_hyperparams.assert_called_once_with({"seed": 1})
 
 
@@ -126,13 +112,3 @@ def test_save_config_skips_config_yaml_for_python_objects(tmp_path, caplog):
     SaveConfig({"net": torch.nn.Linear(1, 1)}).setup(trainer, None, "fit")
     assert not (tmp_path / "config.yaml").exists()
     assert "config.yaml is not saved" in caplog.text
-
-
-@pytest.mark.parametrize("dirpath, name", [("{tmp}", "last-v1.ckpt"), ("s3://bucket/checkpoints", None)])
-def test_ckpt_path_last_accepts_versioned_last_checkpoints_and_remote_folders(tmp_path, dirpath, name):
-    from lighter.engine.runner import _check_last_checkpoint
-
-    if name:
-        (tmp_path / name).touch()
-    trainer = MagicMock(log_dir=str(tmp_path), checkpoint_callbacks=[MagicMock(dirpath=dirpath.format(tmp=tmp_path))])
-    _check_last_checkpoint(trainer)

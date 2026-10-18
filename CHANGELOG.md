@@ -6,8 +6,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 ### Added
 
-- A top-level `seed:` key (default: `PL_GLOBAL_SEED`, else 0) seeds the run, including DataLoader workers,
-  and is written into the saved config. Migration: rename any top-level `seed` key you used for something else.
+- A top-level `seed:` key (default: 0) seeds the run, including DataLoader workers, and is written into the
+  saved config; `seed=7` works without a `seed:` key in the config. Migration: rename any top-level `seed` key
+  you used for something else.
 - `python -m lighter` runs the CLI.
 - `lighter.build(*inputs)` returns `(model, trainer, datamodule)` without running a stage, and `Runner.run`
   returns the stage's result (e.g. the metrics of `validate`/`test`, the predictions of `predict`).
@@ -18,7 +19,11 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `--print_config` (or `--print-config`) prints the composed config, as YAML like the saved `config.yaml`, and exits
   without building anything. `lighter --version` prints the version.
 - `lighter <stage> --help` explains the override syntax (`key::sub=value`, `=key=...`, `~key`) and shell quoting.
-- The CLI prints a two-line banner: project folder, configs and number of overrides, seed, log folder.
+- The CLI prints a two-line banner: project folder, configs and number of overrides, seed, log folder. After
+  `fit` it prints the best checkpoint's path; `validate`, `test` and `predict` without `--ckpt_path` warn that
+  they use the model as the config builds it.
+- An error from your code that imports a folder of your project without `project.` (`from models import x`)
+  says to write `from project.models import x`.
 
 - LighterModule's `optimizer` may be a function of the parameters and `scheduler` a function of the optimizer
   (`_mode_: callable` in the config), so configs no longer need `params: "$@model::network.parameters()"`.
@@ -26,10 +31,8 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - A LighterModule with only a `training_step` and a LighterDataModule with only a `train_dataloader` can `fit`.
   A stage whose dataloader is not set (e.g. `validate` without `val_dataloader`) names the key to add.
 
-- `lighter.load_model(ckpt_path, overrides=())` rebuilds a model from the config saved in its checkpoint and
+- `lighter.load_model(ckpt_path, *overrides)` rebuilds a model from the config saved in its checkpoint and
   loads its weights (with `torch.load(weights_only=True)` by default), finding the project from the checkpoint's folder.
-  A checkpoint saved with `save_weights_only=True` holds no config, so the `config.yaml` its run saved is used
-  instead; a saved `config.yaml` starts with a `# Saved by Lighter` comment, which marks it as a run's.
 - A step that returns something other than a loss tensor, a number, a dict with a `"loss"` key or None
   (e.g. a tuple) warns that no loss is logged.
 
@@ -61,13 +64,15 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `import lighter` no longer imports torch or Lightning, so `lighter --help` and `--print_config` start instantly.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
 - Overrides may also follow options, e.g. `lighter fit config.yaml --ckpt_path last trainer::max_epochs=5`.
+  A config file whose path contains `=` (`runs/lr=0.1/config.yaml`) is read as a file, not as an override.
 
 - LighterModule no longer defines stub step methods. As in Lightning, validation is skipped without a
   `validation_step`, and `validation_step`/`test_step` may return None (only the metrics are logged then).
 - `loss` must be one tensor. Migration: instead of `{"loss": {"total": total, "ce": ce}}`, return
   `{"loss": total}` and log the parts with `self.log("train/loss/ce", ce)`; `train/loss/total/*` becomes `train/loss/*`.
 - LighterModule logs losses and metrics also with `logger: false`, so callbacks such as `ModelCheckpoint` and
-  `EarlyStopping` can monitor them.
+  `EarlyStopping` can monitor them. It logs per-step values (`/step`) in training only, and shows
+  `train/loss/step` and `val/loss/epoch` in the progress bar. Migration: monitor `val/.../epoch`, not `/step`.
 - One `val_metrics`/`test_metrics` object used with several dataloaders is an error (it mixed their results).
 - A dataloader not given to LighterDataModule counts as not defined, as if its method were missing, so Lightning
   skips that loop without a warning. Migration: check `datamodule.val_dataloader is None` instead of calling it.
@@ -77,8 +82,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   checkpoint under `"lighter_config"`. It is no longer merged into the model's hyperparameters.
   Migration: read `checkpoint["lighter_config"]` instead of `checkpoint["hyper_parameters"]["config"]`,
   or use `lighter.load_model`.
-- `--ckpt_path last` without a last checkpoint in the run's checkpoint folder is an error (Lightning silently
-  started from scratch, since each run logs to a new version folder); the message names the latest checkpoint.
+- `--ckpt_path last` without a last checkpoint is an error (Lightning warned and started from scratch, and each
+  run logs to a new version folder). `--ckpt_path best` is an error: it needs a `fit` in the same process.
+  `--weights_only` on Lightning before 2.6 is reported instead of failing with a `TypeError`.
 - Freezer only changes the parameters it selects and gives them back their own `requires_grad` when it
   unfreezes; a selection that matches no parameter is an error. Migration: Freezer no longer sets
   `requires_grad=True` on the other parameters; set it yourself if you relied on that.

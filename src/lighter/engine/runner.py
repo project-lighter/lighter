@@ -7,6 +7,7 @@ import argparse
 import copy
 import difflib
 import importlib.util
+import inspect
 import logging
 import os
 import pydoc
@@ -14,6 +15,7 @@ import re
 import sys
 import sysconfig
 import traceback
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +52,7 @@ FRAMEWORK = (*(folder + os.sep for folder in FOLDERS), str(Path(__file__).parent
 
 
 def _is_override(item: Any) -> bool:
-    return isinstance(item, str) and ("=" in item or item.startswith("~"))
+    return isinstance(item, str) and not Path(item).is_file() and ("=" in item or item.startswith("~"))
 
 
 def _config_dirs(inputs: tuple) -> list[Path]:
@@ -112,8 +114,11 @@ def _missing_file(item: str) -> FileNotFoundError:
 
 
 def load_config(*inputs: Any) -> Config:
-    """Compose config files, dicts and overrides in order. Strings with `=` are overrides, others YAML files."""
-    config = Config()
+    """Compose config files, dicts and overrides in order, on top of `seed: 0`.
+
+    A string that names a file is a YAML file; other strings with `=` (or starting with `~`) are overrides.
+    """
+    config = Config().update({"seed": 0})
     for item in inputs:
         if isinstance(item, (str, Path)) and not _is_override(item):
             if not Path(item).is_file():
@@ -131,8 +136,8 @@ def to_yaml(config: dict) -> str:
 def build(*inputs: Any) -> tuple[Any, Any, Any]:
     """Build `(model, trainer, datamodule)` from config files, dicts and overrides without running a stage.
 
-    Inputs are composed by `load_config`. The seed comes from the top-level `seed:` key (default:
-    `PL_GLOBAL_SEED`, else 0) and is set before anything is built.
+    Inputs are composed by `load_config`. The seed comes from the top-level `seed:` key (default: 0) and is
+    set before anything is built.
     `datamodule` is None when the config has no `data:` key (the model's own dataloader hooks are then used).
     """
     config = load_config(*inputs)
@@ -140,8 +145,6 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     from pytorch_lightning.utilities import rank_zero_only
 
     seed = config.resolve("seed") if isinstance(config.get("seed"), str) else config.get("seed")  # `@`, `%`, `$`
-    if seed is None:
-        seed = int(os.environ.get("PL_GLOBAL_SEED", 0))
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise TypeError(f"`seed` must be an integer, got {seed!r}.")
     config.set("seed", seed)
@@ -174,11 +177,11 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     from lighter.engine.saved_config import SaveConfig
 
     trainer.callbacks.append(SaveConfig(saved))
+    logs = trainer.log_dir if trainer.logger else "off (trainer::logger is false)"  # every rank asks: a broadcast
     if rank_zero_only.rank == 0:
         files = " ".join(str(item) for item in inputs if isinstance(item, (str, Path)) and not _is_override(item))
         configs = f"{files or 'dict'} + {sum(map(_is_override, inputs))} overrides"
         logger.info(f"Lighter {__version__} | project: {root or 'none'} | {configs} | seed: {seed}")
-        logs = trainer.log_dir if trainer.logger else "off (trainer::logger is false)"
         logger.info(f"Logs: {logs or 'none'}")  # no folder under fast_dev_run
     return model, trainer, datamodule
 
@@ -207,20 +210,6 @@ class _Stderr(logging.StreamHandler):
     stream = property(lambda self: sys.stderr, lambda self, stream: None)
 
 
-def _check_last_checkpoint(trainer: Any) -> None:
-    """`--ckpt_path last` resumes only from this run's checkpoint folder, which is new unless set explicitly."""
-    folders = [Path(cb.dirpath or Path(trainer.log_dir) / "checkpoints") for cb in trainer.checkpoint_callbacks]
-    if any("://" in str(cb.dirpath) for cb in trainer.checkpoint_callbacks):
-        return  # remote storage: Lightning looks there itself
-    if not any(file for folder in folders for file in folder.glob("*last*.ckpt")):  # Lightning's rule: "last" in the name
-        earlier = sorted(Path(trainer.log_dir).parent.glob("*/checkpoints/*.ckpt"), key=os.path.getmtime)
-        example = _short(str(earlier[-1])) if earlier and trainer.logger else "path/to/last.ckpt"
-        raise FileNotFoundError(
-            f"`--ckpt_path last` found no last checkpoint in {', '.join(map(_short, map(str, folders))) or 'this run'}: "
-            f"each run logs to a new version folder. Pass the checkpoint file instead, e.g. --ckpt_path {example}"
-        )
-
-
 def _check_stage_data(stage: str, datamodule: Any) -> None:
     """A LighterDataModule must have the dataloader that `stage` runs on."""
     name = {"fit": "train", "validate": "val", "test": "test", "predict": "predict"}[stage]
@@ -229,7 +218,19 @@ def _check_stage_data(stage: str, datamodule: Any) -> None:
 
 
 def _short(path: str) -> str:
-    return os.path.relpath(path) if Path(path).resolve().is_relative_to(Path.cwd()) else path
+    return os.path.relpath(path) if path and Path(path).resolve().is_relative_to(Path.cwd()) else path
+
+
+def _module_hint(error: ModuleNotFoundError, inputs: list) -> str | None:
+    """Explain `from models import ...` in the user's code when `models` is a folder of their project."""
+    try:
+        root = find_project_root(tuple(inputs))
+    except ValueError:
+        return None
+    top = (error.name or "").split(".")[0]
+    if root is None or not top or top == "project" or not ((root / f"{top}.py").exists() or (root / top).is_dir()):
+        return None
+    return f"Code in your project folder is imported as `project`: write `from project.{error.name} import ...`."
 
 
 def _report(error: BaseException, inputs: list) -> int:
@@ -244,6 +245,8 @@ def _report(error: BaseException, inputs: list) -> int:
     frames = [frame for frame in traceback.extract_tb(cause.__traceback__) if not frame.filename.startswith(FRAMEWORK)]
     message = getattr(error, "_original_message", str(error))  # Sparkwheel's message without its snippet
     suggestion = getattr(error, "suggestion", None)
+    if isinstance(cause, ModuleNotFoundError) and not suggestion:
+        suggestion = _module_hint(cause, inputs)
     where = error.source_location if isinstance(error, BaseError) else None
     lines = [f"{type(error).__name__}: {message}"]
     if frames:
@@ -252,7 +255,8 @@ def _report(error: BaseException, inputs: list) -> int:
         lines[-1] = f"{_short(mark.name)}:{mark.line + 1}: {type(error).__name__}: {error.problem}"
     elif where:
         key = f" ({where.id})" if where.id else ""
-        lines[-1] = f"{_short(where.filepath)}:{where.line}{key}: {type(error).__name__}: {message}"
+        place = f"{_short(where.filepath)}:{where.line}" if where.filepath else str(where)  # or an override
+        lines[-1] = f"{place}{key}: {type(error).__name__}: {message}"
     if cause is not error and not (isinstance(cause, BaseError) or suggestion or str(cause) in message):
         lines.append(f"  From {type(cause).__name__}: {cause}")
     if where:
@@ -283,7 +287,9 @@ def cli() -> None:
         stage_parser.add_argument(
             "--print_config", "--print-config", action="store_true", help="Print the composed config and exit."
         )
-        stage_parser.add_argument("--ckpt_path", help='Path to checkpoint. Can be "last", "best", or a file path.')
+        stage_parser.add_argument(
+            "--ckpt_path", help="A checkpoint file, or `last` for the last checkpoint in the checkpoint callback's `dirpath`."
+        )
         stage_parser.add_argument(
             "--weights_only",
             action=argparse.BooleanOptionalAction,
@@ -302,6 +308,8 @@ def cli() -> None:
     if unknown := [item for item in extra if item.startswith("-")]:
         parser.error(f"unrecognized arguments: {' '.join(unknown)}")
     args.inputs += extra
+    if args.ckpt_path == "best":
+        parser.error("--ckpt_path best works only after `fit` in the same process. Pass the checkpoint file instead.")
     if not any(isinstance(handler, _Stderr) for handler in logging.getLogger("lighter").handlers):
         logging.getLogger("lighter").addHandler(_Stderr())
     logging.getLogger("lighter").setLevel(logging.INFO)
@@ -312,10 +320,29 @@ def cli() -> None:
             return
         model, trainer, datamodule = build(*args.inputs)
         _check_stage_data(args.command, datamodule)
-        if args.ckpt_path == "last":
-            _check_last_checkpoint(trainer)
+        stage = getattr(trainer, args.command)
+        if args.weights_only is not None and "weights_only" not in inspect.signature(stage).parameters:
+            raise ValueError("--weights_only needs Lightning 2.6 or newer.")
     except Exception as error:
         if os.environ.get("LIGHTER_DEBUG", "").lower() in ("1", "true", "yes", "on"):
             raise
         sys.exit(_report(error, args.inputs))
-    getattr(trainer, args.command)(model, datamodule=datamodule, **stage_kwargs)
+    if args.command != "fit" and args.ckpt_path is None and trainer.is_global_zero:
+        logger.warning(f"No --ckpt_path: `{args.command}` uses the model as the config builds it, not a trained checkpoint.")
+    with warnings.catch_warnings():
+        if args.ckpt_path == "last" and trainer.world_size == 1:  # under DDP, stopping only rank 0 would hang the rest
+            warnings.filterwarnings("error", message=r".*there is no last checkpoint available")
+        try:
+            stage(model, datamodule=datamodule, **stage_kwargs)
+        except Warning as warning:
+            if "no last checkpoint" not in str(warning):
+                raise
+            print(
+                "`--ckpt_path last` found no last checkpoint: each run logs to a new version folder. Pass the "
+                "checkpoint file instead, or give the checkpoint callback a fixed `dirpath`.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+    best = getattr(trainer.checkpoint_callback, "best_model_path", "") if args.command == "fit" else ""
+    if best and trainer.is_global_zero:
+        logger.info(f"Best checkpoint: {_short(best)}")

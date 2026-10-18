@@ -1,5 +1,6 @@
 $ lighter fit configs/config.yaml seeed=1 --print_config
 # exit code 0
+seed: 0
 trainer:
   _target_: pytorch_lightning.Trainer
   logger: false

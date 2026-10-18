@@ -9,7 +9,7 @@ title: How a run works
 1. **Compose the config.** The inputs are applied left to right: each YAML file is merged into the ones before
    it, then each override is applied. Dicts merge key by key, lists are extended, `=key` replaces and `~key`
    deletes (see the [config cheat sheet](config.md)). `--print_config` prints the result and stops here.
-2. **Seed.** The seed is the top-level `seed:` key, else the `PL_GLOBAL_SEED` environment variable, else 0.
+2. **Seed.** The seed is the top-level `seed:` key, 0 unless you set it.
    Lighter calls Lightning's `seed_everything(seed, workers=True)` and writes the seed into the config.
 3. **Import your code.** Lighter looks for `__lighter__.py` in each config file's folder and its parents, then in
    the current folder and its parents, and imports the folder that holds it as the package `project`
@@ -33,7 +33,8 @@ trainer.fit(model, datamodule=data)
 ## What a run leaves behind
 
 Lightning gives every run, of any stage, a new folder under `lightning_logs/` (or under your logger's
-`save_dir`). Lighter adds `config.yaml` to it:
+`save_dir`) in the folder you run `lighter` from; other relative paths in the config are relative to it too.
+Lighter adds `config.yaml` to the run's folder:
 
 ```text
 lightning_logs/
@@ -46,14 +47,16 @@ lightning_logs/
 ```
 
 Every checkpoint also holds the config, under the key `"lighter_config"`, except one saved with
-`save_weights_only=True`. `lighter.load_model` rebuilds the model from that config, or from the run's
-`config.yaml`, and loads the weights (see [`load_model`][lighter.engine.saved_config.load_model]). With
+`save_weights_only=True`. `lighter.load_model` rebuilds the model from that config and loads the weights
+(see [`load_model`][lighter.engine.saved_config.load_model]). With
 `trainer::logger=false` there is no log folder, so no `config.yaml`; checkpoints still hold the config.
 
 ## What Lighter prints
 
 Before the stage starts, Lighter prints two lines: the project folder, the configs and number of overrides,
-the seed, and the log folder. Everything after that comes from Lightning.
+the seed, and the log folder. `validate`, `test` and `predict` without `--ckpt_path` also warn that they use the
+model as the config builds it. Everything after that comes from Lightning, until `fit` ends and Lighter prints
+the path of the best checkpoint.
 
 When the config cannot be built, Lighter prints the file, line and key, the lines around it and a hint, and
 exits with code 2. When the error comes from your own code while it is being built (for example a model's
