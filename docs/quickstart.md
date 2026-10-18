@@ -58,6 +58,6 @@ lighter fit lighter/examples/quickstart/config.yaml model::lr=0.001 --print_conf
 
 ## Next
 
-- Use your own code: [Your code](guides/custom-code.md)
-- Learn the config syntax: [Configuration](guides/configuration.md)
-- Let Lighter wire the optimizer, loss and metrics: [LighterModule](guides/lighter-module.md)
+- What `lighter fit` did, step by step: [How a run works](run.md)
+- The config syntax on one page: [Config cheat sheet](config.md)
+- Use your own code: [Your code and `project.`](your-code.md)

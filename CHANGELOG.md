@@ -34,6 +34,10 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 - `examples/quickstart`: a plain LightningModule, a dataset of random numbers and a config that train on a CPU in
   seconds, with no download. The README and the docs show these files, and a test runs them.
+- The docs are ten short pages instead of ~7,000 lines that re-documented Lightning. A test builds every YAML block,
+  runs every Python block and parses every `lighter` command in them, and keeps them under 3,000 lines.
+- `projects/tabular_regression`: a download-free `LighterModule` example with disjoint train, validation and test
+  samples, run by a test.
 
 ### Changed
 

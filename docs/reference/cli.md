@@ -4,7 +4,7 @@ title: CLI Reference
 
 # CLI Reference
 
-```bash
+```text
 lighter {fit,validate,test,predict} INPUTS... [OPTIONS]
 python -m lighter {fit,validate,test,predict} INPUTS... [OPTIONS]
 lighter --version

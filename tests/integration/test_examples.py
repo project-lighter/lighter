@@ -13,10 +13,12 @@ from pathlib import Path
 import pytest
 import yaml
 
+from lighter import Runner
 from lighter.engine.runner import cli
 
 ROOT = Path(__file__).parents[2]
 QUICKSTART = ROOT / "examples" / "quickstart"
+TABULAR = ROOT / "projects" / "tabular_regression"
 README_FILE = re.compile(r"(<!-- (examples/\S+) -->\n```\w*\n)(.*?)(```)", re.S)
 
 
@@ -46,6 +48,19 @@ def test_quickstart_learns_and_takes_an_override_from_another_folder(tmp_path, m
     assert losses[-1] < losses[0] / 10
     assert yaml.safe_load((first / "config.yaml").read_text())["model"]["lr"] == 0.01
     assert yaml.safe_load((second / "config.yaml").read_text())["model"]["lr"] == 0.001
+
+
+def test_tabular_regression_fits_tests_and_predicts(tmp_path, monkeypatch, fresh_project):
+    monkeypatch.chdir(tmp_path)
+    config = str(TABULAR / "config.yaml")
+    lighter(monkeypatch, "fit", config)
+    checkpoint = str(next(tmp_path.glob("lightning_logs/version_0/checkpoints/*.ckpt")))
+
+    [results] = Runner().run("test", [config], ckpt_path=checkpoint, verbose=False)
+    assert results["test/metrics/MeanAbsoluteError/epoch"] < 0.01  # the known linear function is learned
+    [batch] = Runner().run("predict", [config], ckpt_path=checkpoint)
+    assert batch["id"][:2] == ["00200", "00201"]  # the held-out test samples, with their IDs
+    assert (batch["prediction"] - batch["target"]).abs().max() < 0.01
 
 
 def test_readme_shows_the_quickstart_files_as_they_are():

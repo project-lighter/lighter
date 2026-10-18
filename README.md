@@ -194,10 +194,11 @@ done
 
 ## Documentation
 
-- [Quick Start](https://project-lighter.github.io/lighter/quickstart/)
-- [Configuration Guide](https://project-lighter.github.io/lighter/guides/configuration/)
-- [LighterModule](https://project-lighter.github.io/lighter/guides/lighter-module/)
-- [Your Code](https://project-lighter.github.io/lighter/guides/custom-code/)
+- [Quickstart](https://project-lighter.github.io/lighter/quickstart/)
+- [How a run works](https://project-lighter.github.io/lighter/run/)
+- [Config cheat sheet](https://project-lighter.github.io/lighter/config/)
+- [LighterModule](https://project-lighter.github.io/lighter/lighter-module/)
+- [Recipes](https://project-lighter.github.io/lighter/recipes/)
 
 ## Real-World Usage
 
