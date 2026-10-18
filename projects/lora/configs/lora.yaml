@@ -53,7 +53,8 @@ trainer:
       monitor: val/metrics/MulticlassAccuracy/epoch
       mode: max
       save_top_k: 1
-      filename: lora-{epoch}-{val_accuracy:.4f}
+      filename: lora-epoch={epoch}-accuracy={val/metrics/MulticlassAccuracy/epoch:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
   # For quick testing, uncomment:
   # fast_dev_run: true

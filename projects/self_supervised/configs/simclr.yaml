@@ -31,7 +31,8 @@ trainer:
       monitor: val/loss
       mode: min
       save_top_k: 1
-      filename: simclr-{epoch}-{val/loss:.4f}
+      filename: simclr-epoch={epoch}-val_loss={val/loss:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
   # For quick testing, uncomment:
   # fast_dev_run: true

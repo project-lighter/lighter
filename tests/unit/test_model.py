@@ -125,9 +125,10 @@ def test_losses_and_metrics_are_logged_without_a_logger():
     run = trainer()
     metrics = MetricCollection([Accuracy(task="multiclass", num_classes=2)])
     run.fit(task(train_metrics=metrics.clone(), val_metrics=metrics.clone()), loader(), loader())
-    names = ["train/loss/step", "train/metrics/MulticlassAccuracy/step"]  # Lightning keeps only epoch values of val
+    names = ["train/loss/step", "train/metrics/MulticlassAccuracy/step"]
     names += [f"{mode}/{name}/epoch" for mode in ("train", "val") for name in ("loss", "metrics/MulticlassAccuracy")]
     assert set(names) <= set(run.callback_metrics)
+    assert {"train/loss/step", "val/loss/epoch"} <= set(run.progress_bar_metrics)
 
 
 @pytest.mark.parametrize("output", [None, {"pred": 1}])

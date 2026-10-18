@@ -19,7 +19,9 @@ class LighterModule(pl.LightningModule):
 
     A step returns the loss tensor, a dict with a `"loss"` key (other keys are passed on to callbacks), or None.
     Lighter logs the loss as `<mode>/loss` and the `<mode>_metrics` you updated in the step as
-    `<mode>/metrics/<name>`, each per step (`/step`) and per epoch (`/epoch`), for train, val and test.
+    `<mode>/metrics/<name>`, per epoch (`/epoch`) for train, val and test, and per step (`/step`) in training.
+    The progress bar shows `train/loss/step` and `val/loss/epoch`. This happens in `on_train_batch_end`,
+    `on_validation_batch_end` and `on_test_batch_end`: if you override one, call `super()` in it.
 
     Args:
         network: The model that `forward` calls.
@@ -86,7 +88,7 @@ class LighterModule(pl.LightningModule):
         self._log_step("test", outputs, dataloader_idx)
 
     def _log_step(self, mode: str, outputs: Any, dataloader_idx: int = 0) -> None:
-        """Log the loss a step returned and the `<mode>_metrics`, per step and per epoch."""
+        """Log the loss a step returned and the `<mode>_metrics`: per epoch, and per step in training."""
         loss = outputs.get("loss") if isinstance(outputs, Mapping) else outputs
         if isinstance(loss, Mapping):
             raise TypeError(LOSS_DICT)
@@ -106,6 +108,9 @@ class LighterModule(pl.LightningModule):
             )
         named = metrics.items() if isinstance(metrics, MetricCollection) else [(type(metrics).__name__, metrics)]
         for name, value in [("loss", loss), *((f"metrics/{name}", metric) for name, metric in named)]:
-            if value is not None:
-                self.log(f"{mode}/{name}/step", value, on_step=True, on_epoch=False)
-                self.log(f"{mode}/{name}/epoch", value, on_step=False, on_epoch=True, sync_dist=True)
+            if value is None:
+                continue
+            if mode == "train":
+                self.log(f"train/{name}/step", value, on_step=True, on_epoch=False, prog_bar=name == "loss")
+            in_bar = name == "loss" and mode == "val"
+            self.log(f"{mode}/{name}/epoch", value, on_step=False, on_epoch=True, sync_dist=True, prog_bar=in_bar)

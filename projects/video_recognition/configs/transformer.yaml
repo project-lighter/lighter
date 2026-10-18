@@ -16,15 +16,16 @@ trainer:
 
   callbacks:
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/MulticlassAccuracy_epoch
+      monitor: val/metrics/MulticlassAccuracy/epoch
       mode: max
       patience: 10
 
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val/MulticlassAccuracy_epoch
+      monitor: val/metrics/MulticlassAccuracy/epoch
       mode: max
       save_top_k: 1
-      filename: transformer-{epoch}-{val/MulticlassAccuracy_epoch:.4f}
+      filename: transformer-epoch={epoch}-accuracy={val/metrics/MulticlassAccuracy/epoch:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
 model:
   _target_: project.models.model.VideoClassificationModel

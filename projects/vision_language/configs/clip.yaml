@@ -54,7 +54,8 @@ trainer:
       monitor: val/i2t_accuracy
       mode: max
       save_top_k: 1
-      filename: clip-{epoch}-{val/i2t_accuracy:.4f}
+      filename: clip-epoch={epoch}-i2t={val/i2t_accuracy:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
   # For quick testing, uncomment:
   # fast_dev_run: true

@@ -36,15 +36,16 @@ trainer:
 
   callbacks:
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/MulticlassJaccardIndex_epoch
+      monitor: val/metrics/MulticlassJaccardIndex/epoch
       mode: max
       patience: 20
 
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val/MulticlassJaccardIndex_epoch
+      monitor: val/metrics/MulticlassJaccardIndex/epoch
       mode: max
       save_top_k: 1
-      filename: spleen-{epoch}-{val/MulticlassJaccardIndex_epoch:.4f}
+      filename: spleen-epoch={epoch}-jaccard={val/metrics/MulticlassJaccardIndex/epoch:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
     # FileWriter saves segmentation masks as .seg.nrrd files
     - _target_: lighter.callbacks.FileWriter

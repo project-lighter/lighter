@@ -60,8 +60,11 @@ None; anything else, such as a tuple, logs no loss and warns. For each stage (`t
 
 | Logged as | Value |
 |-----------|-------|
-| `<stage>/loss/step`, `<stage>/loss/epoch` | the loss the step returned |
-| `<stage>/metrics/<name>/step`, `<stage>/metrics/<name>/epoch` | each `<stage>_metrics` that the step updated |
+| `<stage>/loss/epoch`, and `train/loss/step` | the loss the step returned |
+| `<stage>/metrics/<name>/epoch`, and `train/metrics/<name>/step` | each `<stage>_metrics` that the step updated |
+
+The progress bar shows `train/loss/step` and `val/loss/epoch`. The logging happens in `on_train_batch_end`,
+`on_validation_batch_end` and `on_test_batch_end`; if you override one of them, call `super()` in it.
 
 `<name>` is the metric's class name (`torchmetrics.Accuracy` with `task: multiclass` is `MulticlassAccuracy`), or
 its key when `metrics:` of a `MetricCollection` is a dict. Values are logged also when `trainer::logger` is

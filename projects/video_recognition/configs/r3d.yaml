@@ -15,15 +15,16 @@ trainer:
 
   callbacks:
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val/top1_accuracy_epoch
+      monitor: val/metrics/top1_accuracy/epoch
       mode: max
       patience: 10
 
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val/top1_accuracy_epoch
+      monitor: val/metrics/top1_accuracy/epoch
       mode: max
       save_top_k: 1
-      filename: r3d-{epoch}-{val/top1_accuracy_epoch:.4f}
+      filename: r3d-epoch={epoch}-top1={val/metrics/top1_accuracy/epoch:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
 model:
   _target_: project.models.model.VideoClassificationModel
