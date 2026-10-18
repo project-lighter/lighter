@@ -144,7 +144,7 @@ class TestCsvWriterDDP:
         # Create a second temporary file to simulate rank 1
         temp_path_rank1 = tmp_path / "predictions.tmp_rank1.csv"
         with open(temp_path_rank1, "w", newline="") as f:
-            csv_writer = csv.writer(f)
+            csv_writer = csv.writer(f, lineterminator="\n")  # as CsvWriter writes its shards
             csv_writer.writerow(["pred", "target"])
             csv_writer.writerow([3, 6])
 
@@ -283,7 +283,7 @@ class TestDistributedEdgeCases:
         # Create another rank with data
         temp_path_rank1 = tmp_path / "predictions.tmp_rank1.csv"
         with open(temp_path_rank1, "w", newline="") as f:
-            csv_writer = csv.writer(f)
+            csv_writer = csv.writer(f, lineterminator="\n")  # as CsvWriter writes its shards
             csv_writer.writerow(["pred"])
             csv_writer.writerow([1])
             csv_writer.writerow([2])

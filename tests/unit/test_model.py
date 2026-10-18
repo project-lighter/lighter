@@ -130,14 +130,30 @@ def test_losses_and_metrics_are_logged_without_a_logger():
     assert set(names) <= set(run.callback_metrics)
 
 
-@pytest.mark.parametrize("output", [None, {"pred": 1}, [1, 2]])
-def test_validation_step_may_return_no_loss(output):
+@pytest.mark.parametrize("output", [None, {"pred": 1}])
+def test_validation_step_may_return_no_loss(output, recwarn):
     run = trainer()
     model = task(val_metrics=Accuracy(task="multiclass", num_classes=2))
     model.val_output = lambda loss: output
     run.fit(model, loader(), loader())
     assert "val/metrics/MulticlassAccuracy/epoch" in run.callback_metrics
     assert "val/loss/epoch" not in run.callback_metrics
+    assert not [warning for warning in recwarn if "no loss is logged" in str(warning.message)]
+
+
+def test_a_step_output_without_a_loss_warns():
+    model = task()
+    model.val_output = lambda loss: (loss, loss)
+    with pytest.warns(UserWarning, match="The val step returned tuple, so no loss is logged"):
+        trainer().validate(model, loader())
+
+
+def test_a_float_loss_is_logged():
+    run = trainer()
+    model = task()
+    model.val_output = lambda loss: loss.item()
+    run.validate(model, loader())
+    assert "val/loss/epoch" in run.callback_metrics
 
 
 def test_a_dict_under_loss_explains_the_migration():
@@ -176,5 +192,19 @@ def test_val_dataloader_without_validation_step_is_skipped():
 
 
 def test_a_stage_without_its_dataloader_names_the_key_to_add():
-    with pytest.raises(ValueError, match=r"`trainer.validate` needs `data::val_dataloader`, which is not set"):
-        trainer().validate(task(), datamodule=LighterDataModule(train_dataloader=loader()))
+    from lighter.engine.runner import _check_stage_data
+
+    datamodule = LighterDataModule(train_dataloader=loader())
+    _check_stage_data("fit", datamodule)
+    with pytest.raises(ValueError, match=r"`lighter validate` needs `data::val_dataloader`, which is not set"):
+        _check_stage_data("validate", datamodule)
+
+
+def test_train_only_datamodule_fits_without_dataloader_warnings(recwarn):
+    class TrainOnly(Task):
+        validation_step = LighterModule.validation_step
+
+    model = TrainOnly(network=torch.nn.Linear(4, 2), optimizer=partial(SGD, lr=0.1))
+    trainer().fit(model, datamodule=LighterDataModule(train_dataloader=loader()))
+    messages = [str(warning.message) for warning in recwarn]
+    assert not [message for message in messages if "val_dataloader" in message or "across ranks is zero" in message]

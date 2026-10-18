@@ -59,7 +59,7 @@ class CsvWriter(BaseWriter):
         # Create a temporary file for writing predictions
         self._temp_path = self.path.with_suffix(f".tmp_rank{trainer.global_rank}{self.path.suffix}")
         self._csv_file = open(self._temp_path, "w", newline="", encoding="utf-8")
-        self._csv_writer = csv.writer(self._csv_file)
+        self._csv_writer = csv.writer(self._csv_file, lineterminator="\n")
         # Write header
         self._csv_writer.writerow(self.keys)
 
@@ -156,7 +156,7 @@ class CsvWriter(BaseWriter):
         if trainer.is_global_zero:
             paths = [path for path in all_temp_paths if path is not None]
             header = StringIO()
-            csv.writer(header).writerow(self.keys)
+            csv.writer(header, lineterminator="\n").writerow(self.keys)
             merged = self.path.with_name(f".{self.path.name}.tmp")
             try:
                 with open(merged, "w", newline="", encoding="utf-8") as output:

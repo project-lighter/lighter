@@ -9,6 +9,7 @@ import difflib
 import importlib.util
 import logging
 import os
+import pydoc
 import re
 import sys
 import sysconfig
@@ -33,10 +34,10 @@ STAGES = {
 HELP = """\
 examples:
   lighter {stage} configs/train.yaml
-  lighter {stage} configs/base.yaml configs/big.yaml trainer::max_epochs=10 model::optimizer::lr=1e-3
+  lighter {stage} configs/base.yaml configs/big.yaml trainer::max_epochs=10 model::optimizer::lr=0.001
 
 Inputs are YAML files and overrides, applied left to right. Overrides:
-  key::sub=value   set a value, written in YAML (10, 1e-3, true, null, [1, 2], {{a: 1}})
+  key::sub=value   set a value, written in YAML (10, 0.001, true, null, [1, 2], {{a: 1}})
   =key={{...}}       replace a whole section instead of merging into it
   ~key             delete a key
 Quote overrides that hold $, @, spaces or brackets: 'model::lr=$@base_lr * 2'.
@@ -72,7 +73,7 @@ def find_project_root(inputs: tuple) -> Path | None:
 def _project_hint(error: TargetNotFoundError, inputs: tuple, root: Path | None) -> str | None:
     """Explain a `_target_` that names the user's own code without `project.` or without a `__lighter__.py`."""
     match = re.search(r"function: '([\w.]+)'", str(error))
-    parts = match.group(1).split(".") if match else ["project"]
+    parts = match.group(1).lstrip(".").split(".") if match else ["project"]
     local = parts[1:] if parts[0] == "project" else parts
     if not local or importlib.util.find_spec(local[0]) is not None:  # empty, or an installed package
         return None
@@ -138,13 +139,16 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     from pytorch_lightning import seed_everything  # after the config files are read, so their errors are instant
     from pytorch_lightning.utilities import rank_zero_only
 
-    seed = config.get("seed")
+    seed = config.resolve("seed") if isinstance(config.get("seed"), str) else config.get("seed")  # `@`, `%`, `$`
     if seed is None:
         seed = int(os.environ.get("PL_GLOBAL_SEED", 0))
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise TypeError(f"`seed` must be an integer, got {seed!r}.")
     config.set("seed", seed)
-    saved = copy.deepcopy(config.get())  # before resolving, which drops `_imports_`
+    try:
+        saved = copy.deepcopy(config.get())  # before resolving, which drops `_imports_`
+    except Exception:  # a dict config holding Python objects that cannot be copied
+        saved = config.get()
     seed_everything(seed, workers=True)
     root = find_project_root(inputs)
     if root is not None:
@@ -174,7 +178,8 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
         files = " ".join(str(item) for item in inputs if isinstance(item, (str, Path)) and not _is_override(item))
         configs = f"{files or 'dict'} + {sum(map(_is_override, inputs))} overrides"
         logger.info(f"Lighter {__version__} | project: {root or 'none'} | {configs} | seed: {seed}")
-        logger.info(f"Logs: {trainer.log_dir}" if trainer.logger else "Logs: off (trainer::logger is false)")
+        logs = trainer.log_dir if trainer.logger else "off (trainer::logger is false)"
+        logger.info(f"Logs: {logs or 'none'}")  # no folder under fast_dev_run
     return model, trainer, datamodule
 
 
@@ -192,6 +197,7 @@ class Runner:
         if stage not in STAGES:
             raise ValueError(f"Unknown stage '{stage}', expected one of {list(STAGES)}.")
         model, trainer, datamodule = build(*inputs)
+        _check_stage_data(stage, datamodule)
         return getattr(trainer, stage)(model, datamodule=datamodule, **stage_kwargs)
 
 
@@ -204,13 +210,22 @@ class _Stderr(logging.StreamHandler):
 def _check_last_checkpoint(trainer: Any) -> None:
     """`--ckpt_path last` resumes only from this run's checkpoint folder, which is new unless set explicitly."""
     folders = [Path(cb.dirpath or Path(trainer.log_dir) / "checkpoints") for cb in trainer.checkpoint_callbacks]
-    if not any(file for folder in folders for file in folder.glob("last*.ckpt")):
+    if any("://" in str(cb.dirpath) for cb in trainer.checkpoint_callbacks):
+        return  # remote storage: Lightning looks there itself
+    if not any(file for folder in folders for file in folder.glob("*last*.ckpt")):  # Lightning's rule: "last" in the name
         earlier = sorted(Path(trainer.log_dir).parent.glob("*/checkpoints/*.ckpt"), key=os.path.getmtime)
         example = _short(str(earlier[-1])) if earlier and trainer.logger else "path/to/last.ckpt"
         raise FileNotFoundError(
             f"`--ckpt_path last` found no last checkpoint in {', '.join(map(_short, map(str, folders))) or 'this run'}: "
             f"each run logs to a new version folder. Pass the checkpoint file instead, e.g. --ckpt_path {example}"
         )
+
+
+def _check_stage_data(stage: str, datamodule: Any) -> None:
+    """A LighterDataModule must have the dataloader that `stage` runs on."""
+    name = {"fit": "train", "validate": "val", "test": "test", "predict": "predict"}[stage]
+    if getattr(datamodule, f"{name}_dataloader", True) is None:
+        raise ValueError(f"`lighter {stage}` needs `data::{name}_dataloader`, which is not set.")
 
 
 def _short(path: str) -> str:
@@ -224,23 +239,29 @@ def _report(error: BaseException, inputs: list) -> int:
     user's own code (the root cause was raised there) also shows those frames and exits with 1, like Python.
     """
     cause = error
-    while cause.__cause__ is not None:
-        cause = cause.__cause__
+    while (inner := cause.value if isinstance(cause, pydoc.ErrorDuringImport) else cause.__cause__) is not None:
+        cause = inner  # pydoc.ErrorDuringImport holds the error raised while importing the user's module
     frames = [frame for frame in traceback.extract_tb(cause.__traceback__) if not frame.filename.startswith(FRAMEWORK)]
-    lines = [f"{type(error).__name__}: {error}"]
+    message = getattr(error, "_original_message", str(error))  # Sparkwheel's message without its snippet
+    suggestion = getattr(error, "suggestion", None)
+    where = error.source_location if isinstance(error, BaseError) else None
+    lines = [f"{type(error).__name__}: {message}"]
     if frames:
         lines[:0] = ["Traceback (your code only, LIGHTER_DEBUG=1 shows all frames):", *traceback.format_list(frames)]
     if isinstance(error, yaml.MarkedYAMLError) and (mark := error.problem_mark):
         lines[-1] = f"{_short(mark.name)}:{mark.line + 1}: {type(error).__name__}: {error.problem}"
-    elif isinstance(error, BaseError) and (where := error.source_location):
+    elif where:
         key = f" ({where.id})" if where.id else ""
-        lines[-1] = f"{_short(where.filepath)}:{where.line}{key}: {type(error).__name__}: {error._original_message}"
-        if not (isinstance(cause, BaseError) or error.suggestion or str(cause) in error._original_message):
-            lines.append(f"  From {type(cause).__name__}: {cause}")
-        lines += [error._get_config_snippet(), f"  {error.suggestion.replace('💡 ', '')}" if error.suggestion else ""]
-        keys = [(item, item.lstrip("=~").split("=")[0]) for item in inputs if _is_override(item)]
-        if overrides := [item for item, k in keys if where.id and (k == where.id or k.startswith(f"{where.id}::"))]:
-            lines.append(f"  Overridden by: {' '.join(overrides)}")
+        lines[-1] = f"{_short(where.filepath)}:{where.line}{key}: {type(error).__name__}: {message}"
+    if cause is not error and not (isinstance(cause, BaseError) or suggestion or str(cause) in message):
+        lines.append(f"  From {type(cause).__name__}: {cause}")
+    if where:
+        lines.append(getattr(error, "_get_config_snippet", lambda: "")())
+    if suggestion:
+        lines.append(f"  {suggestion.replace('💡 ', '')}")
+    keys = [(item, item.lstrip("=~").split("=")[0]) for item in inputs if _is_override(item)]
+    if where and (overrides := [item for item, k in keys if where.id and (k == where.id or k.startswith(f"{where.id}::"))]):
+        lines.append(f"  Overridden by: {' '.join(overrides)}")
     print("\n".join(line.rstrip() for line in lines if line), file=sys.stderr)
     return 1 if frames else 2
 
@@ -266,7 +287,7 @@ def cli() -> None:
         stage_parser.add_argument(
             "--weights_only",
             action=argparse.BooleanOptionalAction,
-            help="Restrict checkpoint loading to state_dicts of torch.Tensor (safer for untrusted sources).",
+            help="Restrict checkpoint loading to tensors (safer for untrusted files). Needs Lightning 2.6 or newer.",
         )
         if stage in ("validate", "test"):
             stage_parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, help="Print results.")
@@ -277,7 +298,10 @@ def cli() -> None:
                 help="Keep predictions in memory and return them (Lightning's default unless spawning processes).",
             )
 
-    args = parser.parse_args()
+    args, extra = parser.parse_known_args()  # overrides may also follow options: `config.yaml --ckpt_path x a=1`
+    if unknown := [item for item in extra if item.startswith("-")]:
+        parser.error(f"unrecognized arguments: {' '.join(unknown)}")
+    args.inputs += extra
     if not any(isinstance(handler, _Stderr) for handler in logging.getLogger("lighter").handlers):
         logging.getLogger("lighter").addHandler(_Stderr())
     logging.getLogger("lighter").setLevel(logging.INFO)
@@ -287,10 +311,11 @@ def cli() -> None:
             print(to_yaml(load_config(*args.inputs).get()), end="")
             return
         model, trainer, datamodule = build(*args.inputs)
+        _check_stage_data(args.command, datamodule)
         if args.ckpt_path == "last":
             _check_last_checkpoint(trainer)
     except Exception as error:
-        if os.environ.get("LIGHTER_DEBUG", "0") != "0":
+        if os.environ.get("LIGHTER_DEBUG", "").lower() in ("1", "true", "yes", "on"):
             raise
         sys.exit(_report(error, args.inputs))
     getattr(trainer, args.command)(model, datamodule=datamodule, **stage_kwargs)

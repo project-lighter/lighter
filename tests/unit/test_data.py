@@ -41,14 +41,16 @@ class TestLighterDataModule:
         assert datamodule.test_dataloader() is val_dataloader
         assert datamodule.predict_dataloader() is val_dataloader
 
-    def test_missing_dataloaders_have_no_batches(self, train_dataloader):
-        """Dataloaders that are not set give no batches, so Lightning skips their loop."""
+    def test_missing_dataloaders_are_not_defined_for_lightning(self, train_dataloader):
+        """Dataloaders that are not set look unimplemented to Lightning, which then skips their loop."""
+        from pytorch_lightning.utilities.model_helpers import is_overridden
+
         datamodule = LighterDataModule(train_dataloader=train_dataloader)
 
         assert datamodule.train_dataloader() is train_dataloader
-        assert datamodule.val_dataloader() == []
-        assert datamodule.test_dataloader() == []
-        assert datamodule.predict_dataloader() == []
+        assert is_overridden("train_dataloader", datamodule)
+        for name in ("val_dataloader", "test_dataloader", "predict_dataloader"):
+            assert not is_overridden(name, datamodule)
 
     def test_is_lightning_datamodule(self):
         """Test that LighterDataModule is a LightningDataModule."""

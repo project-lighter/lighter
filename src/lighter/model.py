@@ -5,6 +5,7 @@ from typing import Any
 
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.utilities import rank_zero_warn
 from torchmetrics import Metric, MetricCollection
 
 LOSS_DICT = (
@@ -87,9 +88,13 @@ class LighterModule(pl.LightningModule):
         loss = outputs.get("loss") if isinstance(outputs, Mapping) else outputs
         if isinstance(loss, Mapping):
             raise TypeError(LOSS_DICT)
-        if not isinstance(loss, torch.Tensor):
+        if isinstance(loss, bool) or not isinstance(loss, (torch.Tensor, int, float, type(None))):
+            rank_zero_warn(
+                f"The {mode} step returned {type(outputs).__name__}, so no loss is logged. Return the loss tensor, "
+                "a dict with a 'loss' key, or None."
+            )
             loss = None
-        elif mode == "train" and self.automatic_optimization:
+        elif mode == "train" and self.automatic_optimization and loss is not None:
             loss = loss * self.trainer.accumulate_grad_batches  # Lightning passes the loss divided by it
         metrics = getattr(self, f"{mode}_metrics")
         if metrics is not None and dataloader_idx > 0:

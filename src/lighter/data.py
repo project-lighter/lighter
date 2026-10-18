@@ -5,9 +5,6 @@ from typing import Any
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-# The dataloader each trainer stage needs; the others are optional (e.g. validation during `fit`).
-REQUIRED = {"fit": "train", "validate": "val", "test": "test", "predict": "predict"}
-
 
 class LighterDataModule(LightningDataModule):
     """
@@ -50,22 +47,18 @@ class LighterDataModule(LightningDataModule):
             "test": test_dataloader,
             "predict": predict_dataloader,
         }
-
-    def _loader(self, name: str) -> Any:
-        """The dataloader, or `[]` (no batches) if it is not set and the running stage can do without it."""
-        stage = self.trainer.state.fn.value if self.trainer is not None and self.trainer.state.fn else None
-        if self._loaders[name] is None and stage is not None and REQUIRED[stage] == name:
-            raise ValueError(f"`trainer.{stage}` needs `data::{name}_dataloader`, which is not set.")
-        return [] if self._loaders[name] is None else self._loaders[name]
+        for name, loader in self._loaders.items():
+            if loader is None:  # as if the method were not written: Lightning skips the loop or names what is missing
+                setattr(self, f"{name}_dataloader", None)
 
     def train_dataloader(self) -> Any:
-        return self._loader("train")
+        return self._loaders["train"]
 
     def val_dataloader(self) -> Any:
-        return self._loader("val")
+        return self._loaders["val"]
 
     def test_dataloader(self) -> Any:
-        return self._loader("test")
+        return self._loaders["test"]
 
     def predict_dataloader(self) -> Any:
-        return self._loader("predict")
+        return self._loaders["predict"]

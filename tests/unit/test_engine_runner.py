@@ -152,6 +152,13 @@ def test_seed_comes_from_the_config_then_the_environment(monkeypatch):
     assert os.environ["PL_GLOBAL_SEED"] == "7"
 
 
+@pytest.mark.parametrize("seed", ["@base", "$@base + 0"])
+def test_seed_may_be_a_reference_or_an_expression(monkeypatch, seed):
+    monkeypatch.delenv("PL_GLOBAL_SEED", raising=False)
+    build(config(seed=seed, base=5))
+    assert os.environ["PL_GLOBAL_SEED"] == "5"
+
+
 def test_build_logs_a_banner(tmp_path, caplog):
     caplog.set_level("INFO", logger="lighter")
     build(config(trainer=dict(TRAINER, logger=True, default_root_dir=str(tmp_path))), "seed=3")
@@ -239,3 +246,13 @@ def test_installed_packages_get_no_project_hint():
     with pytest.raises(TargetNotFoundError) as error:
         build(config(model={"_target_": "torch.nn.NotAModule"}))
     assert "project" not in str(error.value)
+
+
+@pytest.mark.parametrize("value, raises", [("1", True), ("true", True), ("false", False), ("0", False)])
+def test_lighter_debug_shows_the_full_error(monkeypatch, tmp_path, value, raises):
+    from lighter.engine.runner import cli
+
+    monkeypatch.setenv("LIGHTER_DEBUG", value)
+    monkeypatch.setattr(sys, "argv", ["lighter", "fit", str(tmp_path / "missing.yaml")])
+    with pytest.raises(FileNotFoundError if raises else SystemExit):
+        cli()

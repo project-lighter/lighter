@@ -4,6 +4,7 @@ After an intended change in the output, regenerate the expected files with `UPDA
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -81,6 +82,9 @@ CASES = {
     "bad_expression": ("proj", "configs/config.yaml model::learning_rate=$math.sqrt(@num_classes)"),
     "metrics_as_a_list": ("proj", "configs/metrics.yaml"),
     "bug_in_user_init": ("proj", "configs/config.yaml model::_target_=project.model.BuggyModel ~model::learning_rate"),
+    "bug_at_import": ("proj", "configs/config.yaml model::_target_=project.boom.TinyModel"),
+    "undefined_name_in_expression": ("proj", "configs/config.yaml model::network::bias=$undefined_x"),
+    "override_after_option": ("proj", "configs/config.yaml --ckpt_path last model::learnin_rate=0.01"),
     "trainer_without_target": ("proj", "configs/config.yaml ~trainer::_target_"),
     "yaml_syntax_error": ("proj", "configs/broken.yaml"),
 }
@@ -92,6 +96,7 @@ def project(tmp_path, monkeypatch):
     (root / "configs").mkdir(parents=True)
     (root / "__lighter__.py").touch()
     (root / "model.py").write_text(MODEL)
+    (root / "boom.py").write_text("import math\n\nraise RuntimeError('boom at import')\n")
     (root / "configs" / "config.yaml").write_text(CONFIG)
     (root / "configs" / "typo.yaml").write_text(CONFIG.replace("learning_rate", "learnin_rate"))
     (root / "configs" / "broken.yaml").write_text(CONFIG.replace("  learning_rate", " learning_rate"))
@@ -119,9 +124,10 @@ def test_mistake(case, project, monkeypatch, capsys):
     out, err = capsys.readouterr()
     output = f"$ lighter fit {args}\n# exit code {code}\n{out}{err}"
     output = output.replace(str(project.parent), "<tmp>").replace(lighter.__version__, "<version>")
+    output = re.sub(r"(?m)^ *[\^~]+ *\n", "", output)  # Python 3.11+ marks the failing expression, 3.10 does not
     golden = GOLDEN / f"{case}.txt"
     if os.environ.get("UPDATE_GOLDEN"):
         golden.write_text(output)
     assert output == golden.read_text()
-    assert code == (1 if case == "bug_in_user_init" else 0 if case.startswith(("run_", "override_new")) else 2)
+    assert code == (1 if case.startswith("bug_") else 0 if case.startswith(("run_", "override_new")) else 2)
     assert len(err.splitlines()) <= 10 or code == 1

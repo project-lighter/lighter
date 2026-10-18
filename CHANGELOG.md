@@ -28,6 +28,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 - `lighter.load_model(ckpt_path, overrides=())` rebuilds a model from the config saved in its checkpoint and
   loads its weights (with `torch.load(weights_only=True)` by default), finding the project from the checkpoint's folder.
+  A checkpoint saved with `save_weights_only=True` holds no config, so the run's `config.yaml` is used instead.
+- A step that returns something other than a loss tensor, a number, a dict with a `"loss"` key or None
+  (e.g. a tuple) warns that no loss is logged.
 
 ### Changed
 
@@ -47,6 +50,7 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   a forgotten `=` in an override, or a similar file name.
 - `import lighter` no longer imports torch or Lightning, so `lighter --help` and `--print_config` start instantly.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
+- Overrides may also follow options, e.g. `lighter fit config.yaml --ckpt_path last trainer::max_epochs=5`.
 
 - LighterModule no longer defines stub step methods. As in Lightning, validation is skipped without a
   `validation_step`, and `validation_step`/`test_step` may return None (only the metrics are logged then).
@@ -55,7 +59,8 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - LighterModule logs losses and metrics also with `logger: false`, so callbacks such as `ModelCheckpoint` and
   `EarlyStopping` can monitor them.
 - One `val_metrics`/`test_metrics` object used with several dataloaders is an error (it mixed their results).
-- LighterDataModule returns `[]` instead of None for a dataloader that is not set.
+- A dataloader not given to LighterDataModule counts as not defined, as if its method were missing, so Lightning
+  skips that loop without a warning. Migration: check `datamodule.val_dataloader is None` instead of calling it.
 
 - The composed config (with the seed and `_imports_`) is saved once the log folder is final, by the global-zero
   process only (also under DDP): `config.yaml` in the log folder, the logger's hyperparameters, and every
@@ -96,4 +101,6 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `pyyaml` is declared as a dependency (Lighter imports it directly).
 - Project URLs point at `github.com/project-lighter/lighter`.
 - The docs passed several config files separated by commas; the CLI takes them separated by spaces.
+- CsvWriter ends lines with `\n` on every platform (Windows wrote `\r\n`).
+- If `config.yaml` cannot be written because a dict config holds Python objects, the run warns and continues.
 - The README states Lighter's real size (~1,200 lines); a test keeps `src/lighter` at most 1,400 lines and the README within 10%.

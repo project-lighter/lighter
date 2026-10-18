@@ -1,0 +1,12 @@
+$ lighter fit configs/config.yaml model::_target_=project.boom.TinyModel
+# exit code 1
+Traceback (your code only, LIGHTER_DEBUG=1 shows all frames):
+  File "<tmp>/proj/boom.py", line 3, in <module>
+    raise RuntimeError('boom at import')
+configs/config.yaml:8 (model): InstantiationError: Failed to instantiate 'project.boom.TinyModel': ErrorDuringImport: problem in project.boom - RuntimeError: boom at import
+       6 │ 
+       7 │ model:
+  →    8 │   _target_: project.model.TinyModel
+       9 │   learning_rate: 0.1
+      10 │   network:
+  Overridden by: model::_target_=project.boom.TinyModel

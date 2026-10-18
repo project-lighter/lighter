@@ -1,0 +1,4 @@
+$ lighter fit configs/config.yaml model::network::bias=$undefined_x
+# exit code 2
+EvaluationError: Failed to evaluate expression: 'undefined_x'
+  From NameError: name 'undefined_x' is not defined

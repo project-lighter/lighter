@@ -80,10 +80,20 @@ def test_load_model_rebuilds_the_model_with_its_weights(run):
     assert isinstance(loaded.criterion, torch.nn.MSELoss)
 
 
+def test_load_model_of_a_weights_only_checkpoint_reads_the_run_config(run):
+    root, model = run
+    checkpoint = torch.load(next(root.glob("lightning_logs/version_0/checkpoints/*.ckpt")), weights_only=True)
+    del checkpoint["lighter_config"]  # ModelCheckpoint(save_weights_only=True) skips the callback that adds it
+    torch.save(checkpoint, root / "lightning_logs" / "version_0" / "checkpoints" / "weights.ckpt")
+    loaded = load_model(root / "lightning_logs" / "version_0" / "checkpoints" / "weights.ckpt")
+    assert torch.equal(loaded.network.weight, model.network.weight)
+
+
 def test_load_model_needs_a_lighter_checkpoint(tmp_path):
-    torch.save({"state_dict": {}}, tmp_path / "plain.ckpt")
-    with pytest.raises(ValueError, match="holds no Lighter config"):
-        load_model(tmp_path / "plain.ckpt")
+    (tmp_path / "checkpoints").mkdir()
+    torch.save({"state_dict": {}}, tmp_path / "checkpoints" / "plain.ckpt")
+    with pytest.raises(ValueError, match=r"holds no Lighter config .*save_weights_only=True.*there is no .*config\.yaml"):
+        load_model(tmp_path / "checkpoints" / "plain.ckpt")
 
 
 def test_ckpt_path_last_without_a_last_checkpoint_explains_the_version_folders(run, monkeypatch, capsys):
@@ -106,3 +116,20 @@ def test_save_config_writes_only_on_global_zero(tmp_path):
     SaveConfig({"seed": 1}).setup(trainer, None, "fit")
     assert (tmp_path / "config.yaml").read_text() == "seed: 1\n"
     trainer.logger.log_hyperparams.assert_called_once_with({"seed": 1})
+
+
+def test_save_config_skips_config_yaml_for_python_objects(tmp_path, caplog):
+    trainer = MagicMock(is_global_zero=True, log_dir=str(tmp_path))
+    SaveConfig({"net": torch.nn.Linear(1, 1)}).setup(trainer, None, "fit")
+    assert not (tmp_path / "config.yaml").exists()
+    assert "config.yaml is not saved" in caplog.text
+
+
+@pytest.mark.parametrize("dirpath, name", [("{tmp}", "last-v1.ckpt"), ("s3://bucket/checkpoints", None)])
+def test_ckpt_path_last_accepts_versioned_last_checkpoints_and_remote_folders(tmp_path, dirpath, name):
+    from lighter.engine.runner import _check_last_checkpoint
+
+    if name:
+        (tmp_path / name).touch()
+    trainer = MagicMock(log_dir=str(tmp_path), checkpoint_callbacks=[MagicMock(dirpath=dirpath.format(tmp=tmp_path))])
+    _check_last_checkpoint(trainer)
