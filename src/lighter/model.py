@@ -28,7 +28,9 @@ class LighterModule(pl.LightningModule):
             (`_mode_: callable` in the config).
         scheduler: A scheduler, a function that builds one from the optimizer (`_mode_: callable`),
             or Lightning's scheduler dict (`scheduler`, `interval`, `monitor`, ...) holding either.
-        train_metrics, val_metrics, test_metrics: A torchmetrics `Metric` or `MetricCollection` (optional).
+        train_metrics: A torchmetrics `Metric` or `MetricCollection` (optional).
+        val_metrics: The same, for validation.
+        test_metrics: The same, for testing.
     """
 
     def __init__(

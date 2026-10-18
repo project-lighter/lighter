@@ -21,7 +21,7 @@ Use your existing PyTorch Lightning code with Lighter's configuration system.
 
 - YAML configuration for hyperparameters
 - CLI overrides without code changes
-- Experiment tracking and versioning
+- The run's config saved with its logs and checkpoints
 - All PyTorch Lightning features
 
 **You write:**
@@ -101,7 +101,7 @@ trainer:
   accelerator: auto
 
 model:
-  _target_: model.ImageClassifier  # Your module!
+  _target_: project.model.ImageClassifier  # Your module!
   num_classes: 10
   learning_rate: 0.001
 
@@ -196,7 +196,7 @@ class FlexibleClassifier(pl.LightningModule):
 
 ```yaml
 model:
-  _target_: models.FlexibleClassifier
+  _target_: project.models.FlexibleClassifier
   learning_rate: 0.001
 
   network:
@@ -220,81 +220,9 @@ network:
 
 # Try your custom network
 network:
-  _target_: my_project.networks.CustomNet
+  _target_: project.networks.CustomNet
   num_classes: 10
   hidden_dim: 512
-```
-
-### Example 2: Multiple Optimizers
-
-For GANs or other multi-optimizer setups:
-
-`gan.py`:
-
-```python
-import pytorch_lightning as pl
-import torch
-
-class GAN(pl.LightningModule):
-    def __init__(self, generator, discriminator, lr_g=0.0002, lr_d=0.0002):
-        super().__init__()
-        self.save_hyperparameters(ignore=['generator', 'discriminator'])
-        self.generator = generator
-        self.discriminator = discriminator
-
-    def training_step(self, batch, batch_idx, optimizer_idx):
-        real_imgs, _ = batch
-
-        # Train generator
-        if optimizer_idx == 0:
-            z = torch.randn(real_imgs.size(0), self.generator.latent_dim)
-            fake_imgs = self.generator(z)
-            g_loss = -torch.mean(self.discriminator(fake_imgs))
-            self.log("train/g_loss", g_loss)
-            return g_loss
-
-        # Train discriminator
-        if optimizer_idx == 1:
-            z = torch.randn(real_imgs.size(0), self.generator.latent_dim)
-            fake_imgs = self.generator(z).detach()
-
-            d_loss_real = -torch.mean(self.discriminator(real_imgs))
-            d_loss_fake = torch.mean(self.discriminator(fake_imgs))
-            d_loss = d_loss_real + d_loss_fake
-
-            self.log("train/d_loss", d_loss)
-            return d_loss
-
-    def configure_optimizers(self):
-        opt_g = torch.optim.Adam(
-            self.generator.parameters(),
-            lr=self.hparams.lr_g,
-            betas=(0.5, 0.999)
-        )
-        opt_d = torch.optim.Adam(
-            self.discriminator.parameters(),
-            lr=self.hparams.lr_d,
-            betas=(0.5, 0.999)
-        )
-        return [opt_g, opt_d]
-```
-
-`config.yaml`:
-
-```yaml
-model:
-  _target_: gan.GAN
-  lr_g: 0.0002
-  lr_d: 0.0002
-
-  generator:
-    _target_: gan.Generator
-    latent_dim: 100
-    img_shape: [3, 32, 32]
-
-  discriminator:
-    _target_: gan.Discriminator
-    img_shape: [3, 32, 32]
 ```
 
 ### Example 3: Custom Metrics
@@ -485,7 +413,7 @@ You can pass **any** data structure through config:
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   layer_sizes: [64, 128, 256, 512]
 ```
 
@@ -502,7 +430,7 @@ def __init__(self, layer_sizes):
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   config:
     hidden_dim: 256
     num_layers: 4
@@ -520,12 +448,12 @@ def __init__(self, config):
 
 ```yaml
 model:
-  _target_: models.MyModule
+  _target_: project.models.MyModule
   encoder:
-    _target_: models.Encoder
+    _target_: project.models.Encoder
     hidden_dim: 256
   decoder:
-    _target_: models.Decoder
+    _target_: project.models.Decoder
     hidden_dim: 256
 ```
 
@@ -549,7 +477,6 @@ trainer:
       monitor: val/acc
       mode: max
       save_top_k: 3
-      filename: 'epoch{epoch:02d}-acc{val/acc:.4f}'
 
     # Early stopping
     - _target_: pytorch_lightning.callbacks.EarlyStopping
@@ -562,7 +489,7 @@ trainer:
       logging_interval: epoch
 
     # Custom callback
-    - _target_: my_project.callbacks.MyCustomCallback
+    - _target_: project.callbacks.MyCustomCallback
       some_param: 42
 ```
 
@@ -610,13 +537,13 @@ Runs 1 batch of train/val to catch bugs.
 ### Validation Only
 
 ```bash
-lighter validate config.yaml args::validate::ckpt_path=checkpoints/best.ckpt
+lighter validate config.yaml --ckpt_path path/to/checkpoint.ckpt
 ```
 
 ### Testing
 
 ```bash
-lighter test config.yaml args::test::ckpt_path=checkpoints/best.ckpt
+lighter test config.yaml --ckpt_path path/to/checkpoint.ckpt
 ```
 
 ### Overfit on Small Batch
@@ -717,11 +644,11 @@ trainer:
   # Copy your Trainer args from your Python script
 
 model:
-  _target_: my_project.models.MyLightningModule
+  _target_: project.models.MyLightningModule
   # Copy your module's __init__ args
 
 data:
-  _target_: my_project.data.MyDataModule
+  _target_: project.data.MyDataModule
   # Or use LighterDataModule
 ```
 
@@ -790,7 +717,7 @@ class MyModule(pl.LightningModule):
 ```yaml
 # Reference it in config
 model:
-  _target_: my_project.models.MyModule
+  _target_: project.models.MyModule
   learning_rate: 0.001
   network:
     _target_: torchvision.models.resnet18

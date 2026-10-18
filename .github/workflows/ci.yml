@@ -30,6 +30,7 @@ jobs:
           - format
           - lint
           - types
+          - docs
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +40,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
-          install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
+          install-deps: ${{ (matrix.check == 'types' || matrix.check == 'docs') && 'true' || 'false' }}
+          install-groups: ${{ matrix.check == 'docs' && '--only-group doc' || '--all-extras --all-groups' }}
 
       - name: Run format check
         if: matrix.check == 'format'
@@ -52,6 +54,10 @@ jobs:
       - name: Run type check
         if: matrix.check == 'types'
         run: uv run mypy src
+
+      - name: Build docs (broken links, anchors and snippets fail the build)
+        if: matrix.check == 'docs'
+        run: uv run --only-group doc mkdocs build --strict
 
   tests:
     name: Tests (Python 3.12)

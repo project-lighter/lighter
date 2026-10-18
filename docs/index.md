@@ -83,10 +83,11 @@ class MyModule(pl.LightningModule):
 
 ```yaml title="config.yaml"
 model:
-  _target_: project.model.MyModule  # Auto-discovered with __lighter__.py
+  _target_: project.model.MyModule  # project = the folder holding __lighter__.py
   learning_rate: 0.001
 
 trainer:
+  _target_: pytorch_lightning.Trainer
   max_epochs: 10
 ```
 
@@ -124,7 +125,7 @@ Choose the approach that fits your workflow:
 
 - YAML configuration
 - CLI overrides
-- Experiment tracking
+- The run's config saved with its logs and checkpoints
 
 [Learn more →](guides/lightning-module.md)
 
@@ -147,9 +148,9 @@ Choose the approach that fits your workflow:
 
 **Lighter adds:**
 
-- Automatic `configure_optimizers()`
-- Dual logging (step + epoch)
-- Config-driven everything
+- `configure_optimizers()` from the config
+- Loss and metrics logged per step and per epoch
+- Criterion, optimizer and metrics in the config
 
 [Learn more →](guides/lighter-module.md)
 
@@ -207,6 +208,8 @@ Choose the approach that fits your workflow:
           root: ./data
           train: true
           download: true
+          transform:
+            _target_: torchvision.transforms.ToTensor
     ```
 
     ```bash
@@ -224,20 +227,20 @@ Choose the approach that fits your workflow:
             pred = self(x)
             loss = self.criterion(pred, y)
 
-            if self.train_metrics:
+            if self.train_metrics is not None:
                 self.train_metrics(pred, y)
 
-            return {"loss": loss}
+            return loss
 
         def validation_step(self, batch, batch_idx):
             x, y = batch
             pred = self(x)
             loss = self.criterion(pred, y)
 
-            if self.val_metrics:
+            if self.val_metrics is not None:
                 self.val_metrics(pred, y)
 
-            return {"loss": loss}
+            return loss
     ```
 
     ```yaml title="config.yaml"
@@ -254,12 +257,12 @@ Choose the approach that fits your workflow:
         _target_: torch.nn.CrossEntropyLoss
       optimizer:
         _target_: torch.optim.Adam
-        params: "$@model::network.parameters()"
+        _mode_: callable  # called with the model's parameters
         lr: 0.001
       train_metrics:
-        - _target_: torchmetrics.Accuracy
-          task: multiclass
-          num_classes: 10
+        _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
       val_metrics: "%model::train_metrics"
 
     data:
@@ -272,6 +275,8 @@ Choose the approach that fits your workflow:
           root: ./data
           train: true
           download: true
+          transform:
+            _target_: torchvision.transforms.ToTensor
     ```
 
     ```bash

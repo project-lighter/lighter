@@ -75,7 +75,7 @@ trainer:
   accelerator: auto
 
 model:
-  _target_: model.MyModel
+  _target_: project.model.MyModel
 
   # Network architecture
   network:
@@ -89,14 +89,14 @@ model:
   # Optimizer (auto-configured!)
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.001
 
   # Metrics (optional)
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
 
   val_metrics: "%model::train_metrics"  # Copy config
 
@@ -192,10 +192,9 @@ def training_step(self, batch, batch_idx):
     return {"loss": loss}
 ```
 
-**Automatically logged as:**
-- `train/metrics/Accuracy/step` - Per-step values
-- `train/metrics/Accuracy/epoch` - Epoch average
-- `train/metrics/F1Score/step`, `train/metrics/F1Score/epoch`
+**Automatically logged as** `train/metrics/<name>/step` and `train/metrics/<name>/epoch`, where `<name>` is
+the metric's class name (`torchmetrics.Accuracy` with `task: multiclass` is a `MulticlassAccuracy`) or its key
+in a `MetricCollection` given as a dict.
 
 #### Learning Rate Logging
 
@@ -271,10 +270,8 @@ class ImageClassifier(LighterModule):
         if self.train_metrics:
             self.train_metrics(logits, labels)
 
-        # Return dict - all values logged automatically
-        return {
-            "loss": loss,
-        }
+        # Lighter logs the loss and the metrics updated above
+        return loss
 
     def validation_step(self, batch, batch_idx):
         images, labels = batch
@@ -300,7 +297,7 @@ class ImageClassifier(LighterModule):
 
 ```yaml
 model:
-  _target_: models.ImageClassifier
+  _target_: project.models.ImageClassifier
 
   network:
     _target_: torchvision.models.resnet50
@@ -313,23 +310,25 @@ model:
 
   optimizer:
     _target_: torch.optim.AdamW
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.001
     weight_decay: 0.01
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
+    _mode_: callable
     T_max: 100
 
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
-      average: macro
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
+      - _target_: torchmetrics.F1Score
+        task: multiclass
+        num_classes: 10
+        average: macro
 
   val_metrics: "%model::train_metrics"
   test_metrics: "%model::train_metrics"
@@ -396,7 +395,7 @@ class SemanticSegmentation(LighterModule):
 
 ```yaml
 model:
-  _target_: models.SemanticSegmentation
+  _target_: project.models.SemanticSegmentation
 
   network:
     _target_: segmentation_models_pytorch.Unet
@@ -411,13 +410,13 @@ model:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.0001
 
   train_metrics:
-    - _target_: torchmetrics.JaccardIndex
-      task: multiclass
-      num_classes: 21
+    _target_: torchmetrics.JaccardIndex
+    task: multiclass
+    num_classes: 21
 
   val_metrics: "%model::train_metrics"
 ```
@@ -456,12 +455,10 @@ class MultiTaskModel(LighterModule):
         # Combined loss
         loss = self.alpha * loss_cls + (1 - self.alpha) * loss_reg
 
-        # Return all for logging
-        return {
-            "loss": loss,
-            "loss_cls": loss_cls.detach(),
-            "loss_reg": loss_reg.detach(),
-        }
+        # Log the parts yourself; return the total
+        self.log("train/loss/cls", loss_cls)
+        self.log("train/loss/reg", loss_reg)
+        return loss
 
     def validation_step(self, batch, batch_idx):
         images, labels_cls, labels_reg = batch
@@ -473,13 +470,8 @@ class MultiTaskModel(LighterModule):
 
         # Accuracy for classification head
         acc = (out_cls.argmax(1) == labels_cls).float().mean()
-
-        return {
-            "loss": loss,
-            "loss_cls": loss_cls,
-            "loss_reg": loss_reg,
-            "acc": acc,
-        }
+        self.log("val/acc", acc)
+        return loss
 ```
 
 ### Example 4: Custom Forward Pass
@@ -510,13 +502,9 @@ class AutoencoderModel(LighterModule):
         # Optional: regularization on latent
         loss_kl = 0.001 * (latent ** 2).mean()
 
-        loss = loss_recon + loss_kl
-
-        return {
-            "loss": loss,
-            "loss_recon": loss_recon.detach(),
-            "loss_kl": loss_kl.detach(),
-        }
+        self.log("train/loss/recon", loss_recon)
+        self.log("train/loss/kl", loss_kl)
+        return loss_recon + loss_kl
 
     def validation_step(self, batch, batch_idx):
         images, _ = batch
@@ -527,18 +515,18 @@ class AutoencoderModel(LighterModule):
 
 ## Adding Schedulers
 
-LighterModule handles schedulers automatically:
+LighterModule builds the scheduler from the config: with `_mode_: callable` it is called with the optimizer.
 
 ```yaml
 model:
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.001
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"  # Reference optimizer
+    _mode_: callable
     T_max: 100
     eta_min: 0.00001
 ```
@@ -550,7 +538,7 @@ model:
 ```yaml
 scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
-  optimizer: "@model::optimizer"
+  _mode_: callable
   step_size: 30
   gamma: 0.1
 ```
@@ -560,7 +548,7 @@ scheduler:
 ```yaml
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  optimizer: "@model::optimizer"
+  _mode_: callable
   mode: min
   factor: 0.5
   patience: 10
@@ -571,41 +559,9 @@ scheduler:
 ```yaml
 scheduler:
   _target_: torch.optim.lr_scheduler.LinearLR
-  optimizer: "@model::optimizer"
+  _mode_: callable
   start_factor: 0.1
   total_iters: 1000
-```
-
-### Chained Schedulers
-
-For complex schedules, override `configure_optimizers`:
-
-```python
-def configure_optimizers(self):
-    # Warmup then cosine
-    warmup = torch.optim.lr_scheduler.LinearLR(
-        self.optimizer,
-        start_factor=0.1,
-        total_iters=1000
-    )
-    cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
-        self.optimizer,
-        T_max=self.trainer.max_epochs - 10
-    )
-
-    scheduler = torch.optim.lr_scheduler.SequentialLR(
-        self.optimizer,
-        schedulers=[warmup, cosine],
-        milestones=[10]
-    )
-
-    return {
-        "optimizer": self.optimizer,
-        "lr_scheduler": {
-            "scheduler": scheduler,
-            "interval": "epoch",
-        }
-    }
 ```
 
 ## Logging the Learning Rate
@@ -646,15 +602,17 @@ if self.train_metrics:
 ```yaml
 model:
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.Precision
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
+      - _target_: torchmetrics.F1Score
+        task: multiclass
+        num_classes: 10
+      - _target_: torchmetrics.Precision
+        task: multiclass
+        num_classes: 10
 ```
 
 Update in code (same!):
@@ -688,10 +646,10 @@ model:
 ```yaml
 model:
   val_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-      average: none  # Per-class accuracy
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
+    average: none  # Per-class accuracy
 ```
 
 ## Custom Initialization
@@ -730,7 +688,7 @@ Config:
 
 ```yaml
 model:
-  _target_: models.MyModel
+  _target_: project.models.MyModel
   special_param: 100
   network:
     _target_: ...
@@ -830,7 +788,7 @@ Run:
 lighter predict config.yaml
 ```
 
-Use Writers to save to files - see [Training Guide](training.md#saving-predictions).
+Use `lighter.callbacks.CsvWriter` or `FileWriter` to save them to files - see [Training Guide](training.md#saving-predictions).
 
 ## Validation Without Training
 
@@ -847,26 +805,6 @@ def validation_step(self, batch, batch_idx):
 ```
 
 ## Common Patterns
-
-### Pattern 1: Return Dict for Auto-Logging
-
-```python
-def training_step(self, batch, batch_idx):
-    # Everything in the dict gets logged automatically
-    return {
-        "loss": loss,                    # Required
-        "accuracy": accuracy,            # Optional
-        "learning_rate": current_lr,     # Optional
-        "custom_metric": custom_value,   # Optional
-    }
-```
-
-Logs as:
-
-- `train/loss`
-- `train/accuracy`
-- `train/learning_rate`
-- `train/custom_metric`
 
 ### Pattern 2: Conditional Logging
 
@@ -976,12 +914,12 @@ class MyModel(LighterModule):
 ```yaml
 # Config
 model:
-  _target_: models.MyModel
+  _target_: project.models.MyModel
   network:
     _target_: ...
   criterion:
     _target_: ...
   optimizer:
     _target_: ...
-    params: "$@model::network.parameters()"
+    _mode_: callable
 ```

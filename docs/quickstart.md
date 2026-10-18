@@ -28,24 +28,16 @@ Create these files:
 ```
 mnist_classifier/
 ├── __lighter__.py          # Marker file (tells Lighter this is a project)
-├── __init__.py             # Makes it a Python package
 ├── model.py                # Your model code
 └── configs/
     └── config.yaml         # Your experiment config
 ```
 
-### Step 2: Add the Marker Files
+### Step 2: Add the Marker File
 
 **`__lighter__.py`** (can be empty):
 ```python
-# This file marks the directory as a Lighter project.
-# When you run `lighter` from this directory, you can reference
-# your code as `project.module.Class`
-```
-
-**`__init__.py`** (can be empty):
-```python
-# Makes this directory a Python package
+# This file marks the folder as a Lighter project: its code is imported as `project`.
 ```
 
 !!! tip "The `project` Prefix"
@@ -169,10 +161,10 @@ Lighter works with **any** PyTorch Lightning module. Pick the style that fits yo
             pred = self(x)
             loss = self.criterion(pred, y)
 
-            if self.train_metrics:
+            if self.train_metrics is not None:
                 self.train_metrics(pred, y)
 
-            return {"loss": loss}
+            return loss
 
         def validation_step(self, batch, batch_idx):
             x, y = batch
@@ -180,10 +172,10 @@ Lighter works with **any** PyTorch Lightning module. Pick the style that fits yo
             pred = self(x)
             loss = self.criterion(pred, y)
 
-            if self.val_metrics:
+            if self.val_metrics is not None:
                 self.val_metrics(pred, y)
 
-            return {"loss": loss}
+            return loss
     ```
 
     ### Create Config
@@ -215,13 +207,13 @@ Lighter works with **any** PyTorch Lightning module. Pick the style that fits yo
 
       optimizer:
         _target_: torch.optim.Adam
-        params: "$@model::network.parameters()"
+        _mode_: callable  # LighterModule calls it with the model's parameters
         lr: 0.001
 
       train_metrics:
-        - _target_: torchmetrics.Accuracy
-          task: multiclass
-          num_classes: 10
+        _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
 
       val_metrics: "%model::train_metrics"
 
@@ -259,17 +251,17 @@ Lighter works with **any** PyTorch Lightning module. Pick the style that fits yo
 
     **That's it!** You get everything from the LightningModule approach PLUS:
 
-    - ✅ Automatic `configure_optimizers()`
-    - ✅ Dual logging (step + epoch)
-    - ✅ Config-driven metrics
+    - ✅ `configure_optimizers()` from the config
+    - ✅ Loss and metrics logged per step and per epoch
+    - ✅ Metrics from the config
 
 ## 4. Experiment!
 
 Now that it's running, try changing things from the CLI:
 
 ```bash
-# Change learning rate
-lighter fit configs/config.yaml model::lr=0.01
+# Change learning rate (LightningModule tab; with LighterModule it is model::optimizer::lr)
+lighter fit configs/config.yaml model::learning_rate=0.01
 
 # Train longer
 lighter fit configs/config.yaml trainer::max_epochs=10
@@ -279,7 +271,7 @@ lighter fit configs/config.yaml data::train_dataloader::batch_size=128
 
 # Combine multiple changes
 lighter fit configs/config.yaml \
-  model::lr=0.01 \
+  model::learning_rate=0.01 \
   trainer::max_epochs=10 \
   data::train_dataloader::batch_size=128
 ```
@@ -335,8 +327,11 @@ This pattern keeps all your custom code organized and easy to reference.
 Use `@` to reference resolved values (after instantiation):
 
 ```yaml
-optimizer:
-  params: "$@model::network.parameters()"  # Call method on instantiated network
+num_classes: 10
+network:
+  _target_: torch.nn.Linear
+  in_features: 784
+  out_features: "@num_classes"  # The value of num_classes
 ```
 
 Use `%` to copy config (for creating new instances):
@@ -355,7 +350,7 @@ val_metrics: "%model::train_metrics"  # New instance with same config
 - ✅ Basic config structure (trainer/model/data)
 - ✅ How to run experiments
 - ✅ How to override from CLI
-- ✅ Key config syntax (`_target_`, `@`, `%`)
+- ✅ Key config syntax (`_target_`, `_mode_`, `@`, `%`)
 
 ## Next Steps
 

@@ -32,8 +32,8 @@ def add_submodules_as_list(parent_folder: Path) -> str:
         # Directories containing __init__.py are considered submodules
         if file.is_dir() and (file / "__init__.py").exists():
             output.append(format_link(file))
-        # Python files apart from __init__.py are considered submodules
-        elif file.suffix == ".py" and file.name != "__init__.py":
+        # Python files apart from __init__.py and __main__.py (which has no page) are considered submodules
+        elif file.suffix == ".py" and file.name not in ("__init__.py", "__main__.py"):
             output.append(format_link(file))
     return "".join(output)
 

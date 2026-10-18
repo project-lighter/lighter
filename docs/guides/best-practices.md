@@ -45,8 +45,8 @@ my_project/
 │   ├── test_models.py
 │   └── test_data.py
 │
-└── outputs/                    # Generated (gitignore)
-    └── YYYY-MM-DD/
+└── lightning_logs/             # Written by Lightning (gitignore)
+    └── version_0/
 ```
 
 ### Why This Structure?
@@ -54,7 +54,7 @@ my_project/
 - **`__lighter__.py`**: Marks project root for auto-discovery
 - **`src/`**: Clear separation of code
 - **`experiments/`**: Version-controlled configs
-- **`outputs/`**: Generated artifacts (not tracked)
+- **`lightning_logs/`**: Lightning's run folders, each with Lighter's `config.yaml` (not tracked)
 - **`tests/`**: Ensure code quality
 
 ## Config Organization
@@ -98,7 +98,7 @@ data:
 ```yaml
 # Experiment-specific settings (merged with base.yaml via CLI)
 model:
-  _target_: src.models.ImageClassifier
+  _target_: project.src.models.ImageClassifier
   learning_rate: 0.001
   network:
     _target_: torchvision.models.resnet18
@@ -624,7 +624,7 @@ Slower, but helps find NaN sources.
 model:
   optimizer:
     _target_: torch.optim.AdamW
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.001  # Tuned via LR finder
     weight_decay: 0.01  # L2 regularization
 
@@ -651,12 +651,15 @@ vars:
 
 data:
   dataset:
-    root: "%vars::data_root/cifar10"
+    root: "$@vars::data_root + '/cifar10'"
 ```
 
-Or use environment variables:
+Or use environment variables (`$` expressions see only the modules listed in `_imports_`):
 
 ```yaml
+_imports_:
+  os: os
+
 vars:
   data_root: "$os.environ.get('DATA_ROOT', './data')"
 ```
@@ -687,8 +690,9 @@ model:
     num_classes: "%vars::num_classes"
 
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      num_classes: "%vars::num_classes"  # Same value
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: "%vars::num_classes"  # Same value
 ```
 
 ## Reproducibility
@@ -726,20 +730,19 @@ trainer:
 dependencies = [
     "torch==2.1.0",
     "pytorch-lightning==2.1.0",
-    "lighter>=3.0.0",
+    "lighter>=0.1",
 ]
 ```
 
 ### Save Config with Outputs
 
-Lightning does this automatically:
+Lighter does this for every run: the composed config goes to the run's log folder and into each checkpoint:
 
 ```
-outputs/
-└── 2024-01-15/
-    └── 10-30-45/
-        ├── config.yaml  # Exact config used
-        └── checkpoints/
+lightning_logs/
+└── version_0/
+    ├── config.yaml  # Exact config used
+    └── checkpoints/
 ```
 
 ## Testing
@@ -858,7 +861,7 @@ def forward(self, x):
 
 ```python
 # After training
-model = MyModule.load_from_checkpoint("best.ckpt")
+model = lighter.load_model("path/to/file.ckpt")  # rebuilds the model from the config saved in the checkpoint
 model.eval()
 
 scripted = torch.jit.script(model)
@@ -868,7 +871,7 @@ scripted.save("model.pt")
 ### Export to ONNX
 
 ```python
-model = MyModule.load_from_checkpoint("best.ckpt")
+model = lighter.load_model("path/to/file.ckpt")  # rebuilds the model from the config saved in the checkpoint
 model.eval()
 
 dummy_input = torch.randn(1, 3, 224, 224)
@@ -908,7 +911,7 @@ val_metrics: "%model::train_metrics"
 
 ```python
 # Inference
-model = MyModule.load_from_checkpoint("best.ckpt")
+model = lighter.load_model("path/to/file.ckpt")  # rebuilds the model from the config saved in the checkpoint
 model.eval()  # Important!
 
 with torch.no_grad():

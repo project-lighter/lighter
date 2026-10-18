@@ -91,7 +91,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]  # `--8<-- "examples/..."` paths start at the repository root
+      check_paths: true  # a missing file fails the build
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
@@ -107,6 +109,13 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - tables
+
+# Broken links and anchors fail `mkdocs build --strict`, which CI runs on every pull request.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
 
 repo_name: project-lighter/lighter
 repo_url: https://github.com/project-lighter/lighter

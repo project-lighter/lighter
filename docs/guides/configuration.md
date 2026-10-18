@@ -124,17 +124,17 @@ Skip instantiation of a component without removing it from config:
 trainer:
   callbacks:
     - _target_: pytorch_lightning.callbacks.EarlyStopping
-      monitor: val_loss
+      monitor: val/loss/epoch
       patience: 3
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       _disabled_: true  # This callback is removed from the list
       save_top_k: 3
 
-system:
+model:
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+    _mode_: callable
     _disabled_: true  # Disable while debugging optimizer issues
-    optimizer: "@system::optimizer"
     T_max: 100
 ```
 
@@ -152,15 +152,12 @@ For complete details (string values, expressions, use cases), see the [Sparkwhee
 Reference values that are **resolved lazily** when needed:
 
 ```yaml
+num_classes: 10
+
 model:
   network:
     _target_: torchvision.models.resnet18
-    num_classes: 10
-
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"  # Resolved lazily
-    lr: 0.001
+    num_classes: "@num_classes"  # Resolved lazily
 ```
 
 **What `@` does:**
@@ -175,9 +172,9 @@ Copy **raw YAML content** that is processed **eagerly** during config merge:
 ```yaml
 model:
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
 
   val_metrics: "%model::train_metrics"  # Copies raw YAML
 ```
@@ -208,19 +205,17 @@ Run Python code in your configs:
 # Simple math
 lr: "$0.001 * 2"  # = 0.002
 
-# Call methods
-optimizer:
-  params: "$@model::network.parameters()"
-
-# Conditionals
-batch_size: "$64 if %vars::large_batch else 32"
+# Conditionals (use @ to read other values inside an expression)
+batch_size: "$64 if @vars::large_batch else 32"
 
 # List comprehensions
 layer_sizes: "$[64 * (2**i) for i in range(4)]"  # [64, 128, 256, 512]
 
 # Type conversions
-warmup_steps: "$int(%vars::total_steps * 0.1)"
+warmup_steps: "$int(@vars::total_steps * 0.1)"
 ```
+
+Modules other than builtins must be imported with `_imports_` (e.g. `_imports_: {math: math}`).
 
 ### 5. `::`: Navigate Config Paths
 
@@ -236,47 +231,23 @@ Use in CLI overrides:
 lighter fit config.yaml model::optimizer::lr=0.01
 ```
 
-## The Critical Rule: `::` vs `.`
-
-- `::` navigates **config** structure
-- `.` accesses **Python** attributes/methods
-
-```yaml
-# ❌ WRONG
-params: "$@model::network::parameters()"  # :: for Python method
-
-# ✅ CORRECT
-params: "$@model::network.parameters()"   # . for Python method
-```
-
 ## Common Patterns
 
-### Pattern 1: Network → Optimizer
+### Pattern 1: Optimizer and Scheduler
 
-```yaml
-model:
-  network:
-    _target_: torchvision.models.resnet50
-    num_classes: 10
-
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"  # Pass network params
-    lr: 0.001
-```
-
-### Pattern 2: Optimizer → Scheduler
+With `_mode_: callable`, the config builds a function that LighterModule calls with the model's parameters
+(and, for the scheduler, with the optimizer):
 
 ```yaml
 model:
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: 0.001
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"  # Pass optimizer object
+    _mode_: callable
     T_max: 100
 ```
 
@@ -285,12 +256,14 @@ model:
 ```yaml
 model:
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
-    - _target_: torchmetrics.F1Score
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.MetricCollection
+    metrics:
+      - _target_: torchmetrics.Accuracy
+        task: multiclass
+        num_classes: 10
+      - _target_: torchmetrics.F1Score
+        task: multiclass
+        num_classes: 10
 
   val_metrics: "%model::train_metrics"  # Reuse config
   test_metrics: "%model::train_metrics"
@@ -310,6 +283,8 @@ model:
     num_classes: "%vars::num_classes"
 
   optimizer:
+    _target_: torch.optim.Adam
+    _mode_: callable
     lr: "%vars::base_lr"
 
 data:
@@ -318,6 +293,8 @@ data:
 ```
 
 ### Pattern 5: Differential Learning Rates
+
+Parameter groups need the network's parts, so build the optimizer itself (without `_mode_: callable`):
 
 ```yaml
 model:
@@ -355,20 +332,17 @@ data:     # LighterDataModule or custom LightningDataModule
 ### Optional Sections
 
 ```yaml
-_requires_:  # Import Python modules
-  - "$import torch"
-  - "$from datetime import datetime"
+_imports_:   # Modules for $ expressions
+  math: math
 
-vars:        # Reusable variables
+seed: 42     # Seeds the run (default: PL_GLOBAL_SEED, else 0)
+
+vars:        # Reusable variables (any key name works)
   num_classes: 10
   lr: 0.001
-
-args:        # Stage-specific arguments
-  fit:
-    ckpt_path: null
-  test:
-    ckpt_path: "checkpoints/best.ckpt"
 ```
+
+Stage arguments such as the checkpoint are CLI flags: `lighter test config.yaml --ckpt_path path/to/file.ckpt`.
 
 ## CLI Overrides
 
@@ -403,6 +377,7 @@ Configs merge automatically:
 ```yaml
 # base.yaml
 trainer:
+  _target_: pytorch_lightning.Trainer
   max_epochs: 10
   accelerator: auto
 
@@ -459,20 +434,6 @@ val_metrics: "%model::train_metrics"  # New instance
 
 ---
 
-### ❌ Wrong: Using `::` for Python Attributes
-
-```yaml
-params: "$@model::network::parameters()"
-```
-
-### ✅ Correct: Using `.` for Python Attributes
-
-```yaml
-params: "$@model::network.parameters()"
-```
-
----
-
 ### ❌ Wrong: Missing `$` for Expressions
 
 ```yaml
@@ -482,7 +443,7 @@ batch_size: "@vars::base_batch * 2"  # Treated as string!
 ### ✅ Correct: Using `$` for Expressions
 
 ```yaml
-batch_size: "$%vars::base_batch * 2"  # Evaluated
+batch_size: "$@vars::base_batch * 2"  # Evaluated
 ```
 
 ## Advanced: Conditional Config
@@ -498,24 +459,18 @@ model:
     num_classes: 10
 ```
 
-## Advanced: Dynamic Imports
+## Advanced: Imports for Expressions
 
 ```yaml
-_requires_:
-  - "$import datetime"
-  - "$from pathlib import Path"
+_imports_:
+  datetime: datetime
 
-trainer:
-  logger:
-    name: "$datetime.datetime.now().strftime('%Y%m%d_%H%M%S')"
+run_name: "$datetime.datetime.now().strftime('%Y%m%d_%H%M%S')"
 ```
 
 ## Complete Example
 
 ```yaml
-_requires_:
-  - "$import torch"
-
 vars:
   num_classes: 10
   base_lr: 0.001
@@ -527,12 +482,12 @@ trainer:
   accelerator: auto
   callbacks:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      monitor: val_loss
+      monitor: val/loss/epoch
       mode: min
       save_top_k: 3
 
 model:
-  _target_: lighter.LighterModule
+  _target_: project.model.MyModel  # A LighterModule subclass with your step methods
 
   network:
     _target_: torchvision.models.resnet18
@@ -543,18 +498,18 @@ model:
 
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable
     lr: "%vars::base_lr"
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
+    _mode_: callable
     T_max: "%vars::max_epochs"
 
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: "%vars::num_classes"
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: "%vars::num_classes"
 
   val_metrics: "%model::train_metrics"
 
@@ -569,6 +524,8 @@ data:
       root: ./data
       train: true
       download: true
+      transform:
+        _target_: torchvision.transforms.ToTensor
 ```
 
 ## Quick Reference
@@ -583,7 +540,7 @@ data:
 | `%` | Raw reference | `%model::train_metrics` |
 | `$` | Python expression | `$0.001 * 2` |
 | `::` | Config path | `model::optimizer::lr` |
-| `.` | Python attribute | `@model::network.parameters()` |
+| `.` | Python attribute | `$@model::network.fc` |
 | `=` | Replace operator | `=callbacks:` |
 | `~` | Delete operator | `~callbacks: [0, 2]` |
 

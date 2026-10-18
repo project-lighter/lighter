@@ -46,15 +46,16 @@ lighter fit config.yaml
 
 ### Output Structure
 
+Lightning's default logger writes each run to a new version folder, and Lighter saves the composed config there:
+
 ```
-outputs/
-└── YYYY-MM-DD/
-    └── HH-MM-SS/
-        ├── config.yaml          # Copy of config used
-        ├── checkpoints/
-        │   ├── last.ckpt       # Latest checkpoint
-        │   └── epoch=09-step=1000.ckpt
-        └── logs/               # Tensorboard/CSV logs
+lightning_logs/
+└── version_0/
+    ├── config.yaml              # The composed config of this run
+    ├── hparams.yaml             # The same config, as logged by Lightning
+    ├── metrics.csv              # (CSVLogger; TensorBoard event files if tensorboard is installed)
+    └── checkpoints/
+        └── epoch=9-step=1000.ckpt
 ```
 
 ### Resuming Training
@@ -104,9 +105,9 @@ lighter fit config.yaml \
 ### Complex Overrides
 
 ```bash
-# Add callbacks from CLI
+# Add a callback from the CLI (a list override is appended to the existing list)
 lighter fit config.yaml \
-  'trainer::callbacks=[{_target_: pytorch_lightning.callbacks.EarlyStopping, monitor: val/loss}]'
+  'trainer::callbacks=[{_target_: pytorch_lightning.callbacks.EarlyStopping, monitor: val/loss/epoch}]'
 ```
 
 ## Merging Configs
@@ -123,12 +124,13 @@ lighter fit base.yaml experiment.yaml
 
 ```yaml
 trainer:
+  _target_: pytorch_lightning.Trainer
   max_epochs: 100
   accelerator: auto
   devices: 1
 
 model:
-  _target_: models.MyModel
+  _target_: project.models.MyModel
   network:
     _target_: torchvision.models.resnet18
     num_classes: 10
@@ -149,7 +151,9 @@ trainer:
 
 model:
   optimizer:
-    lr: 0.01  # Add optimizer config
+    _target_: torch.optim.Adam  # Add optimizer config
+    _mode_: callable
+    lr: 0.01
 ```
 
 **Result**: Merged config with `max_epochs=200`, `devices=4`, new optimizer.
@@ -183,15 +187,14 @@ data:
 
 ### Automatic Checkpointing
 
-Lightning saves `last.ckpt` automatically. For more control:
+By default Lightning saves the latest epoch as `epoch=N-step=M.ckpt` in the run's version folder. For more control:
 
 ```yaml
 trainer:
   callbacks:
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       dirpath: checkpoints
-      filename: 'epoch{epoch:02d}-loss{val/loss:.4f}'
-      monitor: val/loss
+      monitor: val/loss/epoch
       mode: min
       save_top_k: 3          # Keep best 3
       save_last: true        # Keep last checkpoint
@@ -206,7 +209,7 @@ trainer:
   monitor: val/acc
   mode: max
   save_top_k: 1
-  filename: 'best-acc{val/acc:.4f}'
+  filename: best-acc
 ```
 
 ### Multiple Checkpointers
@@ -241,20 +244,20 @@ trainer:
 **For validation/testing**:
 
 ```bash
-lighter validate config.yaml --ckpt_path checkpoints/best.ckpt
-lighter test config.yaml --ckpt_path checkpoints/best.ckpt
+lighter validate config.yaml --ckpt_path path/to/file.ckpt
+lighter test config.yaml --ckpt_path path/to/file.ckpt
 ```
 
 **For inference**:
 
 ```bash
-lighter predict config.yaml --ckpt_path checkpoints/best.ckpt
+lighter predict config.yaml --ckpt_path path/to/file.ckpt
 ```
 
 **To resume training**:
 
 ```bash
-lighter fit config.yaml --ckpt_path checkpoints/last.ckpt
+lighter fit config.yaml --ckpt_path checkpoints/last.ckpt  # with the ModelCheckpoint above (save_last, dirpath)
 ```
 
 ## Logging
@@ -328,92 +331,41 @@ trainer:
 
 ## Saving Predictions
 
-Use Writers to save predictions to files.
+Writers are callbacks that save what `predict_step` returns.
 
 ### CSV Writer
-
-Save predictions to CSV:
 
 ```yaml
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.CSVWriter
-      write_interval: batch  # or 'epoch'
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [id, prediction]
 ```
 
-Your `predict_step` should return a dict:
+Your `predict_step` returns a dict with those keys, one value per sample:
 
 ```python
 def predict_step(self, batch, batch_idx):
-    x, y = batch
-    pred = self(x)
-
-    return {
-        "prediction": pred.argmax(dim=1),
-        "probability": pred.max(dim=1).values,
-        "target": y,
-    }
+    x, ids = batch
+    return {"id": ids, "prediction": self(x).argmax(dim=1)}
 ```
-
-Output: `predictions.csv` with columns for each key.
 
 ### File Writer
 
-Save predictions to individual files:
+Save one file per sample:
 
 ```yaml
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      write_interval: batch
+      directory: predictions
+      value_key: prediction
+      writer_fn: tensor  # or image_2d, image_3d, text, or a function (path, value)
 ```
 
-Return dict with data and filenames:
-
-```python
-def predict_step(self, batch, batch_idx, dataloader_idx=0):
-    images, paths = batch
-
-    predictions = self(images)
-
-    # Save each prediction
-    results = []
-    for i, (pred, path) in enumerate(zip(predictions, paths)):
-        results.append({
-            "prediction": pred.cpu().numpy(),
-            "$id": f"pred_{batch_idx}_{i}",  # Unique filename
-        })
-
-    return results
-```
-
-Saves: `predictions/pred_0_0.npz`, `pred_0_1.npz`, etc.
-
-### Custom Writer
-
-Create your own:
-
-```python
-from lighter.callbacks import BaseWriter
-
-class CustomWriter(BaseWriter):
-    def write(self, data):
-        """Save data however you want."""
-        # data is what you returned from predict_step
-        output_path = self.output_dir / f"{data['$id']}.pkl"
-
-        with open(output_path, 'wb') as f:
-            pickle.dump(data, f)
-```
-
-Use in config:
-
-```yaml
-trainer:
-  callbacks:
-    - _target_: my_project.writers.CustomWriter
-      write_interval: batch
-```
+Pass `--no-return_predictions` to `lighter predict` when the writer is all you need, so Lightning does not
+also keep every prediction in memory.
 
 ## Debugging
 
@@ -483,14 +435,8 @@ trainer:
   _target_: pytorch_lightning.Trainer
   callbacks:
     - _target_: pytorch_lightning.callbacks.LearningRateFinder
-      min_lr: 1e-6
+      min_lr: 0.000001
       max_lr: 1.0
-```
-
-Or run tuner:
-
-```bash
-lighter fit config.yaml trainer::auto_lr_find=true
 ```
 
 ## Multi-GPU Training
@@ -543,21 +489,9 @@ trainer:
   strategy: fsdp
 ```
 
-### Batch Size Adjustment
+### Batch Size
 
-Scale batch size with GPUs:
-
-```yaml
-vars:
-  num_gpus: 4
-  per_gpu_batch: 32
-
-data:
-  train_dataloader:
-    batch_size: "$%vars::per_gpu_batch * %vars::num_gpus"
-```
-
-Or keep per-GPU batch size:
+With DDP, every process builds its own dataloader, so `batch_size` is per GPU:
 
 ```yaml
 # Each GPU gets batch_size=32
@@ -663,7 +597,7 @@ trainer:
 Run validation on a checkpoint:
 
 ```bash
-lighter validate config.yaml --ckpt_path checkpoints/best.ckpt
+lighter validate config.yaml --ckpt_path path/to/file.ckpt
 ```
 
 ### Validation Frequency
@@ -701,23 +635,19 @@ trainer:
 Run final test after training:
 
 ```bash
-# Fit then test automatically
+# Train
 lighter fit config.yaml
 
-# Test separately
-lighter test config.yaml --ckpt_path checkpoints/best.ckpt
+# Then test a checkpoint
+lighter test config.yaml --ckpt_path lightning_logs/version_0/checkpoints/epoch=9-step=1000.ckpt
 ```
-
-### Test During Fit
-
-Not recommended, but possible by loading checkpoint at end of fit.
 
 ## Prediction/Inference
 
 Run inference on data:
 
 ```bash
-lighter predict config.yaml --ckpt_path checkpoints/best.ckpt
+lighter predict config.yaml --ckpt_path path/to/file.ckpt
 ```
 
 Requires:
@@ -734,13 +664,15 @@ data:
     _target_: torch.utils.data.DataLoader
     batch_size: 32
     dataset:
-      _target_: my_project.data.PredictionDataset
+      _target_: project.data.PredictionDataset
       root: ./inference_data
 
 trainer:
   callbacks:
     - _target_: lighter.callbacks.FileWriter
-      write_interval: batch
+      directory: predictions
+      value_key: predictions
+      writer_fn: tensor
 ```
 
 Example predict_step:
@@ -750,10 +682,7 @@ def predict_step(self, batch, batch_idx):
     images = batch
     predictions = self(images)
 
-    return {
-        "predictions": predictions.cpu(),
-        "batch_idx": batch_idx,
-    }
+    return {"predictions": predictions}
 ```
 
 ## Experiment Organization
@@ -772,9 +701,7 @@ my_project/
 │   └── ablation/
 │       ├── no_dropout.yaml
 │       └── no_batchnorm.yaml
-└── outputs/                # Generated by Lighter
-    └── YYYY-MM-DD/
-        └── HH-MM-SS/
+└── lightning_logs/         # Written by Lightning: one version_N/ folder per run
 ```
 
 ### Config Naming
@@ -828,42 +755,11 @@ lighter fit base.yaml model::network::_target_=torchvision.models.efficientnet_b
 Training crashed? Resume:
 
 ```bash
-lighter fit config.yaml --ckpt_path outputs/2024-01-15/10-30-45/checkpoints/last.ckpt
+lighter fit config.yaml --ckpt_path lightning_logs/version_0/checkpoints/epoch=4-step=500.ckpt
 ```
 
-### Workflow 3: Incremental Training
-
-Train, then finetune:
-
-```bash
-# Initial training
-lighter fit pretrain.yaml
-
-# Finetune with lower LR
-lighter fit finetune.yaml \
-  --ckpt_path outputs/.../checkpoints/last.ckpt \
-  model::optimizer::lr=0.0001
-```
-
-### Workflow 4: Cross-Validation
-
-Run multiple folds:
-
-```bash
-for fold in {0..4}; do
-  lighter fit config.yaml data::fold=$fold
-done
-```
-
-Config:
-
-```python
-# data.py
-class CVDataset(Dataset):
-    def __init__(self, root, fold, num_folds=5):
-        # Split data by fold
-        ...
-```
+Each run logs to a new version folder, so name the checkpoint file. `--ckpt_path last` works only when
+a `ModelCheckpoint` with `save_last: true` writes to a fixed `dirpath` shared by the runs.
 
 ## Output Management
 
@@ -976,19 +872,14 @@ trainer:
    lighter fit config.yaml trainer::overfit_batches=10
    ```
 
-2. Check learning rate:
-   ```bash
-   lighter fit config.yaml trainer::auto_lr_find=true
-   ```
-
-3. Visualize data:
+2. Visualize data:
    ```python
    # In training_step
    if batch_idx == 0:
        self.logger.experiment.add_images("train/batch", x[:8])
    ```
 
-4. Profile:
+3. Profile:
    ```bash
    lighter fit config.yaml trainer::profiler=simple
    ```

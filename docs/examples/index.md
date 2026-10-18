@@ -10,13 +10,13 @@ Lighter includes example projects demonstrating real-world applications across v
 
 | Project | Domain | Description | Extra Dependencies |
 |---------|--------|-------------|-------------------|
-| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | Basic image classification with ResNet | - |
+| [cifar10](https://github.com/project-lighter/lighter/tree/main/projects/cifar10) | Image Classification | A small CNN on CIFAR-10 | torchvision |
 | [eeg](https://github.com/project-lighter/lighter/tree/main/projects/eeg) | EEG Analysis | Brain signal classification | braindecode, eegdash, mne |
 | [huggingface_llm](https://github.com/project-lighter/lighter/tree/main/projects/huggingface_llm) | Text Classification | Sentiment analysis with HuggingFace Transformers | transformers, datasets |
-| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Parameter-Efficient Fine-Tuning | LoRA fine-tuning of language models | peft |
+| [lora](https://github.com/project-lighter/lighter/tree/main/projects/lora) | Parameter-Efficient Fine-Tuning | LoRA fine-tuning of a vision model on CIFAR-100 | peft, torchvision |
 | [medical_segmentation](https://github.com/project-lighter/lighter/tree/main/projects/medical_segmentation) | Medical Imaging | 3D medical image segmentation | monai, itk |
 | [self_supervised](https://github.com/project-lighter/lighter/tree/main/projects/self_supervised) | Self-Supervised Learning | SimCLR contrastive learning | lightly |
-| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video Understanding | Video classification with SlowFast | pytorchvideo, av |
+| [video_recognition](https://github.com/project-lighter/lighter/tree/main/projects/video_recognition) | Video Understanding | 3D CNN and video transformer on UCF101 | pytorchvideo, av |
 | [vision_language](https://github.com/project-lighter/lighter/tree/main/projects/vision_language) | Vision-Language | CLIP-style image-text contrastive learning | transformers |
 
 ## Running an Example

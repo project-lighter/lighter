@@ -17,7 +17,6 @@ Lighter uses a **project folder** with auto-discovery. When you add `__lighter__
 ```
 cifar10/
 ├── __lighter__.py          # Marker file
-├── __init__.py             # Python package
 ├── model.py                # Your models
 └── configs/
     └── config.yaml
@@ -38,34 +37,24 @@ A typical Lighter project looks like this:
 ```
 my_project/
 ├── __lighter__.py          # Marker file (can be empty)
-├── __init__.py             # Makes it a package
 ├── model.py                # Your models
 ├── data.py                 # Your datasets
 ├── transforms.py           # Your transforms
-├── configs/
-│   ├── baseline.yaml
-│   └── improved.yaml
-└── outputs/                # Created by Lighter
+└── configs/
+    ├── baseline.yaml
+    └── improved.yaml
 ```
 
 ### The `__lighter__.py` Marker
 
-This file tells Lighter where your project root is. It can be empty:
+This file tells Lighter where your project root is. Lighter never runs it, so it can be empty:
 
 ```python
 # __lighter__.py
 # This file can be empty - it just marks your project root
 ```
 
-Or use it for project-level imports:
-
-```python
-# __lighter__.py
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
-# Any imports here run before config loading
-```
+Code that should run when the project is imported belongs in an `__init__.py` next to it.
 
 ### The `__init__.py` Files
 
@@ -117,20 +106,12 @@ class SimpleNet(nn.Module):
 
 ```yaml
 model:
-  _target_: lighter.LighterModule
+  _target_: project.model.Classifier  # Your LightningModule or LighterModule
 
   network:
     _target_: project.model.SimpleNet  # project.file.Class
     num_classes: 10
     dropout: 0.3
-
-  criterion:
-    _target_: torch.nn.CrossEntropyLoss
-
-  optimizer:
-    _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
-    lr: 0.001
 ```
 
 **Pattern**: `project.module_name.ClassName`
@@ -463,46 +444,6 @@ class MyModule(BaseVisionModule):
         # ... rest of training step ...
 ```
 
-### Pattern 3: Config Inheritance
-
-Use YAML anchors for shared config:
-
-**`configs/base.yaml`**:
-
-```yaml
-# Shared settings
-defaults: &defaults
-  trainer:
-    max_epochs: 100
-    accelerator: auto
-
-  data:
-    train_dataloader:
-      batch_size: 32
-      num_workers: 4
-
-# Experiment inherits defaults
-<<: *defaults
-
-model:
-  _target_: project.model.SimpleNet
-```
-
-**`configs/large_batch.yaml`**:
-
-```yaml
-# Override just batch size (compose with base.yaml via CLI)
-data:
-  train_dataloader:
-    batch_size: 128
-```
-
-Run by composing configs:
-
-```bash
-lighter fit configs/base.yaml configs/large_batch.yaml
-```
-
 ## Organizing Larger Projects
 
 For projects with many modules, organize by functionality:
@@ -560,22 +501,8 @@ data:
 
 **Solution**: Check these in order:
 
-1. `__lighter__.py` exists in project root
-2. You're running `lighter` from the directory containing `__lighter__.py`
-3. All directories have `__init__.py`
-
-```bash
-# Run from here
-my_project/
-├── __lighter__.py          # ✅ Exists
-├── __init__.py             # ✅ Exists
-└── model.py
-
-# Not from here
-parent/
-└── my_project/
-    └── ...
-```
+1. `__lighter__.py` exists in the project folder, or in a parent folder of your config file
+2. The `_target_` starts with `project.` (e.g. `project.model.SimpleNet`)
 
 ### Import Error: `cannot import name 'MyClass'`
 
@@ -594,22 +521,6 @@ class SimpleNet(nn.Module):  # Must match config exactly
 network:
   _target_: project.model.SimpleNet  # Exact match
 ```
-
-### Attribute Error in Config
-
-**Problem**: `AttributeError: 'SimpleNet' object has no attribute 'parameters'`
-
-**Solution**: You're using `::` instead of `.` for Python methods:
-
-```yaml
-# ❌ WRONG
-params: "$@model::network::parameters()"
-
-# ✅ CORRECT
-params: "$@model::network.parameters()"
-```
-
-Remember: `::` navigates config, `.` accesses Python attributes.
 
 ## Best Practices
 
@@ -687,7 +598,6 @@ Here's a full working example:
 ```
 cifar10/
 ├── __lighter__.py
-├── __init__.py
 ├── model.py
 ├── data.py
 ├── configs/
@@ -699,6 +609,7 @@ cifar10/
 **model.py**:
 
 ```python
+import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import torch.nn.functional as F
@@ -812,7 +723,6 @@ my_project/
 _target_: project.module.ClassName
 
 # Common issues
-# ❌ No __lighter__.py
-# ❌ Config file outside the project folder (run from inside the project instead)
-# ❌ Using :: for Python methods (use . instead)
+# ❌ No __lighter__.py next to your code
+# ❌ A _target_ without the project. prefix
 ```

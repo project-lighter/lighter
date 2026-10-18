@@ -12,7 +12,7 @@ Lighter is a YAML configuration layer for PyTorch Lightning experiments.
 
 **You write:** Standard PyTorch Lightning code (LightningModule, datasets, etc.)
 
-**Lighter provides:** YAML configs, CLI overrides, experiment tracking
+**Lighter provides:** YAML configs, CLI overrides, and each run's config saved with its logs and checkpoints
 
 **Result:** Reproducible experiments without hardcoded hyperparameters.
 
@@ -22,7 +22,7 @@ No! Use it directly:
 
 ```yaml
 model:
-  _target_: my_project.MyLightningModule  # Your existing code
+  _target_: project.model.MyLightningModule  # Your existing code, in model.py next to __lighter__.py
   learning_rate: 0.001
 ```
 
@@ -48,16 +48,15 @@ Both are equally supported and give you YAML configs + CLI overrides.
 
 ## How do I use my custom models and datasets?
 
-Three steps:
+Two steps:
 
-1. Add `__lighter__.py` to your project root (can be empty)
-2. Ensure all directories have `__init__.py`
-3. Reference as `project.module.ClassName` in config
+1. Add an empty `__lighter__.py` to your project folder
+2. Reference your code as `project.module.ClassName` in config
 
 ```yaml
 model:
   network:
-    _target_: my_project.models.CustomNet
+    _target_: project.models.CustomNet
     num_classes: 10
 ```
 
@@ -95,13 +94,7 @@ val_metrics: "@model::train_metrics"
 val_metrics: "%model::train_metrics"
 ```
 
-Use `@` for everything else (optimizer, scheduler, network):
-
-```yaml
-# ✅ CORRECT - Pass actual object
-optimizer:
-  params: "$@model::network.parameters()"
-```
+Use `@` to pass the same object or value, e.g. `out_features: "@num_classes"`.
 
 ## Can I use multiple GPUs?
 
@@ -137,21 +130,14 @@ lighter fit config.yaml trainer::fast_dev_run=true
 
 **Import errors** - Check:
 
-- `__lighter__.py` exists in project root
-- All directories have `__init__.py`
-- Running `lighter` from directory with `__lighter__.py`
+- `__lighter__.py` exists in your project folder (or a parent folder of your config)
+- Your `_target_` starts with `project.`
 
-**Attribute errors** - Using `::` for Python methods?
+Print the composed config without building anything:
 
-```yaml
-# ❌ WRONG
-params: "$@model::network::parameters()"
-
-# ✅ CORRECT
-params: "$@model::network.parameters()"
+```bash
+lighter fit config.yaml --print_config
 ```
-
-Remember: `::` for config, `.` for Python.
 
 ### 3. Validate Config Syntax
 
@@ -174,15 +160,16 @@ Use Writers:
 ```yaml
 trainer:
   callbacks:
-    - _target_: lighter.callbacks.CSVWriter
-      write_interval: batch
+    - _target_: lighter.callbacks.CsvWriter
+      path: predictions.csv
+      keys: [prediction, probability]
 ```
 
 In your module:
 
 ```python
 def predict_step(self, batch, batch_idx):
-    x = batch
+    x, _ = batch
     pred = self(x)
 
     return {
@@ -197,7 +184,7 @@ Results saved to `predictions.csv`.
 
 ## Can I merge multiple configs?
 
-Yes! Separate comma-separated paths:
+Yes! Pass several files, separated by spaces:
 
 ```bash
 lighter fit base.yaml experiment.yaml
@@ -224,27 +211,27 @@ Similar concept, different focus:
 **Lighter:**
 
 - Specialized for PyTorch Lightning
-- Built-in CLI commands (`fit`, `test`, `predict`)
+- Built-in CLI commands (`fit`, `validate`, `test`, `predict`)
 - Automatic object instantiation
-- Zero-config experiment tracking
+- No sweeps, launchers or config groups of its own: stack config files, and use Lightning's run folders and your logger
 
 If you're doing deep learning with Lightning, Lighter is simpler. If you need general Python app config, use Hydra.
 
 ## Where can I get help?
 
 - **Discord**: [discord.gg/zJcnp6KrUp](https://discord.gg/zJcnp6KrUp) - Community support
-- **GitHub**: [github.com/project-lighter/lighter](https://github.com/project-lighter/lighter) - Issues and discussions
+- **GitHub**: [github.com/project-lighter/lighter](https://github.com/project-lighter/lighter) - Issues
 - **Docs**: You're here! Check the guides.
 
 ## How do I cite Lighter?
 
 ```bibtex
-@article{lighter2024,
-  title={Lighter: A lightweight deep learning framework for rapid experimentation},
-  author={...},
-  journal={Journal of Open Source Software},
-  year={2024},
-  doi={10.21105/joss.08101}
+@article{lighter,
+    doi = {10.21105/joss.08101},
+    year = {2025}, publisher = {The Open Journal}, volume = {10}, number = {111}, pages = {8101},
+    author = {Hadzic, Ibrahim and Pai, Suraj and Bressem, Keno and Foldyna, Borek and Aerts, Hugo JWL},
+    title = {Lighter: Configuration-Driven Deep Learning},
+    journal = {Journal of Open Source Software}
 }
 ```
 
@@ -255,7 +242,7 @@ If you're doing deep learning with Lightning, Lighter is simpler. If you need ge
 Yes! Lighter is open source:
 
 - **Report bugs**: [GitHub Issues](https://github.com/project-lighter/lighter/issues)
-- **Request features**: [GitHub Discussions](https://github.com/project-lighter/lighter/discussions)
+- **Request features**: [GitHub Issues](https://github.com/project-lighter/lighter/issues)
 - **Contribute code**: Submit PRs
 
 See [CONTRIBUTING.md](https://github.com/project-lighter/lighter/blob/main/CONTRIBUTING.md) for guidelines.

@@ -33,9 +33,9 @@ trainer = Trainer(max_epochs=10)  # And this one too
 
 ```bash
 # Try different learning rates without touching code
-lighter fit config.yaml model::optimizer::lr=0.001
-lighter fit config.yaml model::optimizer::lr=0.01
-lighter fit config.yaml model::optimizer::lr=0.1
+lighter fit config.yaml model::learning_rate=0.001
+lighter fit config.yaml model::learning_rate=0.01
+lighter fit config.yaml model::learning_rate=0.1
 
 # Every experiment is reproducible - just version control your configs
 ```
@@ -47,10 +47,11 @@ pip install lighter
 pip install tensorboard  # optional: Lightning logs to TensorBoard when it is installed, else to CSV
 ```
 
-**Use your existing PyTorch Lightning code:**
+**Use your existing PyTorch Lightning code.** Put it in a folder with an empty `__lighter__.py`, which tells
+Lighter to import that folder as `project`:
 
 ```python
-# model.py
+# model.py (next to __lighter__.py)
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -80,7 +81,7 @@ trainer:
   max_epochs: 10
 
 model:
-  _target_: model.MyModel
+  _target_: project.model.MyModel
   network:
     _target_: torchvision.models.resnet18
     num_classes: 10
@@ -96,6 +97,8 @@ data:
       root: ./data
       train: true
       download: true
+      transform:
+        _target_: torchvision.transforms.ToTensor
 ```
 
 **Run and iterate fast:**
@@ -112,8 +115,8 @@ lighter fit config.yaml data::train_dataloader::batch_size=64
 # Use multiple GPUs
 lighter fit config.yaml trainer::devices=4
 
-# Every run creates timestamped outputs with saved configs
-# outputs/2025-11-21/14-30-45/config.yaml  # Fully reproducible
+# Every run logs to a new lightning_logs/version_N/ folder, with the config it ran
+# lightning_logs/version_0/config.yaml
 ```
 
 ## Key Benefits
@@ -122,12 +125,12 @@ lighter fit config.yaml trainer::devices=4
 - **Fast iteration**: Override any parameter from CLI without editing code.
 - **Zero lock-in**: Works with any PyTorch Lightning module. Your code, your logic.
 - **Composable**: Merge configs, create recipes, share experiments as files.
-- **Organized**: Automatic timestamped output directories with saved configs.
+- **Recorded**: Each run saves its composed config next to its logs and inside its checkpoints.
 - **Simple**: ~1,200 lines of code. Read the framework in an hour.
 
 ## Optional: Use LighterModule for Less Boilerplate
 
-If you want automatic optimizer configuration and dual logging (step + epoch), use `LighterModule`:
+If you want the optimizer, loss and metrics in the config, and the loss and metrics logged per step and per epoch, use `LighterModule`:
 
 ```python
 from lighter import LighterModule
@@ -138,17 +141,17 @@ class MyModel(LighterModule):
         pred = self(x)
         loss = self.criterion(pred, y)
 
-        if self.train_metrics:
+        if self.train_metrics is not None:
             self.train_metrics(pred, y)
 
-        return {"loss": loss}  # Framework logs automatically
+        return loss  # Lighter logs it as train/loss/step and train/loss/epoch
 
     # validation_step, test_step, predict_step...
 ```
 
 ```yaml
 model:
-  _target_: model.MyModel
+  _target_: project.model.MyModel
   network:
     _target_: torchvision.models.resnet18
     num_classes: 10
@@ -156,12 +159,12 @@ model:
     _target_: torch.nn.CrossEntropyLoss
   optimizer:
     _target_: torch.optim.Adam
-    params: "$@model::network.parameters()"
+    _mode_: callable  # LighterModule calls it with the model's parameters
     lr: 0.001
   train_metrics:
-    - _target_: torchmetrics.Accuracy
-      task: multiclass
-      num_classes: 10
+    _target_: torchmetrics.Accuracy
+    task: multiclass
+    num_classes: 10
 ```
 
 **LighterModule gives you:**
@@ -186,16 +189,16 @@ for lr in 0.001 0.01 0.1; do
   done
 done
 
-# Each run saved in outputs/YYYY-MM-DD/HH-MM-SS/ with config.yaml
-# Compare experiments by diffing configs
+# Each run logs to its own lightning_logs/version_N/ with its config.yaml
+# Compare experiments by diffing those configs
 ```
 
 ## Documentation
 
-- 📚 [Get Started Tutorial](https://project-lighter.github.io/lighter/tutorials/get-started/) - 15 min walkthrough
-- ⚙️ [Configuration Guide](https://project-lighter.github.io/lighter/how-to/configuration/) - Master the syntax
-- 🎯 [LighterModule Design](https://project-lighter.github.io/lighter/design/model/) - Understand the internals
-- 🏗️ [Architecture Overview](https://project-lighter.github.io/lighter/design/overview/) - How it all works
+- [Quick Start](https://project-lighter.github.io/lighter/quickstart/)
+- [Configuration Guide](https://project-lighter.github.io/lighter/guides/configuration/)
+- [LighterModule](https://project-lighter.github.io/lighter/guides/lighter-module/)
+- [Your Code](https://project-lighter.github.io/lighter/guides/custom-code/)
 
 ## Real-World Usage
 
