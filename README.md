@@ -123,7 +123,7 @@ lighter fit config.yaml trainer::devices=4
 - **Zero lock-in**: Works with any PyTorch Lightning module. Your code, your logic.
 - **Composable**: Merge configs, create recipes, share experiments as files.
 - **Organized**: Automatic timestamped output directories with saved configs.
-- **Simple**: ~500 lines of code. Read the framework in 30 minutes.
+- **Simple**: ~1,200 lines of code. Read the framework in an hour.
 
 ## Optional: Use LighterModule for Less Boilerplate
 

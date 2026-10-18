@@ -96,3 +96,4 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - `pyyaml` is declared as a dependency (Lighter imports it directly).
 - Project URLs point at `github.com/project-lighter/lighter`.
 - The docs passed several config files separated by commas; the CLI takes them separated by spaces.
+- The README states Lighter's real size (~1,200 lines); a test keeps `src/lighter` at most 1,400 lines and the README within 10%.
