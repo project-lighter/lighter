@@ -39,7 +39,7 @@ Lightning gives every run, of any stage, a new folder under `lightning_logs/` (o
 lightning_logs/
 └── version_0/
     ├── config.yaml        # the composed config, including the seed
-    ├── hparams.yaml       # the same config, logged as hyperparameters
+    ├── hparams.yaml       # the config as the logger's hyperparameters
     ├── metrics.csv        # or TensorBoard files, if tensorboard is installed
     └── checkpoints/
         └── epoch=19-step=160.ckpt

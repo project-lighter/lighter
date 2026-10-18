@@ -89,10 +89,13 @@ def test_load_model_of_a_weights_only_checkpoint_reads_the_run_config(run):
     assert torch.equal(loaded.network.weight, model.network.weight)
 
 
-def test_load_model_needs_a_lighter_checkpoint(tmp_path):
+@pytest.mark.parametrize("project_config", [False, True])
+def test_load_model_needs_a_lighter_checkpoint(tmp_path, project_config):
+    if project_config:  # a fixed `dirpath: checkpoints` sits next to the project's own config, not a run's
+        (tmp_path / "config.yaml").write_text("model:\n  _target_: torch.nn.Identity\n")
     (tmp_path / "checkpoints").mkdir()
     torch.save({"state_dict": {}}, tmp_path / "checkpoints" / "plain.ckpt")
-    with pytest.raises(ValueError, match=r"holds no Lighter config .*save_weights_only=True.*there is no .*config\.yaml"):
+    with pytest.raises(ValueError, match=r"holds no Lighter config .*save_weights_only=True.*no config\.yaml saved by"):
         load_model(tmp_path / "checkpoints" / "plain.ckpt")
 
 
@@ -114,7 +117,7 @@ def test_save_config_writes_only_on_global_zero(tmp_path):
     trainer.logger.log_hyperparams.assert_not_called()
     trainer.is_global_zero = True
     SaveConfig({"seed": 1}).setup(trainer, None, "fit")
-    assert (tmp_path / "config.yaml").read_text() == "seed: 1\n"
+    assert (tmp_path / "config.yaml").read_text() == "# Saved by Lighter: the composed config of this run.\nseed: 1\n"
     trainer.logger.log_hyperparams.assert_called_once_with({"seed": 1})
 
 

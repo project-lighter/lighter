@@ -28,7 +28,8 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 - `lighter.load_model(ckpt_path, overrides=())` rebuilds a model from the config saved in its checkpoint and
   loads its weights (with `torch.load(weights_only=True)` by default), finding the project from the checkpoint's folder.
-  A checkpoint saved with `save_weights_only=True` holds no config, so the run's `config.yaml` is used instead.
+  A checkpoint saved with `save_weights_only=True` holds no config, so the `config.yaml` its run saved is used
+  instead; a saved `config.yaml` starts with a `# Saved by Lighter` comment, which marks it as a run's.
 - A step that returns something other than a loss tensor, a number, a dict with a `"loss"` key or None
   (e.g. a tuple) warns that no loss is logged.
 

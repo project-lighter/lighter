@@ -138,6 +138,7 @@ banner and saves the config. `batch_size` is per process. A test runs this with 
 ```
 
 `lighter.load_model` builds the model from the config saved in the checkpoint, with any overrides you pass as
-its second argument, and loads the weights. A checkpoint saved
-with `save_weights_only=True` holds no config; then `load_model` reads the `config.yaml` in the folder above
-`checkpoints/`, which is the run's folder unless the checkpoint callback has its own `dirpath`.
+its second argument, and loads the weights. A checkpoint saved with `save_weights_only=True` holds no config;
+then `load_model` reads the `config.yaml` that the run saved in the folder above `checkpoints/`. When the
+checkpoint callback has its own `dirpath`, as in `recipes/resume.yaml`, there is none: build the model with
+`lighter.build("lightning_logs/version_0/config.yaml")` and load the weights yourself.
