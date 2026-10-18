@@ -107,7 +107,7 @@ class Freezer(Callback):
         """
         # If the model is a `LighterModule`, get the underlying network so users
         # can specify layer names without the "network." prefix.
-        from lighter import LighterModule
+        from lighter.model import LighterModule
 
         target = model.network if isinstance(model, LighterModule) else model
 

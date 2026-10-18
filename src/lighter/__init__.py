@@ -5,7 +5,7 @@ Lighter is a framework for streamlining deep learning experiments with configura
 __version__ = "0.1.0"
 
 from .data import LighterDataModule
-from .engine.runner import Runner
+from .engine.runner import Runner, build
 from .model import LighterModule
 
-__all__ = ["LighterDataModule", "LighterModule", "Runner"]
+__all__ = ["LighterDataModule", "LighterModule", "Runner", "build"]

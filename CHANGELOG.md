@@ -4,6 +4,16 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 ## Unreleased
 
+### Added
+
+- A top-level `seed:` key (default: `PL_GLOBAL_SEED`, else 0) seeds the run, including DataLoader workers,
+  and is written into the saved config. Migration: rename any top-level `seed` key you used for something else.
+- `python -m lighter` runs the CLI.
+- `lighter.build(*inputs)` returns `(model, trainer, datamodule)` without running a stage, and `Runner.run`
+  returns the stage's result (e.g. the metrics of `validate`/`test`, the predictions of `predict`).
+- Modules and trainers from the `lightning` package (`lightning.pytorch`) are accepted. Mixing them with
+  `pytorch_lightning` objects in one run is reported as an error instead of failing inside Lightning.
+
 ### Changed
 
 - Lighter now depends on six packages: torch, pytorch-lightning, torchmetrics, sparkwheel, pyyaml and cloudpickle.

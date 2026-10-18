@@ -696,13 +696,11 @@ model:
 ### Set Seeds
 
 ```yaml
+seed: 42  # Lighter seeds Python, NumPy, torch and the DataLoader workers (default: 0)
+
 trainer:
   _target_: pytorch_lightning.Trainer
   deterministic: true  # Reproducible
-
-# In __lighter__.py
-import pytorch_lightning as pl
-pl.seed_everything(42, workers=True)
 ```
 
 ### Log Everything

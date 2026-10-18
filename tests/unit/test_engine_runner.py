@@ -1,377 +1,206 @@
-"""Unit tests for the Runner class in lighter/engine/runner.py"""
+"""Unit tests for building and running stages in lighter/engine/runner.py"""
 
-from unittest.mock import MagicMock, mock_open, patch
+import os
+import subprocess
+import sys
+import warnings
+from unittest.mock import MagicMock
 
 import pytest
-from pytorch_lightning import Trainer
+import torch
+from pytorch_lightning import LightningModule, Trainer
 from sparkwheel import Config
+from torch.utils.data import DataLoader, TensorDataset
 
-from lighter.engine.runner import Runner
-from lighter.model import LighterModule
+from lighter import LighterDataModule, Runner, build
+from lighter.engine.runner import _save_config, load_config
 
-
-@pytest.fixture
-def mock_model():
-    """Fixture providing a mock LightningModule instance."""
-    model = MagicMock(spec=LighterModule)
-    model.save_hyperparameters = MagicMock()
-    return model
-
-
-@pytest.fixture
-def mock_datamodule():
-    """Fixture providing a mock LightningDataModule instance."""
-    from pytorch_lightning import LightningDataModule
-
-    datamodule = MagicMock(spec=LightningDataModule)
-    return datamodule
+TRAINER = {
+    "_target_": "pytorch_lightning.Trainer",
+    "accelerator": "cpu",
+    "max_epochs": 1,
+    "logger": False,
+    "enable_checkpointing": False,
+    "enable_progress_bar": False,
+    "enable_model_summary": False,
+    "num_sanity_val_steps": 0,
+}
 
 
-@pytest.fixture
-def mock_runner_trainer():
-    """Fixture providing a mock Trainer instance for runner tests.
+class ResultTask(LightningModule):
+    """A tiny module whose stage results are easy to check."""
 
-    Note: Named differently from the shared mock_trainer to avoid conflicts
-    since this has runner-specific configuration.
-    """
-    trainer = MagicMock(spec=Trainer)
-    trainer.logger = MagicMock()
-    trainer.logger.log_hyperparams = MagicMock()
-    trainer.fit = MagicMock()
-    trainer.validate = MagicMock()
-    trainer.test = MagicMock()
-    trainer.predict = MagicMock()
-    return trainer
+    def __init__(self):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.tensor(1.0))
 
+    def training_step(self, batch, batch_idx):
+        return self.weight * batch[0].float().mean()
 
-@pytest.fixture
-def base_config():
-    """Fixture providing a base configuration dictionary."""
-    return {
-        "trainer": {
-            "_target_": "pytorch_lightning.Trainer",
-            "max_epochs": 10,
-        },
-        "model": {
-            "_target_": "lighter.LighterModule",
-            "model": {"_target_": "torch.nn.Identity"},
-            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
-        },
-        "data": {
-            "_target_": "lighter.LighterDataModule",
-            "train_dataloader": {"batch_size": 32},
-            "val_dataloader": {"batch_size": 32},
-            "test_dataloader": {"batch_size": 32},
-            "predict_dataloader": {"batch_size": 32},
-        },
-        "args": {
-            "fit": {"some_arg": "value"},
-            "validate": {},
-            "test": {},
-            "predict": {},
-        },
-    }
+    def validation_step(self, batch, batch_idx):
+        self.log("score", batch[0].float().mean(), batch_size=len(batch[0]))
+
+    test_step = validation_step
+
+    def predict_step(self, batch, batch_idx):
+        return batch[0] * 2
+
+    def configure_optimizers(self):
+        return torch.optim.SGD(self.parameters(), lr=0.0)
+
+    def train_dataloader(self):
+        return result_loader()
+
+    val_dataloader = test_dataloader = predict_dataloader = train_dataloader
 
 
-@pytest.fixture
-def runner():
-    """Fixture providing a Runner instance."""
-    return Runner()
+def result_loader():
+    return DataLoader(TensorDataset(torch.arange(5)), batch_size=2)
 
 
-def test_runner_initialization(runner):
-    """Test that Runner initializes correctly."""
-    # Runner no longer stores state, just verify it exists
-    assert runner is not None
+def result_data():
+    return LighterDataModule(**{f"{stage}_dataloader": result_loader() for stage in ("train", "val", "test", "predict")})
 
 
-def test_runner_applies_overrides(runner, base_config):
-    """Test that CLI overrides are applied correctly."""
-    # Combine config and overrides into single inputs list
-    inputs = [base_config, "trainer::max_epochs=100"]
-
-    # Mock all methods that would cause side effects
-    with (
-        patch.object(runner, "_resolve_model") as mock_resolve_model,
-        patch.object(runner, "_resolve_trainer") as mock_resolve_trainer,
-        patch.object(runner, "_resolve_datamodule") as mock_resolve_datamodule,
-        patch.object(runner, "_save_config") as mock_save_config,
-        patch.object(runner, "_execute") as mock_execute,
-    ):
-        mock_model = MagicMock()
-        mock_resolve_model.return_value = mock_model
-
-        mock_trainer = MagicMock()
-        mock_resolve_trainer.return_value = mock_trainer
-
-        mock_datamodule = MagicMock()
-        mock_resolve_datamodule.return_value = mock_datamodule
-
-        runner.run("fit", inputs)
-
-        # Verify methods were called
-        mock_resolve_model.assert_called_once()
-        mock_resolve_trainer.assert_called_once()
-        mock_resolve_datamodule.assert_called_once()
-        mock_save_config.assert_called_once()
-        mock_execute.assert_called_once()
+def config(**extra):
+    return {"model": {"_target_": f"{__name__}.ResultTask"}, "trainer": dict(TRAINER), **extra}
 
 
-def test_setup_with_invalid_model(runner, mock_trainer):
-    """Test that _resolve_model raises error for invalid model type."""
-    # Create config that resolves to non-LightningModule object (just a dict)
-    bad_config = {
-        "trainer": {"_target_": "pytorch_lightning.Trainer", "max_epochs": 10},
-        "model": {"_target_": "builtins.dict"},  # This will resolve to dict type, not LightningModule
-    }
-
-    config = Config().update(bad_config)
-
-    # Mock resolve to return dict instead of LightningModule
-    with patch.object(config, "resolve") as mock_resolve:
-        mock_resolve.return_value = dict()  # Returns dict instead of LightningModule
-
-        with pytest.raises(TypeError, match="model must be LightningModule or LighterModule"):
-            runner._resolve_model(config)
+def test_load_config_applies_inputs_in_order():
+    loaded = load_config(config(), "trainer::max_epochs=5", {"trainer": {"devices": 1}})
+    assert loaded.get("trainer::max_epochs") == 5
+    assert loaded.get("trainer::devices") == 1
 
 
-def test_setup_with_invalid_trainer(runner, mock_model):
-    """Test that _resolve_trainer raises error for invalid trainer type."""
-    # Create simple config
-    bad_config = {
-        "trainer": {"_target_": "builtins.dict"},  # This will resolve to dict type
-        "model": {"_target_": "lighter.LighterModule"},
-    }
-
-    config = Config().update(bad_config)
-
-    # Mock resolve to return dict instead of Trainer
-    with patch.object(config, "resolve") as mock_resolve:
-        mock_resolve.return_value = dict()  # Returns dict instead of Trainer
-
-        with pytest.raises(TypeError, match="trainer must be Trainer"):
-            runner._resolve_trainer(config)
+def test_build_returns_objects_without_running():
+    model, trainer, datamodule = build(config())
+    assert isinstance(model, ResultTask)
+    assert isinstance(trainer, Trainer)
+    assert datamodule is None
+    assert trainer.global_step == 0 and model.weight.item() == 1.0
 
 
-def test_execute_calls_stage_method(runner, mock_model, mock_trainer, mock_datamodule):
-    """Test that _execute calls the correct trainer method."""
-    # Test fit
-    runner._execute("fit", mock_model, mock_trainer, mock_datamodule)
-    mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule)
-    mock_trainer.reset_mock()
-
-    # Test validate
-    runner._execute("validate", mock_model, mock_trainer, mock_datamodule)
-    mock_trainer.validate.assert_called_once_with(mock_model, datamodule=mock_datamodule)
-    mock_trainer.reset_mock()
-
-    # Test test
-    runner._execute("test", mock_model, mock_trainer, mock_datamodule)
-    mock_trainer.test.assert_called_once_with(mock_model, datamodule=mock_datamodule)
-    mock_trainer.reset_mock()
-
-    # Test predict
-    runner._execute("predict", mock_model, mock_trainer, mock_datamodule)
-    mock_trainer.predict.assert_called_once_with(mock_model, datamodule=mock_datamodule)
+def test_build_resolves_the_data_key():
+    _, _, datamodule = build(config(data={"_target_": f"{__name__}.result_data"}))
+    assert isinstance(datamodule, LighterDataModule)
 
 
-# Tests for auto-discovery feature
+@pytest.mark.parametrize("stage", ["fit", "validate", "test", "predict"])
+@pytest.mark.parametrize("external_data", [False, True])
+def test_run_returns_the_native_stage_result(tmp_path, stage, external_data):
+    options = {k: v for k, v in TRAINER.items() if k != "_target_"}
+    native_args = {"datamodule": result_data()} if external_data else {}
+    extra = {"data": {"_target_": f"{__name__}.result_data"}} if external_data else {}
+    expected = getattr(Trainer(**options), stage)(ResultTask(), **native_args)
+    actual = Runner().run(stage, [config(**extra)])
+    if stage == "predict":
+        assert torch.equal(torch.cat(actual), torch.arange(5) * 2)
+        assert all(torch.equal(a, b) for a, b in zip(actual, expected, strict=True))
+    elif stage == "fit":
+        assert actual is expected is None
+    else:
+        assert actual == expected == [{"score": 2.0}]
 
 
-def test_auto_discover_project_with_marker(runner, tmp_path, monkeypatch):
-    """Test that the project folder is found by its __lighter__.py marker file."""
-    import sys
+def test_run_rejects_unknown_stage():
+    with pytest.raises(ValueError, match="Unknown stage 'train'"):
+        Runner().run("train", [config()])
 
+
+def test_model_must_be_a_lightning_module():
+    with pytest.raises(TypeError, match="`model` must build a LightningModule, got Linear"):
+        build(config(model={"_target_": "torch.nn.Linear", "in_features": 1, "out_features": 1}))
+
+
+def test_trainer_without_target_explains_the_fix():
+    with pytest.raises(TypeError, match="Add a `_target_` to `trainer:`"):
+        build({"model": {"_target_": f"{__name__}.ResultTask"}, "trainer": {"max_epochs": 1}})
+
+
+def test_lightning_package_modules_are_accepted():
+    import lightning.pytorch as L
+
+    class LightningTask(L.LightningModule):
+        pass
+
+    sys.modules[__name__].LightningTask = LightningTask
+    model, trainer, _ = build(
+        {"model": {"_target_": f"{__name__}.LightningTask"}, "trainer": dict(TRAINER, _target_="lightning.pytorch.Trainer")}
+    )
+    assert isinstance(model, L.LightningModule) and isinstance(trainer, L.Trainer)
+    with pytest.raises(TypeError, match="mixes `pytorch_lightning` and `lightning.pytorch`"):
+        build({"model": {"_target_": f"{__name__}.LightningTask"}, "trainer": dict(TRAINER)})
+
+
+def test_seed_defaults_to_zero_without_a_warning(monkeypatch):
+    monkeypatch.delenv("PL_GLOBAL_SEED", raising=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        build(config())
+    assert os.environ["PL_GLOBAL_SEED"] == "0"
+    assert os.environ["PL_SEED_WORKERS"] == "1"
+
+
+def test_seed_comes_from_the_config_then_the_environment(monkeypatch):
+    build(config(seed=42))
+    first = torch.rand(1)
+    build(config(seed=42))
+    assert torch.equal(first, torch.rand(1))
+    monkeypatch.setenv("PL_GLOBAL_SEED", "7")
+    build(config())
+    assert os.environ["PL_GLOBAL_SEED"] == "7"
+
+
+def test_seed_must_be_an_integer():
+    with pytest.raises(TypeError, match="`seed` must be an integer"):
+        build(config(seed="42"))
+
+
+def test_python_dash_m_lighter_runs_the_cli():
+    result = subprocess.run([sys.executable, "-m", "lighter", "--help"], capture_output=True, text=True, check=True)
+    assert "usage: lighter" in result.stdout
+
+
+# Project discovery
+
+
+def test_auto_discover_project_with_marker(tmp_path, monkeypatch):
+    """The folder holding __lighter__.py is imported as 'project'."""
     from lighter.engine.runner import _import_project
 
-    # Create a project directory with marker file and __init__.py
-    project_dir = tmp_path / "my_project"
-    project_dir.mkdir()
-    marker_file = project_dir / "__lighter__.py"
-    marker_file.touch()
-    init_file = project_dir / "__init__.py"
-    init_file.touch()
-
-    # Change working directory to project
-    monkeypatch.chdir(project_dir)
-
-    # Clean up any previous "project" module to avoid conflicts
+    (tmp_path / "__lighter__.py").touch()
+    (tmp_path / "__init__.py").touch()
+    monkeypatch.chdir(tmp_path)
     sys.modules.pop("project", None)
+    try:
+        assert _import_project() is True
+        assert sys.modules["project"].__path__ == [str(tmp_path)]
+    finally:
+        sys.modules.pop("project", None)
 
-    assert _import_project() is True
 
-    # Cleanup
-    sys.modules.pop("project", None)
-
-
-def test_auto_discover_project_without_marker(runner, tmp_path, monkeypatch):
-    """Test that nothing is imported when the marker is absent."""
+def test_auto_discover_project_without_marker(tmp_path, monkeypatch):
+    """Nothing is imported when the marker is absent."""
     from lighter.engine.runner import _import_project
 
-    # Create a directory without marker file
-    project_dir = tmp_path / "not_a_project"
-    project_dir.mkdir()
-
-    # Change working directory to directory without marker
-    monkeypatch.chdir(project_dir)
-
+    monkeypatch.chdir(tmp_path)
     assert _import_project() is False
 
 
-@patch("lighter.engine.runner.import_module_from_path")
-def test_setup_with_auto_discovery(mock_import, runner, base_config, mock_model, mock_trainer, tmp_path, monkeypatch):
-    """Test that the marked project is imported as 'project'."""
-    from lighter.engine.runner import _import_project
-
-    # Create project directory with marker
-    project_dir = tmp_path / "auto_project"
-    project_dir.mkdir()
-    (project_dir / "__lighter__.py").touch()
-    monkeypatch.chdir(project_dir)
-
-    # Test auto-discovery and import
-    result = _import_project()
-
-    # Verify auto-discovered project was imported as 'project'
-    assert result is True
-    mock_import.assert_called_once_with("project", project_dir)
+# Configuration saving
 
 
-@patch("lighter.engine.runner.import_module_from_path")
-def test_setup_without_project_or_discovery(mock_import, runner, base_config, mock_model, mock_trainer, tmp_path, monkeypatch):
-    """Test that runs work without a project module (plain Lightning)."""
-    from lighter.engine.runner import _import_project
-
-    # Create directory without marker
-    no_project_dir = tmp_path / "plain_lightning"
-    no_project_dir.mkdir()
-    monkeypatch.chdir(no_project_dir)
-
-    # Test auto-discovery without project
-    result = _import_project()
-
-    # Verify no project module was imported
-    assert result is False
-    mock_import.assert_not_called()
+def test_save_config_writes_config_yaml(tmp_path):
+    model, trainer = MagicMock(spec=LightningModule), MagicMock(spec=Trainer)
+    trainer.log_dir = str(tmp_path / "version_0")
+    _save_config(Config().update({"seed": 3}), trainer, model)
+    assert (tmp_path / "version_0" / "config.yaml").read_text() == "seed: 3\n"
+    trainer.logger.log_hyperparams.assert_called_once_with({"seed": 3})
+    model.save_hyperparameters.assert_called_once_with({"config": {"seed": 3}})
 
 
-# Tests for configuration saving
-
-
-@patch("builtins.open", new_callable=mock_open)
-@patch("lighter.engine.runner.yaml.dump")
-def test_save_config_to_trainer_log_dir(mock_yaml_dump, mock_file, runner, base_config, tmp_path, mock_model):
-    """Test that _save_config saves configuration to trainer's log directory."""
-    config = Config().update(base_config)
-
-    # Create mock trainer with log_dir
-    mock_trainer = MagicMock(spec=Trainer)
-    log_dir = tmp_path / "lightning_logs" / "version_0"
-    mock_trainer.log_dir = str(log_dir)
-
-    # Call _save_config with model
-    runner._save_config(config, mock_trainer, mock_model)
-
-    # Verify file was opened at correct path
-    expected_path = log_dir / "config.yaml"
-    mock_file.assert_called_once_with(expected_path, "w")
-
-    # Verify yaml.dump was called with config
-    mock_yaml_dump.assert_called_once()
-    call_args = mock_yaml_dump.call_args
-    assert call_args[0][0] == config.get()
-    assert call_args[1]["default_flow_style"] is False
-    assert call_args[1]["sort_keys"] is False
-
-
-def test_save_config_without_log_dir(runner, base_config, mock_model):
-    """Test that _save_config handles trainer without log_dir gracefully."""
-    config = Config().update(base_config)
-
-    # Create mock trainer without log_dir and without logger
-    mock_trainer = MagicMock(spec=Trainer)
-    mock_trainer.log_dir = None
-    mock_trainer.logger = None
-
-    # Should not raise error
-    runner._save_config(config, mock_trainer, mock_model)
-
-
-def test_save_config_saves_to_model_and_logger(runner, base_config, mock_model):
-    """Test that _save_config saves to model and logger."""
-    config = Config().update(base_config)
-
-    # Create mock trainer with logger (no log_dir to avoid file operations)
-    mock_trainer = MagicMock(spec=Trainer)
-    mock_logger = MagicMock()
-    mock_trainer.logger = mock_logger
-    mock_trainer.log_dir = None
-
-    # Call _save_config
-    runner._save_config(config, mock_trainer, mock_model)
-
-    # Verify model.save_hyperparameters was called with config wrapped in dict
-    mock_model.save_hyperparameters.assert_called_once_with({"config": config.get()})
-
-    # Verify logger.log_hyperparams was called
-    mock_logger.log_hyperparams.assert_called_once_with(config.get())
-
-
-def test_save_config_without_logger(runner, base_config, mock_model):
-    """Test that _save_config handles trainer without logger."""
-    config = Config().update(base_config)
-
-    # Create mock trainer without logger
-    mock_trainer = MagicMock(spec=Trainer)
-    mock_trainer.logger = None
-
-    # Should save to model but not crash
-    runner._save_config(config, mock_trainer, mock_model)
-
-    # Verify model.save_hyperparameters was still called
-    mock_model.save_hyperparameters.assert_called_once_with({"config": config.get()})
-
-
-# Tests for CLI kwargs handling
-
-
-def test_execute_with_cli_kwargs(runner, mock_model, mock_trainer, mock_datamodule):
-    """Test that CLI kwargs are passed to trainer method."""
-    # Test with CLI kwargs
-    runner._execute("fit", mock_model, mock_trainer, mock_datamodule, ckpt_path="checkpoint.ckpt")
-
-    mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule, ckpt_path="checkpoint.ckpt")
-
-
-def test_execute_without_cli_kwargs(runner, mock_model, mock_trainer, mock_datamodule):
-    """Test that execute works without CLI kwargs."""
-    # Test with no CLI kwargs
-    runner._execute("fit", mock_model, mock_trainer, mock_datamodule)
-
-    mock_trainer.fit.assert_called_once_with(mock_model, datamodule=mock_datamodule)
-
-
-def test_run_passes_kwargs_to_execute(runner, base_config, mock_model, mock_trainer, mock_datamodule):
-    """Test that Runner.run() passes CLI kwargs to _execute()."""
-    # Mock all methods that would cause side effects
-    with (
-        patch.object(runner, "_resolve_model") as mock_resolve_model,
-        patch.object(runner, "_resolve_trainer") as mock_resolve_trainer,
-        patch.object(runner, "_resolve_datamodule") as mock_resolve_datamodule,
-        patch.object(runner, "_save_config"),
-        patch.object(runner, "_execute") as mock_execute,
-    ):
-        mock_resolve_model.return_value = mock_model
-        mock_resolve_trainer.return_value = mock_trainer
-        mock_resolve_datamodule.return_value = mock_datamodule
-
-        # Run with CLI kwargs
-        runner.run("fit", [base_config], ckpt_path="checkpoint.ckpt", verbose=True)
-
-        # Verify _execute was called with kwargs
-        mock_execute.assert_called_once()
-        call_kwargs = mock_execute.call_args[1]
-        assert "ckpt_path" in call_kwargs
-        assert call_kwargs["ckpt_path"] == "checkpoint.ckpt"
-        assert "verbose" in call_kwargs
-        assert call_kwargs["verbose"] is True
+def test_save_config_without_logger():
+    model, trainer = MagicMock(spec=LightningModule), MagicMock(spec=Trainer)
+    trainer.logger = None
+    _save_config(Config().update({"seed": 3}), trainer, model)
+    model.save_hyperparameters.assert_called_once_with({"config": {"seed": 3}})
