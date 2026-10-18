@@ -1,6 +1,7 @@
 """Unit tests for building and running stages in lighter/engine/runner.py"""
 
 import os
+import re
 import subprocess
 import sys
 import warnings
@@ -9,11 +10,11 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from pytorch_lightning import LightningModule, Trainer
-from sparkwheel import Config
+from sparkwheel import Config, TargetNotFoundError
 from torch.utils.data import DataLoader, TensorDataset
 
 from lighter import LighterDataModule, Runner, build
-from lighter.engine.runner import _save_config, load_config
+from lighter.engine.runner import _save_config, find_project_root, load_config
 
 TRAINER = {
     "_target_": "pytorch_lightning.Trainer",
@@ -163,28 +164,71 @@ def test_python_dash_m_lighter_runs_the_cli():
 
 # Project discovery
 
-
-def test_auto_discover_project_with_marker(tmp_path, monkeypatch):
-    """The folder holding __lighter__.py is imported as 'project'."""
-    from lighter.engine.runner import _import_project
-
-    (tmp_path / "__lighter__.py").touch()
-    (tmp_path / "__init__.py").touch()
-    monkeypatch.chdir(tmp_path)
-    sys.modules.pop("project", None)
-    try:
-        assert _import_project() is True
-        assert sys.modules["project"].__path__ == [str(tmp_path)]
-    finally:
-        sys.modules.pop("project", None)
+NETS = "import torch\nfrom pytorch_lightning import LightningModule\nclass Net(LightningModule):\n    pass\n"
 
 
-def test_auto_discover_project_without_marker(tmp_path, monkeypatch):
-    """Nothing is imported when the marker is absent."""
-    from lighter.engine.runner import _import_project
+@pytest.fixture
+def project(tmp_path, monkeypatch):
+    """A project folder (`__lighter__.py`, no `__init__.py`) with its config in `configs/`, run from elsewhere."""
+    root = tmp_path / "proj"
+    (root / "configs").mkdir(parents=True)
+    (root / "__lighter__.py").touch()
+    (root / "toynets.py").write_text(NETS)
+    trainer = "".join(f"  {k}: {v}\n" for k, v in TRAINER.items())
+    (root / "configs" / "train.yaml").write_text(f"model:\n  _target_: project.toynets.Net\ntrainer:\n{trainer}")
+    (tmp_path / "elsewhere").mkdir()
+    monkeypatch.chdir(tmp_path / "elsewhere")
+    drop = lambda: [sys.modules.pop(name) for name in list(sys.modules) if name.split(".")[0] == "project"]  # noqa: E731
+    drop()
+    yield root
+    drop()
 
-    monkeypatch.chdir(tmp_path)
-    assert _import_project() is False
+
+def test_project_is_found_from_the_config_folder(project):
+    model, _, _ = build(str(project / "configs" / "train.yaml"))
+    assert type(model).__module__ == "project.toynets"
+    assert find_project_root((str(project / "configs" / "train.yaml"),)) == project
+
+
+def test_project_is_found_from_the_cwd_for_dict_inputs(project, monkeypatch):
+    monkeypatch.chdir(project / "configs")
+    model, _, _ = build(config(model={"_target_": "project.toynets.Net"}))
+    assert type(model).__module__ == "project.toynets"
+
+
+def test_configs_from_two_projects_are_rejected(project, tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "__lighter__.py").touch()
+    (other / "extra.yaml").write_text("seed: 1\n")
+    with pytest.raises(ValueError, match="different projects"):
+        build(str(project / "configs" / "train.yaml"), str(other / "extra.yaml"))
+
+
+def test_relative_parent_paths_do_not_warn(project, monkeypatch):
+    monkeypatch.chdir(project / "configs")
+    (project / "sub").mkdir()
+    monkeypatch.chdir(project / "sub")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert load_config("../configs/train.yaml").get("model::_target_") == "project.toynets.Net"
+
+
+def test_target_without_project_prefix_suggests_it(project):
+    with pytest.raises(TargetNotFoundError, match=r"did you mean 'project\.toynets\.Net'"):
+        build(str(project / "configs" / "train.yaml"), "model::_target_=toynets.Net")
+
+
+def test_missing_marker_suggests_creating_it(project):
+    (project / "__lighter__.py").unlink()
+    with pytest.raises(TargetNotFoundError, match=f"create an empty {re.escape(str(project / '__lighter__.py'))}"):
+        build(str(project / "configs" / "train.yaml"))
+
+
+def test_installed_packages_get_no_project_hint():
+    with pytest.raises(TargetNotFoundError) as error:
+        build(config(model={"_target_": "torch.nn.NotAModule"}))
+    assert "project" not in str(error.value)
 
 
 # Configuration saving

@@ -13,6 +13,8 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   returns the stage's result (e.g. the metrics of `validate`/`test`, the predictions of `predict`).
 - Modules and trainers from the `lightning` package (`lightning.pytorch`) are accepted. Mixing them with
   `pytorch_lightning` objects in one run is reported as an error instead of failing inside Lightning.
+- When a `_target_` names your own code without `project.` (or no `__lighter__.py` was found), the error says
+  what to write instead.
 
 ### Changed
 
@@ -20,6 +22,10 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   numpy, pandas, requests, loguru, rich, tensorboard and torchvision are no longer installed with it.
   Migration: `pip install tensorboard` to keep TensorBoard as Lightning's default logger (otherwise it logs CSV),
   `pip install torchvision` for FileWriter's `image_2d`/`image_3d` writers.
+- `__lighter__.py` is searched for in each config file's folder and its parents first, then in the current
+  directory and its parents, so `lighter fit path/to/project/configs/train.yaml` works from any folder.
+  Configs from two different projects in one run are an error. The project folder no longer needs an `__init__.py`.
+- `python -m lighter` no longer imports modules from the current directory; import your code as `project.<module>`.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
 
 ### Removed

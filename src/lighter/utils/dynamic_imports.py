@@ -6,6 +6,7 @@ is imported, multiprocessing uses a pickler that adds cloudpickle to ForkingPick
 keeping ForkingPickler's own reducers for pipes, queues and file descriptors.
 """
 
+import importlib.machinery
 import importlib.util
 import sys
 from io import BytesIO
@@ -41,10 +42,10 @@ def _hybrid_dump(obj: Any, file: IO[bytes], protocol: int | None = None) -> None
 
 
 def import_module_from_path(module_name: str, module_path: Path | str) -> ModuleType:
-    """Import the package in `module_path` under the name `module_name` (e.g. "project").
+    """Import the folder `module_path` as the package `module_name` (e.g. "project"); `__init__.py` is optional.
 
     Raises:
-        FileNotFoundError: If module_path doesn't contain __init__.py.
+        FileNotFoundError: If module_path is not a folder.
         ValueError: If module_name was already imported from a different path.
     """
     module_path = Path(module_path).resolve()
@@ -55,16 +56,21 @@ def import_module_from_path(module_name: str, module_path: Path | str) -> Module
         return sys.modules[module_name]
 
     init_file = module_path / "__init__.py"
-    if not init_file.is_file():
-        raise FileNotFoundError(f"No __init__.py in '{module_path}'.")
-    spec = importlib.util.spec_from_file_location(module_name, str(init_file))
-    if spec is None or spec.loader is None:
-        raise ModuleNotFoundError(f"Could not load '{module_name}' from '{module_path}'.")
+    if init_file.is_file():
+        spec = importlib.util.spec_from_file_location(module_name, str(init_file))
+        if spec is None or spec.loader is None:
+            raise ModuleNotFoundError(f"Could not load '{module_name}' from '{module_path}'.")
+    elif module_path.is_dir():  # without __init__.py the package has nothing to run
+        spec = importlib.machinery.ModuleSpec(module_name, None, is_package=True)
+        spec.submodule_search_locations = [str(module_path)]
+    else:
+        raise FileNotFoundError(f"No folder '{module_path}'.")
 
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
-        spec.loader.exec_module(module)
+        if spec.loader is not None:
+            spec.loader.exec_module(module)
     except Exception:
         sys.modules.pop(module_name, None)  # so that a retry starts clean
         raise

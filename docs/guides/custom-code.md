@@ -69,20 +69,11 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 ### The `__init__.py` Files
 
-Every directory containing code needs `__init__.py`:
+`__init__.py` files are optional. Add one when you want code to run on import or to re-export names
+(e.g. `from .resnet import ResNet` in `models/__init__.py` lets you write `project.models.ResNet`).
 
-```
-my_project/
-├── __init__.py             # Required
-├── models/
-│   ├── __init__.py         # Required
-│   └── resnet.py
-└── data/
-    ├── __init__.py         # Required
-    └── dataset.py
-```
-
-Without `__init__.py`, Python can't import from that directory.
+Lighter looks for `__lighter__.py` in each config file's folder and its parents, then in the current
+directory and its parents, so you can run `lighter fit my_project/configs/train.yaml` from any folder.
 
 ## Using Custom Models
 
@@ -815,7 +806,6 @@ lighter fit configs/baseline.yaml
 # Project structure
 my_project/
 ├── __lighter__.py          # Required marker
-├── __init__.py             # Required for imports
 └── code.py                 # Your code
 
 # Import syntax in config
@@ -823,7 +813,6 @@ _target_: project.module.ClassName
 
 # Common issues
 # ❌ No __lighter__.py
-# ❌ Missing __init__.py
-# ❌ Wrong working directory
+# ❌ Config file outside the project folder (run from inside the project instead)
 # ❌ Using :: for Python methods (use . instead)
 ```

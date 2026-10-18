@@ -11,13 +11,31 @@ import pytest
 from lighter.utils.dynamic_imports import _HybridPickler, import_module_from_path
 
 
+def _dumps(obj):
+    buffer = BytesIO()
+    _HybridPickler(buffer).dump(obj)
+    return buffer.getvalue()
+
+
 class TestImportModuleFromPath:
     """Tests for import_module_from_path function."""
 
     def test_nonexistent_path_raises_error(self):
-        """Importing from a path without __init__.py raises FileNotFoundError."""
-        with pytest.raises(FileNotFoundError, match="No __init__.py"):
+        """Importing from a folder that does not exist raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="No folder"):
             import_module_from_path("nonexistent", "/path/that/does/not/exist")
+
+    def test_folder_without_init_is_imported_as_a_package(self, tmp_path):
+        """`__init__.py` is optional: submodules of a plain folder import and pickle by value."""
+        (tmp_path / "models.py").write_text("def double(x):\n    return 2 * x\n")
+        try:
+            module = import_module_from_path("no_init_project", tmp_path)
+            assert list(module.__path__) == [str(tmp_path)]
+            pickled = _dumps(importlib.import_module("no_init_project.models").double)
+        finally:
+            sys.modules.pop("no_init_project", None)
+            sys.modules.pop("no_init_project.models", None)
+        assert pickle.loads(pickled)(3) == 6  # rebuilt without importing the project
 
     def test_already_imported_same_path_returns_existing(self, tmp_path):
         """If module is already imported from same path, return cached module."""

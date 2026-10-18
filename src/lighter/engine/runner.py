@@ -1,14 +1,16 @@
 """Build a Lightning run from YAML configs and overrides, then run one stage (`lighter fit config.yaml`)."""
 
 import argparse
+import importlib.util
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
-from sparkwheel import Config
+from sparkwheel import Config, TargetNotFoundError
 
 from lighter.utils.dynamic_imports import import_module_from_path
 
@@ -22,14 +24,43 @@ STAGES = {
 }
 
 
-def _import_project() -> bool:
-    """Import the folder holding `__lighter__.py` (the current directory) as the `project` package."""
-    cwd = Path.cwd()
-    if not (cwd / "__lighter__.py").exists():
-        return False
-    import_module_from_path("project", cwd)
-    logger.info(f"Imported 'project' module from '{cwd}'")
-    return True
+def _is_override(item: Any) -> bool:
+    return isinstance(item, str) and ("=" in item or item.startswith("~"))
+
+
+def _config_dirs(inputs: tuple) -> list[Path]:
+    return [Path(item).resolve().parent for item in inputs if isinstance(item, (str, Path)) and not _is_override(item)]
+
+
+def _find_up(start: Path, name: str) -> Path | None:
+    """The first of `start` and its parents that contains `name`."""
+    return next((folder for folder in (start, *start.parents) if (folder / name).exists()), None)
+
+
+def find_project_root(inputs: tuple) -> Path | None:
+    """The folder holding `__lighter__.py`, searched upward from each config file's folder, then from the cwd."""
+    roots = {root for folder in _config_dirs(inputs) if (root := _find_up(folder, "__lighter__.py"))}
+    if len(roots) > 1:
+        raise ValueError(f"The config files belong to different projects: {', '.join(map(str, sorted(roots)))}.")
+    return roots.pop() if roots else _find_up(Path.cwd(), "__lighter__.py")
+
+
+def _project_hint(error: TargetNotFoundError, inputs: tuple, root: Path | None) -> str | None:
+    """Explain a `_target_` that names the user's own code without `project.` or without a `__lighter__.py`."""
+    match = re.search(r"function: '([\w.]+)'", str(error))
+    parts = match.group(1).split(".") if match else ["project"]
+    local = parts[1:] if parts[0] == "project" else parts
+    if not local or importlib.util.find_spec(local[0]) is not None:  # empty, or an installed package
+        return None
+    if root is not None:
+        if parts[0] != "project" and ((root / f"{local[0]}.py").exists() or (root / local[0]).is_dir()):
+            return f"Code in your project folder is imported as `project`: did you mean 'project.{'.'.join(local)}'?"
+        return None
+    for folder in [*_config_dirs(inputs), Path.cwd()]:
+        if found := _find_up(folder, f"{local[0]}.py") or _find_up(folder, local[0]):
+            marker = found / "__lighter__.py"
+            return f"To import your own code, create an empty {marker} and use '_target_: project.{'.'.join(local)}'."
+    return None
 
 
 def _lightning_package(obj: Any, kind: str, key: str) -> str:
@@ -45,7 +76,8 @@ def load_config(*inputs: Any) -> Config:
     """Compose config files, dicts and overrides in order. Strings with `=` are overrides, others YAML files."""
     config = Config()
     for item in inputs:
-        config.update(item)
+        # Absolute paths keep Sparkwheel from warning about `..` in paths like ../configs/base.yaml.
+        config.update(str(Path(item).resolve()) if isinstance(item, (str, Path)) and not _is_override(item) else item)
     return config
 
 
@@ -66,11 +98,20 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
         raise TypeError(f"`seed` must be an integer, got {seed!r}.")
     config.set("seed", seed)
     seed_everything(seed, workers=True)
-    _import_project()
+    root = find_project_root(inputs)
+    if root is not None:
+        import_module_from_path("project", root)
+        logger.info(f"Imported 'project' module from '{root}'")
 
-    model = config.resolve("model")
-    trainer = config.resolve("trainer")
-    datamodule = None if config.get("data") is None else config.resolve("data")
+    try:
+        model = config.resolve("model")
+        trainer = config.resolve("trainer")
+        datamodule = None if config.get("data") is None else config.resolve("data")
+    except TargetNotFoundError as error:
+        hint = _project_hint(error, inputs, root)
+        if hint is None:
+            raise
+        raise TargetNotFoundError(str(error).split("\n")[0], error.source_location, hint) from error
     packages = {_lightning_package(model, "LightningModule", "model"), _lightning_package(trainer, "Trainer", "trainer")}
     if datamodule is not None:
         packages.add(_lightning_package(datamodule, "LightningDataModule", "data"))
