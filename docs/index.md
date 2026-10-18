@@ -4,17 +4,23 @@ title: Lighter
 
 # Lighter
 
-Lighter runs your PyTorch Lightning code from YAML configs. You write the LightningModule; a config says how to
-build it, the trainer and the data; any value can be changed from the command line.
+--8<-- "README.md:intro"
 
-```bash
-pip install lighter
-git clone --depth 1 https://github.com/project-lighter/lighter
-lighter fit lighter/examples/quickstart/config.yaml
+```python title="model.py"
+--8<-- "examples/quickstart/model.py"
 ```
 
-Lighter is small and adds no API of its own to learn: Lightning is the API, and the YAML only
-builds Python objects.
+```yaml title="config.yaml"
+--8<-- "examples/quickstart/config.yaml"
+```
+
+--8<-- "README.md:run"
+
+Train it yourself; the run takes seconds on a CPU and downloads no data:
+
+--8<-- "README.md:try"
+
+Lighter adds no training API of its own: the config builds Lightning objects, and Lightning runs them.
 
 ## Read next
 

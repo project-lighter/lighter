@@ -12,46 +12,10 @@
 </p>
 <br/>
 
-**Lighter** makes PyTorch Lightning experiments reproducible and composable through YAML configuration. Stop hardcoding hyperparameters—configure everything from the command line.
-
-## Why Lighter?
-
-You're already using PyTorch Lightning. But every experiment requires editing Python code to change hyperparameters:
-
-```python
-# Want to try a different learning rate? Edit the code.
-optimizer = Adam(params, lr=0.001)  # Change this line
-
-# Want to use a different batch size? Edit the code.
-train_loader = DataLoader(dataset, batch_size=32)  # And this one
-
-# Want to train longer? Edit the code again.
-trainer = Trainer(max_epochs=10)  # And this one too
-```
-
-**With Lighter, configure everything in YAML and override from the CLI:**
-
-```bash
-# Try different learning rates without touching code
-lighter fit config.yaml model::learning_rate=0.001
-lighter fit config.yaml model::learning_rate=0.01
-lighter fit config.yaml model::learning_rate=0.1
-
-# Every experiment is reproducible - just version control your configs
-```
-
-## Quick Start
-
-Train a small network on random data, on a CPU, in under a minute:
-
-```bash
-pip install lighter
-git clone --depth 1 https://github.com/project-lighter/lighter
-lighter fit lighter/examples/quickstart/config.yaml
-```
-
-[`examples/quickstart`](examples/quickstart) is a plain LightningModule, a dataset and a config.
-A `__lighter__.py` file marks the folder, so the config names its code `project.model` and `project.data`.
+<!-- --8<-- [start:intro] -->
+**Lighter** runs PyTorch Lightning from YAML: you write a LightningModule, a config builds it together with the
+trainer and the data, and any value can be changed from the command line.
+<!-- --8<-- [end:intro] -->
 
 <!-- examples/quickstart/model.py -->
 ```python
@@ -75,19 +39,6 @@ class Regressor(pl.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 ```
 
-<!-- examples/quickstart/data.py -->
-```python
-import torch
-
-
-class RandomData(torch.utils.data.TensorDataset):
-    """Random inputs x and targets y = sum(x), which a small network learns in seconds."""
-
-    def __init__(self, size: int = 1024):
-        x = torch.randn(size, 8)
-        super().__init__(x, x.sum(dim=1, keepdim=True))
-```
-
 <!-- examples/quickstart/config.yaml -->
 ```yaml
 trainer:
@@ -109,108 +60,74 @@ data:
       _target_: project.data.RandomData
 ```
 
-Lighter builds each `_target_` with the keys below it as arguments and calls `trainer.fit(model, datamodule=data)`.
-Change any value from the command line, without editing a file:
+<!-- --8<-- [start:run] -->
+```console
+$ cd lighter/examples/quickstart
+$ lighter fit config.yaml model::lr=0.001
+Seed set to 0
+...
+Lighter 0.1.0 | project: /home/you/lighter/examples/quickstart | config.yaml + 1 overrides | seed: 0
+Logs: /home/you/lighter/examples/quickstart/lightning_logs/version_0
+...
+Epoch 9: 100%|██████████| 64/64 [00:00<00:00, 422.91it/s, v_num=0, train_loss=0.0319]
+```
+<!-- --8<-- [end:run] -->
 
+## Quick start
+
+Train it yourself; the run takes seconds on a CPU and downloads no data:
+
+<!-- --8<-- [start:try] -->
 ```bash
-lighter fit lighter/examples/quickstart/config.yaml model::lr=0.001 trainer::max_epochs=20
+pip install lighter
+git clone --depth 1 https://github.com/project-lighter/lighter
+lighter fit lighter/examples/quickstart/config.yaml
 ```
+<!-- --8<-- [end:try] -->
 
-Each run writes to a new `lightning_logs/version_N/` folder, with the config it ran saved as `config.yaml`.
+[`examples/quickstart`](examples/quickstart) also holds `data.py`, a dataset of random numbers, and an empty
+`__lighter__.py`, which lets the config name the folder's code `project.model` and `project.data`. Lighter builds
+each `_target_` with the keys below it as arguments, then calls `trainer.fit(model, datamodule=data)`. Each run
+writes to a new `lightning_logs/version_N/` folder and saves the config it ran there as `config.yaml`.
 
-## Key Benefits
+## What Lighter is
 
-- **Reproducible**: Every experiment = one YAML file. Version control configs like code.
-- **Fast iteration**: Override any parameter from CLI without editing code.
-- **Zero lock-in**: Works with any PyTorch Lightning module. Your code, your logic.
-- **Composable**: Merge configs, create recipes, share experiments as files.
-- **Recorded**: Each run saves its composed config next to its logs and inside its checkpoints.
-- **Simple**: ~1,200 lines of code. Read the framework in an hour.
+- **A thin layer over Lightning.** The config builds Lightning objects and Lightning runs them, so any
+  LightningModule, LightningDataModule, callback or logger works as it is.
+- **A record of every run.** The composed config, with its seed, is saved next to the logs and inside every
+  checkpoint.
+- **Errors at your line.** Config errors name the file, line and key where they can, with a suggestion when
+  there is one.
+- **Small.** ~1,200 lines of code.
 
-## Optional: Use LighterModule for Less Boilerplate
+Lighter does not run sweeps, compose config groups or track runs: a shell loop or a sweep tool, stacked config
+files, and Lightning's loggers do those jobs.
 
-If you want the optimizer, loss and metrics in the config, and the loss and metrics logged per step and per epoch, use `LighterModule`:
-
-```python
-from lighter import LighterModule
-
-class MyModel(LighterModule):
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self(x)
-        loss = self.criterion(pred, y)
-
-        if self.train_metrics is not None:
-            self.train_metrics(pred, y)
-
-        return loss  # Lighter logs it as train/loss/step and train/loss/epoch
-
-    # validation_step, test_step, predict_step...
-```
-
-```yaml
-model:
-  _target_: project.model.MyModel
-  network:
-    _target_: torchvision.models.resnet18
-    num_classes: 10
-  criterion:
-    _target_: torch.nn.CrossEntropyLoss
-  optimizer:
-    _target_: torch.optim.Adam
-    _mode_: callable  # LighterModule calls it with the model's parameters
-    lr: 0.001
-  train_metrics:
-    _target_: torchmetrics.Accuracy
-    task: multiclass
-    num_classes: 10
-```
-
-**LighterModule gives you:**
-- Automatic `configure_optimizers()` handling
-- Automatic dual logging (step + epoch)
-- Config-driven criterion and metrics
-
-**But you still control:**
-- All step implementations
-- Loss computation logic
-- When to call metrics
-
-## Example: Running a Hyperparameter Sweep
-
-```bash
-# Run grid search without editing code
-for lr in 0.001 0.01 0.1; do
-  for bs in 32 64 128; do
-    lighter fit config.yaml \
-      model::optimizer::lr=$lr \
-      data::train_dataloader::batch_size=$bs
-  done
-done
-
-# Each run logs to its own lightning_logs/version_N/ with its config.yaml
-# Compare experiments by diffing those configs
-```
+`LighterModule` is an optional base class that takes the network, loss, optimizer, scheduler and metrics from
+the config and logs the loss and metrics; you still write the step methods. See
+[LighterModule](https://project-lighter.github.io/lighter/lighter-module/).
 
 ## Documentation
 
-- [Quickstart](https://project-lighter.github.io/lighter/quickstart/)
-- [How a run works](https://project-lighter.github.io/lighter/run/)
-- [Config cheat sheet](https://project-lighter.github.io/lighter/config/)
-- [LighterModule](https://project-lighter.github.io/lighter/lighter-module/)
-- [Recipes](https://project-lighter.github.io/lighter/recipes/)
+[project-lighter.github.io/lighter](https://project-lighter.github.io/lighter): a
+[quickstart](https://project-lighter.github.io/lighter/quickstart/),
+[how a run works](https://project-lighter.github.io/lighter/run/),
+a [config cheat sheet](https://project-lighter.github.io/lighter/config/),
+[recipes](https://project-lighter.github.io/lighter/recipes/),
+[troubleshooting](https://project-lighter.github.io/lighter/troubleshooting/), and a page for those
+[coming from LightningCLI or Hydra](https://project-lighter.github.io/lighter/coming-from/).
 
-## Real-World Usage
+## Used in
 
-- 🏥 [Foundation Models for Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker)
-- 🧠 [Vision Foundation Models for CT](https://arxiv.org/abs/2501.09001)
+- [Foundation Models for Cancer Imaging](https://aim.hms.harvard.edu/foundation-cancer-image-biomarker)
+- [Vision Foundation Models for CT](https://arxiv.org/abs/2501.09001)
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/zJcnp6KrUp) - Chat with users
-- 🐛 [GitHub Issues](https://github.com/project-lighter/lighter/issues) - Report bugs
-- 📺 [YouTube](https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q) - Video tutorials
-- 🤝 [Contributing](CONTRIBUTING.md) - Help improve Lighter
+- [Discord](https://discord.gg/zJcnp6KrUp) for questions
+- [GitHub Issues](https://github.com/project-lighter/lighter/issues) for bugs
+- [YouTube](https://www.youtube.com/channel/UCef1oTpv2QEBrD2pZtrdk1Q) for video tutorials
+- [Contributing](CONTRIBUTING.md)
 
 ## Citation
 

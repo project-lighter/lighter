@@ -5,6 +5,7 @@
 - Both run in a copy of examples/quickstart, so they may name `project.model.Regressor` or load `config.yaml`.
 - A block that includes a file (`--8<--`) is skipped here: the file is run by the test of its own folder.
 - A `lighter` command in a shell block must parse with the CLI's own parser.
+- The README's blocks are checked the same way.
 - Floats are written with a dot: YAML 1.1 reads `1e-3` as a string.
 - The CLI reference shows tests/unit/cli_help.txt, which is the parser's own `--help`. After changing the CLI,
   refresh it with `UPDATE_GOLDEN=1 pytest tests/unit/test_docs.py`.
@@ -37,13 +38,13 @@ CLI_HELP = Path(__file__).parent / "cli_help.txt"
 
 def blocks(language: str) -> list:
     found = []
-    for page in PAGES:
+    for page in [*PAGES, ROOT / "README.md"]:
         for match in FENCE.finditer(page.read_text()):
             indent, lang, code = match.groups()
             if lang == language:
                 code = "\n".join(line[len(indent) :] for line in code.splitlines())
                 line = page.read_text()[: match.start()].count("\n") + 1
-                found.append(pytest.param(code, id=f"{page.relative_to(DOCS)}:{line}"))
+                found.append(pytest.param(code, id=f"{page.relative_to(ROOT)}:{line}"))
     return found
 
 
