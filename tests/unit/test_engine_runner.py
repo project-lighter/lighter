@@ -5,17 +5,16 @@ import re
 import subprocess
 import sys
 import warnings
-from unittest.mock import MagicMock
 
 import pytest
 import torch
 from pytorch_lightning import LightningModule, Trainer
-from sparkwheel import Config, TargetNotFoundError
+from sparkwheel import TargetNotFoundError
 from torch.utils.data import DataLoader, TensorDataset
 
 import lighter
 from lighter import LighterDataModule, Runner, build
-from lighter.engine.runner import _save_config, find_project_root, load_config
+from lighter.engine.runner import find_project_root, load_config
 
 TRAINER = {
     "_target_": "pytorch_lightning.Trainer",
@@ -240,22 +239,3 @@ def test_installed_packages_get_no_project_hint():
     with pytest.raises(TargetNotFoundError) as error:
         build(config(model={"_target_": "torch.nn.NotAModule"}))
     assert "project" not in str(error.value)
-
-
-# Configuration saving
-
-
-def test_save_config_writes_config_yaml(tmp_path):
-    model, trainer = MagicMock(spec=LightningModule), MagicMock(spec=Trainer)
-    trainer.log_dir = str(tmp_path / "version_0")
-    _save_config(Config().update({"seed": 3}), trainer, model)
-    assert (tmp_path / "version_0" / "config.yaml").read_text() == "seed: 3\n"
-    trainer.logger.log_hyperparams.assert_called_once_with({"seed": 3})
-    model.save_hyperparameters.assert_called_once_with({"config": {"seed": 3}})
-
-
-def test_save_config_without_logger():
-    model, trainer = MagicMock(spec=LightningModule), MagicMock(spec=Trainer)
-    trainer.logger = None
-    _save_config(Config().update({"seed": 3}), trainer, model)
-    model.save_hyperparameters.assert_called_once_with({"config": {"seed": 3}})

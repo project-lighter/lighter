@@ -4,12 +4,19 @@ import importlib
 from typing import TYPE_CHECKING, Any
 
 __version__ = "0.1.0"
-__all__ = ["LighterDataModule", "LighterModule", "Runner", "build"]
-_MODULES = {"LighterDataModule": "data", "LighterModule": "model", "Runner": "engine.runner", "build": "engine.runner"}
+__all__ = ["LighterDataModule", "LighterModule", "Runner", "build", "load_model"]
+_MODULES = {
+    "LighterDataModule": "data",
+    "LighterModule": "model",
+    "Runner": "engine.runner",
+    "build": "engine.runner",
+    "load_model": "engine.saved_config",
+}
 
 if TYPE_CHECKING:
     from .data import LighterDataModule
     from .engine.runner import Runner, build
+    from .engine.saved_config import load_model
     from .model import LighterModule
 
 

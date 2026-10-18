@@ -34,7 +34,7 @@ lighter fit CONFIG [OPTIONS] [OVERRIDES...]
 | Argument | Description | Required |
 |----------|-------------|----------|
 | `CONFIG` | Path to YAML config file | Yes |
-| `--ckpt_path PATH` | Checkpoint path to resume from ("last", "best", or file path) | No |
+| `--ckpt_path PATH` | Checkpoint file to resume from ("last" only finds checkpoints in a fixed `ModelCheckpoint` `dirpath`) | No |
 | `--weights_only BOOL` | Load only weights (security option) | No |
 | `OVERRIDES` | Config overrides (key::path=value) | No |
 
@@ -54,7 +54,7 @@ lighter fit config.yaml model::optimizer::lr=0.01
 lighter fit base.yaml experiment.yaml
 
 # Combine CLI flags and overrides
-lighter fit config.yaml --ckpt_path last trainer::max_epochs=100
+lighter fit config.yaml --ckpt_path lightning_logs/version_0/checkpoints/last.ckpt trainer::max_epochs=100
 ```
 
 ### Config Structure

@@ -4,6 +4,7 @@ Torch and Lightning are imported only when a run is built, so `lighter --help` a
 """
 
 import argparse
+import copy
 import difflib
 import importlib.util
 import logging
@@ -135,6 +136,7 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     """
     config = load_config(*inputs)
     from pytorch_lightning import seed_everything  # after the config files are read, so their errors are instant
+    from pytorch_lightning.utilities import rank_zero_only
 
     seed = config.get("seed")
     if seed is None:
@@ -142,6 +144,7 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise TypeError(f"`seed` must be an integer, got {seed!r}.")
     config.set("seed", seed)
+    saved = copy.deepcopy(config.get())  # before resolving, which drops `_imports_`
     seed_everything(seed, workers=True)
     root = find_project_root(inputs)
     if root is not None:
@@ -164,26 +167,15 @@ def build(*inputs: Any) -> tuple[Any, Any, Any]:
             "The run mixes `pytorch_lightning` and `lightning.pytorch` objects, which Lightning rejects. Use one "
             "package throughout, e.g. `trainer::_target_: lightning.pytorch.Trainer` if your model imports `lightning`."
         )
-    _save_config(config, trainer, model)
-    if trainer.is_global_zero:
+    from lighter.engine.saved_config import SaveConfig
+
+    trainer.callbacks.append(SaveConfig(saved))
+    if rank_zero_only.rank == 0:
         files = " ".join(str(item) for item in inputs if isinstance(item, (str, Path)) and not _is_override(item))
         configs = f"{files or 'dict'} + {sum(map(_is_override, inputs))} overrides"
         logger.info(f"Lighter {__version__} | project: {root or 'none'} | {configs} | seed: {seed}")
         logger.info(f"Logs: {trainer.log_dir}" if trainer.logger else "Logs: off (trainer::logger is false)")
     return model, trainer, datamodule
-
-
-def _save_config(config: Config, trainer: Any, model: Any) -> None:
-    """Save the config to the model's hparams, the logger and `config.yaml` in the log directory."""
-    model.save_hyperparameters({"config": config.get()})
-    if not trainer.logger:
-        return
-    trainer.logger.log_hyperparams(config.get())
-    if trainer.log_dir:
-        config_file = Path(trainer.log_dir) / "config.yaml"
-        config_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_file, "w") as f:
-            f.write(to_yaml(config.get()))
 
 
 class Runner:
@@ -207,6 +199,18 @@ class _Stderr(logging.StreamHandler):
     """Logs to the current `sys.stderr`, like `logging.lastResort`."""
 
     stream = property(lambda self: sys.stderr, lambda self, stream: None)
+
+
+def _check_last_checkpoint(trainer: Any) -> None:
+    """`--ckpt_path last` resumes only from this run's checkpoint folder, which is new unless set explicitly."""
+    folders = [Path(cb.dirpath or Path(trainer.log_dir) / "checkpoints") for cb in trainer.checkpoint_callbacks]
+    if not any(file for folder in folders for file in folder.glob("last*.ckpt")):
+        earlier = sorted(Path(trainer.log_dir).parent.glob("*/checkpoints/*.ckpt"), key=os.path.getmtime)
+        example = _short(str(earlier[-1])) if earlier and trainer.logger else "path/to/last.ckpt"
+        raise FileNotFoundError(
+            f"`--ckpt_path last` found no last checkpoint in {', '.join(map(_short, map(str, folders))) or 'this run'}: "
+            f"each run logs to a new version folder. Pass the checkpoint file instead, e.g. --ckpt_path {example}"
+        )
 
 
 def _short(path: str) -> str:
@@ -283,6 +287,8 @@ def cli() -> None:
             print(to_yaml(load_config(*args.inputs).get()), end="")
             return
         model, trainer, datamodule = build(*args.inputs)
+        if args.ckpt_path == "last":
+            _check_last_checkpoint(trainer)
     except Exception as error:
         if os.environ.get("LIGHTER_DEBUG", "0") != "0":
             raise

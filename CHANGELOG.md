@@ -26,6 +26,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - A LighterModule with only a `training_step` and a LighterDataModule with only a `train_dataloader` can `fit`.
   A stage whose dataloader is not set (e.g. `validate` without `val_dataloader`) names the key to add.
 
+- `lighter.load_model(ckpt_path, overrides=())` rebuilds a model from the config saved in its checkpoint and
+  loads its weights (with `torch.load(weights_only=True)` by default), finding the project from the checkpoint's folder.
+
 ### Changed
 
 - Lighter now depends on six packages: torch, pytorch-lightning, torchmetrics, sparkwheel, pyyaml and cloudpickle.
@@ -53,6 +56,17 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
   `EarlyStopping` can monitor them.
 - One `val_metrics`/`test_metrics` object used with several dataloaders is an error (it mixed their results).
 - LighterDataModule returns `[]` instead of None for a dataloader that is not set.
+
+- The composed config (with the seed and `_imports_`) is saved once the log folder is final, by the global-zero
+  process only (also under DDP): `config.yaml` in the log folder, the logger's hyperparameters, and every
+  checkpoint under `"lighter_config"`. It is no longer merged into the model's hyperparameters.
+  Migration: read `checkpoint["lighter_config"]` instead of `checkpoint["hyper_parameters"]["config"]`,
+  or use `lighter.load_model`.
+- `--ckpt_path last` without a last checkpoint in the run's checkpoint folder is an error (Lightning silently
+  started from scratch, since each run logs to a new version folder); the message names the latest checkpoint.
+- Freezer only changes the parameters it selects and gives them back their own `requires_grad` when it
+  unfreezes; a selection that matches no parameter is an error. Migration: Freezer no longer sets
+  `requires_grad=True` on the other parameters; set it yourself if you relied on that.
 
 ### Removed
 
