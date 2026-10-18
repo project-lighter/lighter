@@ -81,7 +81,8 @@ Train it yourself; the run takes seconds on a CPU and downloads no data:
 ```bash
 pip install lighter
 git clone --depth 1 https://github.com/project-lighter/lighter
-lighter fit lighter/examples/quickstart/config.yaml
+cd lighter/examples/quickstart
+lighter fit config.yaml
 ```
 <!-- --8<-- [end:try] -->
 

@@ -15,7 +15,7 @@ only by `lighter test` and `lighter predict`.
 ## Lighter Features Demonstrated
 
 - **Optimizer as a partial** - `_mode_: callable`, called by LighterModule with the model's parameters
-- **`%` raw references** - `%::train_metrics` for config reuse
+- **`%` copies** - `%model::train_metrics` reuses a definition as a separate object
 - **MetricCollection** - Accuracy, F1, Precision, Recall
 - **FileWriter callback** - saves predictions as tensors
 

@@ -47,8 +47,8 @@ model:
               task: multiclass
               num_classes: 10
               average: macro
-    val_metrics: "%::train_metrics"
-    test_metrics: "%::train_metrics"
+    val_metrics: "%model::train_metrics"  # a copy of the definition: a separate metric object
+    test_metrics: "%model::train_metrics"
 
 data:
     _target_: lighter.LighterDataModule

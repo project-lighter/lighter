@@ -66,7 +66,7 @@ def epochs(run: Path) -> set[int]:
 
 def test_every_command_on_the_page_runs_and_does_what_it_says(project, monkeypatch, capsys):
     commands = page_commands()
-    assert len(commands) == 12
+    assert len(commands) == 14
     skip = ["trainer::accelerator=gpu", *([] if importlib.util.find_spec("wandb") else ["recipes/wandb.yaml"])]
     for command in commands:
         if not any(word in command for word in skip):
@@ -94,6 +94,9 @@ def test_every_command_on_the_page_runs_and_does_what_it_says(project, monkeypat
     assert max(abs(float(row["prediction"]) - float(row["target"])) for row in rows) < 0.01
     # Sweep hyperparameters with a shell loop (after the folder of the predict run).
     assert [config["model"]["optimizer"]["lr"] for config, _ in done[7:10]] == [0.3, 0.1, 0.03]
+    # Change one callback from the command line: by its name.
+    assert done[-2][0]["callbacks"]["early_stopping"]["patience"] == 5
+    assert done[-1][0]["callbacks"]["early_stopping"]["_disabled_"] is True
 
     # Use a trained model in a notebook.
     capsys.readouterr()

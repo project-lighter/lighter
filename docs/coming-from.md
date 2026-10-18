@@ -17,6 +17,8 @@ that Lighter leaves to other tools.
 | `class_path: my.Model` and `init_args:` | `_target_: project.model.Model` and the arguments next to it |
 | `--model.lr 0.01` or `--model.lr=0.01` | `model::lr=0.01` |
 | `--config a.yaml --config b.yaml` | `lighter fit a.yaml b.yaml` |
+| `seed_everything: 42` | `seed: 42` |
+| `from models.net import Net` in your code, run from the repo root | `from project.models.net import Net` |
 | `--print_config` | `--print_config` |
 | `--ckpt_path` | `--ckpt_path` |
 | `link_arguments` | `"@key"` references |
@@ -33,7 +35,7 @@ that Lighter leaves to other tools.
 | `${model.lr}` | `"@model::lr"`, or `"%model::lr"` to copy a definition and build it again |
 | `${oc.env:DATA}` | `"$os.environ['DATA']"` with `_imports_: {os: os}` |
 | `python train.py model.lr=0.01` | `lighter fit config.yaml model::lr=0.01` |
-| `+key=value` to add a key | `key=value` (new keys are accepted) |
+| `+key=value` to add a key | Put the key in a YAML file and stack it: `lighter fit config.yaml extra.yaml` |
 | `~key` | `~key` |
 | `hydra.utils.instantiate(cfg.model)` | `lighter.build("config.yaml")` returns the model, trainer and data |
 | `outputs/<date>/<time>/.hydra/config.yaml` | `lightning_logs/version_N/config.yaml` |

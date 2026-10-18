@@ -1,0 +1,12 @@
+# Callbacks by name: a file or an override changes or turns off one of them by its name, not its position.
+callbacks:
+  checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    monitor: val/loss/epoch
+  early_stopping:
+    _target_: pytorch_lightning.callbacks.EarlyStopping
+    monitor: val/loss/epoch
+    patience: 3
+
+trainer:
+  callbacks: "$list(@callbacks.values())"

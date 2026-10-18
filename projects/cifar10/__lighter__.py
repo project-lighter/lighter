@@ -1,3 +1,1 @@
-# This file marks the directory as a Lighter project.
-# When you run `lighter` from this directory, the project will be auto-discovered
-# and you can reference modules `project.module.submodule`
+# This file marks the project folder: Lighter imports the code next to it as `project` (e.g. project.models).
