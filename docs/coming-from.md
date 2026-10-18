@@ -6,7 +6,8 @@ title: Coming from LightningCLI or Hydra
 
 Lighter does what LightningCLI and Hydra's `instantiate` do for a Lightning project: build the trainer, model
 and data from YAML, and change values from the command line. Your LightningModule and LightningDataModule stay
-as they are. What changes is how the config is written and run.
+as they are. What changes is how the config is written and run, and [a few things](#what-lighter-does-not-do)
+that Lighter leaves to other tools.
 
 ## From LightningCLI
 
@@ -36,3 +37,13 @@ as they are. What changes is how the config is written and run.
 | `~key` | `~key` |
 | `hydra.utils.instantiate(cfg.model)` | `lighter.build("config.yaml")` returns the model, trainer and data |
 | `outputs/<date>/<time>/.hydra/config.yaml` | `lightning_logs/version_N/config.yaml` |
+
+## What Lighter does not do
+
+- **Sweeps and launchers.** There is no multirun, sweeper or job launcher. Loop in the shell, or let Optuna or a
+  W&B sweep run Lighter ([Recipes](recipes.md#sweep-hyperparameters)).
+- **Config groups.** There is no `defaults:` list and no `model=resnet` choice. Put each alternative in its own
+  file and stack it on the base config: `lighter fit base.yaml model/resnet.yaml`.
+- **Run tracking.** Lighter keeps no record of runs beyond Lightning's: with the default logger each run is a
+  `lightning_logs/version_N/` folder with its `config.yaml`, and a logger such as TensorBoard, W&B or MLflow
+  compares runs.
