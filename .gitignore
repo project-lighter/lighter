@@ -149,6 +149,7 @@ tensorboard/
 .scale_batch_size*
 **/*.txt
 !tests/integration/mistakes/*.txt
+!tests/unit/cli_help.txt
 .ruff_cache
 
 # Coding agents

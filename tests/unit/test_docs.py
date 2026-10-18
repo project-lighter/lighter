@@ -6,8 +6,11 @@
 - A block that includes a file (`--8<--`) is skipped here: the file is run by the test of its own folder.
 - A `lighter` command in a shell block must parse with the CLI's own parser.
 - Floats are written with a dot: YAML 1.1 reads `1e-3` as a string.
+- The CLI reference shows tests/unit/cli_help.txt, which is the parser's own `--help`. After changing the CLI,
+  refresh it with `UPDATE_GOLDEN=1 pytest tests/unit/test_docs.py`.
 """
 
+import os
 import re
 import shlex
 import shutil
@@ -29,6 +32,7 @@ INCLUDE = re.compile(r'--8<-- "([^"]+)"')
 # Folders whose files are run by their own tests (examples, projects) or are test outputs (golden files).
 TESTED = ("examples/", "projects/tabular_regression/", "tests/", "README.md")
 EXPONENT_FLOAT = re.compile(r"(?<![\w.])\d+e[-+]?\d+(?![\w.])")
+CLI_HELP = Path(__file__).parent / "cli_help.txt"
 
 
 def blocks(language: str) -> list:
@@ -105,3 +109,20 @@ def test_lighter_commands_parse(code, monkeypatch):
         with pytest.raises((Parsed, SystemExit)) as raised:
             runner.cli()
         assert raised.type is Parsed or "--help" in args or "--version" in args, f"`{line}` does not parse"
+
+
+def test_cli_reference_is_the_parsers_help(monkeypatch, capsys):
+    monkeypatch.setenv("COLUMNS", "100")
+    shown = []
+    for args in (["--help"], *([stage, "--help"] for stage in ("fit", "validate", "test", "predict"))):
+        monkeypatch.setattr(sys, "argv", ["lighter", *args])
+        with pytest.raises(SystemExit):
+            runner.cli()
+        text = capsys.readouterr().out
+        if args[0] != "fit":  # the examples and notes are those of `fit`
+            text = text.split("\nexamples:")[0].rstrip() + "\n"
+        shown.append(f"$ lighter {' '.join(args)}\n{text}")
+    text = "\n".join(shown)
+    if os.environ.get("UPDATE_GOLDEN"):
+        CLI_HELP.write_text(text)
+    assert text == CLI_HELP.read_text(), f"the CLI changed; run UPDATE_GOLDEN=1 pytest {__file__}"

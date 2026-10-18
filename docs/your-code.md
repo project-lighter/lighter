@@ -30,6 +30,12 @@ lighter fit configs/train.yaml                     # a config in a subfolder
 lighter fit ../my_project/configs/train.yaml       # from anywhere else
 ```
 
+The first line Lighter prints names the project it found (`<tmp>` is the folder a test ran this in):
+
+```text
+--8<-- "tests/integration/mistakes/run_from_parent_folder.txt"
+```
+
 Config files from two different projects in one run are an error. Without any `__lighter__.py`, `_target_` can
 still name installed packages (`torch.nn.Linear`, or your own package after `pip install -e .`).
 
