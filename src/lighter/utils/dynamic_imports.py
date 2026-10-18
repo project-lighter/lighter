@@ -9,7 +9,7 @@ keeping ForkingPickler's own reducers for pipes, queues and file descriptors.
 import importlib.machinery
 import importlib.util
 import sys
-from io import BytesIO
+from collections import ChainMap
 from multiprocessing import reduction
 from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
@@ -21,19 +21,10 @@ import cloudpickle
 __all__ = ["import_module_from_path"]
 
 
-class _HybridPickler(ForkingPickler):
-    """ForkingPickler whose remaining objects go through cloudpickle (by value for registered modules)."""
+class _HybridPickler(cloudpickle.CloudPickler):
+    """cloudpickle, plus the reducers that multiprocessing and torch register for pipes, queues and tensors."""
 
-    def __init__(self, file: IO[bytes], protocol: int | None = None) -> None:
-        super().__init__(file, protocol)
-        dispatch_table = cloudpickle.CloudPickler.dispatch.copy()
-        dispatch_table.update(self.dispatch_table)  # ForkingPickler's reducers take priority
-        self.dispatch_table = dispatch_table
-
-    def reducer_override(self, obj: Any) -> Any:
-        if type(obj) in getattr(ForkingPickler, "_extra_reducers", {}):
-            return NotImplemented
-        return cloudpickle.CloudPickler(BytesIO()).reducer_override(obj)
+    dispatch_table = ChainMap(ForkingPickler._extra_reducers, cloudpickle.CloudPickler.dispatch_table)  # type: ignore[attr-defined]
 
 
 def _hybrid_dump(obj: Any, file: IO[bytes], protocol: int | None = None) -> None:

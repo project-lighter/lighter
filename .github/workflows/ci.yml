@@ -131,8 +131,11 @@ jobs:
         if: runner.os == 'Linux'
         run: echo "PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu" >> "$GITHUB_ENV"
 
-      - name: Run the README quick start in a clean venv, with this wheel and checkout
-        run: |  # outside the checkout, which the script copies in place of `git clone`
+      - name: Train the quick start in a clean venv, as the README does
+        run: |  # the venv sits outside the checkout, so the wheel is what gets imported
           python -m venv ../venv
-          ../venv/${{ runner.os == 'Windows' && 'Scripts/python.exe' || 'bin/python' }} \
-            .github/scripts/readme_quickstart.py dist/lighter-*.whl ../quickstart
+          source ../venv/${{ runner.os == 'Windows' && 'Scripts' || 'bin' }}/activate
+          pip install dist/lighter-*.whl
+          (cd examples/quickstart && lighter fit config.yaml trainer::max_epochs=1)
+          test -f examples/quickstart/lightning_logs/version_0/config.yaml
+          cd .. && python -c "import sys, lighter.engine.runner; assert 'torch' not in sys.modules, 'the CLI imports torch'"
