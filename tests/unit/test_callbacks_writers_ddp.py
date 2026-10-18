@@ -6,14 +6,18 @@ These tests emulate DDP on a single device by mocking the distributed environmen
 import csv
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 import torch
 
 from lighter.callbacks.csv_writer import CsvWriter
 from lighter.callbacks.file_writer import FileWriter
 from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
+
+
+def read_csv(path):
+    """Read a CSV file into a list of row dicts (all values are strings)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True):
@@ -29,11 +33,6 @@ def make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True):
     strategy.barrier = MagicMock()
     strategy.root_device = torch.device("cpu")
     trainer.strategy = strategy
-
-    # Mock the predict_loop to avoid the private API issue
-    trainer.predict_loop = MagicMock()
-    trainer.predict_loop.num_dataloaders = 1
-    trainer.predict_loop._predictions = [[]]
 
     return trainer
 
@@ -64,7 +63,7 @@ class TestCsvWriterDDP:
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred", "target"])
 
-        writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp, mock_system, "predict")
 
         # Check that temporary file has rank suffix
         expected_temp = tmp_path / "predictions.tmp_rank0.csv"
@@ -79,12 +78,12 @@ class TestCsvWriterDDP:
         # Rank 0
         trainer_rank0 = make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True)
         writer_rank0 = CsvWriter(path=csv_path, keys=["pred"])
-        writer_rank0.setup(trainer_rank0, mock_system, Stage.PREDICT)
+        writer_rank0.setup(trainer_rank0, mock_system, "predict")
 
         # Rank 1
         trainer_rank1 = make_mock_trainer(global_rank=1, world_size=2, is_global_zero=False)
         writer_rank1 = CsvWriter(path=csv_path, keys=["pred"])
-        writer_rank1.setup(trainer_rank1, mock_system, Stage.PREDICT)
+        writer_rank1.setup(trainer_rank1, mock_system, "predict")
 
         # Verify different temp files
         assert writer_rank0._temp_path == tmp_path / "predictions.tmp_rank0.csv"
@@ -96,7 +95,7 @@ class TestCsvWriterDDP:
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred", "target"])
 
-        writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp, mock_system, "predict")
 
         # Save temp path before it's cleared
         temp_path = writer._temp_path
@@ -113,11 +112,11 @@ class TestCsvWriterDDP:
         assert csv_path.exists()
 
         # Verify content
-        df = pd.read_csv(csv_path)
-        assert len(df) == 3
-        assert list(df.columns) == ["pred", "target"]
-        assert df["pred"].tolist() == [1, 2, 3]
-        assert df["target"].tolist() == [4, 5, 6]
+        rows = read_csv(csv_path)
+        assert len(rows) == 3
+        assert list(rows[0]) == ["pred", "target"]
+        assert [r["pred"] for r in rows] == ["1", "2", "3"]
+        assert [r["target"] for r in rows] == ["4", "5", "6"]
 
         # Verify temp file cleaned up
         assert not temp_path.exists()
@@ -130,7 +129,7 @@ class TestCsvWriterDDP:
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred", "target"])
 
-        writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp, mock_system, "predict")
 
         # Save temp path before it's cleared
         temp_path_rank0 = writer._temp_path
@@ -145,7 +144,7 @@ class TestCsvWriterDDP:
         # Create a second temporary file to simulate rank 1
         temp_path_rank1 = tmp_path / "predictions.tmp_rank1.csv"
         with open(temp_path_rank1, "w", newline="") as f:
-            csv_writer = csv.writer(f)
+            csv_writer = csv.writer(f, lineterminator="\n")  # as CsvWriter writes its shards
             csv_writer.writerow(["pred", "target"])
             csv_writer.writerow([3, 6])
 
@@ -166,11 +165,11 @@ class TestCsvWriterDDP:
 
         # Verify final CSV exists and contains data from both ranks
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 3  # 2 from rank 0 + 1 from rank 1
-        assert list(df.columns) == ["pred", "target"]
-        assert sorted(df["pred"].tolist()) == [1, 2, 3]
-        assert sorted(df["target"].tolist()) == [4, 5, 6]
+        rows = read_csv(csv_path)
+        assert len(rows) == 3  # 2 from rank 0 + 1 from rank 1
+        assert list(rows[0]) == ["pred", "target"]
+        assert sorted(r["pred"] for r in rows) == ["1", "2", "3"]
+        assert sorted(r["target"] for r in rows) == ["4", "5", "6"]
 
         # Verify temp files cleaned up (rank 0 is global_zero, so it cleans)
         assert not temp_path_rank0.exists()
@@ -184,7 +183,7 @@ class TestCsvWriterDDP:
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred"])
 
-        writer.setup(mock_trainer_ddp_rank1, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp_rank1, mock_system, "predict")
 
         # Save temp path before it's cleared
         temp_path_rank1 = writer._temp_path
@@ -239,7 +238,7 @@ class TestFileWriterDDP:
         writer = FileWriter(directory=tmp_path / "rank_0", value_key="pred", writer_fn="tensor")
 
         trainer_rank0 = make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True)
-        writer.setup(trainer_rank0, mock_system, Stage.PREDICT)
+        writer.setup(trainer_rank0, mock_system, "predict")
 
         # Verify directory created
         assert writer.path.exists()
@@ -252,7 +251,7 @@ class TestFileWriterDDP:
         # Create a trainer with a mock strategy that tracks barrier calls
         trainer = make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True)
 
-        writer.setup(trainer, mock_system, Stage.PREDICT)
+        writer.setup(trainer, mock_system, "predict")
 
         # Verify barrier was called on the strategy
         trainer.strategy.barrier.assert_called_once()
@@ -262,7 +261,7 @@ class TestFileWriterDDP:
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor")
 
         with patch("torch.distributed.is_initialized", return_value=False), patch("torch.distributed.barrier") as mock_barrier:
-            writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+            writer.setup(mock_trainer_ddp, mock_system, "predict")
 
             # Barrier should not be called
             mock_barrier.assert_not_called()
@@ -276,7 +275,7 @@ class TestDistributedEdgeCases:
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred"])
 
-        writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp, mock_system, "predict")
 
         # Don't write anything (simulating empty rank)
         writer._csv_file.close()
@@ -284,7 +283,7 @@ class TestDistributedEdgeCases:
         # Create another rank with data
         temp_path_rank1 = tmp_path / "predictions.tmp_rank1.csv"
         with open(temp_path_rank1, "w", newline="") as f:
-            csv_writer = csv.writer(f)
+            csv_writer = csv.writer(f, lineterminator="\n")  # as CsvWriter writes its shards
             csv_writer.writerow(["pred"])
             csv_writer.writerow([1])
             csv_writer.writerow([2])
@@ -305,16 +304,16 @@ class TestDistributedEdgeCases:
 
         # Final CSV should have only rank 1's data
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 2
-        assert df["pred"].tolist() == [1, 2]
+        rows = read_csv(csv_path)
+        assert len(rows) == 2
+        assert [r["pred"] for r in rows] == ["1", "2"]
 
     def test_csv_writer_handles_none_paths(self, tmp_path, mock_trainer_ddp, mock_system):
         """Test that CSV writer handles None paths in gathered list."""
         csv_path = tmp_path / "predictions.csv"
         writer = CsvWriter(path=csv_path, keys=["pred"])
 
-        writer.setup(mock_trainer_ddp, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer_ddp, mock_system, "predict")
         outputs = {"pred": torch.tensor([1, 2])}
         writer.write(outputs, None, 0, 0)
         writer._csv_file.close()
@@ -336,6 +335,6 @@ class TestDistributedEdgeCases:
 
         # Should still work with None paths filtered out
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 2
-        assert df["pred"].tolist() == [1, 2]
+        rows = read_csv(csv_path)
+        assert len(rows) == 2
+        assert [r["pred"] for r in rows] == ["1", "2"]

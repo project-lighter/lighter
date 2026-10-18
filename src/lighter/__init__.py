@@ -1,15 +1,27 @@
-"""
-Lighter is a framework for streamlining deep learning experiments with configuration files.
-"""
+"""Lighter: run Lightning stages from YAML configs."""
+
+import importlib
+from typing import TYPE_CHECKING, Any
 
 __version__ = "0.1.0"
+__all__ = ["LighterDataModule", "LighterModule", "Runner", "build", "load_model"]
+_MODULES = {
+    "LighterDataModule": "data",
+    "LighterModule": "model",
+    "Runner": "engine.runner",
+    "build": "engine.runner",
+    "load_model": "engine.saved_config",
+}
 
-from .utils.logging import _setup_logging
+if TYPE_CHECKING:
+    from .data import LighterDataModule
+    from .engine.runner import Runner, build
+    from .engine.saved_config import load_model
+    from .model import LighterModule
 
-_setup_logging()
 
-from .data import LighterDataModule  # noqa: E402
-from .engine.runner import Runner  # noqa: E402
-from .model import LighterModule  # noqa: E402
-
-__all__ = ["LighterDataModule", "LighterModule", "Runner"]
+def __getattr__(name: str) -> Any:
+    """Import the public names on first use, so the CLI starts without importing torch."""
+    if name not in _MODULES:
+        raise AttributeError(f"module 'lighter' has no attribute '{name}'")
+    return getattr(importlib.import_module(f"lighter.{_MODULES[name]}"), name)

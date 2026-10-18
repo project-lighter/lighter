@@ -42,7 +42,8 @@ trainer:
       monitor: val/loss/epoch
       mode: min
       save_top_k: 3
-      filename: challenge1-{epoch}-{val/loss/epoch:.4f}
+      filename: challenge1-epoch={epoch}-val_loss={val/loss/epoch:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
 
 model:
@@ -79,13 +80,13 @@ model:
 
   optimizer:
     _target_: torch.optim.AdamW
-    params: $@model::network.parameters()
+    _mode_: callable  # LighterModule calls it with the model's parameters
     lr: 0.001
     weight_decay: 0.00001
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
+    _mode_: callable  # LighterModule calls it with the optimizer
     T_max: 100
 
   train_metrics:

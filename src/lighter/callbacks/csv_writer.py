@@ -3,24 +3,23 @@ This module provides the CsvWriter class, which saves predictions in a table for
 """
 
 import csv
-from io import TextIOWrapper
+from io import StringIO, TextIOWrapper
 from pathlib import Path
+from shutil import copyfileobj
 from typing import Any
 
-import pandas as pd
 import torch
 import torch.distributed as dist
-from pytorch_lightning import Trainer
+from pytorch_lightning import LightningModule, Trainer
 
 from lighter.callbacks.base_writer import BaseWriter
-from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
 
 
 class CsvWriter(BaseWriter):
     """
-    Writer for saving predictions in a CSV format. It accumulates predictions in a temporary
-    file and saves them to the final destination at the end of the prediction epoch.
+    Writer for saving predictions in a CSV format. Each rank writes its rows to a temporary file; at the end
+    of the prediction epoch rank 0 joins them as text (so values like `00001` stay as written) and replaces
+    the final file in one step.
 
     Args:
         path (str | Path): Path to save the final CSV file.
@@ -52,15 +51,15 @@ class CsvWriter(BaseWriter):
         self._csv_file = None
         self._csv_writer = None
 
-    def setup(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
-        if stage != Stage.PREDICT:
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        if stage != "predict":
             return
         super().setup(trainer, pl_module, stage)
 
         # Create a temporary file for writing predictions
         self._temp_path = self.path.with_suffix(f".tmp_rank{trainer.global_rank}{self.path.suffix}")
-        self._csv_file = open(self._temp_path, "w", newline="")
-        self._csv_writer = csv.writer(self._csv_file)
+        self._csv_file = open(self._temp_path, "w", newline="", encoding="utf-8")
+        self._csv_writer = csv.writer(self._csv_file, lineterminator="\n")
         # Write header
         self._csv_writer.writerow(self.keys)
 
@@ -138,7 +137,7 @@ class CsvWriter(BaseWriter):
                 record.append(self._get_record_value(value, i))
             self._csv_writer.writerow(record)
 
-    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LighterModule) -> None:
+    def on_predict_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         """
         At the end of the prediction epoch, it saves the temporary file to the final destination.
         """
@@ -155,28 +154,32 @@ class CsvWriter(BaseWriter):
             all_temp_paths = [self._temp_path]
 
         if trainer.is_global_zero:
-            # Read all temporary files into pandas DataFrames and concatenate them
-            dfs = [pd.read_csv(path) for path in all_temp_paths if path is not None]
-            if not dfs:
-                return
-            df = pd.concat(dfs, ignore_index=True)
-
-            # Save the final CSV file
-            df.to_csv(self.path, index=False)
-
-            # Remove all temporary files
-            for path in all_temp_paths:
-                if path is not None:
-                    path.unlink()
+            paths = [path for path in all_temp_paths if path is not None]
+            header = StringIO()
+            csv.writer(header, lineterminator="\n").writerow(self.keys)
+            merged = self.path.with_name(f".{self.path.name}.tmp")
+            try:
+                with open(merged, "w", newline="", encoding="utf-8") as output:
+                    output.write(header.getvalue())
+                    for path in paths:
+                        with open(path, newline="", encoding="utf-8") as shard:
+                            if shard.read(len(header.getvalue())) != header.getvalue():
+                                raise ValueError(f"CsvWriter: {path} does not start with the header {self.keys}.")
+                            copyfileobj(shard, output)
+                merged.replace(self.path)
+            finally:
+                merged.unlink(missing_ok=True)
+            for path in paths:
+                path.unlink()
 
         # Reset temporary path
         self._temp_path = None
 
-    def on_exception(self, trainer: Trainer, pl_module: LighterModule, exception: BaseException) -> None:
+    def on_exception(self, trainer: Trainer, pl_module: LightningModule, exception: BaseException) -> None:
         """Close the file on errors to prevent file handle leaks."""
         self._close_file()
 
-    def teardown(self, trainer: Trainer, pl_module: LighterModule, stage: str) -> None:
+    def teardown(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
         """Guarantee cleanup when stage is PREDICT."""
-        if stage == Stage.PREDICT:
+        if stage == "predict":
             self._close_file()

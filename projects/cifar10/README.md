@@ -4,7 +4,9 @@ Reference example - simple CNN for CIFAR-10 classification.
 
 ## Dataset
 
-**CIFAR-10** - 60,000 32x32 color images, 10 classes. Auto-downloaded.
+**CIFAR-10** - 60,000 32x32 color images, 10 classes. Auto-downloaded. Validation uses 5,000 of the training
+images, held out by `project.dataset.cifar10_split` with a fixed `split_seed`, so the 10,000 test images are used
+only by `lighter test` and `lighter predict`.
 
 ## Architecture
 
@@ -12,16 +14,21 @@ Reference example - simple CNN for CIFAR-10 classification.
 
 ## Lighter Features Demonstrated
 
-- **`$` expressions** - `$@model::network.parameters()`
-- **`%` raw references** - `%::train_metrics` for config reuse
+- **Optimizer as a partial** - `_mode_: callable`, called by LighterModule with the model's parameters
+- **`%` copies** - `%model::train_metrics` reuses a definition as a separate object
 - **MetricCollection** - Accuracy, F1, Precision, Recall
 - **FileWriter callback** - saves predictions as tensors
 
 ## Usage
 
+Needs `torchvision` besides Lighter.
+
 ```bash
-pip install lighter
+pip install lighter torchvision
 cd projects/cifar10
+
+# Check every stage on random images, without a download (CI runs this)
+lighter fit configs/example.yaml configs/fake_data.yaml
 
 # Train
 lighter fit configs/example.yaml

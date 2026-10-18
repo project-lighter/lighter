@@ -1,0 +1,9 @@
+$ lighter fit configs/config.yaml
+# exit code 2
+configs/config.yaml:8 (model): TargetNotFoundError: Cannot locate class or function: 'project.model.TinyModel'
+       6 │ 
+       7 │ model:
+  →    8 │   _target_: project.model.TinyModel
+       9 │   learning_rate: 0.1
+      10 │   network:
+  To import your own code, create an empty <tmp>/proj/__lighter__.py and use '_target_: project.model.TinyModel'.

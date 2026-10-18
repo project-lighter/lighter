@@ -1,16 +1,22 @@
 """Unit tests for FileWriter and CsvWriter callbacks."""
 
-from unittest.mock import MagicMock
+import csv
+import sys
+from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 import torch
 
 from lighter.callbacks.base_writer import BaseWriter
 from lighter.callbacks.csv_writer import CsvWriter
-from lighter.callbacks.file_writer import FileWriter, writer_registry
+from lighter.callbacks.file_writer import WRITERS, FileWriter
 from lighter.model import LighterModule
-from lighter.utils.types.enums import Stage
+
+
+def read_csv(path):
+    """Read a CSV file into a list of row dicts (all values are strings)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 @pytest.fixture
@@ -42,7 +48,7 @@ class TestBaseWriter:
         writer = ConcreteWriter(path=existing_file)
 
         # Should complete without error (just logs a warning)
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         assert writer.path == existing_file
 
@@ -55,7 +61,7 @@ class TestBaseWriter:
                 write_called.append((outputs, batch, batch_idx, dataloader_idx))
 
         writer = ConcreteWriter(path=tmp_path / "test.csv")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"pred": torch.tensor([1, 2, 3])}
         batch = {"input": torch.tensor([1])}
@@ -75,7 +81,7 @@ class TestBaseWriter:
                 write_called.append(True)
 
         writer = ConcreteWriter(path=tmp_path / "test.csv")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Empty outputs
         writer.on_predict_batch_end(mock_trainer, mock_system, {}, None, 0, 0)
@@ -111,7 +117,7 @@ class TestFileWriter:
 
     def test_initialization_invalid_writer(self, tmp_path):
         """Test FileWriter raises error for invalid writer."""
-        with pytest.raises(ValueError, match="Writer with name 'invalid' is not registered"):
+        with pytest.raises(ValueError, match="Unknown writer_fn 'invalid'"):
             FileWriter(directory=tmp_path, value_key="pred", writer_fn="invalid")
 
     def test_initialization_non_callable(self, tmp_path):
@@ -123,7 +129,7 @@ class TestFileWriter:
         """Test FileWriter setup creates directory and initializes counter."""
         writer = FileWriter(directory=tmp_path / "predictions", value_key="pred", writer_fn="tensor")
 
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         assert writer.path.exists()
         assert writer._counter == 0
@@ -136,7 +142,7 @@ class TestFileWriter:
 
         writer = FileWriter(directory=tmp_path / "predictions", value_key="pred", writer_fn="tensor")
 
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         assert writer._counter == 2  # Starts at rank
         assert writer._step == 4  # Step size = world_size
@@ -148,12 +154,12 @@ class TestFileWriter:
         writer = FileWriter(directory=file_path, value_key="pred", writer_fn="tensor")
 
         with pytest.raises(ValueError, match="expects 'directory' to be a directory path"):
-            writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+            writer.setup(mock_trainer, mock_system, "predict")
 
     def test_write_with_tensor_batch(self, tmp_path, mock_trainer, mock_system):
         """Test writing a batch of tensor predictions."""
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {
             "pred": torch.tensor([[1, 2], [3, 4], [5, 6]])  # 3 predictions
@@ -173,7 +179,7 @@ class TestFileWriter:
     def test_write_with_custom_names(self, tmp_path, mock_trainer, mock_system):
         """Test writing with custom sample names."""
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor", name_key="sample_id")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"pred": torch.tensor([[1, 2], [3, 4]]), "sample_id": ["patient_001", "patient_002"]}
 
@@ -185,7 +191,7 @@ class TestFileWriter:
     def test_write_length_mismatch(self, tmp_path, mock_trainer, mock_system):
         """Test error when predictions and names have different lengths."""
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor", name_key="sample_id")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {
             "pred": torch.tensor([[1, 2], [3, 4], [5, 6]]),  # 3 items
@@ -198,7 +204,7 @@ class TestFileWriter:
     def test_write_missing_key(self, tmp_path, mock_trainer, mock_system):
         """Test error when required key is missing from outputs."""
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"other_key": torch.tensor([1, 2, 3])}
 
@@ -268,7 +274,7 @@ class TestFileWriter:
     def test_write_empty_values(self, tmp_path, mock_trainer, mock_system):
         """Test write handles empty values gracefully."""
         writer = FileWriter(directory=tmp_path, value_key="pred", writer_fn="tensor")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Empty tensor
         outputs = {"pred": torch.tensor([])}
@@ -301,7 +307,7 @@ class TestFileWriter:
     def test_write_with_nested_directory(self, tmp_path, mock_trainer, mock_system):
         """Test FileWriter creates nested directories when using custom names."""
         writer = FileWriter(directory=tmp_path / "outputs", value_key="pred", writer_fn="tensor", name_key="path")
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"pred": torch.tensor([[1, 2]]), "path": ["subfolder/sample"]}
 
@@ -310,25 +316,13 @@ class TestFileWriter:
         assert (tmp_path / "outputs" / "subfolder" / "sample.pt").exists()
 
 
-class TestWriterRegistry:
-    """Test suite for writer registry."""
+class TestWriters:
+    """Test suite for the built-in writer functions."""
 
     def test_builtin_writers_exist(self):
-        """Test that all built-in writers are registered."""
-        assert "tensor" in writer_registry._registry
-        assert "image_2d" in writer_registry._registry
-        assert "image_3d" in writer_registry._registry
-        assert "text" in writer_registry._registry
-
-    def test_get_existing_writer(self):
-        """Test getting an existing writer."""
-        writer = writer_registry.get("tensor")
-        assert callable(writer)
-
-    def test_get_nonexistent_writer(self):
-        """Test error when getting non-existent writer."""
-        with pytest.raises(ValueError, match="Writer with name 'nonexistent' is not registered"):
-            writer_registry.get("nonexistent")
+        """Test that all built-in writers are available by name."""
+        assert set(WRITERS) == {"tensor", "image_2d", "image_3d", "text"}
+        assert all(callable(writer) for writer in WRITERS.values())
 
     def test_tensor_writer(self, tmp_path):
         """Test tensor writer function."""
@@ -402,27 +396,6 @@ class TestWriterRegistry:
         with pytest.raises(ValueError, match="write_image_3d expects a 4D tensor"):
             write_image_3d(path, tensor)
 
-    def test_writer_registry_register_duplicate(self):
-        """Test that registering duplicate writer raises error."""
-        from lighter.callbacks.file_writer import WriterRegistry
-
-        registry = WriterRegistry()
-
-        @registry.register("test_writer")
-        def writer1(path, value):
-            pass
-
-        with pytest.raises(ValueError, match="Writer with name 'test_writer' is already registered"):
-
-            @registry.register("test_writer")
-            def writer2(path, value):
-                pass
-
-
-# =============================================================================
-# CsvWriter Tests
-# =============================================================================
-
 
 class TestCsvWriter:
     """Test suite for CsvWriter callback."""
@@ -437,7 +410,7 @@ class TestCsvWriter:
         """Test CsvWriter setup creates temp file and writes header."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
 
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Check temp file created with header
         temp_file = tmp_path / "results.tmp_rank0.csv"
@@ -451,7 +424,7 @@ class TestCsvWriter:
     def test_write_tensor_batch(self, tmp_path, mock_trainer, mock_system):
         """Test writing a batch with tensor values."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"pred": torch.tensor([0.1, 0.2, 0.3]), "target": torch.tensor([0, 1, 0])}
 
@@ -462,17 +435,17 @@ class TestCsvWriter:
 
         # Read temp file
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 3
-        assert list(df.columns) == ["pred", "target"]
-        assert df["pred"].tolist() == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
-        assert df["target"].tolist() == [0, 1, 0]
+        assert len(rows) == 3
+        assert list(rows[0]) == ["pred", "target"]
+        assert [float(r["pred"]) for r in rows] == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
+        assert [r["target"] for r in rows] == ["0", "1", "0"]
 
     def test_write_mixed_types(self, tmp_path, mock_trainer, mock_system):
         """Test writing with mixed data types."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target", "id"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {
             "pred": torch.tensor([0.1, 0.2]),
@@ -486,15 +459,15 @@ class TestCsvWriter:
         writer._csv_file.close()
 
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 2
-        assert df["id"].tolist() == ["sample1", "sample2"]
+        assert len(rows) == 2
+        assert [r["id"] for r in rows] == ["sample1", "sample2"]
 
     def test_write_inconsistent_lengths(self, tmp_path, mock_trainer, mock_system):
         """Test error when outputs have inconsistent lengths."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {
             "pred": torch.tensor([0.1, 0.2, 0.3]),  # 3 items
@@ -507,7 +480,7 @@ class TestCsvWriter:
     def test_write_missing_key(self, tmp_path, mock_trainer, mock_system):
         """Test error when required key is missing."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         outputs = {"pred": torch.tensor([0.1, 0.2])}  # Missing "target"
 
@@ -555,7 +528,7 @@ class TestCsvWriter:
     def test_on_predict_epoch_end_single_rank(self, tmp_path, mock_trainer, mock_system):
         """Test epoch end combines temp file and creates final CSV."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Write some data
         outputs = {"pred": torch.tensor([0.1, 0.2]), "target": torch.tensor([0, 1])}
@@ -566,8 +539,8 @@ class TestCsvWriter:
 
         # Check final CSV exists
         assert (tmp_path / "results.csv").exists()
-        df = pd.read_csv(tmp_path / "results.csv")
-        assert len(df) == 2
+        rows = read_csv(tmp_path / "results.csv")
+        assert len(rows) == 2
 
         # Check temp file was removed
         temp_file = tmp_path / "results.tmp_rank0.csv"
@@ -576,7 +549,7 @@ class TestCsvWriter:
     def test_write_empty_outputs_raises(self, tmp_path, mock_trainer, mock_system):
         """Test write raises KeyError when outputs is empty."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Empty outputs - none of the configured keys are present
         outputs = {}
@@ -587,7 +560,7 @@ class TestCsvWriter:
     def test_write_no_configured_keys_present_raises(self, tmp_path, mock_trainer, mock_system):
         """Test write raises KeyError when outputs has keys but none match configured keys."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "target"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Outputs has keys, but none of them match the configured keys
         outputs = {"other_key": [1, 2, 3], "another_key": [4, 5, 6]}
@@ -601,7 +574,7 @@ class TestCsvWriter:
     def test_write_non_sequence_values(self, tmp_path, mock_trainer, mock_system):
         """Test write with non-sequence values (single sample)."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "label"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Single values (not sequences)
         outputs = {
@@ -615,11 +588,11 @@ class TestCsvWriter:
         writer._csv_file.close()
 
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 1
-        assert df["pred"].iloc[0] == 0.95
-        assert df["label"].iloc[0] == "positive"
+        assert len(rows) == 1
+        assert float(rows[0]["pred"]) == pytest.approx(0.95)
+        assert rows[0]["label"] == "positive"
 
     def test_get_record_value_non_sequence(self):
         """Test _get_record_value with non-sequence value."""
@@ -639,7 +612,7 @@ class TestCsvWriter:
     def test_close_file_closes_open_file(self, tmp_path, mock_trainer, mock_system):
         """Test _close_file closes the file handle and resets state."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # File should be open after setup
         assert writer._csv_file is not None
@@ -669,7 +642,7 @@ class TestCsvWriter:
     def test_close_file_handles_already_closed_file(self, tmp_path, mock_trainer, mock_system):
         """Test _close_file handles already closed file."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Manually close the file
         writer._csv_file.close()
@@ -684,7 +657,7 @@ class TestCsvWriter:
     def test_on_exception_closes_file(self, tmp_path, mock_trainer, mock_system):
         """Test on_exception closes file to prevent handle leaks."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # File should be open
         assert writer._csv_file is not None
@@ -700,13 +673,13 @@ class TestCsvWriter:
     def test_teardown_closes_file_on_predict_stage(self, tmp_path, mock_trainer, mock_system):
         """Test teardown closes file when stage is PREDICT."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # File should be open
         assert writer._csv_file is not None
 
         # Call teardown with PREDICT stage
-        writer.teardown(mock_trainer, mock_system, Stage.PREDICT)
+        writer.teardown(mock_trainer, mock_system, "predict")
 
         # File should be closed
         assert writer._csv_file is None
@@ -715,14 +688,14 @@ class TestCsvWriter:
     def test_teardown_does_not_close_on_other_stages(self, tmp_path, mock_trainer, mock_system):
         """Test teardown does not close file for non-PREDICT stages."""
         writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred"])
-        writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        writer.setup(mock_trainer, mock_system, "predict")
 
         # Store reference to check if still open
         csv_file = writer._csv_file
         assert csv_file is not None
 
         # Call teardown with FIT stage - should not close the file
-        writer.teardown(mock_trainer, mock_system, Stage.FIT)
+        writer.teardown(mock_trainer, mock_system, "fit")
 
         # File should still be open (same reference)
         assert writer._csv_file is csv_file
@@ -746,8 +719,8 @@ class TestWritersIntegration:
         csv_writer = CsvWriter(path=tmp_path / "results.csv", keys=["pred", "confidence"])
 
         # Setup both
-        file_writer.setup(mock_trainer, mock_system, Stage.PREDICT)
-        csv_writer.setup(mock_trainer, mock_system, Stage.PREDICT)
+        file_writer.setup(mock_trainer, mock_system, "predict")
+        csv_writer.setup(mock_trainer, mock_system, "predict")
 
         # Write same outputs to both
         outputs = {"pred": torch.tensor([[1, 2], [3, 4]]), "confidence": torch.tensor([0.9, 0.8])}
@@ -762,3 +735,70 @@ class TestWritersIntegration:
         # Check CsvWriter created temp file
         temp_csv = tmp_path / "results.tmp_rank0.csv"
         assert temp_csv.exists()
+
+
+class TestCsvFidelity:
+    """The merged CSV keeps every field exactly as written and is replaced in one step."""
+
+    def test_fields_are_kept_as_written(self, tmp_path, mock_trainer, mock_system):
+        rows = [
+            ["00001", "NA"],
+            ["900719925474099312345", "NULL"],
+            ["", ""],
+            ["comma,id", 'quoted "label"'],
+            ["line\nbreak", "日本語"],
+        ]
+        path = tmp_path / "predictions.csv"
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": [row[0] for row in rows], "label": [row[1] for row in rows]}, None, 0, 0)
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        with open(path, newline="", encoding="utf-8") as f:
+            assert list(csv.reader(f)) == [["id", "label"], *rows]
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["predictions.csv"]
+
+    def test_no_rows_writes_the_header(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "empty.csv"
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_text(encoding="utf-8").splitlines() == ["id,label"]
+
+    def test_long_text_is_copied_unchanged(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "long.csv"
+        writer = CsvWriter(path, ["id", "text"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": ["0001"], "text": ['line,"quoted"\n日本語' * 20000]}, None, 0, 0)
+        writer._csv_file.flush()
+        shard = writer._temp_path.read_bytes()
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_bytes() == shard
+
+    def test_bad_shard_keeps_the_previous_file(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "predictions.csv"
+        path.write_text("previous complete output\n", encoding="utf-8")
+        other_shard = tmp_path / "other-rank.csv"
+        other_shard.write_text("wrong,header\r\n", encoding="utf-8")
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": ["0001"], "label": ["NA"]}, None, 0, 0)
+
+        def gather(paths, local):
+            paths[:] = [local, other_shard]
+
+        with (
+            patch("torch.distributed.is_initialized", return_value=True),
+            patch("torch.distributed.all_gather_object", side_effect=gather),
+            pytest.raises(ValueError, match="does not start with the header"),
+        ):
+            writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_text(encoding="utf-8") == "previous complete output\n"
+        assert not (tmp_path / ".predictions.csv.tmp").exists()
+
+
+def test_image_writers_explain_missing_torchvision(tmp_path, monkeypatch):
+    from lighter.callbacks.file_writer import write_image_2d
+
+    monkeypatch.setitem(sys.modules, "torchvision.io", None)
+    with pytest.raises(ImportError, match="pip install torchvision"):
+        write_image_2d(tmp_path / "image", torch.rand(3, 4, 4))

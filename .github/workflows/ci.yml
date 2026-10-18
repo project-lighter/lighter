@@ -30,6 +30,7 @@ jobs:
           - format
           - lint
           - types
+          - docs
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +40,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           python-version: "3.12"
-          install-deps: ${{ matrix.check == 'types' && 'true' || 'false' }}
+          install-deps: ${{ (matrix.check == 'types' || matrix.check == 'docs') && 'true' || 'false' }}
+          install-groups: ${{ matrix.check == 'docs' && '--only-group doc' || '--all-extras --all-groups' }}
 
       - name: Run format check
         if: matrix.check == 'format'
@@ -52,6 +54,10 @@ jobs:
       - name: Run type check
         if: matrix.check == 'types'
         run: uv run mypy src
+
+      - name: Build docs (broken links, anchors and snippets fail the build)
+        if: matrix.check == 'docs'
+        run: uv run --only-group doc mkdocs build --strict
 
   tests:
     name: Tests (Python 3.12)
@@ -95,6 +101,41 @@ jobs:
         uses: codecov/codecov-action@v5.4.3
         with:
           files: ./coverage.xml
-          fail_ci_if_error: true
+          fail_ci_if_error: false  # the uploader can fail its own signature check after the tests pass
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  quickstart:
+    name: README quick start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
+
+      - name: Use CPU-only torch on Linux (the default wheel downloads CUDA)
+        if: runner.os == 'Linux'
+        run: echo "PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu" >> "$GITHUB_ENV"
+
+      - name: Train the quick start in a clean venv, as the README does
+        run: |  # the venv sits outside the checkout, so the wheel is what gets imported
+          python -m venv ../venv
+          source ../venv/${{ runner.os == 'Windows' && 'Scripts' || 'bin' }}/activate
+          pip install dist/lighter-*.whl
+          (cd examples/quickstart && lighter fit config.yaml trainer::max_epochs=1)
+          test -f examples/quickstart/lightning_logs/version_0/config.yaml
+          cd .. && python -c "import sys, lighter.engine.runner; assert 'torch' not in sys.modules, 'the CLI imports torch'"

@@ -1,9 +1,11 @@
 name: Docs Publish
 
+# The site documents the released package, so it is published with each release tag, not with every merge.
 on:
   push:
-    branches:
-      - main
+    tags:
+      - '*'
+  workflow_dispatch:
 
 permissions:
   contents: write

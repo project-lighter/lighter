@@ -1,0 +1,6 @@
+# Every run saves to the same folder, so `--ckpt_path last` finds the previous run's last checkpoint.
+trainer:
+  callbacks:
+    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+      dirpath: checkpoints
+      save_last: true

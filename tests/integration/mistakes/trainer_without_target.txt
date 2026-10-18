@@ -1,0 +1,3 @@
+$ lighter fit configs/config.yaml ~trainer::_target_
+# exit code 2
+TypeError: `trainer` must build a Trainer, got dict. Add a `_target_` to `trainer:`.

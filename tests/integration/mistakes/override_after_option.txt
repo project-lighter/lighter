@@ -1,0 +1,10 @@
+$ lighter fit configs/config.yaml --ckpt_path last model::learnin_rate=0.01
+# exit code 2
+configs/config.yaml:8 (model): InstantiationError: Could not instantiate component 'project.model.TinyModel':
+  From TypeError: TinyModel.__init__() got an unexpected keyword argument 'learnin_rate'
+       6 │ 
+       7 │ model:
+  →    8 │   _target_: project.model.TinyModel
+       9 │   learning_rate: 0.1
+      10 │   network:
+  Overridden by: model::learnin_rate=0.01

@@ -31,7 +31,8 @@ trainer:
       monitor: val/loss
       mode: min
       save_top_k: 1
-      filename: simclr-{epoch}-{val/loss:.4f}
+      filename: simclr-epoch={epoch}-val_loss={val/loss:.4f}
+      auto_insert_metric_name: false  # the metric name holds `/`, which would make folders
 
   # For quick testing, uncomment:
   # fast_dev_run: true
@@ -49,14 +50,14 @@ model:
 
   optimizer:
     _target_: torch.optim.SGD
-    params: $@model::network.parameters()
+    _mode_: callable  # LighterModule calls it with the model's parameters
     lr: 0.06
     momentum: 0.9
     weight_decay: 0.0005
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
+    _mode_: callable  # LighterModule calls it with the optimizer
     T_max: 100
 
 data:

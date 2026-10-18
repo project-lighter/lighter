@@ -1,0 +1,13 @@
+$ lighter fit configs/config.yaml model::_target_=project.model.BuggyModel ~model::learning_rate
+# exit code 1
+Traceback (your code only, LIGHTER_DEBUG=1 shows all frames):
+  File "<tmp>/proj/model.py", line 15, in __init__
+    self.head = torch.nn.Linear(network.out_feature, 2)
+configs/config.yaml:8 (model): InstantiationError: Could not instantiate component 'project.model.BuggyModel':
+  From AttributeError: 'Linear' object has no attribute 'out_feature'
+       6 │ 
+       7 │ model:
+  →    8 │   _target_: project.model.TinyModel
+       9 │   learning_rate: 0.1
+      10 │   network:
+  Overridden by: model::_target_=project.model.BuggyModel ~model::learning_rate

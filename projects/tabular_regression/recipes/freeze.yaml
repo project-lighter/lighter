@@ -1,0 +1,5 @@
+# Train only the last layer of recipes/mlp.yaml: the first layer's parameters (`0.weight`, `0.bias`) stay as built.
+trainer:
+  callbacks:
+    - _target_: lighter.callbacks.Freezer
+      name_starts_with: "0."

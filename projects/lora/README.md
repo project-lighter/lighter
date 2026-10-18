@@ -14,7 +14,8 @@ This project uses the industry-standard **PEFT library** from HuggingFace, which
 
 ## Dataset
 
-**CIFAR-100** - 100 classes, 60k images. Auto-downloaded.
+**CIFAR-100** - 100 classes, 60k images. Auto-downloaded. Validation uses 10% of the training images, held out with a fixed
+`split_seed`; the test images are used only for testing.
 
 ## Lighter Features Demonstrated
 

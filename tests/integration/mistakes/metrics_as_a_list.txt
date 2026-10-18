@@ -1,0 +1,9 @@
+$ lighter fit configs/metrics.yaml
+# exit code 2
+configs/metrics.yaml:6 (model): InstantiationError: Could not instantiate component 'lighter.LighterModule':
+  From TypeError: `train_metrics` must be a torchmetrics Metric or MetricCollection, got list. For several metrics, use `_target_: torchmetrics.MetricCollection` with `metrics: [...]`.
+       4 │ 
+       5 │ model:
+  →    6 │   _target_: lighter.LighterModule
+       7 │   network:
+       8 │     _target_: torch.nn.Linear

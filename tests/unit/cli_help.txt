@@ -1,0 +1,119 @@
+$ lighter --help
+usage: lighter [-h] [--version] {fit,validate,test,predict} ...
+
+Run a Lightning stage from YAML configs.
+
+positional arguments:
+  {fit,validate,test,predict}
+    fit                 Train a model
+    validate            Validate a model
+    test                Test a model
+    predict             Run predictions with a model
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+
+$ lighter fit --help
+usage: lighter fit [-h] [--print_config] [--ckpt_path CKPT_PATH]
+                   [--weights_only | --no-weights_only]
+                   inputs [inputs ...]
+
+Train a model
+
+positional arguments:
+  inputs                Config files and overrides, e.g. config.yaml model::lr=0.001
+
+options:
+  -h, --help            show this help message and exit
+  --print_config, --print-config
+                        Print the composed config and exit.
+  --ckpt_path CKPT_PATH
+                        A checkpoint file, or `last` for the last checkpoint in the checkpoint
+                        callback's `dirpath`.
+  --weights_only, --no-weights_only
+                        Restrict checkpoint loading to tensors (safer for untrusted files). Needs
+                        Lightning 2.6 or newer.
+
+examples:
+  lighter fit configs/train.yaml
+  lighter fit configs/base.yaml configs/big.yaml trainer::max_epochs=10 model::optimizer::lr=0.001
+
+Inputs are YAML files and overrides, applied left to right. Overrides:
+  key::sub=value   set a value, written in YAML (10, 0.001, true, null, [1, 2], {a: 1})
+  =key={...}       replace a whole section instead of merging into it
+  ~key             delete a key
+Quote overrides that hold $, @, spaces or brackets: 'model::lr=$@base_lr * 2'.
+New keys belong in YAML: put them in a file and stack it, e.g. lighter fit base.yaml extra.yaml.
+--print_config shows the composed config without running. LIGHTER_DEBUG=1 shows full tracebacks.
+
+$ lighter validate --help
+usage: lighter validate [-h] [--print_config] [--ckpt_path CKPT_PATH]
+                        [--weights_only | --no-weights_only] [--verbose | --no-verbose]
+                        inputs [inputs ...]
+
+Validate a model
+
+positional arguments:
+  inputs                Config files and overrides, e.g. config.yaml model::lr=0.001
+
+options:
+  -h, --help            show this help message and exit
+  --print_config, --print-config
+                        Print the composed config and exit.
+  --ckpt_path CKPT_PATH
+                        A checkpoint file, or `last` for the last checkpoint in the checkpoint
+                        callback's `dirpath`.
+  --weights_only, --no-weights_only
+                        Restrict checkpoint loading to tensors (safer for untrusted files). Needs
+                        Lightning 2.6 or newer.
+  --verbose, --no-verbose
+                        Print results.
+
+$ lighter test --help
+usage: lighter test [-h] [--print_config] [--ckpt_path CKPT_PATH]
+                    [--weights_only | --no-weights_only] [--verbose | --no-verbose]
+                    inputs [inputs ...]
+
+Test a model
+
+positional arguments:
+  inputs                Config files and overrides, e.g. config.yaml model::lr=0.001
+
+options:
+  -h, --help            show this help message and exit
+  --print_config, --print-config
+                        Print the composed config and exit.
+  --ckpt_path CKPT_PATH
+                        A checkpoint file, or `last` for the last checkpoint in the checkpoint
+                        callback's `dirpath`.
+  --weights_only, --no-weights_only
+                        Restrict checkpoint loading to tensors (safer for untrusted files). Needs
+                        Lightning 2.6 or newer.
+  --verbose, --no-verbose
+                        Print results.
+
+$ lighter predict --help
+usage: lighter predict [-h] [--print_config] [--ckpt_path CKPT_PATH]
+                       [--weights_only | --no-weights_only]
+                       [--return_predictions | --no-return_predictions]
+                       inputs [inputs ...]
+
+Run predictions with a model
+
+positional arguments:
+  inputs                Config files and overrides, e.g. config.yaml model::lr=0.001
+
+options:
+  -h, --help            show this help message and exit
+  --print_config, --print-config
+                        Print the composed config and exit.
+  --ckpt_path CKPT_PATH
+                        A checkpoint file, or `last` for the last checkpoint in the checkpoint
+                        callback's `dirpath`.
+  --weights_only, --no-weights_only
+                        Restrict checkpoint loading to tensors (safer for untrusted files). Needs
+                        Lightning 2.6 or newer.
+  --return_predictions, --no-return_predictions
+                        Keep predictions in memory and return them (Lightning's default unless
+                        spawning processes).

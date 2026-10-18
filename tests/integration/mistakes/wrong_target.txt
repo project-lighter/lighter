@@ -1,0 +1,10 @@
+$ lighter fit configs/config.yaml model::network::_target_=torch.nn.Lienar
+# exit code 2
+configs/config.yaml:11 (model::network): TargetNotFoundError: Cannot locate class or function: 'torch.nn.Lienar'
+       9 │   learning_rate: 0.1
+      10 │   network:
+  →   11 │     _target_: torch.nn.Linear
+      12 │     in_features: 4
+      13 │     out_features: "@num_classes"
+  Did you mean 'torch.nn.Linear'?
+  Overridden by: model::network::_target_=torch.nn.Lienar

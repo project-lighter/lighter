@@ -2,12 +2,10 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lighter.engine.runner import Runner
-from lighter.utils.types.enums import Stage
+from lighter.engine.runner import load_config
 
 
 class TestConfigValidation:
@@ -38,17 +36,8 @@ data:
 """
         config_path.write_text(config_content)
 
-        runner = Runner()
-        # Patch internal methods to avoid needing real components
-        with (
-            patch.object(runner, "_resolve_model"),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            # Should not raise error - just verify config loads
-            runner.run(Stage.FIT, [str(config_path)])
+        # Should not raise error - just verify config loads
+        load_config(str(config_path))
 
     def test_config_with_all_components(self, temp_config_dir):
         """Test config with all components."""
@@ -95,26 +84,10 @@ args:
 """
         config_path.write_text(config_content)
 
-        runner = Runner()
-        # Capture config to verify values
-        captured_config = None
-
-        def capture_system(config):
-            nonlocal captured_config
-            captured_config = config
-            return MagicMock()
-
-        with (
-            patch.object(runner, "_resolve_model", side_effect=capture_system),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            runner.run(Stage.FIT, [str(config_path)])
-            assert captured_config.get("project") == "./path/to/project"
-            assert captured_config.get("vars::learning_rate") == 0.001
-            assert captured_config.get("model::optimizer::lr") == 0.001
+        captured_config = load_config(str(config_path))
+        assert captured_config.get("project") == "./path/to/project"
+        assert captured_config.get("vars::learning_rate") == 0.001
+        assert captured_config.get("model::optimizer::lr") == 0.001
 
     def test_multi_file_config_merge(self, temp_config_dir):
         """Test that multiple config files merge correctly."""
@@ -154,31 +127,15 @@ data:
 """
         override_path.write_text(override_content)
 
-        runner = Runner()
-        # Capture config to verify values
-        captured_config = None
-
-        def capture_system(config):
-            nonlocal captured_config
-            captured_config = config
-            return MagicMock()
-
-        with (
-            patch.object(runner, "_resolve_model", side_effect=capture_system),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            runner.run(Stage.FIT, [str(base_path), str(override_path)])
-            # Override values should be applied
-            assert captured_config.get("trainer::max_epochs") == 1
-            assert captured_config.get("trainer::devices") == 2
-            # Model should be present (from override)
-            assert captured_config.get("model::network::_target_") == "torch.nn.Identity"
-            # New values from override should be added
-            assert captured_config.get("model::criterion::_target_") == "torch.nn.MSELoss"
-            assert captured_config.get("data::val_dataloader") is not None
+        captured_config = load_config(str(base_path), str(override_path))
+        # Override values should be applied
+        assert captured_config.get("trainer::max_epochs") == 1
+        assert captured_config.get("trainer::devices") == 2
+        # Model should be present (from override)
+        assert captured_config.get("model::network::_target_") == "torch.nn.Identity"
+        # New values from override should be added
+        assert captured_config.get("model::criterion::_target_") == "torch.nn.MSELoss"
+        assert captured_config.get("data::val_dataloader") is not None
 
     def test_cli_overrides_apply(self, temp_config_dir):
         """Test that CLI overrides are applied correctly."""
@@ -202,25 +159,10 @@ data:
 """
         config_path.write_text(config_content)
 
-        runner = Runner()
-        captured_config = None
-
-        def capture_config(config):
-            nonlocal captured_config
-            captured_config = config
-            return MagicMock()
-
-        with (
-            patch.object(runner, "_resolve_model", side_effect=capture_config),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            overrides = ["trainer::max_epochs=5", "model::optimizer::lr=0.1"]
-            runner.run(Stage.FIT, [str(config_path)] + overrides)
-            assert captured_config.get("trainer::max_epochs") == 5
-            assert captured_config.get("model::optimizer::lr") == 0.1
+        overrides = ["trainer::max_epochs=5", "model::optimizer::lr=0.1"]
+        captured_config = load_config(str(config_path), *overrides)
+        assert captured_config.get("trainer::max_epochs") == 5
+        assert captured_config.get("model::optimizer::lr") == 0.1
 
     def test_config_with_references(self, temp_config_dir):
         """Test configuration with Sparkwheel references."""
@@ -245,33 +187,17 @@ data:
 """
         config_path.write_text(config_content)
 
-        runner = Runner()
-        # Capture config to verify values
-        captured_config = None
+        captured_config = load_config(str(config_path))
+        # Raw references (%) remain as strings until resolution
+        # They are expanded when resolved, not during config loading
+        train_metrics = captured_config.get("model::train_metrics")
+        val_metrics_ref = captured_config.get("model::val_metrics")
 
-        def capture_system(config):
-            nonlocal captured_config
-            captured_config = config
-            return MagicMock()
-
-        with (
-            patch.object(runner, "_resolve_model", side_effect=capture_system),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            runner.run(Stage.FIT, [str(config_path)])
-            # Raw references (%) remain as strings until resolution
-            # They are expanded when resolved, not during config loading
-            train_metrics = captured_config.get("model::train_metrics")
-            val_metrics_ref = captured_config.get("model::val_metrics")
-
-            # train_metrics should be the list of metric configs
-            assert train_metrics == [{"_target_": "torchmetrics.MeanSquaredError"}]
-            # val_metrics uses a raw reference (%::) which Sparkwheel normalizes to absolute path
-            # The reference stays as a string until instantiation time
-            assert val_metrics_ref == "%model::train_metrics"
+        # train_metrics should be the list of metric configs
+        assert train_metrics == [{"_target_": "torchmetrics.MeanSquaredError"}]
+        # val_metrics uses a raw reference (%::) which Sparkwheel normalizes to absolute path
+        # The reference stays as a string until instantiation time
+        assert val_metrics_ref == "%model::train_metrics"
 
     def test_config_with_vars(self, temp_config_dir):
         """Test configuration with vars section."""
@@ -302,23 +228,7 @@ data:
 """
         config_path.write_text(config_content)
 
-        runner = Runner()
-        # Capture config to verify values
-        captured_config = None
-
-        def capture_system(config):
-            nonlocal captured_config
-            captured_config = config
-            return MagicMock()
-
-        with (
-            patch.object(runner, "_resolve_model", side_effect=capture_system),
-            patch.object(runner, "_resolve_trainer"),
-            patch.object(runner, "_resolve_datamodule"),
-            patch.object(runner, "_save_config"),
-            patch.object(runner, "_execute"),
-        ):
-            runner.run(Stage.FIT, [str(config_path)])
-            # Vars should be accessible
-            assert captured_config.get("vars::learning_rate") == 0.001
-            assert captured_config.get("vars::batch_size") == 32
+        captured_config = load_config(str(config_path))
+        # Vars should be accessible
+        assert captured_config.get("vars::learning_rate") == 0.001
+        assert captured_config.get("vars::batch_size") == 32
