@@ -39,7 +39,7 @@ model:
 
     optimizer:
         _target_: torch.optim.AdamW
-        params: "$@model::network.parameters()"
+        _mode_: callable  # LighterModule calls it with the model's parameters
         lr: "%vars::lr"
 
     train_metrics:

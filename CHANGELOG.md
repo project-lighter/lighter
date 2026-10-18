@@ -113,3 +113,7 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - CsvWriter ends lines with `\n` on every platform (Windows wrote `\r\n`).
 - If `config.yaml` cannot be written because a dict config holds Python objects, the run warns and continues.
 - The README states Lighter's real size (~1,200 lines); a test keeps `src/lighter` at most 1,400 lines and the README within 10%.
+- `projects/cifar10` and `projects/lora` validated on the test set; they now hold out 10% of the training images
+  for validation, chosen by a fixed `split_seed`, and keep the test set for `lighter test`. With
+  `configs/fake_data.yaml`, CIFAR-10 runs every stage on random images without a download, and CI does so on
+  every pull request. The example configs pass their optimizer and scheduler as `_mode_: callable`.

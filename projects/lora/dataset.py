@@ -17,30 +17,37 @@ class CIFAR100Dataset(Dataset):
 
     Args:
         root: Root directory for dataset.
-        train: Whether to use training set.
+        split: "train" or "val" (disjoint parts of the training images, chosen by `split_seed`), or "test".
         transform: Transform to apply to images.
         download: Whether to download if not present.
+        validation_fraction: Fraction of the training images held out for validation.
+        split_seed: Seed that chooses the validation images; keep it fixed when comparing runs.
     """
 
     def __init__(
         self,
         root: str = "./.datasets/",
-        train: bool = True,
+        split: str = "train",
         transform: Callable | None = None,
         download: bool = True,
+        validation_fraction: float = 0.1,
+        split_seed: int = 42,
     ) -> None:
-        self.dataset = datasets.CIFAR100(
-            root=root,
-            train=train,
-            download=download,
-        )
+        if split not in ("train", "val", "test"):
+            raise ValueError(f"split must be 'train', 'val' or 'test', got {split!r}")
+        self.dataset = datasets.CIFAR100(root=root, train=split != "test", download=download)
         self.transform = transform
+        self.indices = list(range(len(self.dataset)))
+        if split != "test":
+            count = int(len(self.dataset) * validation_fraction)
+            indices = torch.randperm(len(self.dataset), generator=torch.Generator().manual_seed(split_seed)).tolist()
+            self.indices = indices[count:] if split == "train" else indices[:count]
 
     def __len__(self) -> int:
-        return len(self.dataset)
+        return len(self.indices)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        image, label = self.dataset[idx]
+        image, label = self.dataset[self.indices[idx]]
 
         if self.transform:
             image = self.transform(image)

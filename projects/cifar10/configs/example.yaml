@@ -23,7 +23,7 @@ model:
 
     optimizer:
         _target_: torch.optim.Adam
-        params: "$@model::network.parameters()"
+        _mode_: callable  # LighterModule calls it with the model's parameters
         lr: 0.001
         weight_decay: 0.00001
 
@@ -50,7 +50,6 @@ model:
     val_metrics: "%::train_metrics"
     test_metrics: "%::train_metrics"
 
-# NEW: Data configuration using LighterDataModule
 data:
     _target_: lighter.LighterDataModule
 
@@ -61,10 +60,10 @@ data:
         pin_memory: True
         shuffle: True
         dataset:
-            _target_: torchvision.datasets.CIFAR10
+            _target_: project.dataset.cifar10_split
             download: True
             root: ./.datasets/
-            train: True
+            split: train
             transform:
                 _target_: torchvision.transforms.Compose
                 transforms:
@@ -81,10 +80,10 @@ data:
         pin_memory: True
         shuffle: False
         dataset:
-            _target_: torchvision.datasets.CIFAR10
+            _target_: project.dataset.cifar10_split
             download: True
             root: ./.datasets/
-            train: False
+            split: val
             transform:
                 _target_: torchvision.transforms.Compose
                 transforms:
@@ -94,5 +93,16 @@ data:
                       std: [0.5, 0.5, 0.5]
             target_transform: null
 
-    test_dataloader: "%data::val_dataloader"
-    predict_dataloader: "%data::val_dataloader"
+    test_dataloader:
+        _target_: torch.utils.data.DataLoader
+        batch_size: 512
+        num_workers: 2
+        shuffle: False
+        dataset:
+            _target_: project.dataset.cifar10_split
+            download: True
+            root: ./.datasets/
+            split: test
+            transform: "%data::val_dataloader::dataset::transform"
+
+    predict_dataloader: "%data::test_dataloader"

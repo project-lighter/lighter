@@ -1,0 +1,14 @@
+# Random images in place of CIFAR-10, and one batch per stage: checks the whole pipeline without a download.
+#   lighter fit configs/example.yaml configs/fake_data.yaml
+trainer::fast_dev_run: true
+
+=data::train_dataloader::dataset:
+  _target_: torchvision.datasets.FakeData
+  size: 64
+  image_size: [3, 32, 32]
+  num_classes: 10
+  transform:
+    _target_: torchvision.transforms.ToTensor
+
+=data::val_dataloader::dataset: "%data::train_dataloader::dataset"
+=data::test_dataloader::dataset: "%data::train_dataloader::dataset"

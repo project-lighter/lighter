@@ -79,13 +79,13 @@ model:
 
   optimizer:
     _target_: torch.optim.AdamW
-    params: $@model::network.parameters()
+    _mode_: callable  # LighterModule calls it with the model's parameters
     lr: 0.001
     weight_decay: 0.00001
 
   scheduler:
     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-    optimizer: "@model::optimizer"
+    _mode_: callable  # LighterModule calls it with the optimizer
     T_max: 100
 
   train_metrics:
