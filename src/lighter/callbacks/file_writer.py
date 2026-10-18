@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import torchvision
 from pytorch_lightning import LightningModule, Trainer
 
 from lighter.callbacks.base_writer import BaseWriter
@@ -20,27 +19,29 @@ def write_tensor(path: Path, tensor: torch.Tensor, *, suffix: str = ".pt") -> No
     torch.save(tensor, path.with_suffix(suffix))  # nosec B614
 
 
+def _write_png(tensor: torch.Tensor, path: Path) -> None:
+    """Scale a CHW tensor from [0, 1] to uint8 and save it as PNG."""
+    try:
+        from torchvision.io import write_png
+    except ImportError as e:
+        raise ImportError("The image writers need torchvision: pip install torchvision") from e
+    write_png((tensor.float().clamp(0, 1) * 255).to(torch.uint8), str(path))
+
+
 def write_image_2d(path: Path, tensor: torch.Tensor, *, suffix: str = ".png") -> None:
     """Write a 2D tensor as an image using PNG encoding."""
     if tensor.ndim != 3:
         raise ValueError(f"write_image_2d expects a 3D tensor (CHW), got {tensor.ndim} dimensions.")
-    path = path.with_suffix(suffix)
-    # Scale to [0, 255] and convert to uint8
-    tensor = (tensor.float().clamp(0, 1) * 255).to(torch.uint8)
-    torchvision.io.write_png(tensor, str(path))
+    _write_png(tensor, path.with_suffix(suffix))
 
 
 def write_image_3d(path: Path, tensor: torch.Tensor, *, suffix: str = ".png") -> None:
     """Write a 3D tensor as a 2D image by stacking slices vertically."""
     if tensor.ndim != 4:
         raise ValueError(f"write_image_3d expects a 4D tensor (CDHW), got {tensor.ndim} dimensions.")
-    path = path.with_suffix(suffix)
     # CDHW -> C(D*H)W
     shape = tensor.shape
-    tensor = tensor.view(shape[0], shape[1] * shape[2], shape[3])
-    # Scale to [0, 255] and convert to uint8
-    tensor = (tensor.float().clamp(0, 1) * 255).to(torch.uint8)
-    torchvision.io.write_png(tensor, str(path))
+    _write_png(tensor.view(shape[0], shape[1] * shape[2], shape[3]), path.with_suffix(suffix))
 
 
 def write_text(path: Path, value: Any, *, suffix: str = ".txt", encoding: str = "utf-8") -> None:

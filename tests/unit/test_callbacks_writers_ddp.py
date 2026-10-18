@@ -6,13 +6,18 @@ These tests emulate DDP on a single device by mocking the distributed environmen
 import csv
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 import torch
 
 from lighter.callbacks.csv_writer import CsvWriter
 from lighter.callbacks.file_writer import FileWriter
 from lighter.model import LighterModule
+
+
+def read_csv(path):
+    """Read a CSV file into a list of row dicts (all values are strings)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def make_mock_trainer(global_rank=0, world_size=2, is_global_zero=True):
@@ -107,11 +112,11 @@ class TestCsvWriterDDP:
         assert csv_path.exists()
 
         # Verify content
-        df = pd.read_csv(csv_path)
-        assert len(df) == 3
-        assert list(df.columns) == ["pred", "target"]
-        assert df["pred"].tolist() == [1, 2, 3]
-        assert df["target"].tolist() == [4, 5, 6]
+        rows = read_csv(csv_path)
+        assert len(rows) == 3
+        assert list(rows[0]) == ["pred", "target"]
+        assert [r["pred"] for r in rows] == ["1", "2", "3"]
+        assert [r["target"] for r in rows] == ["4", "5", "6"]
 
         # Verify temp file cleaned up
         assert not temp_path.exists()
@@ -160,11 +165,11 @@ class TestCsvWriterDDP:
 
         # Verify final CSV exists and contains data from both ranks
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 3  # 2 from rank 0 + 1 from rank 1
-        assert list(df.columns) == ["pred", "target"]
-        assert sorted(df["pred"].tolist()) == [1, 2, 3]
-        assert sorted(df["target"].tolist()) == [4, 5, 6]
+        rows = read_csv(csv_path)
+        assert len(rows) == 3  # 2 from rank 0 + 1 from rank 1
+        assert list(rows[0]) == ["pred", "target"]
+        assert sorted(r["pred"] for r in rows) == ["1", "2", "3"]
+        assert sorted(r["target"] for r in rows) == ["4", "5", "6"]
 
         # Verify temp files cleaned up (rank 0 is global_zero, so it cleans)
         assert not temp_path_rank0.exists()
@@ -299,9 +304,9 @@ class TestDistributedEdgeCases:
 
         # Final CSV should have only rank 1's data
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 2
-        assert df["pred"].tolist() == [1, 2]
+        rows = read_csv(csv_path)
+        assert len(rows) == 2
+        assert [r["pred"] for r in rows] == ["1", "2"]
 
     def test_csv_writer_handles_none_paths(self, tmp_path, mock_trainer_ddp, mock_system):
         """Test that CSV writer handles None paths in gathered list."""
@@ -330,6 +335,6 @@ class TestDistributedEdgeCases:
 
         # Should still work with None paths filtered out
         assert csv_path.exists()
-        df = pd.read_csv(csv_path)
-        assert len(df) == 2
-        assert df["pred"].tolist() == [1, 2]
+        rows = read_csv(csv_path)
+        assert len(rows) == 2
+        assert [r["pred"] for r in rows] == ["1", "2"]

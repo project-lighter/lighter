@@ -6,6 +6,10 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 ### Changed
 
+- Lighter now depends on six packages: torch, pytorch-lightning, torchmetrics, sparkwheel, pyyaml and cloudpickle.
+  numpy, pandas, requests, loguru, rich, tensorboard and torchvision are no longer installed with it.
+  Migration: `pip install tensorboard` to keep TensorBoard as Lightning's default logger (otherwise it logs CSV),
+  `pip install torchvision` for FileWriter's `image_2d`/`image_3d` writers.
 - The boolean CLI flags (`--weights_only`, `--verbose`, `--return_predictions`) also accept a `--no-` form.
 
 ### Removed
@@ -23,6 +27,8 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 
 ### Fixed
 
+- CsvWriter keeps every value exactly as written (IDs like `00001` no longer become `1`, `NA` is no longer
+  read as missing) and replaces the final file in one step, so a failed merge never leaves a partial file.
 - `numpy` is no longer pinned below 2.0, so Lighter installs next to NumPy 2.
 - Sparkwheel is capped at `<0.1` until Lighter is tested against its next release; the minimum is 0.0.11.
 - `pyyaml` is declared as a dependency (Lighter imports it directly).

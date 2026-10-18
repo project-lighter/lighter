@@ -261,6 +261,8 @@ lighter fit config.yaml --ckpt_path checkpoints/last.ckpt
 
 ### TensorBoard (Default)
 
+Lightning logs to TensorBoard by default when it is installed (`pip install tensorboard`); otherwise it falls back to CSV files.
+
 ```yaml
 trainer:
   logger:

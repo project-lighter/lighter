@@ -1,8 +1,9 @@
 """Unit tests for FileWriter and CsvWriter callbacks."""
 
-from unittest.mock import MagicMock
+import csv
+import sys
+from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 import torch
 
@@ -10,6 +11,12 @@ from lighter.callbacks.base_writer import BaseWriter
 from lighter.callbacks.csv_writer import CsvWriter
 from lighter.callbacks.file_writer import WRITERS, FileWriter
 from lighter.model import LighterModule
+
+
+def read_csv(path):
+    """Read a CSV file into a list of row dicts (all values are strings)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 @pytest.fixture
@@ -428,12 +435,12 @@ class TestCsvWriter:
 
         # Read temp file
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 3
-        assert list(df.columns) == ["pred", "target"]
-        assert df["pred"].tolist() == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
-        assert df["target"].tolist() == [0, 1, 0]
+        assert len(rows) == 3
+        assert list(rows[0]) == ["pred", "target"]
+        assert [float(r["pred"]) for r in rows] == pytest.approx([0.1, 0.2, 0.3], rel=1e-5)
+        assert [r["target"] for r in rows] == ["0", "1", "0"]
 
     def test_write_mixed_types(self, tmp_path, mock_trainer, mock_system):
         """Test writing with mixed data types."""
@@ -452,10 +459,10 @@ class TestCsvWriter:
         writer._csv_file.close()
 
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 2
-        assert df["id"].tolist() == ["sample1", "sample2"]
+        assert len(rows) == 2
+        assert [r["id"] for r in rows] == ["sample1", "sample2"]
 
     def test_write_inconsistent_lengths(self, tmp_path, mock_trainer, mock_system):
         """Test error when outputs have inconsistent lengths."""
@@ -532,8 +539,8 @@ class TestCsvWriter:
 
         # Check final CSV exists
         assert (tmp_path / "results.csv").exists()
-        df = pd.read_csv(tmp_path / "results.csv")
-        assert len(df) == 2
+        rows = read_csv(tmp_path / "results.csv")
+        assert len(rows) == 2
 
         # Check temp file was removed
         temp_file = tmp_path / "results.tmp_rank0.csv"
@@ -581,11 +588,11 @@ class TestCsvWriter:
         writer._csv_file.close()
 
         temp_file = tmp_path / "results.tmp_rank0.csv"
-        df = pd.read_csv(temp_file)
+        rows = read_csv(temp_file)
 
-        assert len(df) == 1
-        assert df["pred"].iloc[0] == 0.95
-        assert df["label"].iloc[0] == "positive"
+        assert len(rows) == 1
+        assert float(rows[0]["pred"]) == pytest.approx(0.95)
+        assert rows[0]["label"] == "positive"
 
     def test_get_record_value_non_sequence(self):
         """Test _get_record_value with non-sequence value."""
@@ -728,3 +735,70 @@ class TestWritersIntegration:
         # Check CsvWriter created temp file
         temp_csv = tmp_path / "results.tmp_rank0.csv"
         assert temp_csv.exists()
+
+
+class TestCsvFidelity:
+    """The merged CSV keeps every field exactly as written and is replaced in one step."""
+
+    def test_fields_are_kept_as_written(self, tmp_path, mock_trainer, mock_system):
+        rows = [
+            ["00001", "NA"],
+            ["900719925474099312345", "NULL"],
+            ["", ""],
+            ["comma,id", 'quoted "label"'],
+            ["line\nbreak", "日本語"],
+        ]
+        path = tmp_path / "predictions.csv"
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": [row[0] for row in rows], "label": [row[1] for row in rows]}, None, 0, 0)
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        with open(path, newline="", encoding="utf-8") as f:
+            assert list(csv.reader(f)) == [["id", "label"], *rows]
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["predictions.csv"]
+
+    def test_no_rows_writes_the_header(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "empty.csv"
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_text(encoding="utf-8").splitlines() == ["id,label"]
+
+    def test_long_text_is_copied_unchanged(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "long.csv"
+        writer = CsvWriter(path, ["id", "text"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": ["0001"], "text": ['line,"quoted"\n日本語' * 20000]}, None, 0, 0)
+        writer._csv_file.flush()
+        shard = writer._temp_path.read_bytes()
+        writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_bytes() == shard
+
+    def test_bad_shard_keeps_the_previous_file(self, tmp_path, mock_trainer, mock_system):
+        path = tmp_path / "predictions.csv"
+        path.write_text("previous complete output\n", encoding="utf-8")
+        other_shard = tmp_path / "other-rank.csv"
+        other_shard.write_text("wrong,header\r\n", encoding="utf-8")
+        writer = CsvWriter(path, ["id", "label"])
+        writer.setup(mock_trainer, mock_system, "predict")
+        writer.write({"id": ["0001"], "label": ["NA"]}, None, 0, 0)
+
+        def gather(paths, local):
+            paths[:] = [local, other_shard]
+
+        with (
+            patch("torch.distributed.is_initialized", return_value=True),
+            patch("torch.distributed.all_gather_object", side_effect=gather),
+            pytest.raises(ValueError, match="does not start with the header"),
+        ):
+            writer.on_predict_epoch_end(mock_trainer, mock_system)
+        assert path.read_text(encoding="utf-8") == "previous complete output\n"
+        assert not (tmp_path / ".predictions.csv.tmp").exists()
+
+
+def test_image_writers_explain_missing_torchvision(tmp_path, monkeypatch):
+    from lighter.callbacks.file_writer import write_image_2d
+
+    monkeypatch.setitem(sys.modules, "torchvision.io", None)
+    with pytest.raises(ImportError, match="pip install torchvision"):
+        write_image_2d(tmp_path / "image", torch.rand(3, 4, 4))

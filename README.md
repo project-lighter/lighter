@@ -44,6 +44,7 @@ lighter fit config.yaml model::optimizer::lr=0.1
 
 ```bash
 pip install lighter
+pip install tensorboard  # optional: Lightning logs to TensorBoard when it is installed, else to CSV
 ```
 
 **Use your existing PyTorch Lightning code:**
