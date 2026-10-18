@@ -42,82 +42,81 @@ lighter fit config.yaml model::learning_rate=0.1
 
 ## Quick Start
 
+Train a small network on random data, on a CPU, in under a minute:
+
 ```bash
 pip install lighter
-pip install tensorboard  # optional: Lightning logs to TensorBoard when it is installed, else to CSV
+git clone --depth 1 https://github.com/project-lighter/lighter
+lighter fit lighter/examples/quickstart/config.yaml
 ```
 
-**Use your existing PyTorch Lightning code.** Put it in a folder with an empty `__lighter__.py`, which tells
-Lighter to import that folder as `project`:
+[`examples/quickstart`](examples/quickstart) is a plain LightningModule, a dataset and a config.
+A `__lighter__.py` file marks the folder, so the config names its code `project.model` and `project.data`.
 
+<!-- examples/quickstart/model.py -->
 ```python
-# model.py (next to __lighter__.py)
-import torch
-import torch.nn.functional as F
 import pytorch_lightning as pl
+import torch
 
-class MyModel(pl.LightningModule):
-    def __init__(self, network, learning_rate=0.001):
+
+class Regressor(pl.LightningModule):
+    def __init__(self, hidden: int = 32, lr: float = 0.01):
         super().__init__()
-        self.network = network
-        self.lr = learning_rate
+        self.net = torch.nn.Sequential(torch.nn.Linear(8, hidden), torch.nn.ReLU(), torch.nn.Linear(hidden, 1))
+        self.lr = lr
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        loss = F.cross_entropy(self.network(x), y)
-        self.log("train/loss", loss)
+        loss = torch.nn.functional.mse_loss(self.net(x), y)
+        self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 ```
 
-**Configure in YAML instead of hardcoding:**
+<!-- examples/quickstart/data.py -->
+```python
+import torch
 
+
+class RandomData(torch.utils.data.TensorDataset):
+    """Random inputs x and targets y = sum(x), which a small network learns in seconds."""
+
+    def __init__(self, size: int = 1024):
+        x = torch.randn(size, 8)
+        super().__init__(x, x.sum(dim=1, keepdim=True))
+```
+
+<!-- examples/quickstart/config.yaml -->
 ```yaml
-# config.yaml
 trainer:
   _target_: pytorch_lightning.Trainer
   max_epochs: 10
 
 model:
-  _target_: project.model.MyModel
-  network:
-    _target_: torchvision.models.resnet18
-    num_classes: 10
-  learning_rate: 0.001
+  _target_: project.model.Regressor
+  hidden: 32
+  lr: 0.01
 
 data:
   _target_: lighter.LighterDataModule
   train_dataloader:
     _target_: torch.utils.data.DataLoader
-    batch_size: 32
+    batch_size: 16
+    shuffle: true
     dataset:
-      _target_: torchvision.datasets.CIFAR10
-      root: ./data
-      train: true
-      download: true
-      transform:
-        _target_: torchvision.transforms.ToTensor
+      _target_: project.data.RandomData
 ```
 
-**Run and iterate fast:**
+Lighter builds each `_target_` with the keys below it as arguments and calls `trainer.fit(model, datamodule=data)`.
+Change any value from the command line, without editing a file:
 
 ```bash
-# Run your experiment
-lighter fit config.yaml
-
-# Try different hyperparameters - no code editing needed
-lighter fit config.yaml model::learning_rate=0.01
-lighter fit config.yaml trainer::max_epochs=50
-lighter fit config.yaml data::train_dataloader::batch_size=64
-
-# Use multiple GPUs
-lighter fit config.yaml trainer::devices=4
-
-# Every run logs to a new lightning_logs/version_N/ folder, with the config it ran
-# lightning_logs/version_0/config.yaml
+lighter fit lighter/examples/quickstart/config.yaml model::lr=0.001 trainer::max_epochs=20
 ```
+
+Each run writes to a new `lightning_logs/version_N/` folder, with the config it ran saved as `config.yaml`.
 
 ## Key Benefits
 

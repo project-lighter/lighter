@@ -32,6 +32,9 @@ All notable changes to Lighter are listed here. Breaking changes come with a one
 - A step that returns something other than a loss tensor, a number, a dict with a `"loss"` key or None
   (e.g. a tuple) warns that no loss is logged.
 
+- `examples/quickstart`: a plain LightningModule, a dataset of random numbers and a config that train on a CPU in
+  seconds, with no download. The README and the docs show these files, and a test runs them.
+
 ### Changed
 
 - Lighter now depends on six packages: torch, pytorch-lightning, torchmetrics, sparkwheel, pyyaml and cloudpickle.

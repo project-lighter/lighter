@@ -1,0 +1,17 @@
+trainer:
+  _target_: pytorch_lightning.Trainer
+  max_epochs: 10
+
+model:
+  _target_: project.model.Regressor
+  hidden: 32
+  lr: 0.01
+
+data:
+  _target_: lighter.LighterDataModule
+  train_dataloader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 16
+    shuffle: true
+    dataset:
+      _target_: project.data.RandomData
